@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PYTHONPATH=\"D:\\\\backup\\\\BaoBao\\\\PythonProgram\\\\xauusd\" python *)",
+      "Bash(python *)"
+    ]
+  }
+}

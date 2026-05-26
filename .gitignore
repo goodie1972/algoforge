@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+logs/
+*.log
+*.ex4
+*.ex5
