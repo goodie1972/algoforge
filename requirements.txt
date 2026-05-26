@@ -1,0 +1,6 @@
+# 核心依赖
+metaapi-cloud-sdk>=9.0.0
+
+# 回测
+pandas>=2.0.0
+numpy>=1.24.0
