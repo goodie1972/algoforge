@@ -6,3 +6,9 @@ logs/
 *.log
 *.ex4
 *.ex5
+node_modules/
+dist/
+.claude/
+.engine_pid
+.playwright-mcp/
+runtime_config.json

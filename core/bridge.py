@@ -114,10 +114,16 @@ class MT4BridgeBase(abc.ABC):
         """修改止损止盈"""
         ...
 
-    def takeover_existing_positions(self, symbol: str = None) -> list[Position]:
-        """接管现有持仓 - 启动时调用"""
+    def send_heartbeat(self) -> bool:
+        """发送心跳保持连接（可选实现，默认 True）"""
+        return True
+
+    def takeover_existing_positions(self, symbol: str = None, magic: int = 0) -> list[Position]:
+        """接管现有持仓 - 启动时调用，可选按 magic 过滤"""
         positions = self.get_positions(symbol)
-        logger.info(f"[持仓接管] 发现 {len(positions)} 个现有持仓:")
+        if magic:
+            positions = [p for p in positions if p.magic == magic]
+        logger.info(f"[持仓接管] Magic={magic} 发现 {len(positions)} 个现有持仓:")
         for pos in positions:
             logger.info(
                 f"  Ticket={pos.ticket} {pos.order_type} "

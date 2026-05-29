@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, Position, OrderType
-from config.settings import SYMBOL, LOT_SIZE, TIMEFRAME
+import config.settings as _settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +17,17 @@ class BaseStrategy(abc.ABC):
 
     name = "base"
 
-    def __init__(self, bridge: MT4BridgeBase):
+    def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         self.bridge = bridge
-        self.symbol = SYMBOL
-        self.timeframe = TIMEFRAME
+        self.symbol = _settings.SYMBOL
+        self.magic = magic or _settings.MAGIC_NUMBER
+        self.timeframe = timeframe or _settings.TIMEFRAME
         self.candles: list[Candle] = []
 
     def refresh_data(self, count: int = 200):
-        """刷新K线数据"""
-        self.candles = self.bridge.get_candles(self.symbol, self.timeframe, count)
+        """刷新K线数据，转为时间顺序（旧→新）"""
+        raw = self.bridge.get_candles(self.symbol, self.timeframe, count)
+        self.candles = list(reversed(raw))
 
     def get_close_prices(self) -> list[float]:
         """获取收盘价序列"""
@@ -53,6 +55,10 @@ class BaseStrategy(abc.ABC):
         if signal:
             return f"信号: {signal.value}"
         return None
+
+    def reload_config(self):
+        """热重载配置参数，子类覆盖（不覆盖 magic/timeframe，它们由 STRATEGY_POOL 管理）"""
+        self.symbol = _settings.SYMBOL
 
     def filter_positions(self, positions: list[Position]) -> dict:
         """统计当前品种的多空持仓"""

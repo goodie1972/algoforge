@@ -1,0 +1,28 @@
+{
+  "name": "xauusd-dashboard",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.7",
+    "lightweight-charts": "^4.1.3",
+    "axios": "^1.7.0",
+    "naive-ui": "^2.41.0",
+    "@vicons/ionicons5": "^0.13.0",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "typescript": "~5.4.0",
+    "vite": "^5.2.0",
+    "vue-tsc": "^2.0.6",
+    "@types/node": "^20.11.0"
+  }
+}

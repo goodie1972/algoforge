@@ -1,0 +1,138 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useConfigStore } from '@/stores/config'
+import { useMessage } from 'naive-ui'
+
+const store = useConfigStore()
+const message = useMessage()
+
+const pool = ref<Record<string, any>>({})
+const expanded = ref<Set<string>>(new Set())
+
+onMounted(async () => {
+  await store.fetchConfig()
+  pool.value = { ...(store.items.strategy_pool || {}) }
+})
+
+function toggleStrategy(name: string) {
+  if (pool.value[name]) {
+    delete pool.value[name]
+  } else {
+    pool.value[name] = {
+      enabled: true,
+      magic: name === 'stoch_bollinger' ? 888888 : 777777,
+      timeframe: name === 'stoch_bollinger' ? 'H4' : 'H1',
+      double_first: true,
+      max_positions: 2,
+    }
+  }
+  pool.value = { ...pool.value }
+}
+
+function isEnabled(name: string) {
+  return !!pool.value[name]
+}
+
+function toggleExpand(name: string) {
+  if (expanded.value.has(name)) {
+    expanded.value.delete(name)
+  } else {
+    expanded.value.add(name)
+  }
+  expanded.value = new Set(expanded.value)
+}
+
+function isExpanded(name: string) {
+  return expanded.value.has(name)
+}
+
+async function updatePoolParam(name: string, key: string, value: any) {
+  if (!pool.value[name]) return
+  pool.value[name] = { ...pool.value[name], [key]: value }
+  pool.value = { ...pool.value }
+}
+
+async function savePool() {
+  try {
+    await store.updateStrategyPool(pool.value)
+    message.success('策略池已保存，重启引擎后生效')
+  } catch (e: any) {
+    message.error('保存失败: ' + (e.message || '未知错误'))
+  }
+}
+
+const strategyOptions = [
+  { label: '双均线 (Double MA)', value: 'double_ma' },
+  { label: 'ATR 突破', value: 'atr_breakout' },
+  { label: '双均线+ATR 双确认', value: 'combined' },
+  { label: 'RSI+布林带 均值回归', value: 'rsi_bollinger' },
+  { label: 'Stoch+布林带 均值回归', value: 'stoch_bollinger' },
+]
+
+const timeframeOptions = [
+  { label: 'M1', value: 'M1' }, { label: 'M5', value: 'M5' },
+  { label: 'M15', value: 'M15' }, { label: 'M30', value: 'M30' },
+  { label: 'H1', value: 'H1' }, { label: 'H4', value: 'H4' },
+  { label: 'D1', value: 'D1' },
+]
+</script>
+
+<template>
+  <n-space vertical size="large">
+    <n-alert type="info" :bordered="false">
+      策略池：勾选要运行的策略，展开可设置各策略的独立参数。保存后重启引擎生效。
+    </n-alert>
+
+    <div v-for="opt in strategyOptions" :key="opt.value"
+      style="border: 1px solid var(--n-border-color); border-radius: 8px; overflow: hidden;">
+      <div style="display: flex; align-items: center; padding: 8px 12px;
+        background: isEnabled(opt.value) ? 'var(--n-color-pressed)' : 'transparent';
+        cursor: pointer;" @click="toggleExpand(opt.value)">
+        <n-checkbox :checked="isEnabled(opt.value)"
+          @update:checked="() => toggleStrategy(opt.value)"
+          @click.stop />
+        <span style="flex: 1; margin-left: 8px; font-weight: 500;">{{ opt.label }}</span>
+        <n-tag v-if="isEnabled(opt.value)" type="success" size="small">已启用</n-tag>
+        <n-tag v-else type="default" size="small">未启用</n-tag>
+        <n-button text size="tiny" style="margin-left: 8px;">
+          {{ isExpanded(opt.value) ? '收起' : '展开' }}
+        </n-button>
+      </div>
+
+      <!-- 展开的策略配置 -->
+      <div v-if="isExpanded(opt.value) && isEnabled(opt.value)"
+        style="padding: 12px 16px; border-top: 1px solid var(--n-border-color);">
+        <n-grid :cols="3" :x-gap="12" :y-gap="8">
+          <n-grid-item>
+            <n-form-item label="Magic Number" :label-placement="'top'">
+              <n-input-number v-model:value="pool[opt.value].magic" :min="100000" :max="999999"
+                @update:value="(v: any) => updatePoolParam(opt.value, 'magic', v)" style="width:100%;" />
+            </n-form-item>
+          </n-grid-item>
+          <n-grid-item>
+            <n-form-item label="时间周期" :label-placement="'top'">
+              <n-select v-model:value="pool[opt.value].timeframe" :options="timeframeOptions"
+                @update:value="(v: string) => updatePoolParam(opt.value, 'timeframe', v)" />
+            </n-form-item>
+          </n-grid-item>
+          <n-grid-item>
+            <n-form-item label="最大持仓" :label-placement="'top'">
+              <n-input-number v-model:value="pool[opt.value].max_positions" :min="1" :max="5"
+                @update:value="(v: any) => updatePoolParam(opt.value, 'max_positions', v)" style="width:100%;" />
+            </n-form-item>
+          </n-grid-item>
+          <n-grid-item>
+            <n-form-item label="双倍首单" :label-placement="'top'">
+              <n-switch v-model:value="pool[opt.value].double_first"
+                @update:value="(v: boolean) => updatePoolParam(opt.value, 'double_first', v)" />
+            </n-form-item>
+          </n-grid-item>
+        </n-grid>
+      </div>
+    </div>
+
+    <n-button type="primary" @click="savePool" block>
+      保存策略池配置
+    </n-button>
+  </n-space>
+</template>

@@ -1,0 +1,16 @@
+/* 全局覆盖 - Naive UI 深色主题微调 */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 自定义 scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3d4149; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* 价格颜色 */
+.price-up { color: #0ecb81 !important; }
+.price-down { color: #f6465d !important; }
+.price-gold { color: #f0b90b !important; }
