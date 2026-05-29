@@ -1,0 +1,53 @@
+"""
+/api/market 路由 - 行情数据
+"""
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
+
+from config import settings
+
+router = APIRouter(prefix="/api/market", tags=["market"])
+
+engine_runner = None
+
+
+@router.get("/price")
+async def get_price():
+    """获取当前买卖价"""
+    if not engine_runner or not engine_runner.bridge:
+        return {"bid": 0, "ask": 0, "spread": 0, "symbol": settings.SYMBOL}
+    try:
+        bid, ask = engine_runner.bridge.get_tick_price(settings.SYMBOL)
+        return {
+            "bid": bid,
+            "ask": ask,
+            "spread": round(ask - bid, 2),
+            "symbol": settings.SYMBOL,
+        }
+    except Exception as e:
+        raise HTTPException(502, f"获取价格失败: {e}")
+
+
+@router.get("/candles")
+async def get_candles(
+    timeframe: str = Query(default=settings.TIMEFRAME),
+    count: int = Query(default=100, le=1000, ge=10),
+):
+    """获取 K 线数据"""
+    if not engine_runner or not engine_runner.bridge:
+        return []
+    try:
+        candles = engine_runner.bridge.get_candles(settings.SYMBOL, timeframe, count)
+        return [
+            {
+                "time": c.time,
+                "open": c.open,
+                "high": c.high,
+                "low": c.low,
+                "close": c.close,
+                "volume": c.volume,
+            }
+            for c in candles
+        ]
+    except Exception as e:
+        raise HTTPException(502, f"获取 K 线失败: {e}")

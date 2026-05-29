@@ -81,14 +81,16 @@ class PyTraderBridge(MT4BridgeBase):
                 # 去掉结尾的 !
                 return text[:-1]
 
-    def _send_cmd(self, cmd: str) -> Optional[list]:
+    def _send_cmd(self, cmd: str, _retry: bool = True) -> Optional[list]:
         """
         发送命令并解析响应
         格式: 发送 F001#0#!  -> 接收 F001#OK#data1#data2#!
         返回: ['#' 分隔的字段列表，不含 F-code 和 OK/ERROR 头]
         """
         if not self._connected or not self._sock:
-            logger.error("[PyTrader] 未连接")
+            logger.warning("[PyTrader] 连接已断开，尝试重连...")
+            if _retry and self.connect():
+                return self._send_cmd(cmd, _retry=False)
             return None
         try:
             full_cmd = cmd + "!"
@@ -116,16 +118,28 @@ class PyTraderBridge(MT4BridgeBase):
         except socket.timeout:
             logger.error(f"[PyTrader] 超时: {cmd.split('#')[0]}")
             self._connected = False
+            if _retry:
+                logger.warning("[PyTrader] 超时后尝试重连...")
+                if self.connect():
+                    return self._send_cmd(cmd, _retry=False)
             return None
         except Exception as e:
             logger.error(f"[PyTrader] 通信错误: {e}")
             self._connected = False
+            if _retry:
+                logger.warning("[PyTrader] 断线重连中...")
+                if self.connect():
+                    return self._send_cmd(cmd, _retry=False)
             return None
 
     def _check_alive(self) -> bool:
         """心跳检测 F000#0#"""
         data = self._send_cmd("F000#0#")
         return data is not None
+
+    def send_heartbeat(self) -> bool:
+        """公开心跳方法，用于主循环保活"""
+        return self._check_alive()
 
     # ======================== 账户信息 ========================
 
