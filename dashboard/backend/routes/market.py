@@ -39,6 +39,8 @@ async def get_candles(
         return []
     try:
         candles = await run_bridge(engine_runner.bridge.get_candles, settings.SYMBOL, timeframe, count)
+        # MT4 返回最新在前，lightweight-charts 要求最旧在前
+        candles = list(reversed(candles))
         return [
             {
                 "time": int(c.time),
