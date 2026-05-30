@@ -1,5 +1,5 @@
 """
-MT4 桥接层 - 统一接口，支持 PyTrader（本地）和 MetaApi（云端）两种模式
+MT4 桥接层 - 统一接口，支持 FreeMT4 Bridge（本地）和 MetaApi（云端）两种模式
 """
 
 import abc
@@ -135,9 +135,9 @@ class MT4BridgeBase(abc.ABC):
 
 def create_bridge() -> MT4BridgeBase:
     """工厂方法：根据配置创建桥接实例"""
-    if MT4_MODE == "pytrader":
-        from core.pytrader_bridge import PyTraderBridge
-        return PyTraderBridge()
+    if MT4_MODE == "freemt4":
+        from core.freemt4_bridge import FreeMT4Bridge
+        return FreeMT4Bridge()
     elif MT4_MODE == "metaapi":
         from core.metaapi_bridge import MetaApiBridge
         return MetaApiBridge()

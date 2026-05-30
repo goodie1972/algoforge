@@ -1,6 +1,6 @@
 """
 MT4 导出 K线数据到 CSV
-需要 MT4 终端运行中 + PyTrader 已连接
+需要 MT4 终端运行中 + FreeMT4 Bridge 已连接
 用法: python tools/export_history.py
 """
 

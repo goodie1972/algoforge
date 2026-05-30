@@ -12,13 +12,14 @@ def reload():
 
 
 # ============================================================
-# MT4 连接配置 (PyTrader 方式 - 本地 MT4 桥接)
+# MT4 连接配置 (FreeMT4 Bridge - 本地 MT4 Socket 桥接)
+# EA 源码: tools/FreeMT4Bridge.mq4
 # ============================================================
-MT4_MODE = "pytrader"  # "pytrader" | "metaapi"
+MT4_MODE = "freemt4"  # "freemt4" | "metaapi"
 
-# PyTrader 配置 (本地 MT4 + EA 桥接)
-PYTRADER_HOST = "127.0.0.1"
-PYTRADER_PORT = 23232  # PyTrader EA 监听的端口
+# FreeMT4 Bridge 配置 (本地 MT4 + EA 桥接)
+FREEMT4_HOST = "127.0.0.1"
+FREEMT4_PORT = 23232  # FreeMT4Bridge EA 监听的端口
 
 # MetaApi 配置 (云服务方式，如选用)
 METAAPI_TOKEN = ""  # metaapi.cloud 的 API token
