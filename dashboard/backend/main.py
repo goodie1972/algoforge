@@ -59,7 +59,7 @@ async def broadcast_prices():
     while PollerState.running:
         try:
             if engine_runner.is_running and engine_runner.bridge:
-                bid, ask = engine_runner.bridge.get_tick_price("XAUUSD")
+                bid, ask = await asyncio.to_thread(engine_runner.bridge.get_tick_price, "XAUUSD")
                 if bid > 0:
                     await ws_manager.broadcast("prices", {
                         "bid": bid,
@@ -76,7 +76,7 @@ async def broadcast_positions():
     while PollerState.running:
         try:
             if engine_runner.is_running and engine_runner.bridge:
-                positions = engine_runner.bridge.get_positions("XAUUSD")
+                positions = await asyncio.to_thread(engine_runner.bridge.get_positions, "XAUUSD")
                 pos_list = [
                     {
                         "ticket": p.ticket,
@@ -101,7 +101,7 @@ async def broadcast_account():
     while PollerState.running:
         try:
             if engine_runner.is_running and engine_runner.bridge:
-                info = engine_runner.bridge.get_account_info()
+                info = await asyncio.to_thread(engine_runner.bridge.get_account_info)
                 if info:
                     await ws_manager.broadcast("account", {
                         "login": info.login,

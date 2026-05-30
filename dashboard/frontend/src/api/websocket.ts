@@ -11,7 +11,7 @@ class WebSocketClient {
   private shouldReconnect = true
   private url = ''
 
-  connect(url = `ws://${location.hostname}:8000/ws`) {
+  connect(url = `/ws`) {
     this.url = url
     this.shouldReconnect = true
     this._connect()

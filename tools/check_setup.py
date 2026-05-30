@@ -52,7 +52,7 @@ def check_project_files():
         "main.py",
         "config/settings.py",
         "core/bridge.py",
-        "core/pytrader_bridge.py",
+        "core/freemt4_bridge.py",
         "strategies/double_ma.py",
         "strategies/atr_breakout.py",
         "backtest/run_backtest.py",
@@ -95,24 +95,24 @@ def check_mt4():
     return False
 
 
-def check_pytrader_ea():
+def check_freemt4_ea():
     print(f"\n{'='*50}")
-    print("PyTrader EA 检测:")
+    print("FreeMT4 Bridge EA 检测:")
     import socket
-    from config.settings import PYTRADER_HOST, PYTRADER_PORT
+    from config.settings import FREEMT4_HOST, FREEMT4_PORT
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(3)
-        s.connect((PYTRADER_HOST, PYTRADER_PORT))
+        s.connect((FREEMT4_HOST, FREEMT4_PORT))
         s.close()
-        print(f"  [OK] PyTrader EA 正在监听 {PYTRADER_HOST}:{PYTRADER_PORT}")
+        print(f"  [OK] FreeMT4 EA 正在监听 {FREEMT4_HOST}:{FREEMT4_PORT}")
         return True
     except Exception:
-        print(f"  [NOT RUNNING] 无法连接 {PYTRADER_HOST}:{PYTRADER_PORT}")
+        print(f"  [NOT RUNNING] 无法连接 {FREEMT4_HOST}:{FREEMT4_PORT}")
         print("  请确认:")
         print("    1. MT4 已运行")
-        print("    2. PyTrader EA 已加载到图表上")
-        print("    3. EA 端口配置与 config/settings.py 一致 (默认 9988)")
+        print("    2. FreeMT4Bridge EA 已加载到图表上")
+        print("    3. EA 端口配置与 config/settings.py 一致 (默认 23232)")
         return False
 
 
@@ -144,7 +144,7 @@ def main():
         "依赖包": check_dependencies(),
         "项目文件": check_project_files(),
         "MT4 终端": check_mt4(),
-        "PyTrader EA": check_pytrader_ea(),
+        "FreeMT4 Bridge EA": check_freemt4_ea(),
         "回测数据": check_backtest_data(),
     }
 
@@ -157,14 +157,14 @@ def main():
 
     # 给出下一步建议
     mt4_ok = results.get("MT4 终端", False)
-    pytrader_ok = results.get("PyTrader EA", False)
+    freemt4_ok = results.get("FreeMT4 Bridge EA", False)
     data_ok = results.get("回测数据", False)
 
     print(f"\n{'='*50}")
     if not mt4_ok:
         print("  下一步: 请先安装 MT4 终端")
-    elif not pytrader_ok:
-        print("  下一步: 请在 MT4 中加载 PyTrader EA")
+    elif not freemt4_ok:
+        print("  下一步: 请在 MT4 中加载 FreeMT4Bridge EA")
     elif not data_ok:
         print("  下一步: 从 MT4 导出历史数据到 data/ 目录")
     else:

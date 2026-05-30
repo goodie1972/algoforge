@@ -240,6 +240,43 @@ def signal_rsi_bollinger(candles, i, state):
     return None
 
 
+def signal_rsi_cross_bollinger(candles, i, state):
+    """RSI 双线交叉 + 布林带: 快慢线交叉 + 价格触轨"""
+    period = state.get("bb_period", BB_PERIOD)
+    rsi_fast = state.get("rsi_fast", 3)
+    rsi_slow = state.get("rsi_slow", 13)
+
+    if i < max(period, rsi_slow) + 5:
+        return None
+
+    sma, bandwidth, std_val = calc_bb(candles[:i+1], period, BB_STD)
+    curr_fast = calc_rsi(candles[:i+1], rsi_fast)
+    curr_slow = calc_rsi(candles[:i+1], rsi_slow)
+    if sma is None or curr_fast is None or curr_slow is None or bandwidth is None:
+        return None
+
+    current_close = float(candles[i].close)
+    lower = sma - bandwidth
+    upper = sma + bandwidth
+
+    prev_fast = state.get("_prev_fast")
+    prev_slow = state.get("_prev_slow")
+    state["_prev_fast"] = curr_fast
+    state["_prev_slow"] = curr_slow
+
+    if prev_fast is None or prev_slow is None:
+        return None
+
+    golden = prev_fast <= prev_slow and curr_fast > curr_slow
+    death = prev_fast >= prev_slow and curr_fast < curr_slow
+
+    if golden and current_close <= lower:
+        return ("BUY", OrderType.BUY)
+    if death and current_close >= upper:
+        return ("SELL", OrderType.SELL)
+    return None
+
+
 def signal_stoch_bollinger(candles, i, state):
     """Stoch + 布林带: 超卖金叉/超买死叉"""
     oversold = state.get("stoch_oversold", 20)
@@ -296,6 +333,7 @@ SIGNAL_REGISTRY = {
     "atr_breakout": signal_atr_breakout,
     "combined": signal_combined,
     "rsi_bollinger": signal_rsi_bollinger,
+    "rsi_cross_bollinger": signal_rsi_cross_bollinger,
     "stoch_bollinger": signal_stoch_bollinger,
 }
 
@@ -588,6 +626,14 @@ def get_variants():
                            exit_rr=2.0, signal_params={"rsi_oversold": 30, "rsi_overbought": 70}))
     v.append(VariantConfig("RSIBB_基线_ATR止损", "rsi_bollinger", exit_mode="atr_trail", sl_mode="bb_035",
                            signal_params={"rsi_oversold": 30, "rsi_overbought": 70}))
+
+    # ---- RSI 双线交叉 + 布林带 ----
+    v.append(VariantConfig("RSI交叉_3x13", "rsi_cross_bollinger", exit_mode="ma_trail", sl_mode="bb_035",
+                           signal_params={"rsi_fast": 3, "rsi_slow": 13}))
+    v.append(VariantConfig("RSI交叉_3x21", "rsi_cross_bollinger", exit_mode="ma_trail", sl_mode="bb_035",
+                           signal_params={"rsi_fast": 3, "rsi_slow": 21}))
+    v.append(VariantConfig("RSI交叉_5x13", "rsi_cross_bollinger", exit_mode="ma_trail", sl_mode="bb_035",
+                           signal_params={"rsi_fast": 5, "rsi_slow": 13}))
 
     # ---- Stoch + 布林带 ----
     v.append(VariantConfig("Stoch_MA止损(当前实盘)", "stoch_bollinger", exit_mode="ma_trail", sl_mode="bb_035",
