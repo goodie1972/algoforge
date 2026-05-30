@@ -5,10 +5,18 @@ import asyncio
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+
+# 专用单线程执行器 — 所有 MT4 桥接调用串行化，避免共享线程池被锁竞争耗尽
+_bridge_executor = ThreadPoolExecutor(max_workers=4)
+
+async def run_bridge(func, *args):
+    """在专用线程中执行桥接调用，不占用 asyncio 默认线程池"""
+    return await asyncio.get_running_loop().run_in_executor(_bridge_executor, func, *args)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
@@ -42,9 +50,12 @@ from dashboard.backend.routes import news as route_news
 
 route_engine.engine_runner = engine_runner
 route_account.engine_runner = engine_runner
+route_account.run_bridge = run_bridge
 route_positions.engine_runner = engine_runner
+route_positions.run_bridge = run_bridge
 route_config.config_service = config_service
 route_market.engine_runner = engine_runner
+route_market.run_bridge = run_bridge
 route_logs.log_handler = log_handler
 
 
@@ -59,7 +70,7 @@ async def broadcast_prices():
     while PollerState.running:
         try:
             if engine_runner.is_running and engine_runner.bridge:
-                bid, ask = await asyncio.to_thread(engine_runner.bridge.get_tick_price, "XAUUSD")
+                bid, ask = await run_bridge(engine_runner.bridge.get_tick_price, "XAUUSD")
                 if bid > 0:
                     await ws_manager.broadcast("prices", {
                         "bid": bid,
@@ -76,7 +87,7 @@ async def broadcast_positions():
     while PollerState.running:
         try:
             if engine_runner.is_running and engine_runner.bridge:
-                positions = await asyncio.to_thread(engine_runner.bridge.get_positions, "XAUUSD")
+                positions = await run_bridge(engine_runner.bridge.get_positions, "XAUUSD")
                 pos_list = [
                     {
                         "ticket": p.ticket,
@@ -101,7 +112,7 @@ async def broadcast_account():
     while PollerState.running:
         try:
             if engine_runner.is_running and engine_runner.bridge:
-                info = await asyncio.to_thread(engine_runner.bridge.get_account_info)
+                info = await run_bridge(engine_runner.bridge.get_account_info)
                 if info:
                     await ws_manager.broadcast("account", {
                         "login": info.login,

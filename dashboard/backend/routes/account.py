@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter(prefix="/api/account", tags=["account"])
 
 engine_runner = None
+run_bridge = None
 
 
 @router.get("")
@@ -14,7 +15,7 @@ async def get_account():
     if not engine_runner or not engine_runner.bridge:
         return None
     try:
-        info = engine_runner.bridge.get_account_info()
+        info = await run_bridge(engine_runner.bridge.get_account_info)
         if not info:
             return None
         return {

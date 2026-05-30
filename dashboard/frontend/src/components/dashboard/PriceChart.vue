@@ -91,17 +91,14 @@ function switchTf(tf: string) {
       <n-gi><n-text depth="3">中间价</n-text> <span class="price-gold"><strong>{{ store.midPrice.toFixed(2) }}</strong></span></n-gi>
     </n-grid>
 
-    <!-- 加载态 -->
-    <div v-if="store.loading" style="height: 400px; display: flex; align-items: center; justify-content: center;">
-      <n-spin size="large" />
+    <!-- 图表容器始终渲染，加载/空态用覆盖层 -->
+    <div ref="chartContainer" style="width: 100%; height: 400px; position: relative;">
+      <div v-if="store.loading" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a1d23; z-index: 1;">
+        <n-spin size="large" />
+      </div>
+      <div v-else-if="!store.loading && store.candles.length === 0" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a1d23; z-index: 1;">
+        <n-result status="info" title="暂无数据" description="连接 MT4 后自动加载 K 线数据" size="small" />
+      </div>
     </div>
-
-    <!-- 空态 -->
-    <div v-else-if="store.candles.length === 0" style="height: 400px; display: flex; align-items: center; justify-content: center;">
-      <n-result status="info" title="暂无数据" description="连接 MT4 后自动加载 K 线数据" size="small" />
-    </div>
-
-    <!-- 图表 -->
-    <div v-else ref="chartContainer" style="width: 100%; height: 400px;"></div>
   </n-card>
 </template>
