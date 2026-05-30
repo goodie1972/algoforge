@@ -10,6 +10,7 @@ from config import settings
 router = APIRouter(prefix="/api/positions", tags=["positions"])
 
 engine_runner = None
+run_bridge = None
 
 
 class CloseRequest(BaseModel):
@@ -47,7 +48,7 @@ async def get_positions(symbol: Optional[str] = None):
         return []
     try:
         sym = symbol or settings.SYMBOL
-        positions = engine_runner.bridge.get_positions(sym)
+        positions = await run_bridge(engine_runner.bridge.get_positions, sym)
         return [_pos_to_dict(p) for p in positions]
     except Exception as e:
         raise HTTPException(502, f"获取持仓失败: {e}")
@@ -60,7 +61,7 @@ async def close_position(ticket: int, req: CloseRequest = None):
         raise HTTPException(503, "桥接器未连接")
     try:
         volume = req.volume if req and req.volume else 0
-        ok = engine_runner.bridge.close_order(ticket, volume)
+        ok = await run_bridge(engine_runner.bridge.close_order, ticket, volume)
         if not ok:
             raise HTTPException(404, f"平仓失败，订单 {ticket} 可能已不存在")
         return {"message": f"订单 {ticket} 已平仓", "ticket": ticket}
@@ -78,7 +79,7 @@ async def modify_position(ticket: int, req: ModifyRequest):
     try:
         sl = req.sl or 0
         tp = req.tp or 0
-        ok = engine_runner.bridge.modify_order(ticket, sl, tp)
+        ok = await run_bridge(engine_runner.bridge.modify_order, ticket, sl, tp)
         if not ok:
             raise HTTPException(404, f"修改失败，订单 {ticket} 可能已不存在")
         return {"message": f"订单 {ticket} 已修改", "ticket": ticket, "sl": sl, "tp": tp}

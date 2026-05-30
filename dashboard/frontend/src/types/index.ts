@@ -27,7 +27,7 @@ export interface Position {
 }
 
 export interface Candle {
-  time: string
+  time: number
   open: number
   high: number
   low: number

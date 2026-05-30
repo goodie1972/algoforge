@@ -9,6 +9,7 @@ from config import settings
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 engine_runner = None
+run_bridge = None
 
 
 @router.get("/price")
@@ -17,7 +18,7 @@ async def get_price():
     if not engine_runner or not engine_runner.bridge:
         return {"bid": 0, "ask": 0, "spread": 0, "symbol": settings.SYMBOL}
     try:
-        bid, ask = engine_runner.bridge.get_tick_price(settings.SYMBOL)
+        bid, ask = await run_bridge(engine_runner.bridge.get_tick_price, settings.SYMBOL)
         return {
             "bid": bid,
             "ask": ask,
@@ -37,10 +38,10 @@ async def get_candles(
     if not engine_runner or not engine_runner.bridge:
         return []
     try:
-        candles = engine_runner.bridge.get_candles(settings.SYMBOL, timeframe, count)
+        candles = await run_bridge(engine_runner.bridge.get_candles, settings.SYMBOL, timeframe, count)
         return [
             {
-                "time": c.time,
+                "time": int(c.time),
                 "open": c.open,
                 "high": c.high,
                 "low": c.low,

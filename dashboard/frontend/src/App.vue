@@ -46,12 +46,9 @@ async function checkEngineStatus() {
 }
 
 onMounted(() => {
+  // WebSocket 推送覆盖大部分数据，仅需少量 REST 初始加载
   accountStore.fetch()
-  positionStore.fetch()
-  priceStore.fetchPrice()
-  priceStore.fetchCandles()
   logStore.fetchHistory()
-  checkEngineStatus()
 
   wsClient.connect()
   wsClient.on('prices', (msg) => priceStore.updateTick(msg.data.bid, msg.data.ask))
@@ -61,8 +58,6 @@ onMounted(() => {
   wsClient.on('status', (msg) => {
     engineStatus.value = msg.data?.status === 'running' ? 'running' : 'stopped'
   })
-
-  priceStore._pollTimer = setInterval(() => priceStore.fetchPrice(), 5000)
 })
 
 onUnmounted(() => {
