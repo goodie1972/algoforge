@@ -34,7 +34,26 @@ SLIPPAGE = 30               # 最大滑点（points）
 
 # 风控
 MAX_POSITIONS = 2           # 最大同时持仓数（双倍首单，每次开2张）
-MAX_DAILY_LOSS_PCT = 5.0    # 日内最大亏损百分比（触发后停止交易）
+
+# === 账户级硬止损（balance-based） ===
+MAX_DAILY_LOSS_PCT = 12.0   # 全局已实现亏损上限，触发后所有策略停开仓
+
+# === 浮动亏损（equity-based，单策略） ===
+FLOATING_LOSS_WARN_PCT = 5.0       # 警告线，仅日志
+FLOATING_LOSS_BLOCK_PCT = 10.0     # 阻断线，不能开单，浮动降低后自动恢复
+
+# === 单策略已实现亏损 ===
+PER_STRATEGY_REALIZED_LOSS_PCT = 5.0    # 单策略已实现亏损上限
+PER_STRATEGY_LOSS_BLOCK_HOURS = 12      # 触发后阻断小时数
+
+# === 快速出场检测（单策略） ===
+MAX_RAPID_EXITS = 3                     # 窗口内最多出场次数
+RAPID_EXIT_WINDOW_SECONDS = 300         # 检测窗口（5 分钟）
+RAPID_EXIT_COOLDOWN_SECONDS = 7200      # 触发后冷却（2 小时）
+
+# === 安全锁 ===
+SAFETY_LOCK_TIMEOUT_MINUTES = 90        # 自动过期时间（分钟）
+
 STOP_LOSS_PIPS = 50         # 默认止损点数
 TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 
@@ -76,12 +95,18 @@ RSI_PERIOD = 14             # RSI 计算周期
 RSI_OVERSOLD = 30           # 超卖阈值
 RSI_OVERBOUGHT = 70         # 超买阈值
 
+# RSI 双线交叉策略参数
+RSI_FAST = 3                # 快线周期
+RSI_SLOW = 13               # 慢线周期
+
 # Stoch + 布林带策略参数
 STOCH_K = 8                 # Stoch %K 周期
 STOCH_SLOWING = 3           # %K 平滑参数（3 就是 K 线再做 3 期均线）
 STOCH_D = 3                 # Stoch %D 平滑周期
-STOCH_OVERSOLD = 20         # Stoch 超卖阈值
-STOCH_OVERBOUGHT = 80       # Stoch 超买阈值
+STOCH_OVERSOLD = 30         # Stoch 超卖信号阈值（金叉需 K 低于此值）
+STOCH_OVERBOUGHT = 80       # Stoch 超买信号阈值（死叉需 K 高于此值）
+STOCH_EXTREME_OVERSOLD = 20  # Stoch 极端超卖区（买入保护/出场保护边界）
+STOCH_EXTREME_OVERBOUGHT = 80  # Stoch 极端超买区（卖出保护/出场保护边界）
 
 TIMEFRAME = "H4"           # K线周期: M1/M5/M15/M30/H1/H4/D1
 

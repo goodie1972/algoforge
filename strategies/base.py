@@ -23,6 +23,7 @@ class BaseStrategy(abc.ABC):
         self.magic = magic or _settings.MAGIC_NUMBER
         self.timeframe = timeframe or _settings.TIMEFRAME
         self.candles: list[Candle] = []
+        self._trail_sl: dict[int, float] = {}
 
     def refresh_data(self, count: int = 200):
         """刷新K线数据，转为时间顺序（旧→新）"""

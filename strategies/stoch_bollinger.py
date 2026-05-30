@@ -30,6 +30,8 @@ class StochBollingerStrategy(BaseStrategy):
         self._load_settings()
         self._prev_k: Optional[float] = None
         self._prev_d: Optional[float] = None
+        self._in_extreme_entry: set[int] = set()  # 从极端区入场的 ticket 集合
+        self._mark_next: int = 0  # 待标记为极端区入场的开仓计数（支持双单）
 
     def _load_settings(self):
         self.bb_period = _settings.BB_PERIOD
@@ -39,10 +41,18 @@ class StochBollingerStrategy(BaseStrategy):
         self.stoch_d = _settings.STOCH_D
         self.oversold = _settings.STOCH_OVERSOLD
         self.overbought = _settings.STOCH_OVERBOUGHT
+        self.extreme_oversold = _settings.STOCH_EXTREME_OVERSOLD
+        self.extreme_overbought = _settings.STOCH_EXTREME_OVERBOUGHT
 
     def reload_config(self):
         self._load_settings()
         logger.info(f"[{self.name}] 配置已热重载")
+
+    def mark_extreme_entry(self, ticket: int):
+        """标记该持仓从极端区入场，供出场保护使用（支持双单）"""
+        if self._mark_next > 0:
+            self._in_extreme_entry.add(ticket)
+            self._mark_next -= 1
 
     def _calc_ema(self, period: int) -> Optional[float]:
         closes = self.get_close_prices()
@@ -120,7 +130,17 @@ class StochBollingerStrategy(BaseStrategy):
         upper = sma + self.bb_std * self.bb_std if sma and bb_std else 0
         lower = sma - self.bb_std * self.bb_std if sma and bb_std else 0
 
+        # 极端区双向保护：低位不开卖，高位不开买（使用极端区阈值）
+        in_buy_extreme = curr_k < self.extreme_oversold and curr_d < self.extreme_oversold
+        in_sell_extreme = curr_k > self.extreme_overbought and curr_d > self.extreme_overbought
+
         if golden_cross and curr_k < self.oversold:
+            if in_sell_extreme:
+                logger.info(
+                    f"[{self.name}] 高位极端区跳过金叉 BUY: K={curr_k:.1f} D={curr_d:.1f}"
+                )
+                return None
+            self._mark_next += 1  # 标记为极端区入场
             logger.info(
                 f"[{self.name}] 超卖金叉 BUY: 价格={current_close:.2f} "
                 f"K={curr_k:.1f} D={curr_d:.1f} "
@@ -129,6 +149,12 @@ class StochBollingerStrategy(BaseStrategy):
             return OrderType.BUY
 
         if death_cross and curr_k > self.overbought:
+            if in_buy_extreme:
+                logger.info(
+                    f"[{self.name}] 低位极端区跳过死叉 SELL: K={curr_k:.1f} D={curr_d:.1f}"
+                )
+                return None
+            self._mark_next += 1  # 标记为极端区入场
             logger.info(
                 f"[{self.name}] 超买死叉 SELL: 价格={current_close:.2f} "
                 f"K={curr_k:.1f} D={curr_d:.1f} "
@@ -167,26 +193,50 @@ class StochBollingerStrategy(BaseStrategy):
         return round(ema, 2)
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """检查是否触及 EMA20 跟踪止损"""
-        trail = self.get_ema20_trail(position.order_type)
-        if trail is None:
+        """EMA20 渐进式追踪止损 + 极端区出场保护
+        - EMA20 只在有利方向移动时才更新追踪止损位，不后退
+        - 从极端区入场的持仓，K/D 都在极端区时不被短期波动振走"""
+        ema20 = self.get_ema20_trail(position.order_type)
+        if ema20 is None:
             return False
 
+        ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
+
+        # === 极端区出场保护 ===
+        if ticket in self._in_extreme_entry:
+            stoch = self._calc_stoch()
+            if stoch:
+                in_oversold = stoch["curr_k"] < self.extreme_oversold and stoch["curr_d"] < self.extreme_oversold
+                in_overbought = stoch["curr_k"] > self.extreme_overbought and stoch["curr_d"] > self.extreme_overbought
+                if (is_buy and in_oversold) or (not is_buy and in_overbought):
+                    return False  # K/D 还在极端区，不出场
+                # 已走出极端区，恢复正常 EMA20 追踪
+                self._in_extreme_entry.discard(ticket)
+
+        if ticket not in self._trail_sl:
+            self._trail_sl[ticket] = position.stop_loss
+
         if is_buy:
-            # 多单：价格跌破 EMA20 出场
-            if bid <= trail:
+            # 只在 EMA20 上移且高于当前追踪止损时才更新，且不能高于当前 Bid（否则立即触发）
+            if ema20 > self._trail_sl[ticket] and ema20 < bid:
+                self._trail_sl[ticket] = ema20
+            if bid <= self._trail_sl[ticket]:
                 logger.info(
-                    f"[{self.name}] EMA20跟踪止损 BUY ticket={position.ticket} "
-                    f"Bid={bid:.2f} EMA20={trail:.2f}"
+                    f"[{self.name}] EMA20跟踪止损 BUY ticket={ticket} "
+                    f"Bid={bid:.2f} TrailSL={self._trail_sl[ticket]:.2f} EMA20={ema20:.2f}"
                 )
+                del self._trail_sl[ticket]
                 return True
         else:
-            # 空单：价格突破 EMA20 出场
-            if ask >= trail:
+            # 只在 EMA20 下移且低于当前追踪止损时才更新，且不能低于当前 Ask（否则立即触发）
+            if ema20 < self._trail_sl[ticket] and ema20 > ask:
+                self._trail_sl[ticket] = ema20
+            if ask >= self._trail_sl[ticket]:
                 logger.info(
-                    f"[{self.name}] EMA20跟踪止损 SELL ticket={position.ticket} "
-                    f"Ask={ask:.2f} EMA20={trail:.2f}"
+                    f"[{self.name}] EMA20跟踪止损 SELL ticket={ticket} "
+                    f"Ask={ask:.2f} TrailSL={self._trail_sl[ticket]:.2f} EMA20={ema20:.2f}"
                 )
+                del self._trail_sl[ticket]
                 return True
         return False

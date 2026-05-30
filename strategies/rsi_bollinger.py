@@ -154,23 +154,38 @@ class RSIBollingerStrategy(BaseStrategy):
         return round(ema, 2)
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        trail = self.get_ema20_trail(position.order_type)
-        if trail is None:
+        """EMA20 渐进式追踪止损 — 与回测逻辑一致
+        EMA20 只在有利方向移动时才更新追踪止损位，不后退。
+        BUY: EMA20 上移 → 止损上移；SELL: EMA20 下移 → 止损下移"""
+        ema20 = self.get_ema20_trail(position.order_type)
+        if ema20 is None:
             return False
 
+        ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
+
+        # 初始化或更新追踪止损（只在有利方向移动）
+        if ticket not in self._trail_sl:
+            self._trail_sl[ticket] = position.stop_loss
+
         if is_buy:
-            if bid <= trail:
+            if ema20 > self._trail_sl[ticket] and ema20 < bid:
+                self._trail_sl[ticket] = ema20
+            if bid <= self._trail_sl[ticket]:
                 logger.info(
-                    f"[{self.name}] EMA20跟踪止损 BUY ticket={position.ticket} "
-                    f"Bid={bid:.2f} EMA20={trail:.2f}"
+                    f"[{self.name}] EMA20跟踪止损 BUY ticket={ticket} "
+                    f"Bid={bid:.2f} TrailSL={self._trail_sl[ticket]:.2f} EMA20={ema20:.2f}"
                 )
+                del self._trail_sl[ticket]
                 return True
         else:
-            if ask >= trail:
+            if ema20 < self._trail_sl[ticket] and ema20 > ask:
+                self._trail_sl[ticket] = ema20
+            if ask >= self._trail_sl[ticket]:
                 logger.info(
-                    f"[{self.name}] EMA20跟踪止损 SELL ticket={position.ticket} "
-                    f"Ask={ask:.2f} EMA20={trail:.2f}"
+                    f"[{self.name}] EMA20跟踪止损 SELL ticket={ticket} "
+                    f"Ask={ask:.2f} TrailSL={self._trail_sl[ticket]:.2f} EMA20={ema20:.2f}"
                 )
+                del self._trail_sl[ticket]
                 return True
         return False

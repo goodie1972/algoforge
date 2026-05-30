@@ -19,6 +19,10 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "runtime_config.json")
 _ENGINE_KEYS = {
     "lot_size", "stop_loss_pips", "take_profit_pips",
     "max_positions", "max_daily_loss_pct",
+    "floating_loss_warn_pct", "floating_loss_block_pct",
+    "per_strategy_realized_loss_pct", "per_strategy_loss_block_hours",
+    "max_rapid_exits", "rapid_exit_window_seconds", "rapid_exit_cooldown_seconds",
+    "safety_lock_timeout_minutes",
     "news_filter_enabled", "news_before_minutes", "news_after_minutes",
     "news_impact_filter", "news_currency_filter",
 }
@@ -108,6 +112,15 @@ class RuntimeConfig:
             "news_after_minutes": "NEWS_AFTER_MINUTES",
             "news_impact_filter": "NEWS_IMPACT_FILTER",
             "news_currency_filter": "NEWS_CURRENCY_FILTER",
+            # 风控扩展
+            "floating_loss_warn_pct": "FLOATING_LOSS_WARN_PCT",
+            "floating_loss_block_pct": "FLOATING_LOSS_BLOCK_PCT",
+            "per_strategy_realized_loss_pct": "PER_STRATEGY_REALIZED_LOSS_PCT",
+            "per_strategy_loss_block_hours": "PER_STRATEGY_LOSS_BLOCK_HOURS",
+            "max_rapid_exits": "MAX_RAPID_EXITS",
+            "rapid_exit_window_seconds": "RAPID_EXIT_WINDOW_SECONDS",
+            "rapid_exit_cooldown_seconds": "RAPID_EXIT_COOLDOWN_SECONDS",
+            "safety_lock_timeout_minutes": "SAFETY_LOCK_TIMEOUT_MINUTES",
         }
         attr = key_map.get(key)
         if attr and hasattr(settings, attr):
