@@ -71,14 +71,14 @@ STRATEGY_POOL = {
     "stoch_bollinger": {
         "magic": 888888,
         "timeframe": "H4",
-        "double_first": True,
-        "max_positions": 2,
+        "double_first": False,
+        "max_positions": 1,
     },
     "rsi_bollinger": {
         "magic": 777777,
         "timeframe": "H1",
-        "double_first": True,
-        "max_positions": 2,
+        "double_first": False,
+        "max_positions": 1,
     },
 }
 

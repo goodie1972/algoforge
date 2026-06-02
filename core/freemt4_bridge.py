@@ -7,6 +7,7 @@ EA 源码: tools/FreeMT4Bridge.mq4
 import socket
 import logging
 import threading
+import time
 from typing import Optional
 from datetime import datetime
 
@@ -27,42 +28,56 @@ TF_MAP = {
 class FreeMT4Bridge(MT4BridgeBase):
     """通过 FreeMT4Bridge EA 连接 MT4 - 自定义 # 分隔协议"""
 
+    RECONNECT_INTERVAL = 3.0  # 重连间隔至少 3 秒
+
     def __init__(self):
         self._sock: Optional[socket.socket] = None
         self._connected = False
         self._lock = threading.Lock()
+        self._last_reconnect = 0.0
 
     def connect(self) -> bool:
+        self.disconnect()
+
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._sock.settimeout(10)
+            self._sock.settimeout(5)
             self._sock.connect((FREEMT4_HOST, FREEMT4_PORT))
             self._connected = True
 
-            logger.info(f"[FreeMT4] 已连接到 {FREEMT4_HOST}:{FREEMT4_PORT}")
-
             if not self._check_alive():
-                logger.error("[FreeMT4] 心跳测试失败")
                 self.disconnect()
                 return False
 
+            logger.info(f"[FreeMT4] 已连接到 {FREEMT4_HOST}:{FREEMT4_PORT}")
             info = self.get_account_info()
             if info:
                 logger.info(f"[FreeMT4] 账户 #{info.login} 余额: {info.balance} {info.currency}")
             return True
-        except Exception as e:
-            logger.error(f"[FreeMT4] 连接失败: {e}")
-            self._connected = False
+        except Exception:
+            self.disconnect()
             return False
 
     def disconnect(self):
-        if self._sock:
+        self._connected = False
+        if self._sock is not None:
             try:
                 self._sock.close()
             except Exception:
                 pass
-            self._connected = False
-            logger.info("[FreeMT4] 已断开连接")
+            self._sock = None
+
+    def _try_reconnect(self) -> bool:
+        """限速重连，3 秒内不重复尝试"""
+        now = time.time()
+        if now - self._last_reconnect < self.RECONNECT_INTERVAL:
+            return False
+        self._last_reconnect = now
+        logger.info("[FreeMT4] 尝试重连...")
+        ok = self.connect()
+        if ok:
+            logger.info("[FreeMT4] 重连成功")
+        return ok
 
     # ======================== 底层通信 ========================
 
@@ -70,7 +85,10 @@ class FreeMT4Bridge(MT4BridgeBase):
         """接收直到遇到 ! 终止符"""
         data = b""
         while True:
-            chunk = self._sock.recv(500000)
+            try:
+                chunk = self._sock.recv(500000)
+            except Exception:
+                raise ConnectionError("连接已关闭")
             if not chunk:
                 raise ConnectionError("连接已关闭")
             data += chunk
@@ -78,55 +96,38 @@ class FreeMT4Bridge(MT4BridgeBase):
             if text.endswith("!"):
                 return text[:-1]
 
-    def _send_cmd(self, cmd: str, _retry: bool = True) -> Optional[list]:
-        """
-        发送命令并解析响应
-        格式: 发送 F001#0#!  -> 接收 F001#OK#data1#data2#!
-        返回: ['#' 分隔的字段列表，不含 F-code 和 OK/ERROR 头]
-        """
-        if not self._connected or not self._sock:
-            logger.warning("[FreeMT4] 连接已断开，尝试重连...")
-            if _retry and self.connect():
-                return self._send_cmd(cmd, _retry=False)
-            return None
-        try:
-            with self._lock:
-                full_cmd = cmd + "!"
-                self._sock.sendall(full_cmd.encode("utf-8"))
-                response = self._recv_raw()
-            parts = response.split("#")
+    def _send_cmd(self, cmd: str) -> Optional[list]:
+        """非递归发送命令，断连时最多重连一次重试"""
+        for attempt in range(2):
+            if not self._connected or not self._sock:
+                if attempt == 0:
+                    self._try_reconnect()
+                if not self._connected or not self._sock:
+                    return None
 
-            if len(parts) < 2:
-                logger.error(f"[FreeMT4] 响应格式错误: {response}")
-                return None
+            try:
+                with self._lock:
+                    full_cmd = cmd + "!"
+                    self._sock.sendall(full_cmd.encode("utf-8"))
+                    response = self._recv_raw()
+                parts = response.split("#")
 
-            if parts[0] != cmd.split("#")[0]:
-                logger.error(f"[FreeMT4] 响应码不匹配: 期望 {cmd.split('#')[0]}, 收到 {parts[0]}")
-                return None
+                if len(parts) < 2:
+                    return None
 
-            if parts[1] != "OK":
-                error_msg = parts[2] if len(parts) > 2 else "未知错误"
-                logger.error(f"[FreeMT4] 命令失败 {cmd.split('#')[0]}: {error_msg}")
-                return None
+                if parts[0] != cmd.split("#")[0]:
+                    return None
 
-            return parts[2:]
+                if parts[1] != "OK":
+                    return None
 
-        except socket.timeout:
-            logger.error(f"[FreeMT4] 超时: {cmd.split('#')[0]}")
-            self._connected = False
-            if _retry:
-                logger.warning("[FreeMT4] 超时后尝试重连...")
-                if self.connect():
-                    return self._send_cmd(cmd, _retry=False)
-            return None
-        except Exception as e:
-            logger.error(f"[FreeMT4] 通信错误: {e}")
-            self._connected = False
-            if _retry:
-                logger.warning("[FreeMT4] 断线重连中...")
-                if self.connect():
-                    return self._send_cmd(cmd, _retry=False)
-            return None
+                return parts[2:]
+
+            except Exception:
+                self.disconnect()
+                # 继续下一轮循环尝试重连
+
+        return None
 
     def _check_alive(self) -> bool:
         data = self._send_cmd("F000#0#")
