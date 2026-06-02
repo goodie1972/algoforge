@@ -103,10 +103,27 @@ class TradingEngine:
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._closed_trades: list[dict] = []               # 已平仓记录（内存）
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
+        self._load_closed_trades()
 
     @property
     def closed_trades(self) -> list[dict]:
         return list(self._closed_trades)
+
+    def _load_closed_trades(self):
+        """启动时从 JSONL 加载历史已平仓记录"""
+        try:
+            if os.path.exists(self._trades_file) and os.path.getsize(self._trades_file) > 0:
+                with open(self._trades_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            try:
+                                self._closed_trades.append(json.loads(line))
+                            except json.JSONDecodeError:
+                                continue
+                logger.info(f"加载历史成交 {len(self._closed_trades)} 条")
+        except Exception as e:
+            logger.warning(f"加载历史成交失败: {e}")
 
     def _init_risk_state(self, name: str, magic: int):
         """初始化单策略风控状态"""
@@ -204,7 +221,7 @@ class TradingEngine:
             self._global_loss_blocked = True
             return True
 
-        loss_pct = (self._daily_start_balance - balance) / self._daily_start_balance * 100
+        loss_pct = (self._daily_start_balance - balance) / self._daily_start_balance * 100 if self._daily_start_balance else 0
         if loss_pct >= settings.MAX_DAILY_LOSS_PCT:
             if not self._global_loss_blocked:
                 logger.error(

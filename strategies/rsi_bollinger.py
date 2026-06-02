@@ -10,7 +10,7 @@ import math
 from typing import Optional
 
 from config.settings import (
-    BB_PERIOD, BB_STD, RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT,
+    BB_PERIOD, BB_STD, RSI_PERIOD, RSI_OVERSOLD, RSI_OVERBOUGHT, SYMBOL,
 )
 import config.settings as _settings
 from core.bridge import MT4BridgeBase, OrderType
@@ -91,6 +91,62 @@ class RSIBollingerStrategy(BaseStrategy):
         variance = sum((c - mean) ** 2 for c in closes[-period:]) / period
         return math.sqrt(variance)
 
+    def _calc_m30_rsi(self, closes_slice) -> Optional[float]:
+        """计算一组收盘价的 RSI 值"""
+        if len(closes_slice) < self.rsi_period + 1:
+            return None
+        gains, losses = [], []
+        for i in range(-self.rsi_period, 0):
+            diff = closes_slice[i] - closes_slice[i - 1]
+            gains.append(max(diff, 0))
+            losses.append(max(-diff, 0))
+        avg_gain = sum(gains) / self.rsi_period
+        avg_loss = sum(losses) / self.rsi_period
+        if avg_loss == 0:
+            return 100.0
+        return 100.0 - (100.0 / (1.0 + avg_gain / avg_loss))
+
+    def _calc_m30_rsi_direction(self) -> Optional[str]:
+        """入场方向判断：取最近 3 根 M30 的 RSI，连续递增→up，连续递减→down"""
+        raw = self.bridge.get_candles(self.symbol, "M30", self.rsi_period + 10)
+        if not raw or len(raw) < self.rsi_period + 4:
+            return None
+        candles = list(reversed(raw))
+        closes = [c.close for c in candles]
+
+        rsi_oldest = self._calc_m30_rsi(closes[:-2])  # 前前一根
+        rsi_mid = self._calc_m30_rsi(closes[:-1])     # 前一根
+        rsi_newest = self._calc_m30_rsi(closes)       # 当前一根
+
+        if rsi_oldest is None or rsi_mid is None or rsi_newest is None:
+            return None
+
+        if rsi_oldest < rsi_mid < rsi_newest:
+            return "up"
+        elif rsi_oldest > rsi_mid > rsi_newest:
+            return "down"
+        return "flat"
+
+    def _calc_m30_rsi_exit(self) -> Optional[str]:
+        """出场方向判断：取最近 2 根 M30 的 RSI，上升→up，下降→down"""
+        raw = self.bridge.get_candles(self.symbol, "M30", self.rsi_period + 10)
+        if not raw or len(raw) < self.rsi_period + 3:
+            return None
+        candles = list(reversed(raw))
+        closes = [c.close for c in candles]
+
+        rsi_prev = self._calc_m30_rsi(closes[:-1])  # 前一根 M30
+        rsi_curr = self._calc_m30_rsi(closes)       # 当前一根 M30
+
+        if rsi_prev is None or rsi_curr is None:
+            return None
+
+        if rsi_prev < rsi_curr:
+            return "up"
+        elif rsi_prev > rsi_curr:
+            return "down"
+        return "flat"
+
     def generate_signal(self) -> Optional[OrderType]:
         closes = self.get_close_prices()
         if len(closes) < max(self.bb_period, self.rsi_period) + 10:
@@ -108,10 +164,13 @@ class RSIBollingerStrategy(BaseStrategy):
         lower = sma - self.bb_std * std
         current_close = closes[-1]
 
-        # RSI
+        # H1 RSI
         rsi = self._calc_rsi(self.rsi_period)
         if rsi is None:
             return None
+
+        # M30 RSI 方向
+        m30_rsi_dir = self._calc_m30_rsi_direction()
 
         # EMA20 趋势方向过滤
         ema20 = self._calc_ema(20)
@@ -126,36 +185,49 @@ class RSIBollingerStrategy(BaseStrategy):
                 ema_trend = "flat"
 
         if current_close <= lower and rsi < self.rsi_oversold:
-            if ema_trend != "up":
+            # if ema_trend != "up":
+            #     logger.info(
+            #         f"[{self.name}] EMA20趋势过滤 BUY: 价格={current_close:.2f} "
+            #         f"下轨={lower:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+            #     )
+            #     return None
+            if m30_rsi_dir != "up":
                 logger.info(
-                    f"[{self.name}] EMA20趋势过滤 BUY: 价格={current_close:.2f} "
-                    f"下轨={lower:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+                    f"[{self.name}] M30 RSI方向过滤 BUY: 价格={current_close:.2f} "
+                    f"下轨={lower:.2f} RSI={rsi:.1f} M30 RSI方向={m30_rsi_dir}"
                 )
                 return None
             logger.info(
                 f"[{self.name}] 超卖反弹 BUY: 价格={current_close:.2f} "
                 f"下轨={lower:.2f} RSI={rsi:.1f} "
-                f"上轨={upper:.2f} EMA趋势={ema_trend}"
+                f"上轨={upper:.2f} EMA趋势={ema_trend} M30 RSI方向={m30_rsi_dir}"
             )
             return OrderType.BUY
 
         if current_close >= upper and rsi > self.rsi_overbought:
-            if ema_trend != "down":
+            # if ema_trend != "down":
+            #     logger.info(
+            #         f"[{self.name}] EMA20趋势过滤 SELL: 价格={current_close:.2f} "
+            #         f"上轨={upper:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+            #     )
+            #     return None
+            if m30_rsi_dir != "down":
                 logger.info(
-                    f"[{self.name}] EMA20趋势过滤 SELL: 价格={current_close:.2f} "
-                    f"上轨={upper:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+                    f"[{self.name}] M30 RSI方向过滤 SELL: 价格={current_close:.2f} "
+                    f"上轨={upper:.2f} RSI={rsi:.1f} M30 RSI方向={m30_rsi_dir}"
                 )
                 return None
             logger.info(
                 f"[{self.name}] 超买回调 SELL: 价格={current_close:.2f} "
                 f"上轨={upper:.2f} RSI={rsi:.1f} "
-                f"下轨={lower:.2f} EMA趋势={ema_trend}"
+                f"下轨={lower:.2f} EMA趋势={ema_trend} M30 RSI方向={m30_rsi_dir}"
             )
             return OrderType.SELL
 
         logger.info(
             f"[{self.name}] 无信号: 价格={current_close:.2f} "
-            f"上轨={upper:.2f} 下轨={lower:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+            f"上轨={upper:.2f} 下轨={lower:.2f} RSI={rsi:.1f} "
+            f"EMA趋势={ema_trend} M30 RSI方向={m30_rsi_dir}"
         )
         return None
 
@@ -174,45 +246,36 @@ class RSIBollingerStrategy(BaseStrategy):
             tp = round(entry_price - dist * 100, 2)
         return sl, tp
 
-    def get_ema20_trail(self, direction: OrderType) -> Optional[float]:
-        ema = self._calc_ema(20)
-        if ema is None:
-            return None
-        return round(ema, 2)
+    # def get_ema20_trail(self, direction: OrderType) -> Optional[float]:
+    #     ema = self._calc_ema(20)
+    #     if ema is None:
+    #         return None
+    #     return round(ema, 2)
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """EMA20 渐进式追踪止损 — 与回测逻辑一致
-        EMA20 只在有利方向移动时才更新追踪止损位，不后退。
-        BUY: EMA20 上移 → 止损上移；SELL: EMA20 下移 → 止损下移"""
-        ema20 = self.get_ema20_trail(position.order_type)
-        if ema20 is None:
-            return False
-
+        """M30 RSI 反转出场 — 替代原 EMA20 跟踪止损
+        多空逻辑对称：连续 2 根 M30 RSI 反向即出场"""
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
-        # 初始化或更新追踪止损（只在有利方向移动）
-        if ticket not in self._trail_sl:
-            self._trail_sl[ticket] = position.stop_loss
+        m30_exit = self._calc_m30_rsi_exit()
+        if m30_exit is None:
+            return False
 
         if is_buy:
-            if ema20 > self._trail_sl[ticket] and ema20 < bid:
-                self._trail_sl[ticket] = ema20
-            if bid <= self._trail_sl[ticket]:
+            # BUY 入场后，最近 2 根 M30 RSI 连续下降 → 反转出场
+            if m30_exit == "down":
                 logger.info(
-                    f"[{self.name}] EMA20跟踪止损 BUY ticket={ticket} "
-                    f"Bid={bid:.2f} TrailSL={self._trail_sl[ticket]:.2f} EMA20={ema20:.2f}"
+                    f"[{self.name}] M30 RSI反转出场 BUY ticket={ticket} "
+                    f"M30 RSI出场方向={m30_exit}"
                 )
-                del self._trail_sl[ticket]
                 return True
         else:
-            if ema20 < self._trail_sl[ticket] and ema20 > ask:
-                self._trail_sl[ticket] = ema20
-            if ask >= self._trail_sl[ticket]:
+            # SELL 入场后，最近 2 根 M30 RSI 连续上升 → 反转出场
+            if m30_exit == "up":
                 logger.info(
-                    f"[{self.name}] EMA20跟踪止损 SELL ticket={ticket} "
-                    f"Ask={ask:.2f} TrailSL={self._trail_sl[ticket]:.2f} EMA20={ema20:.2f}"
+                    f"[{self.name}] M30 RSI反转出场 SELL ticket={ticket} "
+                    f"M30 RSI出场方向={m30_exit}"
                 )
-                del self._trail_sl[ticket]
                 return True
         return False

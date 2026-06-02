@@ -2,6 +2,7 @@
 TradingEngine 线程封装 - 在后台 daemon 线程中运行 main.py 的多策略引擎
 """
 
+import importlib.util
 import logging
 import os
 import sys
@@ -69,6 +70,16 @@ class EngineRunner:
 
     def _run(self):
         """后台线程入口 - 运行多策略 TradingEngine"""
+        try:
+            self._run_impl()
+        except Exception as e:
+            self.logger.exception(f"引擎线程异常终止: {e}")
+            self._running = False
+            self._engine = None
+            self.bridge = None
+
+    def _run_impl(self):
+        """引擎实际运行逻辑，异常由 _run 统一捕获"""
         # 切换到项目根目录，确保日志/配置路径正确
         project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "../.."))
         os.chdir(project_root)
@@ -78,10 +89,18 @@ class EngineRunner:
         self.logger.info("XAUUSD Web Dashboard - 启动多策略交易引擎")
         self.logger.info("=" * 60)
 
-        # 导入多策略引擎
+        # 导入多策略引擎（用 importlib 避开 module 缓存冲突 'main'）
         try:
-            from main import TradingEngine
-        except ImportError as e:
+            main_path = os.path.join(project_root, "main.py")
+            spec = importlib.util.spec_from_file_location("xauusd_trading_engine", main_path)
+            if spec is None or spec.loader is None:
+                self.logger.error(f"无法加载 TradingEngine: {main_path} 不存在或格式错误")
+                self._running = False
+                return
+            main_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(main_module)
+            TradingEngine = main_module.TradingEngine
+        except Exception as e:
             self.logger.error(f"无法导入 TradingEngine: {e}")
             self._running = False
             return

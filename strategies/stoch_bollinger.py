@@ -107,6 +107,51 @@ class StochBollingerStrategy(BaseStrategy):
         std = math.sqrt(variance)
         return std * self.bb_std
 
+    def _calc_macd(self) -> Optional[dict]:
+        """计算 MACD: macd, signal, histogram, hist_increasing"""
+        closes = self.get_close_prices()
+        if len(closes) < 35:
+            return None
+
+        # 从第 26 根开始逐根计算 MACD 线（EMA12 - EMA26）
+        macd_values = []
+        for i in range(26, len(closes)):
+            window = closes[:i + 1]
+            e12 = e26 = window[0]
+            k12, k26 = 2.0 / 13, 2.0 / 27
+            for p in window[1:]:
+                e12 = (p - e12) * k12 + e12
+                e26 = (p - e26) * k26 + e26
+            macd_values.append(e12 - e26)
+
+        if len(macd_values) < 10:
+            return None
+
+        curr_macd = macd_values[-1]
+        prev_macd = macd_values[-2]
+
+        # 信号线 = EMA9 of MACD
+        k9 = 2.0 / 10
+        sig = macd_values[0]
+        for v in macd_values[1:]:
+            sig = (v - sig) * k9 + sig
+        curr_signal = sig
+
+        ps = macd_values[0]
+        for v in macd_values[:-1]:
+            ps = (v - ps) * k9 + ps
+        prev_signal = ps
+
+        curr_hist = curr_macd - curr_signal
+        prev_hist = prev_macd - prev_signal
+
+        return {
+            "macd": round(curr_macd, 4),
+            "signal": round(curr_signal, 4),
+            "histogram": round(curr_hist, 4),
+            "hist_increasing": curr_hist > prev_hist,
+        }
+
     def generate_signal(self) -> Optional[OrderType]:
         closes = self.get_close_prices()
         if len(closes) < self.bb_period + 10:
@@ -149,23 +194,41 @@ class StochBollingerStrategy(BaseStrategy):
             else:
                 ema_trend = "flat"
 
+        # MACD 动量过滤
+        macd = self._calc_macd()
+        macd_filter = ""
+        if macd is not None:
+            macd_filter = f"MACD柱={macd['histogram']:.3f}"
+            if golden_cross and curr_k < self.oversold and macd["histogram"] < 0:
+                logger.info(
+                    f"[{self.name}] MACD过滤金叉 BUY: 价格={current_close:.2f} "
+                    f"K={curr_k:.1f} D={curr_d:.1f} histogram={macd['histogram']:.3f}"
+                )
+                return None
+            if death_cross and curr_k > self.overbought and macd["histogram"] > 0:
+                logger.info(
+                    f"[{self.name}] MACD过滤死叉 SELL: 价格={current_close:.2f} "
+                    f"K={curr_k:.1f} D={curr_d:.1f} histogram={macd['histogram']:.3f}"
+                )
+                return None
+
         if golden_cross and curr_k < self.oversold:
             if in_sell_extreme:
                 logger.info(
                     f"[{self.name}] 高位极端区跳过金叉 BUY: K={curr_k:.1f} D={curr_d:.1f}"
                 )
                 return None
-            if ema_trend != "up":
-                logger.info(
-                    f"[{self.name}] EMA20趋势过滤金叉 BUY: 价格={current_close:.2f} "
-                    f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend}"
-                )
-                return None
+            # if ema_trend != "up":
+            #     logger.info(
+            #         f"[{self.name}] EMA20趋势过滤金叉 BUY: 价格={current_close:.2f} "
+            #         f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend}"
+            #     )
+            #     return None
             self._mark_next += 1
             logger.info(
                 f"[{self.name}] 超卖金叉 BUY: 价格={current_close:.2f} "
                 f"K={curr_k:.1f} D={curr_d:.1f} "
-                f"上轨={upper:.2f} 下轨={lower:.2f} EMA趋势={ema_trend}"
+                f"上轨={upper:.2f} 下轨={lower:.2f} EMA趋势={ema_trend} {macd_filter}"
             )
             return OrderType.BUY
 
@@ -175,24 +238,24 @@ class StochBollingerStrategy(BaseStrategy):
                     f"[{self.name}] 低位极端区跳过死叉 SELL: K={curr_k:.1f} D={curr_d:.1f}"
                 )
                 return None
-            if ema_trend != "down":
-                logger.info(
-                    f"[{self.name}] EMA20趋势过滤死叉 SELL: 价格={current_close:.2f} "
-                    f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend}"
-                )
-                return None
+            # if ema_trend != "down":
+            #     logger.info(
+            #         f"[{self.name}] EMA20趋势过滤死叉 SELL: 价格={current_close:.2f} "
+            #         f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend}"
+            #     )
+            #     return None
             self._mark_next += 1
             logger.info(
                 f"[{self.name}] 超买死叉 SELL: 价格={current_close:.2f} "
                 f"K={curr_k:.1f} D={curr_d:.1f} "
-                f"上轨={upper:.2f} 下轨={lower:.2f} EMA趋势={ema_trend}"
+                f"上轨={upper:.2f} 下轨={lower:.2f} EMA趋势={ema_trend} {macd_filter}"
             )
             return OrderType.SELL
 
         logger.info(
             f"[{self.name}] 无信号: 价格={current_close:.2f} "
             f"上轨={upper:.2f} 下轨={lower:.2f} "
-            f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend} "
+            f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend} {macd_filter} "
             f"{'金叉' if golden_cross else '死叉' if death_cross else ''}"
         )
         return None

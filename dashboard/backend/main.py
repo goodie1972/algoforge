@@ -37,6 +37,11 @@ log_handler.setFormatter(logging.Formatter(
 logging.getLogger().addHandler(log_handler)
 logging.getLogger().setLevel(logging.INFO)
 
+# 确保引擎线程日志可读（同时输出到 stderr）
+_console = logging.StreamHandler()
+_console.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s"))
+logging.getLogger().addHandler(_console)
+
 engine_runner = EngineRunner(config_service=config_service)
 
 # === 注入依赖到路由模块 ===
@@ -49,6 +54,7 @@ from dashboard.backend.routes import logs as route_logs
 from dashboard.backend.routes import news as route_news
 from dashboard.backend.routes import backtest as route_backtest
 from dashboard.backend.routes import trades as route_trades
+from dashboard.backend.routes import data as route_data
 
 route_engine.engine_runner = engine_runner
 route_account.engine_runner = engine_runner
@@ -60,6 +66,8 @@ route_market.engine_runner = engine_runner
 route_market.run_bridge = run_bridge
 route_logs.log_handler = log_handler
 route_trades.engine_runner = engine_runner
+route_data.engine_runner = engine_runner
+route_data.run_bridge = run_bridge
 
 
 # === 后台轮询任务 ===
@@ -196,6 +204,7 @@ app.include_router(route_logs.router)
 app.include_router(route_news.router)
 app.include_router(route_backtest.router)
 app.include_router(route_trades.router)
+app.include_router(route_data.router)
 
 
 # === WebSocket 端点 ===

@@ -48,6 +48,7 @@ async function checkEngineStatus() {
 }
 
 onMounted(() => {
+  checkEngineStatus()
   // WebSocket 推送覆盖大部分数据，仅需少量 REST 初始加载
   accountStore.fetch()
   logStore.fetchHistory()
