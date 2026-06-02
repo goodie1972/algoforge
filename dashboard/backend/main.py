@@ -47,6 +47,8 @@ from dashboard.backend.routes import config as route_config
 from dashboard.backend.routes import market as route_market
 from dashboard.backend.routes import logs as route_logs
 from dashboard.backend.routes import news as route_news
+from dashboard.backend.routes import backtest as route_backtest
+from dashboard.backend.routes import trades as route_trades
 
 route_engine.engine_runner = engine_runner
 route_account.engine_runner = engine_runner
@@ -57,6 +59,7 @@ route_config.config_service = config_service
 route_market.engine_runner = engine_runner
 route_market.run_bridge = run_bridge
 route_logs.log_handler = log_handler
+route_trades.engine_runner = engine_runner
 
 
 # === 后台轮询任务 ===
@@ -191,6 +194,8 @@ app.include_router(route_config.router)
 app.include_router(route_market.router)
 app.include_router(route_logs.router)
 app.include_router(route_news.router)
+app.include_router(route_backtest.router)
+app.include_router(route_trades.router)
 
 
 # === WebSocket 端点 ===

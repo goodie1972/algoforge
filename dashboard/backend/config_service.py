@@ -23,6 +23,7 @@ _ENGINE_KEYS = {
     "per_strategy_realized_loss_pct", "per_strategy_loss_block_hours",
     "max_rapid_exits", "rapid_exit_window_seconds", "rapid_exit_cooldown_seconds",
     "safety_lock_timeout_minutes",
+    "per_strategy_realized_loss_amount", "max_consecutive_losses", "consecutive_loss_cooldown_hours",
     "news_filter_enabled", "news_before_minutes", "news_after_minutes",
     "news_impact_filter", "news_currency_filter",
 }
@@ -121,6 +122,9 @@ class RuntimeConfig:
             "rapid_exit_window_seconds": "RAPID_EXIT_WINDOW_SECONDS",
             "rapid_exit_cooldown_seconds": "RAPID_EXIT_COOLDOWN_SECONDS",
             "safety_lock_timeout_minutes": "SAFETY_LOCK_TIMEOUT_MINUTES",
+            "per_strategy_realized_loss_amount": "PER_STRATEGY_REALIZED_LOSS_AMOUNT",
+            "max_consecutive_losses": "MAX_CONSECUTIVE_LOSSES",
+            "consecutive_loss_cooldown_hours": "CONSECUTIVE_LOSS_COOLDOWN_HOURS",
         }
         attr = key_map.get(key)
         if attr and hasattr(settings, attr):

@@ -24,6 +24,11 @@ const params = computed(() => ({
   max_rapid_exits: store.items.max_rapid_exits ?? 3,
   rapid_exit_window_seconds: store.items.rapid_exit_window_seconds ?? 300,
   rapid_exit_cooldown_seconds: store.items.rapid_exit_cooldown_seconds ?? 7200,
+  // 单策略绝对亏损上限
+  per_strategy_realized_loss_amount: store.items.per_strategy_realized_loss_amount ?? 30.0,
+  // 连续亏损冷却
+  max_consecutive_losses: store.items.max_consecutive_losses ?? 3,
+  consecutive_loss_cooldown_hours: store.items.consecutive_loss_cooldown_hours ?? 4,
   // 安全锁
   safety_lock_timeout_minutes: store.items.safety_lock_timeout_minutes ?? 90,
 }))
@@ -112,6 +117,25 @@ async function update(updates: Record<string, any>) {
           <n-input-number :value="params.rapid_exit_cooldown_seconds" :min="300" :max="86400" :step="300"
             @update:value="(v: any) => v && update({ rapid_exit_cooldown_seconds: v })" style="width:100%;" />
           <template #feedback>触发后 {{ Math.round(params.rapid_exit_cooldown_seconds / 60) }} 分钟不能开单</template>
+        </n-form-item>
+
+        <n-divider title-position="left">单策略绝对亏损冷却</n-divider>
+        <n-form-item label="已实现亏损上限 ($)">
+          <n-input-number :value="params.per_strategy_realized_loss_amount" :min="5" :max="500" :step="5"
+            @update:value="(v: any) => v && update({ per_strategy_realized_loss_amount: v })" style="width:100%;" />
+          <template #feedback>单策略累计已实现亏损 ≥${{ params.per_strategy_realized_loss_amount }} 触发冷却（与百分比亏损并行）</template>
+        </n-form-item>
+
+        <n-divider title-position="left">连续亏损冷却</n-divider>
+        <n-form-item label="连续亏损上限 (次)">
+          <n-input-number :value="params.max_consecutive_losses" :min="1" :max="20"
+            @update:value="(v: any) => v && update({ max_consecutive_losses: v })" style="width:100%;" />
+          <template #feedback>连续亏损达到此次数后触发冷却</template>
+        </n-form-item>
+        <n-form-item label="冷却时长 (小时)">
+          <n-input-number :value="params.consecutive_loss_cooldown_hours" :min="1" :max="72"
+            @update:value="(v: any) => v && update({ consecutive_loss_cooldown_hours: v })" style="width:100%;" />
+          <template #feedback>冷却到期后自动恢复</template>
         </n-form-item>
 
         <n-divider title-position="left">安全锁</n-divider>

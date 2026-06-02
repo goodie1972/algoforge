@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { darkTheme, NIcon } from 'naive-ui'
 import {
   AnalyticsOutline, WalletOutline, SettingsOutline, DocumentTextOutline,
-  BarChartOutline, PowerOutline, PlayOutline, StopOutline,
+  BarChartOutline, PowerOutline, PlayOutline, StopOutline, TimeOutline,
 } from '@vicons/ionicons5'
 import { useAccountStore } from '@/stores/account'
 import { usePositionStore } from '@/stores/positions'
@@ -28,10 +28,12 @@ function renderIcon(icon: any) {
 }
 
 const menuOptions = [
-  { label: '仪表板', key: '/', icon: renderIcon(AnalyticsOutline) },
-  { label: '持仓管理', key: '/positions', icon: renderIcon(WalletOutline) },
+  { label: '交易终端', key: '/', icon: renderIcon(AnalyticsOutline) },
+  { label: '账户持仓', key: '/positions', icon: renderIcon(WalletOutline) },
+  { label: '策略中心', key: '/strategies', icon: renderIcon(BarChartOutline) },
   { label: '运行配置', key: '/config', icon: renderIcon(SettingsOutline) },
   { label: '系统日志', key: '/logs', icon: renderIcon(DocumentTextOutline) },
+  { label: '历史成交', key: '/trades', icon: renderIcon(TimeOutline) },
 ]
 
 function handleMenuUpdate(key: string) {
@@ -62,7 +64,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   wsClient.disconnect()
-  clearInterval(priceStore._pollTimer)
 })
 
 </script>
@@ -112,7 +113,7 @@ onUnmounted(() => {
                 </n-button>
                 <n-breadcrumb>
                   <n-breadcrumb-item>XAUUSD 量化交易系统</n-breadcrumb-item>
-                  <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'logs' ? '日志' : '仪表板' }}</n-breadcrumb-item>
+                  <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'strategies' ? '策略' : route.name === 'logs' ? '日志' : '仪表板' }}</n-breadcrumb-item>
                 </n-breadcrumb>
                 <div style="flex:1;"></div>
                 <n-tag :type="engineStatus === 'running' ? 'success' : 'default'" size="small" :bordered="false">

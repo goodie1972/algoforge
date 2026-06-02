@@ -39,10 +39,13 @@ class RSIBollingerStrategy(BaseStrategy):
         self._load_settings()
         logger.info(f"[{self.name}] 配置已热重载")
 
-    def _calc_ema(self, period: int) -> Optional[float]:
+    def _calc_ema(self, period: int, shift: int = 0) -> Optional[float]:
         closes = self.get_close_prices()
-        if len(closes) < period:
+        needed = period + shift
+        if len(closes) < needed:
             return None
+        if shift:
+            closes = closes[:-shift]
         k = 2.0 / (period + 1)
         ema = closes[0]
         for p in closes[1:]:
@@ -110,25 +113,49 @@ class RSIBollingerStrategy(BaseStrategy):
         if rsi is None:
             return None
 
+        # EMA20 趋势方向过滤
+        ema20 = self._calc_ema(20)
+        ema20_2 = self._calc_ema(20, shift=2)
+        ema_trend = None
+        if ema20 is not None and ema20_2 is not None:
+            if ema20 > ema20_2:
+                ema_trend = "up"
+            elif ema20 < ema20_2:
+                ema_trend = "down"
+            else:
+                ema_trend = "flat"
+
         if current_close <= lower and rsi < self.rsi_oversold:
+            if ema_trend != "up":
+                logger.info(
+                    f"[{self.name}] EMA20趋势过滤 BUY: 价格={current_close:.2f} "
+                    f"下轨={lower:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+                )
+                return None
             logger.info(
                 f"[{self.name}] 超卖反弹 BUY: 价格={current_close:.2f} "
                 f"下轨={lower:.2f} RSI={rsi:.1f} "
-                f"上轨={upper:.2f}"
+                f"上轨={upper:.2f} EMA趋势={ema_trend}"
             )
             return OrderType.BUY
 
         if current_close >= upper and rsi > self.rsi_overbought:
+            if ema_trend != "down":
+                logger.info(
+                    f"[{self.name}] EMA20趋势过滤 SELL: 价格={current_close:.2f} "
+                    f"上轨={upper:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
+                )
+                return None
             logger.info(
                 f"[{self.name}] 超买回调 SELL: 价格={current_close:.2f} "
                 f"上轨={upper:.2f} RSI={rsi:.1f} "
-                f"下轨={lower:.2f}"
+                f"下轨={lower:.2f} EMA趋势={ema_trend}"
             )
             return OrderType.SELL
 
         logger.info(
             f"[{self.name}] 无信号: 价格={current_close:.2f} "
-            f"上轨={upper:.2f} 下轨={lower:.2f} RSI={rsi:.1f}"
+            f"上轨={upper:.2f} 下轨={lower:.2f} RSI={rsi:.1f} EMA趋势={ema_trend}"
         )
         return None
 

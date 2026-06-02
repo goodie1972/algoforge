@@ -3,6 +3,7 @@
 支持 STRATEGY_POOL 中多个策略同时运行，各自独立 magic/timeframe
 """
 
+import json
 import logging
 import time
 import sys
@@ -53,9 +54,14 @@ class StrategyRiskState:
     realized_pnl: float = 0.0                     # 累计已实现盈亏
     floating_pnl: float = 0.0                     # 当前浮动盈亏
     exit_timestamps: deque = field(default_factory=deque)  # 快速出场检测窗口
-    realized_loss_blocked: bool = False            # 已实现亏损阻断
+    realized_loss_blocked: bool = False            # 已实现亏损阻断（百分比）
     floating_loss_blocked: bool = False            # 浮动亏损阻断
     rapid_exit_blocked: bool = False               # 快速出场阻断
+    realized_loss_amount_blocked: bool = False     # 已实现亏损 ≥$30 阻断
+    realized_loss_amount_blocked_at: float = 0.0
+    consecutive_losses: int = 0                    # 连续亏损次数
+    consecutive_loss_blocked: bool = False         # 连续亏损阻断
+    consecutive_loss_blocked_at: float = 0.0
     realized_loss_blocked_at: float = 0.0          # 阻断时间戳
     rapid_exit_blocked_at: float = 0.0
 
@@ -95,6 +101,12 @@ class TradingEngine:
         self._last_news_check = 0.0
         self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
+        self._closed_trades: list[dict] = []               # 已平仓记录（内存）
+        self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
+
+    @property
+    def closed_trades(self) -> list[dict]:
+        return list(self._closed_trades)
 
     def _init_risk_state(self, name: str, magic: int):
         """初始化单策略风控状态"""
@@ -136,7 +148,38 @@ class TradingEngine:
                 f"冷却 {settings.RAPID_EXIT_COOLDOWN_SECONDS//60}min"
             )
 
-        # 已实现亏损阻断检查
+        # 连续亏损跟踪
+        if pnl < 0:
+            state.consecutive_losses += 1
+            logger.info(
+                f"[{state.name}] 连续亏损 {state.consecutive_losses} 次 "
+                f"（上限 {settings.MAX_CONSECUTIVE_LOSSES}）"
+            )
+            if state.consecutive_losses >= settings.MAX_CONSECUTIVE_LOSSES and not state.consecutive_loss_blocked:
+                state.consecutive_loss_blocked = True
+                state.consecutive_loss_blocked_at = now
+                logger.error(
+                    f"[{state.name}] 连续亏损 {state.consecutive_losses} 次，"
+                    f"冷却 {settings.CONSECUTIVE_LOSS_COOLDOWN_HOURS}h"
+                )
+        elif pnl > 0:
+            state.consecutive_losses = 0
+
+        # 绝对亏损阻断：已实现亏损 ≥$30 触发 12h 冷却
+        if state.realized_pnl <= -settings.PER_STRATEGY_REALIZED_LOSS_AMOUNT and not state.realized_loss_amount_blocked:
+            state.realized_loss_amount_blocked = True
+            state.realized_loss_amount_blocked_at = now
+            logger.error(
+                f"[{state.name}] 已实现亏损 ${abs(state.realized_pnl):.2f} "
+                f"（≥${settings.PER_STRATEGY_REALIZED_LOSS_AMOUNT}），"
+                f"冷却 {settings.PER_STRATEGY_LOSS_BLOCK_HOURS}h"
+            )
+        # 亏损回正自动解除
+        if state.realized_pnl > 0 and state.realized_loss_amount_blocked:
+            state.realized_loss_amount_blocked = False
+            logger.info(f"[{state.name}] 已实现亏损回正，解除绝对亏损冷却")
+
+        # 已实现亏损阻断检查（百分比）
         balance = self._get_balance()
         if balance > 0:
             loss_pct = abs(state.realized_pnl) / balance * 100
@@ -208,6 +251,30 @@ class TradingEngine:
                     )
                 else:
                     return f"浮动亏损阻断（{floating_pct:.2f}%）"
+
+        # 绝对亏损阻断 — 12h 自动解
+        if state.realized_loss_amount_blocked:
+            elapsed = now - state.realized_loss_amount_blocked_at
+            if elapsed >= settings.PER_STRATEGY_LOSS_BLOCK_HOURS * 3600:
+                state.realized_loss_amount_blocked = False
+                logger.info(
+                    f"[{state.name}] 绝对亏损冷却到期（{elapsed/3600:.1f}h），恢复开仓"
+                )
+            else:
+                remain_h = (settings.PER_STRATEGY_LOSS_BLOCK_HOURS * 3600 - elapsed) / 3600
+                return f"绝对亏损冷却，剩余 {remain_h:.1f}h"
+
+        # 连续亏损阻断 — 4h 自动解
+        if state.consecutive_loss_blocked:
+            elapsed = now - state.consecutive_loss_blocked_at
+            if elapsed >= settings.CONSECUTIVE_LOSS_COOLDOWN_HOURS * 3600:
+                state.consecutive_loss_blocked = False
+                logger.info(
+                    f"[{state.name}] 连续亏损冷却到期（{elapsed/3600:.1f}h），恢复开仓"
+                )
+            else:
+                remain_h = (settings.CONSECUTIVE_LOSS_COOLDOWN_HOURS * 3600 - elapsed) / 3600
+                return f"连续亏损冷却，剩余 {remain_h:.1f}h"
 
         # 快速出场阻断 — 2h 自动解
         if state.rapid_exit_blocked:
@@ -394,6 +461,34 @@ class TradingEngine:
             self.bridge.close_order(pos.ticket)
             # 记录平仓：已实现盈亏 + 快速出场检测
             self._record_close(pos.ticket, pnl, strategy.magic)
+
+            # 记录已平仓明细到内存 + JSONL 文件
+            close_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            record = dict(
+                ticket=pos.ticket,
+                symbol=pos.symbol,
+                order_type=pos.order_type,
+                volume=pos.volume,
+                entry_price=entry,
+                exit_price=exit_price,
+                pnl=round(pnl, 2),
+                stop_loss=pos.stop_loss,
+                take_profit=pos.take_profit,
+                swap=pos.swap,
+                commission=pos.commission,
+                magic=pos.magic,
+                strategy=strategy.name,
+                open_time=pos.open_time,
+                close_time=close_time,
+                hold_seconds=round(hold_sec),
+                exit_reason="ema20_trail",
+            )
+            self._closed_trades.append(record)
+            try:
+                with open(self._trades_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            except OSError:
+                pass
 
     def _lock_new_entries(self, reason: str):
         """安全锁：暂停开新仓，已持仓仍可正常平仓"""

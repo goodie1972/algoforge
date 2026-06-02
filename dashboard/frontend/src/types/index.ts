@@ -62,3 +62,80 @@ export interface WsMessage {
 }
 
 export type EngineStatusType = 'running' | 'stopped' | 'uninitialized' | 'error'
+
+// 回测类型
+export interface BacktestRequest {
+  strategies: string[]
+  symbol?: string
+  timeframe?: string
+  start_date: string
+  end_date: string
+  initial_cash?: number
+  commission?: number
+}
+
+export interface BacktestJob {
+  job_id: string
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  progress?: string
+  error?: string
+  created_at?: string
+  completed_at?: string
+}
+
+export interface BacktestTrade {
+  entry_time: number
+  exit_time: number
+  direction: string
+  entry_price: number
+  exit_price: number
+  pnl: number
+  strategy: string
+}
+
+export interface BacktestResult {
+  total_return: number
+  total_return_pct: number
+  total_trades: number
+  win_rate: number
+  max_drawdown: number
+  sharpe_ratio: number
+  equity_curve: Array<{ time: number; value: number }>
+  trades: BacktestTrade[]
+  by_strategy: Record<string, {
+    total_pnl: number
+    total_return_pct: number
+    total_trades: number
+    max_drawdown: number
+    trades: BacktestTrade[]
+    equity_curve: Array<{ time: number; value: number }>
+  }>
+}
+
+export interface ClosedTrade {
+  ticket: number
+  symbol: string
+  order_type: string
+  volume: number
+  entry_price: number
+  exit_price: number
+  pnl: number
+  stop_loss: number
+  take_profit: number
+  swap: number
+  commission: number
+  magic: number
+  strategy: string
+  open_time: string
+  close_time: string
+  hold_seconds: number
+  exit_reason: string
+}
+
+export interface BacktestHistoryItem {
+  job_id: string
+  status: string
+  created_at: string
+  params: BacktestRequest
+  result_summary: Partial<BacktestResult> | null
+}

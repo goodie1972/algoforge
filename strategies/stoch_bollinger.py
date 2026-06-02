@@ -54,10 +54,13 @@ class StochBollingerStrategy(BaseStrategy):
             self._in_extreme_entry.add(ticket)
             self._mark_next -= 1
 
-    def _calc_ema(self, period: int) -> Optional[float]:
+    def _calc_ema(self, period: int, shift: int = 0) -> Optional[float]:
         closes = self.get_close_prices()
-        if len(closes) < period:
+        needed = period + shift
+        if len(closes) < needed:
             return None
+        if shift:
+            closes = closes[:-shift]
         k = 2.0 / (period + 1)
         ema = closes[0]
         for p in closes[1:]:
@@ -134,17 +137,35 @@ class StochBollingerStrategy(BaseStrategy):
         in_buy_extreme = curr_k < self.extreme_oversold and curr_d < self.extreme_oversold
         in_sell_extreme = curr_k > self.extreme_overbought and curr_d > self.extreme_overbought
 
+        # EMA20 趋势方向过滤
+        ema20 = self._calc_ema(20)
+        ema20_2 = self._calc_ema(20, shift=2)
+        ema_trend = None
+        if ema20 is not None and ema20_2 is not None:
+            if ema20 > ema20_2:
+                ema_trend = "up"
+            elif ema20 < ema20_2:
+                ema_trend = "down"
+            else:
+                ema_trend = "flat"
+
         if golden_cross and curr_k < self.oversold:
             if in_sell_extreme:
                 logger.info(
                     f"[{self.name}] 高位极端区跳过金叉 BUY: K={curr_k:.1f} D={curr_d:.1f}"
                 )
                 return None
-            self._mark_next += 1  # 标记为极端区入场
+            if ema_trend != "up":
+                logger.info(
+                    f"[{self.name}] EMA20趋势过滤金叉 BUY: 价格={current_close:.2f} "
+                    f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend}"
+                )
+                return None
+            self._mark_next += 1
             logger.info(
                 f"[{self.name}] 超卖金叉 BUY: 价格={current_close:.2f} "
                 f"K={curr_k:.1f} D={curr_d:.1f} "
-                f"上轨={upper:.2f} 下轨={lower:.2f}"
+                f"上轨={upper:.2f} 下轨={lower:.2f} EMA趋势={ema_trend}"
             )
             return OrderType.BUY
 
@@ -154,18 +175,24 @@ class StochBollingerStrategy(BaseStrategy):
                     f"[{self.name}] 低位极端区跳过死叉 SELL: K={curr_k:.1f} D={curr_d:.1f}"
                 )
                 return None
-            self._mark_next += 1  # 标记为极端区入场
+            if ema_trend != "down":
+                logger.info(
+                    f"[{self.name}] EMA20趋势过滤死叉 SELL: 价格={current_close:.2f} "
+                    f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend}"
+                )
+                return None
+            self._mark_next += 1
             logger.info(
                 f"[{self.name}] 超买死叉 SELL: 价格={current_close:.2f} "
                 f"K={curr_k:.1f} D={curr_d:.1f} "
-                f"上轨={upper:.2f} 下轨={lower:.2f}"
+                f"上轨={upper:.2f} 下轨={lower:.2f} EMA趋势={ema_trend}"
             )
             return OrderType.SELL
 
         logger.info(
             f"[{self.name}] 无信号: 价格={current_close:.2f} "
             f"上轨={upper:.2f} 下轨={lower:.2f} "
-            f"K={curr_k:.1f} D={curr_d:.1f} "
+            f"K={curr_k:.1f} D={curr_d:.1f} EMA趋势={ema_trend} "
             f"{'金叉' if golden_cross else '死叉' if death_cross else ''}"
         )
         return None
