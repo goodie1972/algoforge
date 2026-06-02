@@ -52,6 +52,11 @@ MAX_RAPID_EXITS = 3                     # 窗口内最多出场次数
 RAPID_EXIT_WINDOW_SECONDS = 300         # 检测窗口（5 分钟）
 RAPID_EXIT_COOLDOWN_SECONDS = 7200      # 触发后冷却（2 小时）
 
+# === 单策略绝对亏损冷却（与快速出场/百分比亏损并行） ===
+PER_STRATEGY_REALIZED_LOSS_AMOUNT = 30.0    # 已实现亏损 ≥$30 触发 12h 冷却
+MAX_CONSECUTIVE_LOSSES = 3                  # 连续亏损 N 次后触发冷却
+CONSECUTIVE_LOSS_COOLDOWN_HOURS = 4         # 连续亏损冷却时长
+
 # === 安全锁 ===
 SAFETY_LOCK_TIMEOUT_MINUTES = 90        # 自动过期时间（分钟）
 

@@ -1,6 +1,6 @@
 // REST API 客户端
 import axios from 'axios'
-import type { AccountInfo, Position, Candle, TickPrice, LogEntry, EngineStatus } from '@/types'
+import type { AccountInfo, Position, Candle, TickPrice, LogEntry, EngineStatus, BacktestRequest, BacktestJob, BacktestResult, BacktestHistoryItem, ClosedTrade } from '@/types'
 
 const http = axios.create({
   baseURL: '/api',
@@ -98,4 +98,31 @@ export async function getNewsCalendar(): Promise<{
 export async function getLogs(level?: string, limit = 100): Promise<LogEntry[]> {
   const { data } = await http.get('/logs', { params: { level, limit } })
   return data.logs
+}
+
+// === 历史成交 ===
+export async function getTradeHistory(limit = 100): Promise<ClosedTrade[]> {
+  const { data } = await http.get('/trades/history', { params: { limit } })
+  return data
+}
+
+// === 回测 ===
+export async function runBacktest(params: BacktestRequest): Promise<{ job_id: string; status: string }> {
+  const { data } = await http.post('/backtest/run', params)
+  return data
+}
+
+export async function getBacktestStatus(jobId: string): Promise<BacktestJob> {
+  const { data } = await http.get(`/backtest/status/${jobId}`)
+  return data
+}
+
+export async function getBacktestResults(jobId: string): Promise<BacktestJob & { result?: BacktestResult }> {
+  const { data } = await http.get(`/backtest/results/${jobId}`)
+  return data
+}
+
+export async function getBacktestHistory(limit = 20): Promise<BacktestHistoryItem[]> {
+  const { data } = await http.get('/backtest/history', { params: { limit } })
+  return data
 }
