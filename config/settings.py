@@ -80,6 +80,12 @@ STRATEGY_POOL = {
         "double_first": False,
         "max_positions": 1,
     },
+    "rsi_bollinger_m30": {
+        "magic": 777888,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
 }
 
 # 向后兼容

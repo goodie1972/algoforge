@@ -13,6 +13,7 @@ const strategyLabels: Record<string, string> = {
   atr_breakout: 'ATR 突破',
   combined: '双确认',
   rsi_bollinger: 'RSI+BB',
+  rsi_bollinger_m30: 'RSI+BB M30',
   stoch_bollinger: 'Stoch+BB',
 }
 

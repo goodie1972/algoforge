@@ -22,6 +22,7 @@ export const useAccountStore = defineStore('account', () => {
 
   function updateFromWs(data: AccountInfo) {
     info.value = data
+    error.value = null  // WebSocket 数据到达说明连接正常，清除之前的错误
   }
 
   return { info, loading, error, fetch, updateFromWs }

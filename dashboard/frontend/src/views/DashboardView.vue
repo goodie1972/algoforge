@@ -8,6 +8,7 @@ import { usePositionStore } from '@/stores/positions'
 import { usePriceStore } from '@/stores/prices'
 import TradingTerminal from '@/components/dashboard/TradingTerminal.vue'
 import StrategySignals from '@/components/dashboard/StrategySignals.vue'
+import AccountPanel from '@/components/dashboard/AccountPanel.vue'
 
 const message = useMessage()
 const accountStore = useAccountStore()
@@ -84,59 +85,8 @@ async function toggleEngine() {
       </n-space>
     </n-card>
 
-    <!-- 账户指标卡片 -->
-    <n-card size="small" :bordered="true">
-      <template #header>
-        <n-space align="center">
-          <n-text strong>账户概览</n-text>
-          <n-tag v-if="accountStore.error && accountStore.info" size="tiny" type="warning" :bordered="false">同步延迟</n-tag>
-        </n-space>
-      </template>
-      <template v-if="accountStore.loading && !accountStore.info">
-        <n-skeleton text :repeat="1" />
-      </template>
-      <template v-else-if="!accountStore.info && accountStore.error">
-        <n-result status="error" title="获取账户信息失败" :description="accountStore.error" size="small">
-          <template #footer>
-            <n-button size="small" @click="accountStore.fetch()">重试</n-button>
-          </template>
-        </n-result>
-      </template>
-      <template v-else-if="!accountStore.info">
-        <n-result status="info" title="等待连接" description="MT4 未连接，启动引擎后自动获取" size="small" />
-      </template>
-      <template v-else>
-        <n-grid :cols="5" :x-gap="16">
-          <n-gi>
-            <n-statistic label="余额" tabular-nums>
-              <span class="price-gold">${{ accountStore.info.balance.toFixed(2) }}</span>
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic label="净值" tabular-nums>
-              <span :class="(accountStore.info.equity ?? 0) >= accountStore.info.balance ? 'price-up' : 'price-down'">
-                ${{ (accountStore.info.equity ?? 0).toFixed(2) }}
-              </span>
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic label="已用保证金" tabular-nums>
-              ${{ accountStore.info.margin.toFixed(2) }}
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic label="可用保证金" tabular-nums>
-              ${{ accountStore.info.free_margin.toFixed(2) }}
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic label="当前报价" tabular-nums>
-              <span class="price-gold">{{ priceStore.midPrice.toFixed(2) }}</span>
-            </n-statistic>
-          </n-gi>
-        </n-grid>
-      </template>
-    </n-card>
+    <!-- 账户概览（共用组件） -->
+    <AccountPanel />
 
     <!-- 图表 + 信号 -->
     <n-grid :cols="3" :x-gap="16">

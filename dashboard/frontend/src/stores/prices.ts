@@ -33,19 +33,29 @@ export const usePriceStore = defineStore('prices', () => {
     finally { loading.value = false }
   }
 
-  /** 轻量刷新：只拉最后 N 根 K 线（用于定时轮询），更新 candles[] 尾部 */
+  /** 轻量刷新：只拉最后 N 根 K 线（用于定时轮询），按时间戳匹配更新 */
   async function fetchLatestCandles(timeframe = 'H1', count = 10) {
     try {
       const data = await getCandles(timeframe, count)
       if (data.length === 0) return data
-      // 替换末尾对应条数，处理新蜡烛追加
-      for (let i = 0; i < data.length; i++) {
-        const idx = candles.value.length - count + i
-        if (idx >= 0 && idx < candles.value.length) {
-          candles.value[idx] = data[i]
+      // 按时间戳匹配更新，新蜡烛追加到尾部
+      const timeMap = new Map(candles.value.map(c => [c.time, true]))
+      let added = 0
+      for (const c of data) {
+        if (timeMap.has(c.time)) {
+          // 更新已有蜡烛
+          const idx = candles.value.findIndex(x => x.time === c.time)
+          if (idx >= 0) candles.value[idx] = c
         } else {
-          candles.value.push(data[i])
+          // 新蜡烛，追加
+          candles.value.push(c)
+          timeMap.set(c.time, true)
+          added++
         }
+      }
+      // 如果追加了新蜡烛，裁剪旧数据防止无限膨胀
+      if (added > 0 && candles.value.length > 1000) {
+        candles.value.splice(0, added)
       }
       return data
     } catch { return [] }

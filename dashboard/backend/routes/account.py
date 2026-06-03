@@ -11,21 +11,10 @@ run_bridge = None
 
 @router.get("")
 async def get_account():
-    """获取 MT4 账户信息"""
-    if not engine_runner or not engine_runner.bridge:
+    """获取 MT4 账户信息（从广播缓存读取，不直接走桥接避免抢锁）"""
+    if not engine_runner:
         return None
-    try:
-        info = await run_bridge(engine_runner.bridge.get_account_info)
-        if not info:
-            return None
-        return {
-            "login": info.login,
-            "balance": info.balance,
-            "equity": info.equity,
-            "margin": info.margin,
-            "free_margin": info.free_margin,
-            "currency": info.currency,
-            "leverage": info.leverage,
-        }
-    except Exception as e:
-        raise HTTPException(502, f"获取账户信息失败: {e}")
+    cached = engine_runner._cached_account
+    if not cached:
+        return None
+    return cached

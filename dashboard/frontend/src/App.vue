@@ -33,7 +33,6 @@ const menuOptions = [
   { label: '策略中心', key: '/strategies', icon: renderIcon(BarChartOutline) },
   { label: '运行配置', key: '/config', icon: renderIcon(SettingsOutline) },
   { label: '系统日志', key: '/logs', icon: renderIcon(DocumentTextOutline) },
-  { label: '历史成交', key: '/trades', icon: renderIcon(TimeOutline) },
 ]
 
 function handleMenuUpdate(key: string) {

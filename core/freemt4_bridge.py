@@ -234,6 +234,41 @@ class FreeMT4Bridge(MT4BridgeBase):
             ))
         return positions
 
+    def get_order_history(self, symbol: str = None) -> list[dict]:
+        """获取 MT4 历史成交记录（需要 EA 支持 F062 指令）"""
+        data = self._send_cmd("F062#0#")
+        if not data:
+            return []
+
+        all_fields = "$".join(data).split("$")
+        FIELDS_PER_ORDER = 15
+
+        orders = []
+        for i in range(0, len(all_fields) - FIELDS_PER_ORDER + 1, FIELDS_PER_ORDER):
+            chunk = all_fields[i:i + FIELDS_PER_ORDER]
+            if not chunk[0] or not chunk[0].isdigit():
+                continue
+            if symbol and chunk[1] != symbol:
+                continue
+            orders.append({
+                "ticket": int(chunk[0]),
+                "symbol": chunk[1],
+                "order_type": chunk[2],
+                "magic": int(chunk[3]),
+                "volume": float(chunk[4]),
+                "open_price": float(chunk[5]),
+                "open_time": int(chunk[6]),
+                "close_price": float(chunk[7]),
+                "close_time": int(chunk[8]),
+                "profit": float(chunk[9]),
+                "swap": float(chunk[10]),
+                "commission": float(chunk[11]),
+                "stop_loss": float(chunk[12]),
+                "take_profit": float(chunk[13]),
+                "comment": chunk[14],
+            })
+        return orders
+
     # ======================== 下单/平仓 ========================
 
     def open_order(self, symbol: str, order_type: OrderType, volume: float,

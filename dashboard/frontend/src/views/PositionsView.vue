@@ -3,8 +3,9 @@ import { h, ref, computed, onMounted } from 'vue'
 import { usePositionStore } from '@/stores/positions'
 import { useAccountStore } from '@/stores/account'
 import { useTradeStore } from '@/stores/trades'
-import { useMessage, useDialog, NButton, NTag, NSpace, NInput, NDataTable, NCard, NEmpty, NText } from 'naive-ui'
+import { useMessage, useDialog, NButton, NTag, NSpace, NInput, NDataTable, NCard, NEmpty, NText, NModal } from 'naive-ui'
 import { closePosition, modifyPosition } from '@/api/client'
+import AccountPanel from '@/components/dashboard/AccountPanel.vue'
 
 const store = usePositionStore()
 const account = useAccountStore()
@@ -17,8 +18,21 @@ const editTp = ref(0)
 const loadingClose = ref<number | null>(null)
 const loadingModify = ref(false)
 const showDrawer = computed(() => editingTicket.value != null)
+const showHistoryModal = ref(false)
+const fullHistory = ref<any[]>([])
+const loadingFullHistory = ref(false)
 
 onMounted(() => tradeStore.fetch(10))
+
+async function openFullHistory() {
+  showHistoryModal.value = true
+  loadingFullHistory.value = true
+  try {
+    const { getTradeHistory } = await import('@/api/client')
+    fullHistory.value = await getTradeHistory(999)
+  } catch { /* ignore */ }
+  finally { loadingFullHistory.value = false }
+}
 
 const columns = [
   { title: 'Ticket', key: 'ticket', width: 90 },
@@ -167,35 +181,8 @@ async function handleModify() {
 
 <template>
   <n-space vertical size="large">
-    <!-- 账户信息卡片 -->
-    <n-card title="账户信息" size="small">
-      <template v-if="account.loading">
-        <n-skeleton text :repeat="3" />
-      </template>
-      <template v-else-if="account.error">
-        <n-result status="error" title="获取账户信息失败" :description="account.error" size="small">
-          <template #footer>
-            <n-button size="small" @click="account.fetch()">重试</n-button>
-          </template>
-        </n-result>
-      </template>
-      <template v-else-if="!account.info">
-        <n-result status="info" title="等待连接" description="MT4 未连接，启动引擎后自动获取" size="small" />
-      </template>
-      <template v-else>
-        <n-grid :cols="4" :x-gap="12" :y-gap="12">
-          <n-gi><n-statistic label="余额" tabular-nums><span class="price-gold">${{ account.info.balance.toFixed(2) }}</span></n-statistic></n-gi>
-          <n-gi><n-statistic label="净值" tabular-nums><span :class="account.info.equity >= account.info.balance ? 'price-up' : 'price-down'">${{ account.info.equity.toFixed(2) }}</span></n-statistic></n-gi>
-          <n-gi><n-statistic label="已用保证金" tabular-nums>${{ account.info.margin.toFixed(2) }}</n-statistic></n-gi>
-          <n-gi><n-statistic label="可用保证金" tabular-nums>${{ account.info.free_margin.toFixed(2) }}</n-statistic></n-gi>
-        </n-grid>
-        <n-descriptions :column="3" size="small" bordered style="margin-top: 12px;">
-          <n-descriptions-item label="账户"><n-tag size="small" round>{{ account.info.login }}</n-tag></n-descriptions-item>
-          <n-descriptions-item label="杠杆">1:{{ account.info.leverage }}</n-descriptions-item>
-          <n-descriptions-item label="货币">{{ account.info.currency }}</n-descriptions-item>
-        </n-descriptions>
-      </template>
-    </n-card>
+    <!-- 账户信息（共用组件） -->
+    <AccountPanel />
 
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <n-h2 style="margin:0;">持仓管理</n-h2>
@@ -225,7 +212,12 @@ async function handleModify() {
     <!-- 最近成交 -->
     <n-card title="最近成交" size="small">
       <template #header-extra>
-        <n-tag :bordered="false" type="info">共 {{ tradeStore.items.length }} 笔</n-tag>
+        <n-space size="small">
+          <n-tag :bordered="false" type="info">共 {{ tradeStore.items.length }} 笔</n-tag>
+          <n-button size="tiny" secondary circle type="primary" @click="openFullHistory">
+            <template #icon><span style="font-weight:bold;font-size:16px;">+</span></template>
+          </n-button>
+        </n-space>
       </template>
       <n-data-table v-if="tradeStore.loading" :columns="tradeColumns" :data="[]" :loading="true" :bordered="true" :max-height="240" />
       <n-empty v-else-if="tradeStore.items.length === 0" description="暂无历史成交">
@@ -235,6 +227,13 @@ async function handleModify() {
       <n-data-table v-else :columns="tradeColumns" :data="tradeStore.items" :bordered="true"
                     :max-height="240" striped :single-line="false" />
     </n-card>
+
+    <!-- 全部历史成交弹窗 -->
+    <n-modal v-model:show="showHistoryModal" preset="card" title="全部历史成交"
+             :style="{ maxWidth: '95vw', maxHeight: '90vh' }" size="large" closable>
+      <n-data-table :columns="tradeColumns" :data="fullHistory" :bordered="true" :loading="loadingFullHistory"
+                    :max-height="560" striped :single-line="false" virtual-scroll />
+    </n-modal>
 
     <!-- 修改 SL/TP 抽屉 -->
     <n-drawer v-model:show="showDrawer" :width="360" placement="right">

@@ -9,6 +9,7 @@ import time
 import sys
 import os
 import importlib
+import threading
 from datetime import datetime
 from dataclasses import dataclass, field
 from collections import deque
@@ -21,6 +22,7 @@ from strategies.double_ma import DoubleMAStrategy
 from strategies.atr_breakout import ATRBreakoutStrategy
 from strategies.combined import CombinedStrategy
 from strategies.rsi_bollinger import RSIBollingerStrategy
+from strategies.rsi_bollinger_m30 import RSIBollingerM30Strategy
 from strategies.stoch_bollinger import StochBollingerStrategy
 
 STRATEGY_MAP = {
@@ -28,6 +30,7 @@ STRATEGY_MAP = {
     "atr_breakout": ATRBreakoutStrategy,
     "combined": CombinedStrategy,
     "rsi_bollinger": RSIBollingerStrategy,
+    "rsi_bollinger_m30": RSIBollingerM30Strategy,
     "stoch_bollinger": StochBollingerStrategy,
 }
 
@@ -90,6 +93,7 @@ class TradingEngine:
     def __init__(self):
         self.bridge = create_bridge()
         self.strategies = create_strategies(self.bridge)
+        self._strategies_lock = threading.Lock()
         self.news_filter = NewsFilter()
         self.running = False
         self._last_balance_check = 0
@@ -124,6 +128,50 @@ class TradingEngine:
                 logger.info(f"加载历史成交 {len(self._closed_trades)} 条")
         except Exception as e:
             logger.warning(f"加载历史成交失败: {e}")
+
+    def add_strategy(self, name: str, cfg: dict) -> bool:
+        """动态添加策略（运行中），返回是否成功"""
+        with self._strategies_lock:
+            if any(s.name == name for s in self.strategies):
+                logger.warning(f"[策略动态添加] {name} 已存在，跳过")
+                return False
+            magic = cfg["magic"]
+            if any(s.magic == magic for s in self.strategies):
+                logger.warning(f"[策略动态添加] Magic {magic} 已被占用，跳过")
+                return False
+            cls = STRATEGY_MAP.get(name)
+            if cls is None:
+                logger.warning(f"[策略动态添加] 未知策略: {name}")
+                return False
+            strategy = cls(self.bridge, magic=magic, timeframe=cfg.get("timeframe", "H1"))
+            strategy.magic = magic
+            strategy.double_first = cfg.get("double_first", False)
+            strategy.max_positions = cfg.get("max_positions", 1)
+            self.strategies.append(strategy)
+            self._init_risk_state(name, magic)
+            existing = self.bridge.takeover_existing_positions(settings.SYMBOL, magic)
+            for pos in existing:
+                self._entry_times[pos.ticket] = time.time()
+            logger.info(f"[策略动态添加] {name} Magic={magic} TF={cfg.get('timeframe','H1')}")
+            return True
+
+    def remove_strategy(self, name: str, close_positions: bool = True) -> bool:
+        """动态移除策略（运行中），返回是否成功"""
+        with self._strategies_lock:
+            strategy = next((s for s in self.strategies if s.name == name), None)
+            if strategy is None:
+                logger.warning(f"[策略动态移除] {name} 不存在")
+                return False
+            if close_positions:
+                positions = self.bridge.get_positions(settings.SYMBOL)
+                for pos in positions:
+                    if pos.magic == strategy.magic:
+                        self.bridge.close_order(pos.ticket)
+                        self._entry_times.pop(pos.ticket, None)
+            self.strategies = [s for s in self.strategies if s.name != name]
+            self._risk_states.pop(strategy.magic, None)
+            logger.info(f"[策略动态移除] {name} Magic={strategy.magic}")
+            return True
 
     def _init_risk_state(self, name: str, magic: int):
         """初始化单策略风控状态"""
@@ -358,13 +406,17 @@ class TradingEngine:
         logger.info("交易引擎已停止")
 
     def _tick(self):
+        # 取策略快照（线程安全，允许运行中加减策略）
+        with self._strategies_lock:
+            snapshot = list(self.strategies)
+
         # 配置热重载
         try:
             mtime = os.path.getmtime(settings.__file__)
             if mtime > self._config_mtime:
                 self._config_mtime = mtime
                 importlib.reload(settings)
-                for s in self.strategies:
+                for s in snapshot:
                     s.reload_config()
                 logger.info("[热重载] 配置已更新")
         except OSError:
@@ -373,7 +425,7 @@ class TradingEngine:
         self._check_status_report()
 
         # ---- 止损平仓：所有风控/新闻禁售不限制平仓 ----
-        for strategy in self.strategies:
+        for strategy in snapshot:
             self._run_exits(strategy)
 
         # 更新浮动盈亏
@@ -404,7 +456,7 @@ class TradingEngine:
         self._check_floating_loss_blocks()
 
         # ---- 开仓：逐策略判断 ----
-        for strategy in self.strategies:
+        for strategy in snapshot:
             block_reason = self._is_strategy_blocked(strategy.magic)
             if block_reason:
                 logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
@@ -657,6 +709,10 @@ class TradingEngine:
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
         all_positions = self.bridge.get_positions(settings.SYMBOL)
 
+        with self._strategies_lock:
+            strategies_snapshot = list(self.strategies)
+            strategy_magics = [s.magic for s in strategies_snapshot]
+
         report = (
             f"\n{'='*50}\n"
             f"  XAUUSD 多策略状态  {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
@@ -667,7 +723,7 @@ class TradingEngine:
         )
 
         total_pnl = 0.0
-        for s in self.strategies:
+        for s in strategies_snapshot:
             my_pos = [p for p in all_positions if p.magic == s.magic]
             pnl = sum(p.profit for p in my_pos)
             total_pnl += pnl
@@ -685,8 +741,7 @@ class TradingEngine:
                 report += f" ⛔{blocked}"
             report += "\n"
 
-        manual = [p for p in all_positions if p.magic not in
-                  [s.magic for s in self.strategies]]
+        manual = [p for p in all_positions if p.magic not in strategy_magics]
         manual_pnl = sum(p.profit for p in manual)
         if manual:
             report += f"  [手工单] 持仓={len(manual)} 浮动=${manual_pnl:.2f}\n"

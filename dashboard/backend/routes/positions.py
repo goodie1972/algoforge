@@ -43,15 +43,10 @@ def _pos_to_dict(pos):
 
 @router.get("")
 async def get_positions(symbol: Optional[str] = None):
-    """获取当前持仓"""
-    if not engine_runner or not engine_runner.bridge:
+    """获取当前持仓（从广播缓存读取）"""
+    if not engine_runner:
         return []
-    try:
-        sym = symbol or settings.SYMBOL
-        positions = await run_bridge(engine_runner.bridge.get_positions, sym)
-        return [_pos_to_dict(p) for p in positions]
-    except Exception as e:
-        raise HTTPException(502, f"获取持仓失败: {e}")
+    return engine_runner._cached_positions
 
 
 @router.post("/{ticket}/close")
