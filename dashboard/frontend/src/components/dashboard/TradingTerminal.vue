@@ -121,7 +121,7 @@ function parsePeriods(s: string): number[] {
 
 // 参数变更时重建对应指标
 watch([showEMA, showSMA, showBB, emaPeriods, smaPeriods, bbPeriod, bbStd], () => {
-  if (showEMA.value || showSMA.value || showBB.value) applyOverlay()
+  applyOverlay()
 })
 // 复选框切换时重建/销毁副图
 watch(showRSI, () => { destroyPane('rsi'); if (showRSI.value) applyRSI() })
@@ -261,8 +261,8 @@ function applyOverlay() {
       overlaySeries[key].setData(castTime(padLinePoints(data, calcEMA(data, p))))
     })
   }
-  // 清理不在参数列表中的 EMA 系列
-  const emaKeys = parsePeriods(emaPeriods.value).map(p => `ema${p}`)
+  // 清理不在参数列表中的 EMA 系列（取消勾选时全部清理）
+  const emaKeys = showEMA.value ? parsePeriods(emaPeriods.value).map(p => `ema${p}`) : []
   Object.keys(overlaySeries).forEach(k => {
     if (k.startsWith('ema') && !emaKeys.includes(k)) removeOverlaySeries(k)
   })
@@ -277,7 +277,7 @@ function applyOverlay() {
       overlaySeries[key].setData(castTime(padLinePoints(data, calcSMA(data, p))))
     })
   }
-  const smaKeys = parsePeriods(smaPeriods.value).map(p => `sma${p}`)
+  const smaKeys = showSMA.value ? parsePeriods(smaPeriods.value).map(p => `sma${p}`) : []
   Object.keys(overlaySeries).forEach(k => {
     if (k.startsWith('sma') && !smaKeys.includes(k)) removeOverlaySeries(k)
   })

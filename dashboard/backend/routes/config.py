@@ -14,6 +14,18 @@ class ConfigUpdate(BaseModel):
     updates: dict[str, Any]
 
 
+class StrategyPoolUpdate(BaseModel):
+    pool: dict[str, dict]
+
+
+@router.get("/strategy-pool")
+async def get_strategy_pool():
+    """获取策略池配置（在 /{key} 之前注册，避免被捕获）"""
+    if not config_service:
+        raise HTTPException(500, "配置服务未初始化")
+    return config_service.get_strategy_pool()
+
+
 @router.get("")
 async def get_config():
     """获取完整运行时配置"""
@@ -43,18 +55,6 @@ async def update_config(req: ConfigUpdate):
         return {"message": "配置已更新", "updated": updated}
     except Exception as e:
         raise HTTPException(422, f"配置更新失败: {e}")
-
-
-@router.get("/strategy-pool")
-async def get_strategy_pool():
-    """获取策略池配置"""
-    if not config_service:
-        raise HTTPException(500, "配置服务未初始化")
-    return config_service.get_strategy_pool()
-
-
-class StrategyPoolUpdate(BaseModel):
-    pool: dict[str, dict]
 
 
 @router.post("/strategy-pool")

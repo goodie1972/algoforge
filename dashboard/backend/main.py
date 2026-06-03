@@ -57,6 +57,12 @@ from dashboard.backend.routes import trades as route_trades
 from dashboard.backend.routes import data as route_data
 
 route_engine.engine_runner = engine_runner
+# 注入可用策略列表（来自 main.py 的 STRATEGY_MAP）
+try:
+    _main_module = __import__('main')
+    route_engine.available_strategies = {k: True for k in _main_module.STRATEGY_MAP}
+except Exception:
+    route_engine.available_strategies = {}
 route_account.engine_runner = engine_runner
 route_account.run_bridge = run_bridge
 route_positions.engine_runner = engine_runner
@@ -66,6 +72,7 @@ route_market.engine_runner = engine_runner
 route_market.run_bridge = run_bridge
 route_logs.log_handler = log_handler
 route_trades.engine_runner = engine_runner
+route_trades.run_bridge = run_bridge
 route_data.engine_runner = engine_runner
 route_data.run_bridge = run_bridge
 
@@ -83,6 +90,7 @@ async def broadcast_prices():
             if engine_runner.is_running and engine_runner.bridge:
                 bid, ask = await run_bridge(engine_runner.bridge.get_tick_price, "XAUUSD")
                 if bid > 0:
+                    engine_runner._cached_price = {"bid": bid, "ask": ask}
                     await ws_manager.broadcast("prices", {
                         "bid": bid,
                         "ask": ask,
@@ -112,6 +120,7 @@ async def broadcast_positions():
                     }
                     for p in positions
                 ]
+                engine_runner._cached_positions = pos_list
                 await ws_manager.broadcast("positions", pos_list)
         except Exception:
             pass
@@ -125,7 +134,7 @@ async def broadcast_account():
             if engine_runner.is_running and engine_runner.bridge:
                 info = await run_bridge(engine_runner.bridge.get_account_info)
                 if info:
-                    await ws_manager.broadcast("account", {
+                    account_data = {
                         "login": info.login,
                         "balance": info.balance,
                         "equity": info.equity,
@@ -133,7 +142,9 @@ async def broadcast_account():
                         "free_margin": info.free_margin,
                         "currency": info.currency,
                         "leverage": info.leverage,
-                    })
+                    }
+                    engine_runner._cached_account = account_data
+                    await ws_manager.broadcast("account", account_data)
         except Exception:
             pass
         await asyncio.sleep(10)

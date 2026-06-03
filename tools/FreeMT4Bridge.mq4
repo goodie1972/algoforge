@@ -220,6 +220,23 @@ void ProcessCommand(string cmd)
       resp += "#";
       SendResponse(resp);
    }
+   else if(fcode == "F062") {
+      string resp = "F062#OK#";
+      int total = OrdersHistoryTotal();
+      for(int i = total - 1; i >= 0; i--) {
+         if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) continue;
+         if(OrderType() > OP_SELL) continue;
+         string type = (OrderType() == OP_BUY) ? "BUY" : "SELL";
+         resp += StringFormat("%d$%s$%s$%d$%.2f$%.5f$%d$%.5f$%d$%.2f$%.2f$%.2f$%.5f$%.5f$%s$",
+            OrderTicket(), OrderSymbol(), type, OrderMagicNumber(),
+            OrderLots(), OrderOpenPrice(), (int)OrderOpenTime(),
+            OrderClosePrice(), (int)OrderCloseTime(),
+            OrderProfit(), OrderSwap(), OrderCommission(),
+            OrderStopLoss(), OrderTakeProfit(), OrderComment());
+      }
+      resp += "#";
+      SendResponse(resp);
+   }
    else if(fcode == "F070") {
       if(n < 12) { SendResponse("F070#ERROR#bad params#"); return; }
       string sym = parts[2];

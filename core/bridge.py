@@ -114,6 +114,10 @@ class MT4BridgeBase(abc.ABC):
         """修改止损止盈"""
         ...
 
+    def get_order_history(self, symbol: str = None) -> list[dict]:
+        """获取历史成交记录（可选实现，默认返回空）"""
+        return []
+
     def send_heartbeat(self) -> bool:
         """发送心跳保持连接（可选实现，默认 True）"""
         return True

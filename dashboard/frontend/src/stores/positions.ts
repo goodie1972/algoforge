@@ -26,6 +26,7 @@ export const usePositionStore = defineStore('positions', () => {
 
   function updateFromWs(data: Position[]) {
     items.value = data
+    error.value = null
   }
 
   async function close(ticket: number) {

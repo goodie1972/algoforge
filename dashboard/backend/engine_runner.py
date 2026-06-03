@@ -28,6 +28,11 @@ class EngineRunner:
         self._start_time: Optional[datetime] = None
         self.logger = logging.getLogger("engine_runner")
 
+        # 缓存由后台广播任务更新的最近数据，避免 REST API 与广播抢桥接锁
+        self._cached_account: Optional[dict] = None
+        self._cached_price: Optional[dict] = None
+        self._cached_positions: list = []
+
     @property
     def is_running(self) -> bool:
         return self._running and self.engine_thread is not None and self.engine_thread.is_alive()
@@ -65,6 +70,74 @@ class EngineRunner:
             "started_at": self._start_time.isoformat() if self._start_time else None,
             "bridge_connected": self.bridge is not None and hasattr(self.bridge, '_connected') and self.bridge._connected,
         }
+
+    def add_strategy(self, name: str, cfg: dict) -> bool:
+        """动态添加策略"""
+        if self._engine:
+            return self._engine.add_strategy(name, cfg)
+        return False
+
+    def remove_strategy(self, name: str, close_positions: bool = True) -> bool:
+        """动态移除策略"""
+        if self._engine:
+            return self._engine.remove_strategy(name, close_positions)
+        return False
+
+    # ======================== 数据库数据完整性检查 ========================
+
+    def _sync_data_after_start(self, engine):
+        """引擎启动后检查数据库数据，按活跃策略的周期自动补漏"""
+        try:
+            from data import database as db
+            from data.downloader import download_timeframe
+
+            db.init_db()  # 确保表存在
+
+            # 获取活跃策略的周期列表
+            pool = {}
+            if self.config_service:
+                pool = self.config_service.get_strategy_pool()
+            active_tfs = set()
+            for name, cfg in pool.items():
+                if cfg.get("enabled", False):
+                    tf = cfg.get("timeframe", "H1")
+                    active_tfs.add(tf)
+
+            if not active_tfs:
+                self.logger.info("[数据同步] 无活跃策略，跳过")
+                return
+
+            self.logger.info(f"[数据同步] 检查周期: {active_tfs}")
+            for tf in sorted(active_tfs):
+                try:
+                    latest = db.get_latest_timestamp(tf)
+                    now_ts = int(time.time())
+                    tf_sec = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800,
+                              "H1": 3600, "H4": 14400, "D1": 86400, "W1": 604800}
+                    interval = tf_sec.get(tf, 3600)
+
+                    if latest is None:
+                        self.logger.info(f"[数据同步] {tf} 无数据，开始下载")
+                        n = download_timeframe(engine.bridge, tf)
+                        self.logger.info(f"[数据同步] {tf} 下载完成，写入 {n} 条")
+                    else:
+                        gap = now_ts - latest
+                        if gap > interval * 3:  # 缺失超过 3 根
+                            self.logger.info(f"[数据同步] {tf} 最新数据 {datetime.fromtimestamp(latest).strftime('%Y-%m-%d %H:%M')}，缺口 {gap//interval} 根，开始补漏")
+                            n = download_timeframe(engine.bridge, tf)
+                            self.logger.info(f"[数据同步] {tf} 补漏完成，写入 {n} 条")
+                        else:
+                            self.logger.info(f"[数据同步] {tf} 数据完整（最新 {datetime.fromtimestamp(latest).strftime('%Y-%m-%d %H:%M')}）")
+                except Exception as e:
+                    self.logger.error(f"[数据同步] {tf} 处理失败: {e}")
+
+            # 打印汇总
+            stats = db.get_db_stats()
+            for tf, info in stats.items():
+                if info["count"] > 0:
+                    self.logger.info(f"[数据同步] {tf}: {info['count']} 条 ({info['from']} ~ {info['to']})")
+        except Exception as e:
+            self.logger.warning(f"[数据同步] 跳过（模块未就绪: {e}）")
 
     # ======================== 引擎主循环 ========================
 
@@ -135,6 +208,9 @@ class EngineRunner:
         self._start_time = datetime.now()
         self._running = True
         self.logger.info("进入主循环...")
+
+        # 引擎启动后检查数据库数据完整性，自动补漏
+        self._sync_data_after_start(engine)
 
         # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
         while engine.running and not self._stop_requested:

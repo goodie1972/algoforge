@@ -14,19 +14,18 @@ run_bridge = None
 
 @router.get("/price")
 async def get_price():
-    """获取当前买卖价"""
-    if not engine_runner or not engine_runner.bridge:
+    """获取当前买卖价（从广播缓存读取）"""
+    if not engine_runner:
         return {"bid": 0, "ask": 0, "spread": 0, "symbol": settings.SYMBOL}
-    try:
-        bid, ask = await run_bridge(engine_runner.bridge.get_tick_price, settings.SYMBOL)
+    cached = engine_runner._cached_price
+    if cached:
         return {
-            "bid": bid,
-            "ask": ask,
-            "spread": round(ask - bid, 2),
+            "bid": cached["bid"],
+            "ask": cached["ask"],
+            "spread": round(cached["ask"] - cached["bid"], 2),
             "symbol": settings.SYMBOL,
         }
-    except Exception as e:
-        raise HTTPException(502, f"获取价格失败: {e}")
+    return {"bid": 0, "ask": 0, "spread": 0, "symbol": settings.SYMBOL}
 
 
 @router.get("/candles")
