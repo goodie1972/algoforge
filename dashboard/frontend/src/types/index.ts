@@ -63,6 +63,14 @@ export interface WsMessage {
 
 export type EngineStatusType = 'running' | 'stopped' | 'uninitialized' | 'error'
 
+// 监控告警
+export interface PatrolAlert {
+  id: number
+  time: string
+  level: 'info' | 'warning' | 'critical'
+  message: string
+}
+
 // 回测类型
 export interface BacktestRequest {
   strategies: string[]

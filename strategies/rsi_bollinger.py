@@ -39,6 +39,14 @@ class RSIBollingerStrategy(BaseStrategy):
         self._load_settings()
         logger.info(f"[{self.name}] 配置已热重载")
 
+    def _get_oversold(self, ema_trend: Optional[str] = None) -> int:
+        """子类可覆写实现动态阈值"""
+        return self.rsi_oversold
+
+    def _get_overbought(self, ema_trend: Optional[str] = None) -> int:
+        """子类可覆写实现动态阈值"""
+        return self.rsi_overbought
+
     def _calc_ema(self, period: int, shift: int = 0) -> Optional[float]:
         closes = self.get_close_prices()
         needed = period + shift
@@ -184,7 +192,7 @@ class RSIBollingerStrategy(BaseStrategy):
             else:
                 ema_trend = "flat"
 
-        if current_close <= lower and rsi < self.rsi_oversold:
+        if current_close <= lower and rsi < self._get_oversold(ema_trend):
             # if ema_trend != "up":
             #     logger.info(
             #         f"[{self.name}] EMA20趋势过滤 BUY: 价格={current_close:.2f} "
@@ -204,7 +212,7 @@ class RSIBollingerStrategy(BaseStrategy):
             )
             return OrderType.BUY
 
-        if current_close >= upper and rsi > self.rsi_overbought:
+        if current_close >= upper and rsi > self._get_overbought(ema_trend):
             # if ema_trend != "down":
             #     logger.info(
             #         f"[{self.name}] EMA20趋势过滤 SELL: 价格={current_close:.2f} "
