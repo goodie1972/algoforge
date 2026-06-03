@@ -33,8 +33,7 @@ LOT_SIZE = 0.01             # 每次开仓手数（从最小开始）
 MAGIC_NUMBER = 888888       # EA 魔术号，用于标识本程序的订单
 SLIPPAGE = 30               # 最大滑点（points）
 
-# 风控
-MAX_POSITIONS = 2           # 最大同时持仓数（双倍首单，每次开2张）
+# 风控 — 见文件底部 STRATEGY_POOL 后动态计算
 
 # === 账户级硬止损（balance-based） ===
 MAX_DAILY_LOSS_PCT = 12.0   # 全局已实现亏损上限，触发后所有策略停开仓
@@ -68,28 +67,25 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # 每个策略有独立的 magic number、时间周期、仓位
 # ============================================================
 STRATEGY_POOL = {
-    "stoch_bollinger": {
+    "H4_stoch_bollinger": {
         "magic": 888888,
         "timeframe": "H4",
         "double_first": False,
         "max_positions": 1,
     },
-    "rsi_bollinger": {
+    "H1_rsi_bollinger": {
         "magic": 777777,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
-    "rsi_bollinger_m30": {
-        "magic": 777888,
-        "timeframe": "M30",
-        "double_first": False,
-        "max_positions": 1,
-    },
 }
 
+# 全局最大持仓 = 策略数量 × 1.5 四舍五入
+MAX_POSITIONS = int(len(STRATEGY_POOL) * 1.5 + 0.5)  # 3策略 → 5
+
 # 向后兼容
-STRATEGY = list(STRATEGY_POOL.keys())[0] if STRATEGY_POOL else "stoch_bollinger"
+STRATEGY = list(STRATEGY_POOL.keys())[0] if STRATEGY_POOL else "H4_stoch_bollinger"
 MAGIC_NUMBER = 888888       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
 MA_FAST = 20                # 快速均线周期
 MA_SLOW = 60                # 慢速均线周期

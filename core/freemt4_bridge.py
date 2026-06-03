@@ -119,6 +119,9 @@ class FreeMT4Bridge(MT4BridgeBase):
                     return None
 
                 if parts[1] != "OK":
+                    cmd_type = cmd.split("#")[0] if "#" in cmd else cmd
+                    error_detail = "#".join(parts[1:])[:200]
+                    logger.error(f"[FreeMT4] EA 错误: {cmd_type} 返回 {error_detail}")
                     return None
 
                 return parts[2:]
@@ -276,12 +279,16 @@ class FreeMT4Bridge(MT4BridgeBase):
                    comment: str = "", magic: int = 0) -> Optional[int]:
         if magic == 0:
             magic = MAGIC_NUMBER
+        # 防御: None → 0，防止 f-string 格式化为 "None" 导致 EA 无法解析
+        sl = sl if sl is not None else 0
+        tp = tp if tp is not None else 0
         type_str = order_type.value.lower()
 
         data = self._send_cmd(
             f"F070#8#{symbol}#{type_str}#{volume}#{price}#{SLIPPAGE}#{magic}#{sl}#{tp}#{comment}#"
         )
         if not data:
+            logger.error(f"[FreeMT4] 开仓失败: {symbol} {order_type.value} magic={magic} _send_cmd 返回空")
             return None
 
         try:

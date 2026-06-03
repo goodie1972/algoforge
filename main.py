@@ -23,15 +23,17 @@ from strategies.atr_breakout import ATRBreakoutStrategy
 from strategies.combined import CombinedStrategy
 from strategies.rsi_bollinger import RSIBollingerStrategy
 from strategies.rsi_bollinger_m30 import RSIBollingerM30Strategy
+from strategies.rsi_turn_m30 import RSITurnM30Strategy
 from strategies.stoch_bollinger import StochBollingerStrategy
 
 STRATEGY_MAP = {
     "double_ma": DoubleMAStrategy,
     "atr_breakout": ATRBreakoutStrategy,
     "combined": CombinedStrategy,
-    "rsi_bollinger": RSIBollingerStrategy,
+    "H1_rsi_bollinger": RSIBollingerStrategy,
     "rsi_bollinger_m30": RSIBollingerM30Strategy,
-    "stoch_bollinger": StochBollingerStrategy,
+    "M30_rsi_turn": RSITurnM30Strategy,
+    "H4_stoch_bollinger": StochBollingerStrategy,
 }
 
 # 日志配置
@@ -526,7 +528,7 @@ class TradingEngine:
                     f"入场={entry:.2f} 出场={exit_price:.2f} 持仓={hold_sec:.0f}秒 亏损=${abs(pnl):.2f}"
                 )
 
-            logger.info(f"[{strategy.name}] EMA20跟踪止损平仓 Ticket={pos.ticket}")
+            logger.info(f"[{strategy.name}] 策略出场 Ticket={pos.ticket}")
             self.bridge.close_order(pos.ticket)
             # 记录平仓：已实现盈亏 + 快速出场检测
             self._record_close(pos.ticket, pnl, strategy.magic)
@@ -550,7 +552,7 @@ class TradingEngine:
                 open_time=pos.open_time,
                 close_time=close_time,
                 hold_seconds=round(hold_sec),
-                exit_reason="ema20_trail",
+                exit_reason="strategy_exit",
             )
             self._closed_trades.append(record)
             try:
@@ -624,6 +626,9 @@ class TradingEngine:
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
         if hasattr(strategy, 'get_dynamic_sl_tp'):
             sl, tp = strategy.get_dynamic_sl_tp(OrderType.BUY, ask)
+            if sl is None or tp is None:
+                sl = ask - settings.STOP_LOSS_PIPS * 0.01
+                tp = ask + settings.TAKE_PROFIT_PIPS * 0.01
         else:
             sl = ask - settings.STOP_LOSS_PIPS * 0.01
             tp = ask + settings.TAKE_PROFIT_PIPS * 0.01
@@ -649,6 +654,9 @@ class TradingEngine:
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
         if hasattr(strategy, 'get_dynamic_sl_tp'):
             sl, tp = strategy.get_dynamic_sl_tp(OrderType.SELL, bid)
+            if sl is None or tp is None:
+                sl = bid + settings.STOP_LOSS_PIPS * 0.01
+                tp = bid - settings.TAKE_PROFIT_PIPS * 0.01
         else:
             sl = bid + settings.STOP_LOSS_PIPS * 0.01
             tp = bid - settings.TAKE_PROFIT_PIPS * 0.01
@@ -679,12 +687,7 @@ class TradingEngine:
         return info.equity if info else 0.0
 
     def _check_news_blackout(self) -> bool:
-        """检查是否在新闻禁售期，每5分钟刷新一次"""
-        now = time.time()
-        if now - self._last_news_check < 300:
-            return False
-        self._last_news_check = now
-
+        """检查是否在新闻禁售期，每次主循环检查"""
         blocked, reason = self.news_filter.is_in_blackout()
         if blocked:
             logger.info(f"[新闻过滤] 禁售时段: {reason}，跳过开仓")

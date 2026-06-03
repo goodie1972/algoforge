@@ -276,7 +276,7 @@ def _generate_signals(df, strategy_name: str) -> list[int]:
             elif ema_fast[i] < ema_slow[i] and ema_fast[i - 1] >= ema_slow[i - 1]:
                 signals[i] = -1
 
-    elif strategy_name == "rsi_bollinger":
+    elif strategy_name in ("rsi_bollinger", "H1_rsi_bollinger"):
         rsi_period = 14
         bb_period = 20
         if len(close) < max(rsi_period, bb_period) + 1:
@@ -292,7 +292,7 @@ def _generate_signals(df, strategy_name: str) -> list[int]:
             elif rsi[i] > 70 and close[i] > sma[i] + 2 * std[i]:
                 signals[i] = -1
 
-    elif strategy_name == "stoch_bollinger":
+    elif strategy_name in ("stoch_bollinger", "H4_stoch_bollinger"):
         k_period = 14
         if len(close) < k_period + 1:
             return signals

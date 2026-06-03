@@ -15,8 +15,9 @@ run_bridge = None
 logger = logging.getLogger(__name__)
 
 MAGIC_TO_STRATEGY = {
-    777777: "rsi_bollinger",
-    888888: "stoch_bollinger",
+    777777: "H1_rsi_bollinger",
+    777888: "M30_rsi_turn",
+    888888: "H4_stoch_bollinger",
 }
 
 
