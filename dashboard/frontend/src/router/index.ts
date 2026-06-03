@@ -33,6 +33,11 @@ const router = createRouter({
       name: 'trades',
       component: () => import('@/views/TradeHistoryView.vue'),
     },
+    {
+      path: '/patrol',
+      name: 'patrol',
+      component: () => import('@/views/PatrolView.vue'),
+    },
   ],
 })
 

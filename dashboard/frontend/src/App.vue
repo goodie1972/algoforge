@@ -10,8 +10,10 @@ import { useAccountStore } from '@/stores/account'
 import { usePositionStore } from '@/stores/positions'
 import { usePriceStore } from '@/stores/prices'
 import { useLogStore } from '@/stores/logs'
+import { usePatrolStore } from '@/stores/patrol'
 import { wsClient } from '@/api/websocket'
 import { getEngineStatus } from '@/api/client'
+import PatrolIndicator from '@/components/PatrolIndicator.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -19,6 +21,7 @@ const accountStore = useAccountStore()
 const positionStore = usePositionStore()
 const priceStore = usePriceStore()
 const logStore = useLogStore()
+const patrolStore = usePatrolStore()
 
 const engineStatus = ref<'running' | 'stopped'>('stopped')
 const collapsed = ref(false)
@@ -31,6 +34,7 @@ const menuOptions = [
   { label: '交易终端', key: '/', icon: renderIcon(AnalyticsOutline) },
   { label: '账户持仓', key: '/positions', icon: renderIcon(WalletOutline) },
   { label: '策略中心', key: '/strategies', icon: renderIcon(BarChartOutline) },
+  { label: '监控告警', key: '/patrol', icon: renderIcon(TimeOutline) },
   { label: '运行配置', key: '/config', icon: renderIcon(SettingsOutline) },
   { label: '系统日志', key: '/logs', icon: renderIcon(DocumentTextOutline) },
 ]
@@ -48,6 +52,8 @@ async function checkEngineStatus() {
 
 onMounted(() => {
   checkEngineStatus()
+  // 启动前端巡检（每 30 秒自动检测引擎/价格/持仓/日志异常）
+  patrolStore.start(30000)
   // WebSocket 推送覆盖大部分数据，仅需少量 REST 初始加载
   accountStore.fetch()
   logStore.fetchHistory()
@@ -64,6 +70,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   wsClient.disconnect()
+  patrolStore.stop()
 })
 
 </script>
@@ -98,6 +105,9 @@ onUnmounted(() => {
                 </n-text>
               </div>
 
+              <!-- 监控状态 -->
+              <PatrolIndicator v-if="!collapsed" />
+
               <n-menu :value="route.path" :options="menuOptions" :collapsed="collapsed"
                       :collapsed-width="64" :collapsed-icon-size="22"
                       @update:value="handleMenuUpdate" />
@@ -113,7 +123,7 @@ onUnmounted(() => {
                 </n-button>
                 <n-breadcrumb>
                   <n-breadcrumb-item>XAUUSD 量化交易系统</n-breadcrumb-item>
-                  <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'strategies' ? '策略' : route.name === 'logs' ? '日志' : '仪表板' }}</n-breadcrumb-item>
+                  <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'strategies' ? '策略' : route.name === 'logs' ? '日志' : route.name === 'patrol' ? '监控' : '仪表板' }}</n-breadcrumb-item>
                 </n-breadcrumb>
                 <div style="flex:1;"></div>
                 <n-tag :type="engineStatus === 'running' ? 'success' : 'default'" size="small" :bordered="false">
