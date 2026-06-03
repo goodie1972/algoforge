@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class StochBollingerStrategy(BaseStrategy):
     """Stoch + 布林带均值回归 + EMA20 跟踪止损"""
 
-    name = "stoch_bollinger"
+    name = "H4_stoch_bollinger"
 
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
