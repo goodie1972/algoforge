@@ -12,3 +12,29 @@ dist/
 .engine_pid
 .playwright-mcp/
 runtime_config.json
+
+# 数据库
+*.db
+*.db-shm
+*.db-wal
+
+# 截图
+*.png
+*.jpg
+*.jpeg
+
+# 可执行文件
+*.exe
+
+# 运行时状态
+monitor/.patrol.*
+
+# 测试输出
+test-results/
+strategies/test_*.txt
+
+# IDE
+.opencode/
+
+# 备份
+*.bak
