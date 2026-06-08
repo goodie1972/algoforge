@@ -1,0 +1,147 @@
+{
+  "best_params": {
+    "rsi_os": 30,
+    "rsi_ob": 65,
+    "bb_std": 2.0,
+    "thresh": 3,
+    "atr_trail": 4.0,
+    "atr_hard": 3.0
+  },
+  "best_result": {
+    "trades": 178,
+    "pnl": 860.6,
+    "wr": 51.1
+  },
+  "top10": [
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 65,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 4.0,
+        "atr_hard": 3.0
+      },
+      "trades": 178,
+      "pnl": 860.6,
+      "wr": 51.1
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 65,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 3.0,
+        "atr_hard": 3.0
+      },
+      "trades": 179,
+      "pnl": 851.93,
+      "wr": 51.4
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 65,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 4.0,
+        "atr_hard": 2.0
+      },
+      "trades": 193,
+      "pnl": 884.4,
+      "wr": 48.2
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 65,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 3.0,
+        "atr_hard": 2.0
+      },
+      "trades": 194,
+      "pnl": 870.59,
+      "wr": 48.5
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 70,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 4.0,
+        "atr_hard": 2.0
+      },
+      "trades": 162,
+      "pnl": 757.04,
+      "wr": 45.7
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 70,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 4.0,
+        "atr_hard": 3.0
+      },
+      "trades": 147,
+      "pnl": 705.98,
+      "wr": 49.0
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 70,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 3.0,
+        "atr_hard": 2.0
+      },
+      "trades": 164,
+      "pnl": 743.18,
+      "wr": 46.3
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 70,
+        "bb_std": 2.0,
+        "thresh": 3,
+        "atr_trail": 3.0,
+        "atr_hard": 3.0
+      },
+      "trades": 149,
+      "pnl": 692.12,
+      "wr": 49.7
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 65,
+        "bb_std": 2.5,
+        "thresh": 3,
+        "atr_trail": 4.0,
+        "atr_hard": 2.0
+      },
+      "trades": 170,
+      "pnl": 702.53,
+      "wr": 46.5
+    },
+    {
+      "params": {
+        "rsi_os": 30,
+        "rsi_ob": 65,
+        "bb_std": 2.5,
+        "thresh": 3,
+        "atr_trail": 3.0,
+        "atr_hard": 2.0
+      },
+      "trades": 171,
+      "pnl": 688.72,
+      "wr": 46.8
+    }
+  ]
+}
