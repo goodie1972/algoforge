@@ -28,14 +28,10 @@ _ENGINE_KEYS = {
     "news_impact_filter", "news_currency_filter",
 }
 
-# 策略参数（根据当前策略决定哪些生效）
+# 策略参数（V6 Hybrid 通用指标参数）
 _STRATEGY_KEYS = {
-    "ma_fast", "ma_slow", "ma_method",
-    "atr_breakout_period", "atr_period", "atr_multiplier",
-    # RSI + 布林带
     "bb_period", "bb_std", "rsi_period", "rsi_oversold", "rsi_overbought",
-    # Stoch + 布林带
-    "stoch_k", "stoch_slowing", "stoch_d", "stoch_oversold", "stoch_overbought",
+    "stoch_k", "atr_period",
 }
 
 
@@ -86,27 +82,17 @@ class RuntimeConfig:
             "take_profit_pips": "TAKE_PROFIT_PIPS",
             "max_positions": "MAX_POSITIONS",
             "max_daily_loss_pct": "MAX_DAILY_LOSS_PCT",
-            "ma_fast": "MA_FAST",
-            "ma_slow": "MA_SLOW",
-            "ma_method": "MA_METHOD",
-            "atr_breakout_period": "ATR_BREAKOUT_PERIOD",
-            "atr_period": "ATR_PERIOD",
-            "atr_multiplier": "ATR_MULTIPLIER",
             "slippage": "SLIPPAGE",
             "timeframe": "TIMEFRAME",
             "magic_number": "MAGIC_NUMBER",
-            # RSI + 布林带
+            # 通用指标参数
             "bb_period": "BB_PERIOD",
             "bb_std": "BB_STD",
             "rsi_period": "RSI_PERIOD",
             "rsi_oversold": "RSI_OVERSOLD",
             "rsi_overbought": "RSI_OVERBOUGHT",
-            # Stoch + 布林带
             "stoch_k": "STOCH_K",
-            "stoch_slowing": "STOCH_SLOWING",
-            "stoch_d": "STOCH_D",
-            "stoch_oversold": "STOCH_OVERSOLD",
-            "stoch_overbought": "STOCH_OVERBOUGHT",
+            "atr_period": "ATR_PERIOD",
             # 新闻过滤
             "news_filter_enabled": "NEWS_FILTER_ENABLED",
             "news_before_minutes": "NEWS_BEFORE_MINUTES",

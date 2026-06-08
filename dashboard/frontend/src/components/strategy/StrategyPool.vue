@@ -15,19 +15,17 @@ interface StrategyCfg {
 }
 
 const strategyLabels: Record<string, string> = {
-  double_ma: '双均线',
-  atr_breakout: 'ATR 突破',
-  combined: '双确认',
-  rsi_bollinger: 'RSI+BB',
-  stoch_bollinger: 'Stoch+BB',
+  M30_rsi_bb: 'M30 RSI+BB（当前实盘）',
+  H1_v6_hybrid: 'V6 Hybrid [已归档]',
+  double_ma: '双均线 [已归档]',
+  atr_breakout: 'ATR 突破 [已归档]',
+  combined: '双确认 [已归档]',
+  rsi_bollinger: 'RSI+BB [已归档]',
+  stoch_bollinger: 'Stoch+BB [已归档]',
 }
 
 const strategyDefaults: Record<string, { magic: number; timeframe: string; params: Record<string, number> }> = {
-  double_ma: { magic: 101, timeframe: 'H1', params: { fast: 20, slow: 60 } },
-  atr_breakout: { magic: 102, timeframe: 'H1', params: { atr_period: 14, multiplier: 1.5 } },
-  combined: { magic: 103, timeframe: 'H1', params: { fast: 20, slow: 60, rsi_period: 14 } },
-  rsi_bollinger: { magic: 104, timeframe: 'H1', params: { rsi_period: 14, bb_period: 20, bb_std: 2 } },
-  stoch_bollinger: { magic: 105, timeframe: 'H1', params: { k_period: 14, k_smooth: 3, d_smooth: 3 } },
+  M30_rsi_bb: { magic: 777001, timeframe: 'M30', params: { rsi_os: 30, rsi_ob: 65, bb_std: 2, atr_trail: 4, atr_hard: 3 } },
 }
 
 const timeframes = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1']
@@ -93,7 +91,7 @@ async function save() {
         </n-space>
         <n-space size="small" align="center">
           <n-text depth="3" style="font-size: 12px;">Magic</n-text>
-          <n-input-number v-model:value="cfg.magic" size="tiny" :min="100" :max="999" style="width: 80px;" />
+          <n-input-number v-model:value="cfg.magic" size="tiny" :min="100" :max="999999" style="width: 100px;" />
           <n-select v-model:value="cfg.timeframe" :options="timeframes.map(t => ({ label: t, value: t }))"
                     size="tiny" style="width: 72px;" />
         </n-space>

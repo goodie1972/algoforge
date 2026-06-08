@@ -117,6 +117,8 @@ async def broadcast_positions():
                         "profit": round(p.profit, 2),
                         "stop_loss": p.stop_loss,
                         "take_profit": p.take_profit,
+                        "magic": p.magic,
+                        "comment": getattr(p, "comment", ""),
                     }
                     for p in positions
                 ]

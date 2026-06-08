@@ -31,8 +31,8 @@ class NewsFilter:
         """读取最新配置"""
         return {
             "enabled": getattr(settings, "NEWS_FILTER_ENABLED", True),
-            "before_min": int(getattr(settings, "NEWS_BEFORE_MINUTES", 30)),
-            "after_min": int(getattr(settings, "NEWS_AFTER_MINUTES", 30)),
+            "before_min": int(getattr(settings, "NEWS_PRE_TIGHTEN_MINUTES", 120)),
+            "after_min": int(getattr(settings, "NEWS_AFTER_MINUTES", 120)),
             "impact": getattr(settings, "NEWS_IMPACT_FILTER", "High"),
             "currency": getattr(settings, "NEWS_CURRENCY_FILTER", "USD"),
         }
@@ -121,6 +121,55 @@ class NewsFilter:
                 return True, title
 
         return False, ""
+
+    def is_in_pre_tighten(self, now: Optional[datetime] = None) -> bool:
+        """检查是否在事件前收紧窗口 [event-2h, event-15min]，是则策略应收紧止损"""
+        return self._is_in_window(now, "pre_tighten")
+
+    def is_in_force_close(self, now: Optional[datetime] = None) -> bool:
+        """检查是否在事件前强平窗口 [event-15min, event]，是则应平所有持仓"""
+        return self._is_in_window(now, "force_close")
+
+    def _is_in_window(self, now: Optional[datetime], mode: str) -> bool:
+        """通用窗口检查，mode='pre_tighten' 或 'force_close'"""
+        cfg = self._read_config()
+        if not cfg["enabled"]:
+            return False
+        if now is None:
+            now = datetime.utcnow()
+
+        self.fetch_calendar()
+        if not self._cache:
+            return False
+
+        impact_filter = set(cfg["impact"].replace(" ", "").split(","))
+        currency_filter = set(cfg["currency"].replace(" ", "").split(","))
+        pre_close_min = int(getattr(settings, "NEWS_PRE_CLOSE_MINUTES", 15))
+        pre_tighten_min = int(getattr(settings, "NEWS_PRE_TIGHTEN_MINUTES", 120))
+
+        for evt in self._cache:
+            currency = (evt.get("country") or "").upper()
+            impact = (evt.get("impact") or "").strip()
+            if currency not in currency_filter or impact not in impact_filter:
+                continue
+
+            evt_dt = self._parse_event_datetime(evt)
+            if evt_dt is None:
+                continue
+
+            if mode == "pre_tighten":
+                start = evt_dt - timedelta(minutes=pre_tighten_min)
+                end = evt_dt - timedelta(minutes=pre_close_min)
+            elif mode == "force_close":
+                start = evt_dt - timedelta(minutes=pre_close_min)
+                end = evt_dt
+            else:
+                return False
+
+            if start <= now <= end:
+                return True
+
+        return False
 
     def get_upcoming_events(self, limit: int = 10) -> list[dict]:
         """获取即将到来的高影响事件（供前端展示）"""

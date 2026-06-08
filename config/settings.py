@@ -67,63 +67,71 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # 每个策略有独立的 magic number、时间周期、仓位
 # ============================================================
 STRATEGY_POOL = {
-    "H4_stoch_bollinger": {
-        "magic": 888888,
-        "timeframe": "H4",
+    "M30_rsi_bb": {
+        "magic": 777001,
+        "timeframe": "M30",
         "double_first": False,
         "max_positions": 1,
     },
-    "H1_rsi_bollinger": {
-        "magic": 777777,
+    "H1_v6_hybrid": {
+        "magic": 666666,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
+    # === 新增实盘策略 (来自 GitHub 开源回测) ===
+    "sanqing_h1": {
+        "magic": 777002,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "gold_auto_research": {
+        "magic": 777003,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    # === 后备策略 (随时可启用) ===
+    # "bakome_backup": {
+    #     "magic": 777004,
+    #     "timeframe": "H1",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "xaubot_backup": {
+    #     "magic": 777005,
+    #     "timeframe": "H1",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
 }
 
 # 全局最大持仓 = 策略数量 × 1.5 四舍五入
-MAX_POSITIONS = int(len(STRATEGY_POOL) * 1.5 + 0.5)  # 3策略 → 5
+MAX_POSITIONS = int(len(STRATEGY_POOL) * 1.5)  # 1策略 → 1
 
 # 向后兼容
-STRATEGY = list(STRATEGY_POOL.keys())[0] if STRATEGY_POOL else "H4_stoch_bollinger"
-MAGIC_NUMBER = 888888       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
-MA_FAST = 20                # 快速均线周期
-MA_SLOW = 60                # 慢速均线周期
-MA_METHOD = "EMA"           # 均线类型: EMA / SMA
-
-# ATR 突破策略参数
-ATR_BREAKOUT_PERIOD = 20    # 突破周期
-ATR_PERIOD = 14             # ATR 计算周期
-ATR_MULTIPLIER = 2.0        # ATR 止损倍数
-
-# RSI + 布林带策略参数
+STRATEGY = "M30_rsi_bb"
+MAGIC_NUMBER = 777001       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
+# 通用指标参数（供工具脚本使用）
 BB_PERIOD = 20              # 布林带周期
 BB_STD = 2.0                # 布林带标准差倍数
 RSI_PERIOD = 14             # RSI 计算周期
 RSI_OVERSOLD = 30           # 超卖阈值
 RSI_OVERBOUGHT = 70         # 超买阈值
-
-# RSI 双线交叉策略参数
-RSI_FAST = 3                # 快线周期
-RSI_SLOW = 13               # 慢线周期
-
-# Stoch + 布林带策略参数
+ATR_PERIOD = 14             # ATR 计算周期
 STOCH_K = 8                 # Stoch %K 周期
-STOCH_SLOWING = 3           # %K 平滑参数（3 就是 K 线再做 3 期均线）
-STOCH_D = 3                 # Stoch %D 平滑周期
-STOCH_OVERSOLD = 30         # Stoch 超卖信号阈值（金叉需 K 低于此值）
-STOCH_OVERBOUGHT = 80       # Stoch 超买信号阈值（死叉需 K 高于此值）
-STOCH_EXTREME_OVERSOLD = 20  # Stoch 极端超卖区（买入保护/出场保护边界）
-STOCH_EXTREME_OVERBOUGHT = 80  # Stoch 极端超买区（卖出保护/出场保护边界）
 
-TIMEFRAME = "H4"           # K线周期: M1/M5/M15/M30/H1/H4/D1
+TIMEFRAME = "H1"           # K线周期: M1/M5/M15/M30/H1/H4/D1
 
 # ============================================================
 # 新闻过滤配置
 # ============================================================
 NEWS_FILTER_ENABLED = True        # 是否启用新闻过滤
 NEWS_BEFORE_MINUTES = 30          # 数据发布前 N 分钟停止开新仓
-NEWS_AFTER_MINUTES = 30           # 数据发布后 N 分钟恢复交易
+NEWS_AFTER_MINUTES = 120          # 数据发布后 N 分钟恢复交易（原30→120）
+NEWS_PRE_TIGHTEN_MINUTES = 120    # 事件前 N 分钟开始收紧止损
+NEWS_PRE_CLOSE_MINUTES = 15       # 事件前 N 分钟强制平仓
 NEWS_IMPACT_FILTER = "High"       # 影响级别: "High" | "High,Medium"
 NEWS_CURRENCY_FILTER = "USD"      # 关注货币: "USD" | "USD,EUR"
 

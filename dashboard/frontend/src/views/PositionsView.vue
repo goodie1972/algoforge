@@ -36,7 +36,26 @@ async function openFullHistory() {
 
 const columns = [
   { title: 'Ticket', key: 'ticket', width: 90 },
-  { title: '品种', key: 'symbol', width: 90 },
+  {
+    title: '策略', key: 'strategy', width: 110,
+    render(row: any) {
+      const name = row.comment || row._strategy_name || ''
+      const magic = row.magic || ''
+      const label = name || (magic ? `Magic ${magic}` : '-')
+      const colors: Record<string, string> = {
+        'H1_v6_hybrid': '#2080f0',
+        'M30_rsi_bb': '#f0a020',
+        'sanqing_h1': '#9220f0',
+        'gold_auto_research': '#20c080',
+        'bakome_backup': '#808080',
+        'xaubot_backup': '#808080',
+      }
+      const color = colors[name] || '#808080'
+      return h(NTag, { color: { color, textColor: '#fff' }, size: 'small' },
+        { default: () => label }
+      )
+    }
+  },
   {
     title: '方向', key: 'order_type', width: 70,
     render(row: any) {
@@ -110,11 +129,38 @@ const columns = [
   },
 ]
 
+// 策略颜色映射（与持仓保持一致）
+const strategyColors: Record<string, string> = {
+  'H1_v6_hybrid': '#2080f0',
+  'M30_rsi_bb': '#f0a020',
+  'sanqing_h1': '#9220f0',
+  'gold_auto_research': '#20c080',
+  'bakome_backup': '#808080',
+  'xaubot_backup': '#808080',
+}
+
+const exitReasonLabels: Record<string, string> = {
+  'strategy_exit': '策略出场',
+  'mt4_history': 'MT4历史',
+  'stop_loss': '止损',
+  'take_profit': '止盈',
+}
+
 // 最近成交（精简列）
 const tradeColumns = [
-  { title: 'Ticket', key: 'ticket', width: 80 },
+  { title: 'Ticket', key: 'ticket', width: 70 },
   {
-    title: '方向', key: 'order_type', width: 60,
+    title: '策略', key: 'strategy', width: 100,
+    render(row: any) {
+      const name = row.strategy || row.comment || ''
+      const color = strategyColors[name] || '#808080'
+      return h(NTag, { color: { color, textColor: '#fff' }, size: 'small' },
+        { default: () => name || '-' }
+      )
+    }
+  },
+  {
+    title: '方向', key: 'order_type', width: 55,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
       return h(NTag, { type: isBuy ? 'success' : 'error', size: 'small' },
@@ -122,15 +168,15 @@ const tradeColumns = [
       )
     }
   },
-  { title: '手数', key: 'volume', width: 50 },
-  { title: '开仓价', key: 'entry_price', width: 90,
+  { title: '手数', key: 'volume', width: 45 },
+  { title: '开仓价', key: 'entry_price', width: 85,
     render(row: any) { return row.entry_price?.toFixed(2) }
   },
-  { title: '平仓价', key: 'exit_price', width: 90,
+  { title: '平仓价', key: 'exit_price', width: 85,
     render(row: any) { return row.exit_price?.toFixed(2) }
   },
   {
-    title: '盈亏', key: 'pnl', width: 90,
+    title: '盈亏', key: 'pnl', width: 80,
     render(row: any) {
       const val = row.pnl ?? 0
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -139,7 +185,7 @@ const tradeColumns = [
     }
   },
   {
-    title: '净盈亏', key: 'net_pnl', width: 90,
+    title: '净盈亏', key: 'net_pnl', width: 80,
     render(row: any) {
       const val = (row.pnl ?? 0) + (row.swap ?? 0) + (row.commission ?? 0)
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -147,7 +193,7 @@ const tradeColumns = [
       )
     }
   },
-  { title: '持仓', key: 'hold_seconds', width: 70,
+  { title: '持仓', key: 'hold_seconds', width: 60,
     render(row: any) {
       const sec = row.hold_seconds ?? 0
       if (sec < 60) return `${sec}s`
@@ -155,13 +201,16 @@ const tradeColumns = [
       return `${(sec / 3600).toFixed(1)}h`
     }
   },
-  { title: '出场原因', key: 'exit_reason', width: 80,
+  {
+    title: '出场原因', key: 'exit_reason', width: 85,
     render(row: any) {
-      const reason = row.exit_reason || '-'
-      return h(NTag, { size: 'small', type: 'default' }, { default: () => reason })
+      const reason = row.exit_reason || ''
+      const label = exitReasonLabels[reason] || reason || '-'
+      const type = reason === 'stop_loss' ? 'error' : reason === 'take_profit' ? 'success' : 'default'
+      return h(NTag, { size: 'small', type }, { default: () => label })
     }
   },
-  { title: '平仓时间', key: 'close_time', width: 140 },
+  { title: '平仓时间', key: 'close_time', width: 130 },
 ]
 
 async function handleModify() {

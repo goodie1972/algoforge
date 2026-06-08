@@ -20,6 +20,26 @@ const columns = [
       )
     }
   },
+  {
+    title: '策略', key: 'strategy', width: 110,
+    render(row: any) {
+      const name = row.comment || row._strategy_name || ''
+      const magic = row.magic || ''
+      const label = name || (magic ? `Magic ${magic}` : '-')
+      const colors: Record<string, string> = {
+        'H1_v6_hybrid': '#2080f0',
+        'M30_rsi_bb': '#f0a020',
+        'sanqing_h1': '#9220f0',
+        'gold_auto_research': '#20c080',
+        'bakome_backup': '#808080',
+        'xaubot_backup': '#808080',
+      }
+      const color = colors[name] || '#808080'
+      return h(NTag, { color: { color, textColor: '#fff' }, size: 'small' },
+        { default: () => label }
+      )
+    }
+  },
   { title: '手数', key: 'volume', width: 70 },
   { title: '开仓价', key: 'open_price', width: 100,
     render(row: any) { return row.open_price?.toFixed(2) }

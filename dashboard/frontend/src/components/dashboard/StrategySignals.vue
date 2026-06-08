@@ -9,12 +9,14 @@ const priceStore = usePriceStore()
 const configStore = useConfigStore()
 
 const strategyLabels: Record<string, string> = {
-  double_ma: '双均线',
-  atr_breakout: 'ATR 突破',
-  combined: '双确认',
-  rsi_bollinger: 'RSI+BB',
-  rsi_bollinger_m30: 'RSI+BB M30',
-  stoch_bollinger: 'Stoch+BB',
+  H1_v6_hybrid: 'V6 Hybrid (当前)',
+  M30_rsi_bb: 'M30 RSI+BB',
+  // 历史策略（保留标签用于已存在的数据展示）
+  double_ma: '双均线[已归档]',
+  atr_breakout: 'ATR 突破[已归档]',
+  combined: '双确认[已归档]',
+  rsi_bollinger: 'RSI+BB[已归档]',
+  stoch_bollinger: 'Stoch+BB[已归档]',
 }
 
 const activeStrategies = computed(() => {
@@ -40,7 +42,7 @@ onMounted(() => configStore.fetch())
       <div v-for="s in activeStrategies" :key="s.name"
         style="display: flex; align-items: center; justify-content: space-between;
           padding: 6px 8px; border-radius: 6px; background: var(--n-color-embedded);">
-        <n-tag :type="s.name === 'stoch_bollinger' ? 'warning' : 'success'" size="small">
+        <n-tag :type="s.name === 'M30_rsi_bb' ? 'success' : 'default'" size="small">
           {{ s.label }}
         </n-tag>
         <n-space size="small">

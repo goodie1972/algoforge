@@ -18,22 +18,22 @@ from typing import Optional
 from config import settings
 from core.bridge import create_bridge, OrderType
 from services.news_filter import NewsFilter
-from strategies.double_ma import DoubleMAStrategy
-from strategies.atr_breakout import ATRBreakoutStrategy
-from strategies.combined import CombinedStrategy
-from strategies.rsi_bollinger import RSIBollingerStrategy
-from strategies.rsi_bollinger_m30 import RSIBollingerM30Strategy
-from strategies.rsi_turn_m30 import RSITurnM30Strategy
-from strategies.stoch_bollinger import StochBollingerStrategy
+from data.downloader import download_timeframe
+from data import database as db
+from strategies.m30_rsi import M30RSIStrategy
+from strategies.v6_hybrid import V6HybridStrategy
+from strategies.sanqing_h1 import SanQingH1Strategy
+from strategies.gold_autoresearch_h1 import GoldAutoResearchStrategy
+from strategies.bakome_backup import BAKOMEBackupStrategy
+from strategies.xaubot_backup import XAUBotBackupStrategy
 
 STRATEGY_MAP = {
-    "double_ma": DoubleMAStrategy,
-    "atr_breakout": ATRBreakoutStrategy,
-    "combined": CombinedStrategy,
-    "H1_rsi_bollinger": RSIBollingerStrategy,
-    "rsi_bollinger_m30": RSIBollingerM30Strategy,
-    "M30_rsi_turn": RSITurnM30Strategy,
-    "H4_stoch_bollinger": StochBollingerStrategy,
+    "M30_rsi_bb": M30RSIStrategy,
+    "H1_v6_hybrid": V6HybridStrategy,
+    "sanqing_h1": SanQingH1Strategy,
+    "gold_auto_research": GoldAutoResearchStrategy,
+    "bakome_backup": BAKOMEBackupStrategy,
+    "xaubot_backup": XAUBotBackupStrategy,
 }
 
 # 日志配置
@@ -105,8 +105,11 @@ class TradingEngine:
         self._report_interval = 4 * 3600
         self._config_mtime = 0.0
         self._last_news_check = 0.0
+        self._last_data_sync = 0.0
+        self._data_sync_interval = 300  # 每300秒（5分钟）同步一次数据
         self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
+        self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
         self._closed_trades: list[dict] = []               # 已平仓记录（内存）
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._load_closed_trades()
@@ -198,6 +201,8 @@ class TradingEngine:
 
         # 清除 entry_time
         self._entry_times.pop(ticket, None)
+        # 本地持仓计数器递减（防桥接漏查导致 max_positions 失效）
+        self._known_position_count[magic] = max(0, self._known_position_count.get(magic, 0) - 1)
 
         # 快速出场检测
         now = time.time()
@@ -377,6 +382,7 @@ class TradingEngine:
         # 接管现有持仓 + 填充 _entry_times
         for s in self.strategies:
             existing = self.bridge.takeover_existing_positions(settings.SYMBOL, s.magic)
+            self._known_position_count[s.magic] = len(existing)  # 初始化本地计数
             for pos in existing:
                 # 以当前时间作为近似入场时间（无法获取真实开仓时间）
                 self._entry_times[pos.ticket] = time.time()
@@ -424,7 +430,13 @@ class TradingEngine:
         except OSError:
             pass
 
+        # 周期性同步K线数据到SQLite
+        self._sync_market_data()
+
         self._check_status_report()
+
+        # ---- 新闻风险处理：收紧止损 or 强制平仓 ----
+        self._handle_news_risk(snapshot)
 
         # ---- 止损平仓：所有风控/新闻禁售不限制平仓 ----
         for strategy in snapshot:
@@ -590,13 +602,18 @@ class TradingEngine:
         # 刷新数据
         strategy.refresh_data()
 
-        # 获取该策略的持仓
+        # 获取该策略的持仓（桥接查询 + 本地跟踪双重校验防漏）
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic == strategy.magic]
-        n_total = len(my_positions)
+        n_bridge = len(my_positions)
+        n_local = self._known_position_count.get(strategy.magic, 0)
+        n_total = max(n_bridge, n_local)  # 取较大值防止桥接漏查
         n_longs = sum(1 for p in my_positions if p.order_type in ("OP_BUY", "BUY"))
         n_shorts = sum(1 for p in my_positions if p.order_type in ("OP_SELL", "SELL"))
         logger.info(f"[{strategy.name}] 持仓: {n_total} (多:{n_longs} 空:{n_shorts})")
+
+        if n_bridge != n_local:
+            logger.warning(f"[{strategy.name}] 持仓不一致: 桥接={n_bridge} 本地={n_local}，取较大值={n_total}")
 
         if n_total >= strategy.max_positions:
             return  # 已达上限
@@ -644,6 +661,7 @@ class TradingEngine:
             magic=strategy.magic,
         )
         if ticket:
+            self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
             logger.info(f"[{strategy.name}] 开多仓 Magic={strategy.magic} "
                         f"{settings.LOT_SIZE}手 @ {ask:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
@@ -672,6 +690,7 @@ class TradingEngine:
             magic=strategy.magic,
         )
         if ticket:
+            self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
             logger.info(f"[{strategy.name}] 开空仓 Magic={strategy.magic} "
                         f"{settings.LOT_SIZE}手 @ {bid:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
@@ -686,6 +705,69 @@ class TradingEngine:
         info = self.bridge.get_account_info()
         return info.equity if info else 0.0
 
+    def _handle_news_risk(self, snapshot: list):
+        """新闻事件三级风控：收紧 → 强平 → 封仓"""
+        # ① 强平窗口：平所有持仓
+        if self.news_filter.is_in_force_close():
+            logger.warning("[新闻风控] 强制平仓窗口 (事件前15min)，平所有持仓")
+            for strategy in snapshot:
+                self._close_strategy_positions(strategy, "news_force_close")
+            return
+
+        # ② 收紧窗口：收紧止损
+        if self.news_filter.is_in_pre_tighten():
+            logger.info("[新闻风控] 收紧窗口 (事件前2h~15min)，收紧所有策略止损")
+            for strategy in snapshot:
+                strategy.tight_exit_mode = True
+            return
+
+        # ③ 正常模式：关闭收紧
+        for strategy in snapshot:
+            if strategy.tight_exit_mode:
+                strategy.tight_exit_mode = False
+
+    def _close_strategy_positions(self, strategy, reason: str):
+        """平掉某个策略的所有持仓，记录指定出场原因"""
+        positions = self.bridge.get_positions(settings.SYMBOL)
+        my_positions = [p for p in positions if p.magic == strategy.magic]
+        if not my_positions:
+            return
+        bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
+        for pos in my_positions:
+            entry = pos.open_price
+            if pos.order_type in ("OP_BUY", "BUY"):
+                pnl = (bid - entry) * settings.LOT_SIZE * 100
+                exit_price = bid
+            else:
+                pnl = (entry - ask) * settings.LOT_SIZE * 100
+                exit_price = ask
+            logger.warning(
+                f"[新闻风控] 强制平仓 Ticket={pos.ticket} {pos.order_type} "
+                f"入场={entry:.2f} 盈亏=${pnl:.2f} 原因={reason}"
+            )
+            self.bridge.close_order(pos.ticket)
+            self._record_close(pos.ticket, pnl, strategy.magic)
+            # 记录已平仓明细
+            close_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            hold_sec = int(time.time() - pos.open_time)
+            record = dict(
+                ticket=pos.ticket, symbol=pos.symbol,
+                order_type=pos.order_type, volume=pos.volume,
+                entry_price=entry, exit_price=exit_price,
+                pnl=round(pnl, 2), stop_loss=pos.stop_loss,
+                take_profit=pos.take_profit, swap=pos.swap,
+                commission=pos.commission, magic=pos.magic,
+                strategy=strategy.name, open_time=pos.open_time,
+                close_time=close_time, hold_seconds=hold_sec,
+                exit_reason=reason,
+            )
+            self._closed_trades.append(record)
+            try:
+                with open(self._trades_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            except OSError:
+                pass
+
     def _check_news_blackout(self) -> bool:
         """检查是否在新闻禁售期，每次主循环检查"""
         blocked, reason = self.news_filter.is_in_blackout()
@@ -696,6 +778,30 @@ class TradingEngine:
                 self.bridge.send_heartbeat()
             return True
         return False
+
+    def _sync_market_data(self):
+        """周期性同步 K 线数据到 SQLite，仅同步活跃策略的周期"""
+        now = time.time()
+        if now - self._last_data_sync < self._data_sync_interval:
+            return
+        self._last_data_sync = now
+
+        active_tfs = set()
+        with self._strategies_lock:
+            for s in self.strategies:
+                active_tfs.add(s.timeframe)
+        if not active_tfs:
+            return
+
+        logger.info(f"[数据同步] 开始增量同步周期: {active_tfs}")
+        for tf in sorted(active_tfs):
+            try:
+                n = download_timeframe(self.bridge, tf, settings.SYMBOL)
+                if n > 0:
+                    logger.info(f"[数据同步] {tf} 写入 {n} 条")
+            except Exception as e:
+                logger.warning(f"[数据同步] {tf} 失败: {e}")
+        logger.info(f"[数据同步] 完成")
 
     def _check_status_report(self):
         now = time.time()

@@ -1,8 +1,10 @@
 """
-/api/engine/* 路由 - 引擎启停、状态查询、动态策略管理
+/api/engine/* 路由 - 引擎启停、状态查询、动态策略管理、健康检查
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from config import settings
 
 router = APIRouter(prefix="/api/engine", tags=["engine"])
 
@@ -92,3 +94,225 @@ async def remove_strategy(req: RemoveStrategyRequest):
     if not ok:
         raise HTTPException(404, f"策略 {req.name} 不存在")
     return {"message": f"策略 {req.name} 已移除", "closed_positions": req.close_positions}
+
+
+@router.get("/health")
+async def get_health():
+    """Consolidated health check — engine, bridge, account, positions, risk"""
+    engine_block = _build_engine_block()
+    bridge_block = _build_bridge_block()
+    strategies_block = _build_strategies_block()
+    account_block = _build_account_block()
+    positions_block = _build_positions_block()
+    risk_block = _build_risk_block()
+    signals_block = _build_signals_block()
+
+    # Derive overall verdict from all blocks
+    verdict, reason = _compute_verdict(
+        engine_block, bridge_block, risk_block, account_block
+    )
+
+    return {
+        "verdict": verdict,
+        "verdict_reason": reason,
+        "engine": engine_block,
+        "bridge": bridge_block,
+        "account": account_block,
+        "positions": positions_block,
+        "risk": risk_block,
+        "strategies": strategies_block.get("running", []),
+        "signals": signals_block,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers — each builds one block of the health response
+# ---------------------------------------------------------------------------
+
+def _build_engine_block() -> dict:
+    if not engine_runner:
+        return {"status": "uninitialized", "uptime_seconds": 0}
+    return engine_runner.get_status()
+
+
+def _build_bridge_block() -> dict:
+    connected = (
+        engine_runner is not None
+        and engine_runner.bridge is not None
+        and hasattr(engine_runner.bridge, "_connected")
+        and engine_runner.bridge._connected
+    )
+    return {
+        "connected": connected,
+        "host": getattr(settings, "FREEMT4_HOST", "unknown"),
+        "port": getattr(settings, "FREEMT4_PORT", 0),
+    }
+
+
+def _build_strategies_block() -> dict:
+    if not engine_runner or not engine_runner._engine:
+        return {"running": [], "available": list(available_strategies.keys())}
+    engine = engine_runner._engine
+    with engine._strategies_lock:
+        running = [
+            {
+                "name": s.name,
+                "magic": s.magic,
+                "timeframe": s.timeframe,
+                "double_first": s.double_first,
+                "max_positions": s.max_positions,
+            }
+            for s in engine.strategies
+        ]
+    return {"running": running, "available": list(available_strategies.keys())}
+
+
+def _build_account_block() -> dict | None:
+    if not engine_runner:
+        return None
+    return engine_runner._cached_account
+
+
+def _build_positions_block() -> dict:
+    """Aggregate statistics from cached positions."""
+    if not engine_runner:
+        return {
+            "count": 0,
+            "total_volume": 0.0,
+            "unrealized_pnl": 0.0,
+            "longs": {"count": 0, "volume": 0.0, "unrealized_pnl": 0.0},
+            "shorts": {"count": 0, "volume": 0.0, "unrealized_pnl": 0.0},
+        }
+
+    positions = engine_runner._cached_positions or []
+    count = len(positions)
+    total_volume = sum(p.get("volume", 0) for p in positions)
+    unrealized_pnl = sum(p.get("profit", 0) for p in positions)
+
+    longs = [p for p in positions if p.get("order_type", "").upper() in ("BUY", "OP_BUY")]
+    shorts = [p for p in positions if p.get("order_type", "").upper() in ("SELL", "OP_SELL")]
+
+    return {
+        "count": count,
+        "total_volume": round(total_volume, 2),
+        "unrealized_pnl": round(unrealized_pnl, 2),
+        "longs": {
+            "count": len(longs),
+            "volume": round(sum(p.get("volume", 0) for p in longs), 2),
+            "unrealized_pnl": round(sum(p.get("profit", 0) for p in longs), 2),
+        },
+        "shorts": {
+            "count": len(shorts),
+            "volume": round(sum(p.get("volume", 0) for p in shorts), 2),
+            "unrealized_pnl": round(sum(p.get("profit", 0) for p in shorts), 2),
+        },
+    }
+
+
+def _build_risk_block() -> dict:
+    """Daily P&L and drawdown from engine internal state."""
+    if not engine_runner or not engine_runner._engine:
+        return {
+            "daily_pnl": 0.0,
+            "daily_drawdown": 0.0,
+            "drawdown_pct": 0.0,
+        }
+
+    engine = engine_runner._engine
+    start_balance = getattr(engine, "_daily_start_balance", 0.0) or 0.0
+    current_balance = engine._get_balance()
+    daily_pnl = current_balance - start_balance
+    daily_drawdown = 0.0
+    drawdown_pct = 0.0
+
+    if daily_pnl < 0:
+        daily_drawdown = abs(daily_pnl)
+        if start_balance > 0:
+            drawdown_pct = round(daily_drawdown / start_balance * 100, 2)
+
+    return {
+        "daily_pnl": round(daily_pnl, 2),
+        "daily_drawdown": round(daily_drawdown, 2),
+        "drawdown_pct": drawdown_pct,
+    }
+
+
+def _build_signals_block() -> dict:
+    """Check each strategy for the most recent signal, if tracked."""
+    latest = {}
+    total_count = 0
+
+    if engine_runner and engine_runner._engine:
+        engine = engine_runner._engine
+        with engine._strategies_lock:
+            for s in engine.strategies:
+                candidate = None
+                # Strategies implement on_tick() — we check for any
+                # stored signal attribute such as last_signal / _last_signal.
+                if hasattr(s, "last_signal"):
+                    candidate = s.last_signal
+                elif hasattr(s, "_last_signal"):
+                    candidate = s._last_signal
+                if candidate is not None:
+                    latest[s.name] = candidate
+                    total_count += 1
+
+    return {
+        "latest": latest,
+        "count": total_count,
+    }
+
+
+def _compute_verdict(
+    engine_block: dict,
+    bridge_block: dict,
+    risk_block: dict,
+    account_block: dict | None,
+) -> tuple:
+    """Return (verdict: str, reason: str) based on current state."""
+    reasons: list[str] = []
+
+    # --- RED conditions ---
+    eng_status = engine_block.get("status", "uninitialized")
+    if eng_status in ("uninitialized", "stopped"):
+        return "RED", f"Engine is {eng_status}"
+
+    if eng_status != "running":
+        return "RED", f"Engine status is '{eng_status}'"
+
+    # --- YELLOW / RED bridge ---
+    bridge_ok = bridge_block.get("connected", False)
+    if not bridge_ok:
+        return "RED", "Engine running but bridge disconnected"
+
+    # --- RED: critical risk (global loss block) ---
+    if engine_runner and engine_runner._engine:
+        engine = engine_runner._engine
+        if getattr(engine, "_global_loss_blocked", False):
+            return "RED", "Global daily loss limit breached — all strategies blocked"
+
+    # --- YELLOW conditions ---
+    dd_pct = risk_block.get("drawdown_pct", 0.0)
+    max_dd = getattr(settings, "MAX_DAILY_LOSS_PCT", 12.0)
+    warning_dd = max_dd * 0.7  # 70 % of limit → YELLOW
+
+    if dd_pct >= max_dd:
+        reasons.append(f"Daily drawdown {dd_pct:.1f}% at limit ({max_dd}%)")
+    elif dd_pct >= warning_dd:
+        reasons.append(f"Daily drawdown {dd_pct:.1f}% approaching limit ({max_dd}%)")
+
+    # Check margin level if we have account data
+    if account_block:
+        margin = account_block.get("margin", 0)
+        equity = account_block.get("equity", 0)
+        if margin > 0 and equity > 0:
+            margin_level = equity / margin * 100
+            if margin_level < 200:
+                reasons.append(f"Margin level low ({margin_level:.0f}%)")
+            if margin_level < 100:
+                return "RED", f"Margin call level ({margin_level:.0f}%)"
+
+    if reasons:
+        return "YELLOW", "; ".join(reasons)
+
+    return "GREEN", "All systems operational"

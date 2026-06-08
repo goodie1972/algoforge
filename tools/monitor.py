@@ -14,8 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings
 from core.bridge import create_bridge, OrderType
-from strategies.double_ma import DoubleMAStrategy
-from strategies.atr_breakout import ATRBreakoutStrategy
+from strategies.v6_hybrid import V6HybridStrategy
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -32,8 +31,7 @@ def run_monitor(interval: int = 30):
         return
 
     strategies = [
-        DoubleMAStrategy(bridge),
-        ATRBreakoutStrategy(bridge),
+        V6HybridStrategy(bridge, magic=666666, timeframe="H1"),
     ]
 
     try:
@@ -89,19 +87,15 @@ def run_monitor(interval: int = 30):
                     status = ">>> 做空信号 <<<"
                 print(f"    {s.name:<20} K线: {candles_count:>4}  |  {status}")
 
-                # 显示均线信息
-                if hasattr(s, '_calc_ma'):
-                    fast = s._calc_ma(s.ma_fast_period)
-                    slow = s._calc_ma(s.ma_slow_period)
-                    if fast and slow:
-                        print(f"      MA{s.ma_fast_period}={fast:.2f}  MA{s.ma_slow_period}={slow:.2f}")
+                # 显示 V6 评分信息
+                if hasattr(s, 'oversold'):
+                    print(f"      KDJ超卖={s.oversold} 超买={s.overbought}  背离回看={s.div_lookback}")
 
                 # 显示 ATR 信息
                 if hasattr(s, '_calc_atr'):
                     atr = s._calc_atr()
                     if atr:
-                        highest, lowest = s._get_channel()
-                        print(f"      ATR={atr:.2f}  通道: [{lowest:.2f} - {highest:.2f}]")
+                        print(f"      ATR={atr:.2f}  Trailing={s.p_trailing_atr}x  HardStop={s.p_hard_atr}x")
 
             print(f"\n  刷新间隔: {interval}秒 | 按 Ctrl+C 退出")
             print("=" * 70)

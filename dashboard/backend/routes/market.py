@@ -31,7 +31,7 @@ async def get_price():
 @router.get("/candles")
 async def get_candles(
     timeframe: str = Query(default=settings.TIMEFRAME),
-    count: int = Query(default=100, le=1000, ge=10),
+    count: int = Query(default=100, le=1000, ge=3),
 ):
     """获取 K 线数据"""
     if not engine_runner or not engine_runner.bridge:

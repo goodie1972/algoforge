@@ -8,6 +8,9 @@ const backtest = useBacktestStore()
 const message = useMessage()
 
 const strategyOptions = [
+  { label: 'M30 RSI+BB（当前实盘）', value: 'm30_rsi_bb' },
+  { label: '— 历史策略 —', value: '' },
+  { label: 'V6 Hybrid（已归档）', value: 'v6_hybrid' },
   { label: '双均线', value: 'double_ma' },
   { label: 'ATR 突破', value: 'atr_breakout' },
   { label: '双确认', value: 'combined' },
@@ -18,8 +21,8 @@ const strategyOptions = [
 const timeframeOptions = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1'].map(t => ({ label: t, value: t }))
 
 const form = ref({
-  strategies: ['double_ma'] as string[],
-  timeframe: 'H1',
+  strategies: ['m30_rsi_bb'] as string[],
+  timeframe: 'M30',
   start_date: '2024-01-01',
   end_date: '2024-12-31',
   initial_cash: 10000,
