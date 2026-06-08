@@ -1,0 +1,615 @@
+{
+  "generated_at": "2026-06-07 17:46:50",
+  "description": "GitHub 全部10个开源策略统一回测",
+  "data_ranges": {
+    "H1": {
+      "candles": 8645,
+      "from": "2024-01-01",
+      "to": "2026-06-06"
+    },
+    "H4": {
+      "candles": 2095,
+      "from": "2025-01-27",
+      "to": "2026-06-05"
+    },
+    "M1": {
+      "candles": 9923,
+      "from": "2026-05-23",
+      "to": "2026-06-05"
+    },
+    "M30": {
+      "candles": 2445,
+      "from": "2026-03-24",
+      "to": "2026-06-06"
+    },
+    "M5": {
+      "candles": 4033,
+      "from": "2026-05-15",
+      "to": "2026-06-05"
+    }
+  },
+  "results_by_strategy": {
+    "sanqing-ea": {
+      "H1": {
+        "trades": 379,
+        "pnl": 3331.94,
+        "wr": 28.2,
+        "avg_w": 61.73,
+        "avg_l": -12.04,
+        "best": 3000.44,
+        "worst": -185.66,
+        "buy": 191,
+        "sell": 188,
+        "buy_pnl": 2526.53,
+        "sell_pnl": 805.41,
+        "avg_bar": 20.4,
+        "max_loss_streak": 21
+      },
+      "H4": {
+        "trades": 52,
+        "pnl": 523.17,
+        "wr": 32.7,
+        "avg_w": 160.96,
+        "avg_l": -63.23,
+        "best": 632.2,
+        "worst": -251.5,
+        "buy": 26,
+        "sell": 26,
+        "buy_pnl": 1350.91,
+        "sell_pnl": -827.74,
+        "avg_bar": 30.9,
+        "max_loss_streak": 7
+      },
+      "M30": {
+        "trades": 93,
+        "pnl": -212.38,
+        "wr": 32.3,
+        "avg_w": 45.44,
+        "avg_l": -25.01,
+        "best": 128.84,
+        "worst": -61.87,
+        "buy": 47,
+        "sell": 46,
+        "buy_pnl": -255.31,
+        "sell_pnl": 42.93,
+        "avg_bar": 22.2,
+        "max_loss_streak": 7
+      },
+      "M5": {
+        "trades": 150,
+        "pnl": -338.32,
+        "wr": 32.0,
+        "avg_w": 13.75,
+        "avg_l": -9.79,
+        "best": 88.54,
+        "worst": -36.81,
+        "buy": 75,
+        "sell": 75,
+        "buy_pnl": -209.0,
+        "sell_pnl": -129.32,
+        "avg_bar": 22.6,
+        "max_loss_streak": 8
+      }
+    },
+    "N30_Gold_Scalper": {
+      "H1": {
+        "trades": 17,
+        "pnl": 524.22,
+        "wr": 35.3,
+        "avg_w": 97.22,
+        "avg_l": -5.37,
+        "best": 502.45,
+        "worst": -16.74,
+        "buy": 8,
+        "sell": 9,
+        "buy_pnl": 519.59,
+        "sell_pnl": 4.63,
+        "avg_bar": 12.6,
+        "max_loss_streak": 6
+      },
+      "M1": {
+        "trades": 20,
+        "pnl": -16.82,
+        "wr": 30.0,
+        "avg_w": 4.28,
+        "avg_l": -3.04,
+        "best": 9.94,
+        "worst": -6.33,
+        "buy": 10,
+        "sell": 10,
+        "buy_pnl": -23.11,
+        "sell_pnl": 6.29,
+        "avg_bar": 14.3,
+        "max_loss_streak": 5
+      },
+      "M30": {
+        "trades": 4,
+        "pnl": -90.68,
+        "wr": 0.0,
+        "avg_w": 0,
+        "avg_l": -22.67,
+        "best": 0,
+        "worst": -47.64,
+        "buy": 2,
+        "sell": 2,
+        "buy_pnl": -64.56,
+        "sell_pnl": -26.12,
+        "avg_bar": 13.8,
+        "max_loss_streak": 4
+      }
+    },
+    "XAUUSD_TrendFollow": {
+      "H1": {
+        "trades": 82,
+        "pnl": 627.69,
+        "wr": 28.0,
+        "avg_w": 66.61,
+        "avg_l": -15.33,
+        "best": 269.94,
+        "worst": -98.47,
+        "buy": 82,
+        "sell": 0,
+        "buy_pnl": 627.69,
+        "sell_pnl": 0,
+        "avg_bar": 18.2,
+        "max_loss_streak": 9
+      },
+      "H4": {
+        "trades": 20,
+        "pnl": 928.22,
+        "wr": 45.0,
+        "avg_w": 194.51,
+        "avg_l": -74.76,
+        "best": 353.19,
+        "worst": -241.61,
+        "buy": 20,
+        "sell": 0,
+        "buy_pnl": 928.22,
+        "sell_pnl": 0,
+        "avg_bar": 27.6,
+        "max_loss_streak": 3
+      },
+      "M30": {
+        "trades": 20,
+        "pnl": 14.35,
+        "wr": 20.0,
+        "avg_w": 119.4,
+        "avg_l": -28.95,
+        "best": 160.65,
+        "worst": -80.8,
+        "buy": 20,
+        "sell": 0,
+        "buy_pnl": 14.35,
+        "sell_pnl": 0,
+        "avg_bar": 21.4,
+        "max_loss_streak": 10
+      }
+    },
+    "Gold_AutoResearch": {
+      "H1": {
+        "trades": 438,
+        "pnl": 3353.42,
+        "wr": 30.1,
+        "avg_w": 56.98,
+        "avg_l": -13.62,
+        "best": 2826.13,
+        "worst": -174.75,
+        "buy": 224,
+        "sell": 214,
+        "buy_pnl": 2659.34,
+        "sell_pnl": 694.08,
+        "avg_bar": 18.1,
+        "max_loss_streak": 17
+      },
+      "H4": {
+        "trades": 68,
+        "pnl": 1558.55,
+        "wr": 42.6,
+        "avg_w": 135.4,
+        "avg_l": -60.72,
+        "best": 787.81,
+        "worst": -409.34,
+        "buy": 34,
+        "sell": 34,
+        "buy_pnl": 1522.61,
+        "sell_pnl": 35.94,
+        "avg_bar": 27.6,
+        "max_loss_streak": 6
+      },
+      "M30": {
+        "trades": 106,
+        "pnl": 232.35,
+        "wr": 37.7,
+        "avg_w": 42.54,
+        "avg_l": -22.26,
+        "best": 130.1,
+        "worst": -68.19,
+        "buy": 52,
+        "sell": 54,
+        "buy_pnl": 34.28,
+        "sell_pnl": 198.07,
+        "avg_bar": 20.9,
+        "max_loss_streak": 7
+      }
+    },
+    "BAKOME_GoldScalper": {
+      "M30": {
+        "trades": 84,
+        "pnl": 70.6,
+        "wr": 41.7,
+        "avg_w": 35.97,
+        "avg_l": -24.25,
+        "best": 145.17,
+        "worst": -78.89,
+        "buy": 41,
+        "sell": 43,
+        "buy_pnl": -4.84,
+        "sell_pnl": 75.44,
+        "avg_bar": 13.6,
+        "max_loss_streak": 5
+      },
+      "M5": {
+        "trades": 120,
+        "pnl": -222.64,
+        "wr": 42.5,
+        "avg_w": 5.38,
+        "avg_l": -7.2,
+        "best": 26.29,
+        "worst": -18.31,
+        "buy": 64,
+        "sell": 56,
+        "buy_pnl": -145.48,
+        "sell_pnl": -77.16,
+        "avg_bar": 8.0,
+        "max_loss_streak": 5
+      }
+    },
+    "xaubot-ai": {
+      "M30": {
+        "trades": 218,
+        "pnl": 1926.47,
+        "wr": 67.9,
+        "avg_w": 25.59,
+        "avg_l": -26.59,
+        "best": 173.83,
+        "worst": -103.38,
+        "buy": 120,
+        "sell": 98,
+        "buy_pnl": 721.06,
+        "sell_pnl": 1205.41,
+        "avg_bar": 9.3,
+        "max_loss_streak": 5
+      },
+      "H1": {
+        "trades": 49,
+        "pnl": 555.98,
+        "wr": 42.9,
+        "avg_w": 77.81,
+        "avg_l": -38.5,
+        "best": 418.04,
+        "worst": -87.73,
+        "buy": 12,
+        "sell": 37,
+        "buy_pnl": 46.75,
+        "sell_pnl": 509.23,
+        "avg_bar": 23.8,
+        "max_loss_streak": 6
+      },
+      "H4": {
+        "trades": 55,
+        "pnl": 1726.85,
+        "wr": 41.8,
+        "avg_w": 184.42,
+        "avg_l": -78.59,
+        "best": 1006.89,
+        "worst": -376.36,
+        "buy": 55,
+        "sell": 0,
+        "buy_pnl": 1726.85,
+        "sell_pnl": 0,
+        "avg_bar": 31.4,
+        "max_loss_streak": 6
+      }
+    }
+  },
+  "results_by_timeframe": {
+    "H1": {
+      "sanqing-ea": {
+        "trades": 379,
+        "pnl": 3331.94,
+        "wr": 28.2,
+        "avg_w": 61.73,
+        "avg_l": -12.04,
+        "best": 3000.44,
+        "worst": -185.66,
+        "buy": 191,
+        "sell": 188,
+        "buy_pnl": 2526.53,
+        "sell_pnl": 805.41,
+        "avg_bar": 20.4,
+        "max_loss_streak": 21
+      },
+      "N30_Gold_Scalper": {
+        "trades": 17,
+        "pnl": 524.22,
+        "wr": 35.3,
+        "avg_w": 97.22,
+        "avg_l": -5.37,
+        "best": 502.45,
+        "worst": -16.74,
+        "buy": 8,
+        "sell": 9,
+        "buy_pnl": 519.59,
+        "sell_pnl": 4.63,
+        "avg_bar": 12.6,
+        "max_loss_streak": 6
+      },
+      "XAUUSD_TrendFollow": {
+        "trades": 82,
+        "pnl": 627.69,
+        "wr": 28.0,
+        "avg_w": 66.61,
+        "avg_l": -15.33,
+        "best": 269.94,
+        "worst": -98.47,
+        "buy": 82,
+        "sell": 0,
+        "buy_pnl": 627.69,
+        "sell_pnl": 0,
+        "avg_bar": 18.2,
+        "max_loss_streak": 9
+      },
+      "Gold_AutoResearch": {
+        "trades": 438,
+        "pnl": 3353.42,
+        "wr": 30.1,
+        "avg_w": 56.98,
+        "avg_l": -13.62,
+        "best": 2826.13,
+        "worst": -174.75,
+        "buy": 224,
+        "sell": 214,
+        "buy_pnl": 2659.34,
+        "sell_pnl": 694.08,
+        "avg_bar": 18.1,
+        "max_loss_streak": 17
+      },
+      "xaubot-ai": {
+        "trades": 49,
+        "pnl": 555.98,
+        "wr": 42.9,
+        "avg_w": 77.81,
+        "avg_l": -38.5,
+        "best": 418.04,
+        "worst": -87.73,
+        "buy": 12,
+        "sell": 37,
+        "buy_pnl": 46.75,
+        "sell_pnl": 509.23,
+        "avg_bar": 23.8,
+        "max_loss_streak": 6
+      }
+    },
+    "H4": {
+      "sanqing-ea": {
+        "trades": 52,
+        "pnl": 523.17,
+        "wr": 32.7,
+        "avg_w": 160.96,
+        "avg_l": -63.23,
+        "best": 632.2,
+        "worst": -251.5,
+        "buy": 26,
+        "sell": 26,
+        "buy_pnl": 1350.91,
+        "sell_pnl": -827.74,
+        "avg_bar": 30.9,
+        "max_loss_streak": 7
+      },
+      "XAUUSD_TrendFollow": {
+        "trades": 20,
+        "pnl": 928.22,
+        "wr": 45.0,
+        "avg_w": 194.51,
+        "avg_l": -74.76,
+        "best": 353.19,
+        "worst": -241.61,
+        "buy": 20,
+        "sell": 0,
+        "buy_pnl": 928.22,
+        "sell_pnl": 0,
+        "avg_bar": 27.6,
+        "max_loss_streak": 3
+      },
+      "Gold_AutoResearch": {
+        "trades": 68,
+        "pnl": 1558.55,
+        "wr": 42.6,
+        "avg_w": 135.4,
+        "avg_l": -60.72,
+        "best": 787.81,
+        "worst": -409.34,
+        "buy": 34,
+        "sell": 34,
+        "buy_pnl": 1522.61,
+        "sell_pnl": 35.94,
+        "avg_bar": 27.6,
+        "max_loss_streak": 6
+      },
+      "xaubot-ai": {
+        "trades": 55,
+        "pnl": 1726.85,
+        "wr": 41.8,
+        "avg_w": 184.42,
+        "avg_l": -78.59,
+        "best": 1006.89,
+        "worst": -376.36,
+        "buy": 55,
+        "sell": 0,
+        "buy_pnl": 1726.85,
+        "sell_pnl": 0,
+        "avg_bar": 31.4,
+        "max_loss_streak": 6
+      }
+    },
+    "M1": {
+      "N30_Gold_Scalper": {
+        "trades": 20,
+        "pnl": -16.82,
+        "wr": 30.0,
+        "avg_w": 4.28,
+        "avg_l": -3.04,
+        "best": 9.94,
+        "worst": -6.33,
+        "buy": 10,
+        "sell": 10,
+        "buy_pnl": -23.11,
+        "sell_pnl": 6.29,
+        "avg_bar": 14.3,
+        "max_loss_streak": 5
+      }
+    },
+    "M30": {
+      "sanqing-ea": {
+        "trades": 93,
+        "pnl": -212.38,
+        "wr": 32.3,
+        "avg_w": 45.44,
+        "avg_l": -25.01,
+        "best": 128.84,
+        "worst": -61.87,
+        "buy": 47,
+        "sell": 46,
+        "buy_pnl": -255.31,
+        "sell_pnl": 42.93,
+        "avg_bar": 22.2,
+        "max_loss_streak": 7
+      },
+      "N30_Gold_Scalper": {
+        "trades": 4,
+        "pnl": -90.68,
+        "wr": 0.0,
+        "avg_w": 0,
+        "avg_l": -22.67,
+        "best": 0,
+        "worst": -47.64,
+        "buy": 2,
+        "sell": 2,
+        "buy_pnl": -64.56,
+        "sell_pnl": -26.12,
+        "avg_bar": 13.8,
+        "max_loss_streak": 4
+      },
+      "XAUUSD_TrendFollow": {
+        "trades": 20,
+        "pnl": 14.35,
+        "wr": 20.0,
+        "avg_w": 119.4,
+        "avg_l": -28.95,
+        "best": 160.65,
+        "worst": -80.8,
+        "buy": 20,
+        "sell": 0,
+        "buy_pnl": 14.35,
+        "sell_pnl": 0,
+        "avg_bar": 21.4,
+        "max_loss_streak": 10
+      },
+      "Gold_AutoResearch": {
+        "trades": 106,
+        "pnl": 232.35,
+        "wr": 37.7,
+        "avg_w": 42.54,
+        "avg_l": -22.26,
+        "best": 130.1,
+        "worst": -68.19,
+        "buy": 52,
+        "sell": 54,
+        "buy_pnl": 34.28,
+        "sell_pnl": 198.07,
+        "avg_bar": 20.9,
+        "max_loss_streak": 7
+      },
+      "BAKOME_GoldScalper": {
+        "trades": 84,
+        "pnl": 70.6,
+        "wr": 41.7,
+        "avg_w": 35.97,
+        "avg_l": -24.25,
+        "best": 145.17,
+        "worst": -78.89,
+        "buy": 41,
+        "sell": 43,
+        "buy_pnl": -4.84,
+        "sell_pnl": 75.44,
+        "avg_bar": 13.6,
+        "max_loss_streak": 5
+      },
+      "xaubot-ai": {
+        "trades": 218,
+        "pnl": 1926.47,
+        "wr": 67.9,
+        "avg_w": 25.59,
+        "avg_l": -26.59,
+        "best": 173.83,
+        "worst": -103.38,
+        "buy": 120,
+        "sell": 98,
+        "buy_pnl": 721.06,
+        "sell_pnl": 1205.41,
+        "avg_bar": 9.3,
+        "max_loss_streak": 5
+      }
+    },
+    "M5": {
+      "sanqing-ea": {
+        "trades": 150,
+        "pnl": -338.32,
+        "wr": 32.0,
+        "avg_w": 13.75,
+        "avg_l": -9.79,
+        "best": 88.54,
+        "worst": -36.81,
+        "buy": 75,
+        "sell": 75,
+        "buy_pnl": -209.0,
+        "sell_pnl": -129.32,
+        "avg_bar": 22.6,
+        "max_loss_streak": 8
+      },
+      "BAKOME_GoldScalper": {
+        "trades": 120,
+        "pnl": -222.64,
+        "wr": 42.5,
+        "avg_w": 5.38,
+        "avg_l": -7.2,
+        "best": 26.29,
+        "worst": -18.31,
+        "buy": 64,
+        "sell": 56,
+        "buy_pnl": -145.48,
+        "sell_pnl": -77.16,
+        "avg_bar": 8.0,
+        "max_loss_streak": 5
+      }
+    }
+  },
+  "not_testable": [
+    {
+      "name": "7. mt5-ai-xauusd-trader",
+      "reason": "需要 MT5 实时连接 + PyTorch RL 模型权重"
+    },
+    {
+      "name": "8. EA_SCALPER_XAUUSD",
+      "reason": "仅编译后 .ex5 文件, 无 MQL 源码"
+    },
+    {
+      "name": "9. Forex-Gold-Auto-Trader",
+      "reason": "仅文档/README, 无可执行策略代码"
+    },
+    {
+      "name": "10. YQTS",
+      "reason": "策略规格说明(YQTS_BRIEF.md), 无执行代码"
+    }
+  ]
+}

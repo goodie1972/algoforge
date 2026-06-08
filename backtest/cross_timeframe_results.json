@@ -1,0 +1,274 @@
+{
+  "M15": {
+    "V1-KDJ+MACD": {
+      "total_return_pct": 0.27,
+      "total_pnl": 11.89,
+      "n_trades": 6,
+      "win_rate": 33.3,
+      "avg_win": 45.79,
+      "avg_loss": -19.92,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 1.15
+    },
+    "V2-KDJ+RSI": {
+      "total_return_pct": -0.18,
+      "total_pnl": -17.9,
+      "n_trades": 1,
+      "win_rate": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": -17.9,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.0
+    },
+    "V3-双向交易": {
+      "total_return_pct": -0.18,
+      "total_pnl": -17.9,
+      "n_trades": 1,
+      "win_rate": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": -17.9,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.0
+    },
+    "V4-布林带KDJ": {
+      "total_return_pct": -0.14,
+      "total_pnl": -10.87,
+      "n_trades": 2,
+      "win_rate": 50.0,
+      "avg_win": 4.98,
+      "avg_loss": -15.85,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.31
+    },
+    "V5-肯特纳KDJ": {
+      "total_return_pct": -0.32,
+      "total_pnl": -28.77,
+      "n_trades": 3,
+      "win_rate": 33.3,
+      "avg_win": 4.98,
+      "avg_loss": -16.87,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.15
+    },
+    "V6-终极混合": {
+      "total_return_pct": -1.89,
+      "total_pnl": -277.4,
+      "n_trades": 56,
+      "win_rate": 25.0,
+      "avg_win": 51.75,
+      "avg_loss": -24.44,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.72
+    }
+  },
+  "M30": {
+    "V1-KDJ+MACD": {
+      "total_return_pct": -0.93,
+      "total_pnl": -55.62,
+      "n_trades": 8,
+      "win_rate": 37.5,
+      "avg_win": 22.36,
+      "avg_loss": -24.54,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.55
+    },
+    "V2-KDJ+RSI": {
+      "total_return_pct": 0.41,
+      "total_pnl": 52.31,
+      "n_trades": 1,
+      "win_rate": 100.0,
+      "avg_win": 52.31,
+      "avg_loss": 0.0,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": Infinity
+    },
+    "V3-双向交易": {
+      "total_return_pct": 0.73,
+      "total_pnl": 61.52,
+      "n_trades": 3,
+      "win_rate": 66.7,
+      "avg_win": 32.95,
+      "avg_loss": -4.39,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 15.01
+    },
+    "V4-布林带KDJ": {
+      "total_return_pct": 0.41,
+      "total_pnl": 52.31,
+      "n_trades": 1,
+      "win_rate": 100.0,
+      "avg_win": 52.31,
+      "avg_loss": 0.0,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": Infinity
+    },
+    "V5-肯特纳KDJ": {
+      "total_return_pct": 0.41,
+      "total_pnl": 52.31,
+      "n_trades": 1,
+      "win_rate": 100.0,
+      "avg_win": 52.31,
+      "avg_loss": 0.0,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": Infinity
+    },
+    "V6-终极混合": {
+      "total_return_pct": -2.06,
+      "total_pnl": -283.1,
+      "n_trades": 50,
+      "win_rate": 32.0,
+      "avg_win": 60.18,
+      "avg_loss": -37.76,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.77
+    }
+  },
+  "H1": {
+    "V1-KDJ+MACD": {
+      "total_return_pct": -1.28,
+      "total_pnl": -67.29,
+      "n_trades": 38,
+      "win_rate": 36.8,
+      "avg_win": 18.13,
+      "avg_loss": -13.38,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.79
+    },
+    "V2-KDJ+RSI": {
+      "total_return_pct": 0.31,
+      "total_pnl": 21.63,
+      "n_trades": 5,
+      "win_rate": 40.0,
+      "avg_win": 18.45,
+      "avg_loss": -5.09,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 2.42
+    },
+    "V3-双向交易": {
+      "total_return_pct": 0.29,
+      "total_pnl": 10.95,
+      "n_trades": 7,
+      "win_rate": 28.6,
+      "avg_win": 18.45,
+      "avg_loss": -5.19,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 1.42
+    },
+    "V4-布林带KDJ": {
+      "total_return_pct": 0.0,
+      "total_pnl": 0.0,
+      "n_trades": 0,
+      "win_rate": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": 0.0,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": Infinity
+    },
+    "V5-肯特纳KDJ": {
+      "total_return_pct": 0.58,
+      "total_pnl": 65.99,
+      "n_trades": 11,
+      "win_rate": 45.5,
+      "avg_win": 19.74,
+      "avg_loss": -5.45,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 3.02
+    },
+    "V6-终极混合": {
+      "total_return_pct": 25.5,
+      "total_pnl": 2442.3,
+      "n_trades": 203,
+      "win_rate": 37.4,
+      "avg_win": 49.41,
+      "avg_loss": -10.42,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 2.86
+    }
+  },
+  "H4": {
+    "V1-KDJ+MACD": {
+      "total_return_pct": -0.83,
+      "total_pnl": -40.12,
+      "n_trades": 13,
+      "win_rate": 30.8,
+      "avg_win": 41.1,
+      "avg_loss": -22.72,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.8
+    },
+    "V2-KDJ+RSI": {
+      "total_return_pct": -0.49,
+      "total_pnl": -37.05,
+      "n_trades": 4,
+      "win_rate": 75.0,
+      "avg_win": 18.99,
+      "avg_loss": -94.01,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.61
+    },
+    "V3-双向交易": {
+      "total_return_pct": -0.49,
+      "total_pnl": -37.05,
+      "n_trades": 4,
+      "win_rate": 75.0,
+      "avg_win": 18.99,
+      "avg_loss": -94.01,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.61
+    },
+    "V4-布林带KDJ": {
+      "total_return_pct": -0.91,
+      "total_pnl": -94.01,
+      "n_trades": 1,
+      "win_rate": 0.0,
+      "avg_win": 0.0,
+      "avg_loss": -94.01,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.0
+    },
+    "V5-肯特纳KDJ": {
+      "total_return_pct": -0.09,
+      "total_pnl": -4.6,
+      "n_trades": 7,
+      "win_rate": 57.1,
+      "avg_win": 29.06,
+      "avg_loss": -40.28,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 0.96
+    },
+    "V6-终极混合": {
+      "total_return_pct": 24.1,
+      "total_pnl": 2413.42,
+      "n_trades": 36,
+      "win_rate": 41.7,
+      "avg_win": 193.5,
+      "avg_loss": -24.45,
+      "avg_bars": 0.0,
+      "max_dd_pct": 0.0,
+      "profit_factor": 5.93
+    }
+  }
+}
