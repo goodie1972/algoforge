@@ -12,7 +12,7 @@ const cfg = computed(() => ({
   signal_direction: store.items?.coordinator?.signal_direction ?? 'BUY',
   target_strategies: store.items?.coordinator?.target_strategies ?? [],
   target_direction: store.items?.coordinator?.target_direction ?? 'SELL',
-  // 功能②③：短周期反向止盈
+  // 功能②：短周期反向止盈
   m15_reverse_tp_enabled: store.items?.coordinator?.m15_reverse_tp_enabled ?? false,
   m5_reverse_tp_enabled: store.items?.coordinator?.m5_reverse_tp_enabled ?? false,
 }))
@@ -38,17 +38,68 @@ async function update(key: string, value: any) {
 
 <template>
   <n-grid :cols="2" :x-gap="24" :y-gap="12">
-    <!-- 左列 -->
+    <!-- 左列：启用开关 + 联动目标设置 + 规则说明 -->
     <n-grid-item>
       <n-space vertical size="medium">
         <n-form-item label="启用协调器">
           <n-switch :value="cfg.enabled"
             @update:value="(v: boolean) => update('enabled', v)" />
           <template #feedback>
-            开启后可按需启用下方功能
+            开启后可按需启用右侧功能
           </template>
         </n-form-item>
 
+        <template v-if="cfg.enabled">
+          <n-divider title-position="left">联动目标设置</n-divider>
+
+          <n-form-item label="受影响策略">
+            <n-checkbox-group :value="cfg.target_strategies"
+              @update:value="(v: string[]) => update('target_strategies', v)">
+              <n-space vertical size="small">
+                <n-checkbox v-for="opt in strategyOptions" :key="opt.value"
+                  :value="opt.value" :label="opt.label" />
+              </n-space>
+            </n-checkbox-group>
+            <template #feedback>勾选需要被联动平仓的策略</template>
+          </n-form-item>
+
+          <n-form-item label="目标方向">
+            <n-select :value="cfg.target_direction" :options="directionOptions"
+              @update:value="(v: string) => update('target_direction', v)"
+              style="width: 100%;" />
+            <template #feedback>关闭目标策略的哪个方向</template>
+          </n-form-item>
+
+          <n-divider title-position="left">规则说明</n-divider>
+
+          <n-alert type="info" :bordered="false" style="font-size: 13px;">
+            <div v-if="cfg.cross_exit_enabled">
+              当 <n-text code>{{ cfg.signal_strategy }}</n-text> 的
+              <n-text code>{{ cfg.signal_direction === 'BUY' ? '多单' : '空单' }}</n-text>
+              盈利时，自动关闭
+              <n-text code>{{ cfg.target_strategies.join('、') || '(未选择)' }}</n-text>
+              的
+              <n-text code>{{ cfg.target_direction === 'SELL' ? '空单' : '多单' }}</n-text>
+              盈利单。
+            </div>
+            <div v-if="cfg.m15_reverse_tp_enabled || cfg.m5_reverse_tp_enabled">
+              当
+              <template v-if="cfg.m15_reverse_tp_enabled"><n-text code>M15</n-text></template>
+              <template v-if="cfg.m15_reverse_tp_enabled && cfg.m5_reverse_tp_enabled"> / </template>
+              <template v-if="cfg.m5_reverse_tp_enabled"><n-text code>M5</n-text></template>
+              EMA20 斜率反向时，平掉所有原方向盈利单（即趋势反转前方向上的仓位）。
+            </div>
+            <div v-if="!cfg.cross_exit_enabled && !cfg.m15_reverse_tp_enabled && !cfg.m5_reverse_tp_enabled">
+              请勾选右侧功能后启用
+            </div>
+          </n-alert>
+        </template>
+      </n-space>
+    </n-grid-item>
+
+    <!-- 右列：功能① + 功能② -->
+    <n-grid-item>
+      <n-space vertical size="medium">
         <template v-if="cfg.enabled">
           <n-divider title-position="left">功能①：跨策略联动出场</n-divider>
 
@@ -72,15 +123,8 @@ async function update(key: string, value: any) {
               <template #feedback>该方向的持仓盈利时触发联动</template>
             </n-form-item>
           </template>
-        </template>
-      </n-space>
-    </n-grid-item>
 
-    <!-- 右列 -->
-    <n-grid-item>
-      <n-space vertical size="medium">
-        <template v-if="cfg.enabled">
-          <n-divider title-position="left">功能②③：短周期反向止盈</n-divider>
+          <n-divider title-position="left">功能②：短周期反向止盈</n-divider>
 
           <n-form-item label="M15 反向止盈">
             <n-switch :value="cfg.m15_reverse_tp_enabled"
@@ -93,52 +137,6 @@ async function update(key: string, value: any) {
               @update:value="(v: boolean) => update('m5_reverse_tp_enabled', v)" />
             <template #feedback>M5 EMA20 斜率转势时平盈利单，反应最快但可能误触</template>
           </n-form-item>
-
-          <template v-if="cfg.cross_exit_enabled">
-            <n-divider title-position="left">联动目标设置</n-divider>
-
-            <n-form-item label="受影响策略">
-              <n-checkbox-group :value="cfg.target_strategies"
-                @update:value="(v: string[]) => update('target_strategies', v)">
-                <n-space vertical size="small">
-                  <n-checkbox v-for="opt in strategyOptions" :key="opt.value"
-                    :value="opt.value" :label="opt.label" />
-                </n-space>
-              </n-checkbox-group>
-              <template #feedback>勾选需要被联动平仓的策略</template>
-            </n-form-item>
-
-            <n-form-item label="目标方向">
-              <n-select :value="cfg.target_direction" :options="directionOptions"
-                @update:value="(v: string) => update('target_direction', v)"
-                style="width: 100%;" />
-              <template #feedback>关闭目标策略的哪个方向</template>
-            </n-form-item>
-          </template>
-
-          <n-divider title-position="left">规则说明</n-divider>
-
-          <n-alert type="info" :bordered="false" style="font-size: 13px;">
-            <div v-if="cfg.cross_exit_enabled">
-              当 <n-text code>{{ cfg.signal_strategy }}</n-text> 的
-              <n-text code>{{ cfg.signal_direction === 'BUY' ? '多单' : '空单' }}</n-text>
-              盈利时，自动关闭
-              <n-text code>{{ cfg.target_strategies.join('、') || '(未选择)' }}</n-text>
-              的
-              <n-text code>{{ cfg.target_direction === 'SELL' ? '空单' : '多单' }}</n-text>
-              盈利单。
-            </div>
-            <div v-if="cfg.m15_reverse_tp_enabled || cfg.m5_reverse_tp_enabled">
-              当
-              <template v-if="cfg.m15_reverse_tp_enabled"><n-text code>M15</n-text></template>
-              <template v-if="cfg.m15_reverse_tp_enabled && cfg.m5_reverse_tp_enabled"> / </template>
-              <template v-if="cfg.m5_reverse_tp_enabled"><n-text code>M5</n-text></template>
-              EMA20 斜率反向时，平掉所有同向盈利单。
-            </div>
-            <div v-if="!cfg.cross_exit_enabled && !cfg.m15_reverse_tp_enabled && !cfg.m5_reverse_tp_enabled">
-              请勾选上方功能后启用
-            </div>
-          </n-alert>
         </template>
       </n-space>
     </n-grid-item>
