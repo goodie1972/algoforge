@@ -314,49 +314,55 @@ class M30RSIStrategy(BaseStrategy):
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
-            drawdown = td["highest"] - bid
-            loss = td["entry"] - bid
             current_profit = bid - td["entry"]
+            loss = td["entry"] - bid
             if abs(current_profit) < atr_val * 10:
                 td["peak_profit"] = max(td["peak_profit"], current_profit)
 
-            if td["peak_profit"] > atr_val * 0.5:
-                profit_ratio = current_profit / td["peak_profit"]
-                if profit_ratio < (1 - pdd):
-                    logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
+            if current_profit > 0:
+                # 盈利 → 止盈逻辑
+                if td["peak_profit"] > atr_val * 0.5:
+                    profit_ratio = current_profit / td["peak_profit"]
+                    if profit_ratio < (1 - pdd):
+                        logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
+                        del self._trail_data[ticket]
+                        return True
+                drawdown = td["highest"] - bid
+                if drawdown > atr_val * trail_mult:
+                    logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
                     del self._trail_data[ticket]
                     return True
-
-            if drawdown > atr_val * trail_mult:
-                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
-                del self._trail_data[ticket]
-                return True
-            if loss > atr_val * hard_mult:
-                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                del self._trail_data[ticket]
-                return True
+            else:
+                # 亏损 → 只走硬止损
+                if loss > atr_val * hard_mult:
+                    logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
+                    del self._trail_data[ticket]
+                    return True
         else:
             td["lowest"] = min(td["lowest"], ask)
-            rally = ask - td["lowest"]
-            loss = ask - td["entry"]
             current_profit = td["entry"] - ask
+            loss = ask - td["entry"]
             if abs(current_profit) < atr_val * 10:
                 td["peak_profit"] = max(td["peak_profit"], current_profit)
 
-            if td["peak_profit"] > atr_val * 0.5:
-                profit_ratio = current_profit / td["peak_profit"]
-                if profit_ratio < (1 - pdd):
-                    logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
+            if current_profit > 0:
+                # 盈利 → 止盈逻辑
+                if td["peak_profit"] > atr_val * 0.5:
+                    profit_ratio = current_profit / td["peak_profit"]
+                    if profit_ratio < (1 - pdd):
+                        logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
+                        del self._trail_data[ticket]
+                        return True
+                rally = ask - td["lowest"]
+                if rally > atr_val * trail_mult:
+                    logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
                     del self._trail_data[ticket]
                     return True
-
-            if rally > atr_val * trail_mult:
-                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
-                del self._trail_data[ticket]
-                return True
-            if loss > atr_val * hard_mult:
-                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                del self._trail_data[ticket]
-                return True
+            else:
+                # 亏损 → 只走硬止损
+                if loss > atr_val * hard_mult:
+                    logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
+                    del self._trail_data[ticket]
+                    return True
 
         return False

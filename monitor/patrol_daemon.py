@@ -103,12 +103,15 @@ def load_state() -> dict:
         "reported_sl_4480": False,
         "reported_deviation": 0,
         "last_pos_tickets": [],
+        "last_closed_tickets": set(),
+        "last_closed_analysis": {},
     }
 
 
 def save_state(state: dict):
     copy = dict(state)
     copy["last_pos_tickets"] = list(copy.get("last_pos_tickets", []))
+    copy["last_closed_tickets"] = list(copy.get("last_closed_tickets", []))
     STATE_FILE.write_text(json.dumps(copy, indent=2), encoding="utf-8")
 
 
@@ -120,6 +123,8 @@ def patrol():
     # 转换旧格式中的 last_pos_tickets
     if isinstance(state.get("last_pos_tickets"), list):
         state["last_pos_tickets"] = set(state["last_pos_tickets"])
+    if isinstance(state.get("last_closed_tickets"), list):
+        state["last_closed_tickets"] = set(state["last_closed_tickets"])
     had_alert = False
 
     # ---- 1. 引擎状态 ----
@@ -228,6 +233,47 @@ def patrol():
     else:
         state["last_pos_tickets"] = set()
         state["positions"] = []
+
+    # ---- 5. 已平仓亏损分析 ----
+    history = api_get("/trades/history")
+    if history is not None:
+        current_closed_tickets = {t.get("ticket") for t in history if t.get("ticket")}
+        prev_closed_tickets = state.get("last_closed_tickets", set())
+        if isinstance(prev_closed_tickets, list):
+            prev_closed_tickets = set(prev_closed_tickets)
+
+        # 检测新平仓记录
+        new_closed = current_closed_tickets - prev_closed_tickets
+        if new_closed:
+            logger.info(f"检测到 {len(new_closed)} 笔新平仓: {new_closed}")
+            for t in new_closed:
+                trade = next((x for x in history if x.get("ticket") == t), None)
+                if trade:
+                    pnl = trade.get("pnl", 0)
+                    strategy = trade.get("strategy", "?")
+                    exit_reason = trade.get("exit_reason", "?")
+                    logger.info(f"  平仓 {t}: {strategy} pnl={pnl:+.2f} 原因={exit_reason}")
+                    # 亏损单 → 自动分析
+                    if pnl < 0:
+                        analysis = api_get(f"/trades/analysis/{t}")
+                        if analysis:
+                            xa = analysis.get("exit_analysis", {})
+                            la = xa.get("loss_analysis", {})
+                            reasons = la.get("possible_reasons", [])
+                            suggestions = la.get("suggestions", [])
+                            logger.warning(f"  ⚠ 亏损分析 #{t}:")
+                            for r in reasons:
+                                logger.warning(f"    - 原因: {r}")
+                            for s in suggestions:
+                                logger.warning(f"    → 建议: {s}")
+                            notify_info(
+                                "亏损单分析",
+                                f"单 {t} {strategy} 亏损 ${abs(pnl):.2f}。"
+                                f"原因: {'; '.join(reasons[:2]) or xa.get('label','?')}",
+                            )
+                            state.setdefault("last_closed_analysis", {})[str(t)] = analysis
+
+        state["last_closed_tickets"] = current_closed_tickets
 
     # ---- 4. 错误日志 ----
     logs = api_get("/logs")

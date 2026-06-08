@@ -41,15 +41,16 @@ STRATEGY_MAP = {
     "xaubot_backup": XAUBotBackupStrategy,
 }
 
-# 日志配置
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-    handlers=[
-        logging.FileHandler(f"{settings.LOG_DIR}/trading_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log", encoding="utf-8"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
+# 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL),
+        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+        handlers=[
+            logging.FileHandler(f"{settings.LOG_DIR}/trading_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log", encoding="utf-8"),
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
 logger = logging.getLogger(__name__)
 
 SAFETY_LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "safety_lock.txt")
@@ -124,6 +125,100 @@ class TradingEngine:
     def closed_trades(self) -> list[dict]:
         return list(self._closed_trades)
 
+    # ── K 线获取（桥接优先 → 数据库补充）─────────────────────────
+
+    @staticmethod
+    def _pos_open_time(pos) -> tuple:
+        """将 Position 的 open_time 转为 (格式化时间字符串, UNIX时间戳)"""
+        raw = str(pos.open_time)
+        try:
+            ts = int(raw)
+            dt = datetime.fromtimestamp(ts)
+            return (dt.strftime("%Y-%m-%d %H:%M:%S"), ts)
+        except (ValueError, OSError):
+            # 可能是已格式化的时间字符串
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y.%m.%d %H:%M", "%Y.%m.%d %H:%M:%S"):
+                try:
+                    dt = datetime.strptime(raw, fmt)
+                    return (raw, int(dt.timestamp()))
+                except ValueError:
+                    continue
+            return (raw, 0)
+
+    @staticmethod
+    def _tf_to_seconds(tf: str) -> int:
+        mapping = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800, "H1": 3600, "H4": 14400, "D1": 86400}
+        return mapping.get(tf, 0)
+
+    @staticmethod
+    def _parse_bridge_time(time_str: str) -> int:
+        """将桥接 K 线时间字符串转为 UNIX 时间戳"""
+        for fmt in ("%Y.%m.%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y.%m.%d %H:%M:%S"):
+            try:
+                return int(datetime.strptime(time_str, fmt).timestamp())
+            except ValueError:
+                continue
+        raise ValueError(f"无法解析桥接时间: {time_str}")
+
+    def _db_to_candles(self, db_candles: list[dict]) -> list[Candle]:
+        """将数据库 K 线 dict 转为 Candle 对象"""
+        result = []
+        for c in db_candles:
+            time_str = datetime.fromtimestamp(c["time"]).strftime("%Y-%m-%d %H:%M:%S")
+            result.append(Candle(
+                time=time_str,
+                open=c["open"],
+                high=c["high"],
+                low=c["low"],
+                close=c["close"],
+                volume=c["volume"],
+            ))
+        return result
+
+    def _get_candles(self, tf: str, count: int) -> list[Candle]:
+        """获取 K 线，桥接优先 — 不足时从 market_data.db 补充"""
+        # 1. 桥接优先
+        try:
+            candles = self.bridge.get_candles(settings.SYMBOL, tf, count)
+        except Exception as e:
+            logger.warning(f"[K线获取] {tf} 桥接失败: {e}")
+            candles = []
+
+        if len(candles) >= count:
+            return candles
+
+        # 2. 桥接数据不足 — 从数据库补充
+        needed = count - len(candles)
+
+        if not candles:
+            db_raw = db.get_candles(tf, end_ts=int(time.time()), limit=count)
+            if db_raw:
+                logger.info(f"[K线获取] {tf} 桥接无数据，从数据库补充 {len(db_raw)} 条")
+                return self._db_to_candles(db_raw)
+            return []
+
+        # 3. 桥接有部分数据 — 补充更早的
+        try:
+            oldest_ts = self._parse_bridge_time(candles[0].time)
+        except Exception as e:
+            logger.warning(f"[K线获取] {tf} 解析桥接头时间失败: {e}")
+            return candles
+
+        tf_sec = self._tf_to_seconds(tf)
+        if tf_sec <= 0:
+            return candles
+
+        end_ts = oldest_ts - 1
+        db_raw = db.get_candles(tf, end_ts=end_ts, limit=needed)
+        if not db_raw:
+            return candles
+
+        db_candles = self._db_to_candles(db_raw)
+        total = len(db_candles) + len(candles)
+        logger.info(f"[K线获取] {tf} 桥接 {len(candles)} + 补充 {len(db_candles)} = {total}")
+
+        return db_candles + candles
+
     def _load_closed_trades(self):
         """启动时从 JSONL 加载历史已平仓记录"""
         try:
@@ -139,6 +234,60 @@ class TradingEngine:
                 logger.info(f"加载历史成交 {len(self._closed_trades)} 条")
         except Exception as e:
             logger.warning(f"加载历史成交失败: {e}")
+
+    def _recover_missing_trades(self):
+        """启动时从 MT4 补充遗漏的历史成交记录"""
+        try:
+            orders = self.bridge.get_order_history(settings.SYMBOL)
+        except Exception as e:
+            logger.warning(f"[成交恢复] 获取历史失败: {e}")
+            return
+        if not orders:
+            return
+
+        existing_tickets = {t["ticket"] for t in self._closed_trades}
+        missing = [o for o in orders if o["ticket"] not in existing_tickets]
+        if not missing:
+            logger.info(f"[成交恢复] 无需补充，已是最新")
+            return
+
+        records = []
+        for order in missing:
+            magic = order["magic"]
+            strategy = f"magic_{magic}"
+            # 尝试从策略池解析策略名
+            for s in self.strategies:
+                if s.magic == magic:
+                    strategy = s.name
+                    break
+            open_dt = datetime.fromtimestamp(order["open_time"])
+            close_dt = datetime.fromtimestamp(order["close_time"])
+            hold_sec = int(order["close_time"] - order["open_time"])
+            record = {
+                "ticket": order["ticket"], "symbol": order["symbol"],
+                "order_type": order["order_type"], "volume": order["volume"],
+                "entry_price": order["open_price"], "exit_price": order["close_price"],
+                "pnl": round(order["profit"], 2),
+                "stop_loss": order["stop_loss"], "take_profit": order["take_profit"],
+                "swap": round(order["swap"], 2), "commission": round(order["commission"], 2),
+                "magic": magic, "strategy": strategy,
+                "open_time": open_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "close_time": close_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "hold_seconds": hold_sec,
+                "exit_reason": "mt4_history",
+            }
+            records.append(record)
+            self._closed_trades.append(record)
+
+        # 追加到 JSONL 文件
+        try:
+            with open(self._trades_file, "a", encoding="utf-8") as f:
+                for r in records:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        except OSError as e:
+            logger.warning(f"[成交恢复] 写入文件失败: {e}")
+
+        logger.info(f"[成交恢复] 补充 {len(records)} 条历史成交")
 
     def add_strategy(self, name: str, cfg: dict) -> bool:
         """动态添加策略（运行中），返回是否成功"""
@@ -387,8 +536,15 @@ class TradingEngine:
         logger.info("=" * 60)
 
         if not self.bridge.connect():
-            logger.error("无法连接 MT4")
-            return
+            logger.warning("无法连接 MT4，每 10 秒重试...")
+            for attempt in range(30):  # 最多重试 5 分钟
+                time.sleep(10)
+                if self.bridge.connect():
+                    logger.info(f"第 {attempt+1} 次重试后连接成功")
+                    break
+            else:
+                logger.error("重试 30 次仍无法连接 MT4，退出")
+                return
 
         # 初始化策略风控状态
         for s in self.strategies:
@@ -405,6 +561,9 @@ class TradingEngine:
 
         self._daily_start_balance = self._get_balance()
         self.running = True
+
+        # 自动补充遗漏历史成交
+        self._recover_missing_trades()
 
         # 新闻过滤初始化加载
         windows = self.news_filter.get_blackout_windows()
@@ -444,6 +603,21 @@ class TradingEngine:
                 logger.info("[热重载] 配置已更新")
         except OSError:
             pass
+
+        # 桥接连接保活：心跳失败时尝试重连
+        try:
+            self.bridge.send_heartbeat()
+        except Exception:
+            logger.warning("[桥接] 心跳失败，尝试重连...")
+            try:
+                self.bridge.disconnect()
+                time.sleep(2)
+                if self.bridge.connect():
+                    logger.info("[桥接] 重连成功")
+                else:
+                    logger.error("[桥接] 重连失败")
+            except Exception as e:
+                logger.error(f"[桥接] 重连异常: {e}")
 
         # 周期性同步K线数据到SQLite
         self._sync_market_data()
@@ -617,7 +791,7 @@ class TradingEngine:
         for tf in timeframes:
             count = 60 if tf == "M15" else 120  # M15≈15h, M5≈10h
             try:
-                candles = self.bridge.get_candles(settings.SYMBOL, tf, count)
+                candles = self._get_candles(tf, count)
             except Exception as e:
                 logger.warning(f"[反向止盈] 获取{tf}数据失败: {e}")
                 continue
@@ -740,12 +914,39 @@ class TradingEngine:
 
             logger.info(f"[{strategy.name}] 策略出场 Ticket={pos.ticket}")
             self.bridge.close_order(pos.ticket)
-            # 记录平仓：已实现盈亏 + 快速出场检测
+
+            # 从 MT4 历史成交获取开平仓时间（同源，计算持仓时间准确）
+            broker_open = 0
+            broker_close = 0
+            try:
+                history = self.bridge.get_order_history(settings.SYMBOL)
+                for o in history:
+                    if o["ticket"] == pos.ticket:
+                        broker_open = o["open_time"]
+                        broker_close = o["close_time"]
+                        break
+            except Exception:
+                pass
+
             direction = "BUY" if pos.order_type in ("OP_BUY", "BUY") else "SELL"
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
 
-            # 记录已平仓明细到内存 + JSONL 文件
-            close_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if broker_close > 0 and broker_open > 0:
+                open_dt = datetime.fromtimestamp(broker_open)
+                close_dt = datetime.fromtimestamp(broker_close)
+                open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
+                close_time_str = close_dt.strftime('%Y-%m-%d %H:%M:%S')
+                actual_hold = int(broker_close - broker_open)
+            else:
+                # 兜底：用本地时间
+                close_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                entry_ts = self._entry_times.get(pos.ticket, 0)
+                if entry_ts > 0:
+                    open_time_str = datetime.fromtimestamp(entry_ts).strftime('%Y-%m-%d %H:%M:%S')
+                    actual_hold = int(time.time() - entry_ts)
+                else:
+                    open_time_str, open_ts = self._pos_open_time(pos)
+                    actual_hold = max(0, int(time.time() - open_ts)) if open_ts > 0 else round(hold_sec)
             record = dict(
                 ticket=pos.ticket,
                 symbol=pos.symbol,
@@ -760,9 +961,9 @@ class TradingEngine:
                 commission=pos.commission,
                 magic=pos.magic,
                 strategy=strategy.name,
-                open_time=pos.open_time,
-                close_time=close_time,
-                hold_seconds=round(hold_sec),
+                open_time=open_time_str,
+                close_time=close_time_str,
+                hold_seconds=actual_hold,
                 exit_reason="strategy_exit",
             )
             self._closed_trades.append(record)
@@ -958,11 +1159,38 @@ class TradingEngine:
                 f"入场={entry:.2f} 盈亏=${pnl:.2f} 原因={reason}"
             )
             self.bridge.close_order(pos.ticket)
+
+            # 从 MT4 历史成交获取开平仓时间
+            broker_open = 0
+            broker_close = 0
+            try:
+                history = self.bridge.get_order_history(settings.SYMBOL)
+                for o in history:
+                    if o["ticket"] == pos.ticket:
+                        broker_open = o["open_time"]
+                        broker_close = o["close_time"]
+                        break
+            except Exception:
+                pass
+
             direction = "BUY" if pos.order_type in ("OP_BUY", "BUY") else "SELL"
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
-            # 记录已平仓明细
-            close_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            hold_sec = int(time.time() - pos.open_time)
+
+            if broker_close > 0 and broker_open > 0:
+                open_dt = datetime.fromtimestamp(broker_open)
+                close_dt = datetime.fromtimestamp(broker_close)
+                open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
+                close_time_str = close_dt.strftime('%Y-%m-%d %H:%M:%S')
+                hold_sec = int(broker_close - broker_open)
+            else:
+                close_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                entry_ts = self._entry_times.get(pos.ticket, 0)
+                if entry_ts > 0:
+                    open_time_str = datetime.fromtimestamp(entry_ts).strftime('%Y-%m-%d %H:%M:%S')
+                    hold_sec = int(time.time() - entry_ts)
+                else:
+                    open_time_str, open_ts = self._pos_open_time(pos)
+                    hold_sec = max(0, int(time.time() - open_ts)) if open_ts > 0 else 0
             record = dict(
                 ticket=pos.ticket, symbol=pos.symbol,
                 order_type=pos.order_type, volume=pos.volume,
@@ -970,8 +1198,8 @@ class TradingEngine:
                 pnl=round(pnl, 2), stop_loss=pos.stop_loss,
                 take_profit=pos.take_profit, swap=pos.swap,
                 commission=pos.commission, magic=pos.magic,
-                strategy=strategy.name, open_time=pos.open_time,
-                close_time=close_time, hold_seconds=hold_sec,
+                strategy=strategy.name, open_time=open_time_str,
+                close_time=close_time_str, hold_seconds=hold_sec,
                 exit_reason=reason,
             )
             self._closed_trades.append(record)
@@ -993,7 +1221,7 @@ class TradingEngine:
         return False
 
     def _sync_market_data(self):
-        """周期性同步 K 线数据到 SQLite，仅同步活跃策略的周期"""
+        """周期性同步 K 线数据到 SQLite（含协调器短周期）"""
         now = time.time()
         if now - self._last_data_sync < self._data_sync_interval:
             return
@@ -1003,10 +1231,16 @@ class TradingEngine:
         with self._strategies_lock:
             for s in self.strategies:
                 active_tfs.add(s.timeframe)
+        # 协调器反向止盈需要的短周期
+        coord = getattr(settings, 'COORDINATOR_CONFIG', {})
+        if coord.get("m15_reverse_tp_enabled", False):
+            active_tfs.add("M15")
+        if coord.get("m5_reverse_tp_enabled", False):
+            active_tfs.add("M5")
         if not active_tfs:
             return
 
-        logger.info(f"[数据同步] 开始增量同步周期: {active_tfs}")
+        logger.info(f"[数据同步] 开始增量同步周期: {sorted(active_tfs)}")
         for tf in sorted(active_tfs):
             try:
                 n = download_timeframe(self.bridge, tf, settings.SYMBOL)

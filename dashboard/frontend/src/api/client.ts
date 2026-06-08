@@ -1,6 +1,6 @@
 // REST API 客户端
 import axios from 'axios'
-import type { AccountInfo, Position, Candle, TickPrice, LogEntry, EngineStatus, BacktestRequest, BacktestJob, BacktestResult, BacktestHistoryItem, ClosedTrade } from '@/types'
+import type { AccountInfo, Position, Candle, TickPrice, LogEntry, EngineStatus, BacktestRequest, BacktestJob, BacktestResult, BacktestHistoryItem, ClosedTrade, TradeStats } from '@/types'
 
 const http = axios.create({
   baseURL: '/api',
@@ -113,6 +113,21 @@ export async function getLogs(level?: string, limit = 100): Promise<LogEntry[]> 
 // === 历史成交 ===
 export async function getTradeHistory(limit = 100): Promise<ClosedTrade[]> {
   const { data } = await http.get('/trades/history', { params: { limit } })
+  return data
+}
+
+// === 策略收益统计 ===
+export async function getTradeStats(params?: {
+  strategies?: string
+  from_date?: string
+  to_date?: string
+}): Promise<TradeStats> {
+  const { data } = await http.get('/trades/stats', { params })
+  return data
+}
+
+export async function getTradeAnalysis(ticket: number): Promise<any> {
+  const { data } = await http.get(`/trades/analysis/${ticket}`)
   return data
 }
 
