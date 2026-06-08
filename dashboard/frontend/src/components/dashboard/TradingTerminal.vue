@@ -199,6 +199,7 @@ onMounted(() => {
       const nw = chartContainer.value.clientWidth
       chart.applyOptions({ width: nw })
       Object.values(paneCharts).forEach(pc => pc.applyOptions({ width: nw }))
+      requestAnimationFrame(() => syncAllPriceScaleWidths())
     }
   })
   observer.observe(chartContainer.value)

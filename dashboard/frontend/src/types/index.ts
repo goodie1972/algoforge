@@ -147,3 +147,39 @@ export interface BacktestHistoryItem {
   params: BacktestRequest
   result_summary: Partial<BacktestResult> | null
 }
+
+// 策略收益统计（MT4 标准报表）
+export interface StrategyStats {
+  total_net_profit: number
+  gross_profit: number
+  gross_loss: number
+  profit_factor: number | string
+  expected_payoff: number
+  total_trades: number
+  short_trades: number
+  short_won: number
+  short_won_pct: number
+  long_trades: number
+  long_won: number
+  long_won_pct: number
+  profit_trades: number
+  loss_trades: number
+  win_rate: number
+  largest_profit_trade: number
+  largest_loss_trade: number
+  avg_profit_trade: number
+  avg_loss_trade: number
+  ratio_avg_profit_loss: number
+  avg_hold_seconds: number
+  max_consecutive_wins: number
+  max_consecutive_losses: number
+  max_consecutive_wins_pnl: number
+  max_consecutive_losses_pnl: number
+  total_commission: number
+  total_swap: number
+}
+
+export interface TradeStats {
+  summary: StrategyStats
+  by_magic: Record<string, StrategyStats & { magic: number; strategy: string }>
+}

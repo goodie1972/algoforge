@@ -5,6 +5,7 @@ import { darkTheme, NIcon } from 'naive-ui'
 import {
   AnalyticsOutline, WalletOutline, SettingsOutline, DocumentTextOutline,
   BarChartOutline, PowerOutline, PlayOutline, StopOutline, TimeOutline,
+  ReaderOutline,
 } from '@vicons/ionicons5'
 import { useAccountStore } from '@/stores/account'
 import { usePositionStore } from '@/stores/positions'
@@ -35,6 +36,7 @@ const menuOptions = [
   { label: '账户持仓', key: '/positions', icon: renderIcon(WalletOutline) },
   { label: '策略中心', key: '/strategies', icon: renderIcon(BarChartOutline) },
   { label: '监控告警', key: '/patrol', icon: renderIcon(TimeOutline) },
+  { label: '历史成交', key: '/trades', icon: renderIcon(ReaderOutline) },
   { label: '运行配置', key: '/config', icon: renderIcon(SettingsOutline) },
   { label: '系统日志', key: '/logs', icon: renderIcon(DocumentTextOutline) },
 ]

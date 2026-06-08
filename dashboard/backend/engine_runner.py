@@ -187,11 +187,18 @@ class EngineRunner:
         engine = TradingEngine()
         self._engine = engine
 
-        # 连接 MT4
+        # 连接 MT4（带重试）
         if not engine.bridge.connect():
-            self.logger.error("无法连接 MT4，请确认 MT4 终端已运行且 EA 已加载")
-            self._running = False
-            return
+            self.logger.warning("无法连接 MT4，每 10 秒重试...")
+            for attempt in range(30):
+                time.sleep(10)
+                if engine.bridge.connect():
+                    self.logger.info(f"第 {attempt+1} 次重试后连接成功")
+                    break
+            else:
+                self.logger.error("重试 30 次仍无法连接 MT4")
+                self._running = False
+                return
 
         # 暴露 bridge 供 Dashboard WebSocket 轮询使用
         self.bridge = engine.bridge
@@ -215,12 +222,27 @@ class EngineRunner:
         self._running = True
         self.logger.info("进入主循环...")
 
+        # 自动补充遗漏历史成交
+        engine._recover_missing_trades()
+
         # 引擎启动后检查数据库数据完整性，自动补漏
         self._sync_data_after_start(engine)
 
         # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
         while engine.running and not self._stop_requested:
             try:
+                # 桥接保活检测
+                try:
+                    engine.bridge.send_heartbeat()
+                except Exception:
+                    self.logger.warning("[桥接] 心跳失败，尝试重连...")
+                    try:
+                        engine.bridge.disconnect()
+                        time.sleep(2)
+                        engine.bridge.connect()
+                    except Exception as e2:
+                        self.logger.error(f"[桥接] 重连失败: {e2}")
+
                 engine._tick()
             except Exception as e:
                 self.logger.exception(f"主循环异常: {e}")

@@ -34,13 +34,13 @@ log_handler = LogCaptureHandler()
 log_handler.setFormatter(logging.Formatter(
     "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 ))
-logging.getLogger().addHandler(log_handler)
-logging.getLogger().setLevel(logging.INFO)
-
-# 确保引擎线程日志可读（同时输出到 stderr）
-_console = logging.StreamHandler()
-_console.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s"))
-logging.getLogger().addHandler(_console)
+# 在 uvicorn 二次 import 时不重复添加 handler
+if not logging.getLogger().handlers:
+    logging.getLogger().addHandler(log_handler)
+    logging.getLogger().setLevel(logging.INFO)
+    _console = logging.StreamHandler()
+    _console.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s - %(message)s"))
+    logging.getLogger().addHandler(_console)
 
 engine_runner = EngineRunner(config_service=config_service)
 
@@ -244,4 +244,4 @@ if __name__ == "__main__":
     print("  API: http://localhost:8000/api")
     print("  WS:  ws://localhost:8000/ws")
     print("=" * 50)
-    uvicorn.run("dashboard.backend.main:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
