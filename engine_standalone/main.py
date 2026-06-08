@@ -117,6 +117,7 @@ class TradingEngine:
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
         self._closed_trades: list[dict] = []               # 已平仓记录（内存）
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
+        self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
         self._load_closed_trades()
 
     @property
@@ -195,7 +196,7 @@ class TradingEngine:
             my_pos = [p for p in all_positions if p.magic == state.magic]
             state.floating_pnl = sum(p.profit for p in my_pos)
 
-    def _record_close(self, ticket: int, pnl: float, magic: int):
+    def _record_close(self, ticket: int, pnl: float, magic: int, direction: str = ""):
         """记录平仓：更新已实现盈亏 + 快速出场检测"""
         state = self._risk_states.get(magic)
         if state is None:
@@ -241,6 +242,15 @@ class TradingEngine:
                 )
         elif pnl > 0:
             state.consecutive_losses = 0
+            # 盈利平仓 → 记录冷却时间
+            if direction:
+                if magic not in self._profit_exit_cooldown:
+                    self._profit_exit_cooldown[magic] = {}
+                self._profit_exit_cooldown[magic][direction] = time.time()
+                logger.info(
+                    f"[止盈冷却] {state.name} {direction} 盈利 ${pnl:.2f}，"
+                    f"{settings.PROFIT_EXIT_COOLDOWN_HOURS}h 内不再开同向单"
+                )
 
         # 绝对亏损阻断：已实现亏损 ≥$30 触发 12h 冷却
         if state.realized_pnl <= -settings.PER_STRATEGY_REALIZED_LOSS_AMOUNT and not state.realized_loss_amount_blocked:
@@ -447,6 +457,12 @@ class TradingEngine:
         for strategy in snapshot:
             self._run_exits(strategy)
 
+        # ---- 多策略协调出场：信号盈利时联动平目标 ----
+        self._coordinated_exits(snapshot)
+
+        # ---- 短周期反向止盈：M15/M5 趋势反转时平盈利单 ----
+        self._check_trend_reverse_tp()
+
         # 更新浮动盈亏
         self._update_floating_pnl()
 
@@ -481,6 +497,183 @@ class TradingEngine:
                 logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
                 continue
             self._run_strategy(strategy)
+
+    def _coordinated_exits(self, snapshot: list):
+        """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""
+        try:
+            coord = settings.COORDINATOR_CONFIG
+        except AttributeError:
+            return
+
+        if not coord.get("enabled", False) or not coord.get("cross_exit_enabled", False):
+            return
+
+        signal_name = coord.get("signal_strategy", "")
+        signal_dir = coord.get("signal_direction", "BUY")
+        target_names = coord.get("target_strategies", [])
+        target_dir = coord.get("target_direction", "SELL")
+        if not signal_name or not target_names:
+            return
+
+        # 策略名 → magic 映射
+        signal_magic = None
+        target_magics: set[int] = set()
+        for name, cfg in settings.STRATEGY_POOL.items():
+            if name == signal_name:
+                signal_magic = cfg["magic"]
+            if name in target_names:
+                target_magics.add(cfg["magic"])
+        if signal_magic is None or not target_magics:
+            return
+
+        # 获取所有持仓
+        try:
+            positions = self.bridge.get_positions(settings.SYMBOL)
+        except Exception as e:
+            logger.warning(f"[协调器] 获取持仓失败: {e}")
+            return
+
+        # 信号策略的盈利单？
+        signal_profit = 0.0
+        signal_found = False
+        for pos in positions:
+            if pos.magic != signal_magic:
+                continue
+            is_buy = pos.order_type in ("OP_BUY", "BUY")
+            if signal_dir == "BUY" and is_buy and pos.profit > 0:
+                signal_profit = pos.profit
+                signal_found = True
+                break
+            elif signal_dir == "SELL" and not is_buy and pos.profit > 0:
+                signal_profit = pos.profit
+                signal_found = True
+                break
+
+        if not signal_found:
+            return
+
+        # 联动关闭目标策略的盈利单
+        target_is_buy = target_dir == "BUY"
+        closed = 0
+        for pos in positions:
+            if pos.magic not in target_magics:
+                continue
+            is_buy = pos.order_type in ("OP_BUY", "BUY")
+            if is_buy != target_is_buy:
+                continue
+            if pos.profit <= 0:
+                continue
+
+            logger.info(
+                f"[协调器] {signal_name} {signal_dir}盈利 ${signal_profit:.2f} → "
+                f"平 Magic={pos.magic} {target_dir} ticket={pos.ticket} "
+                f"盈利 ${pos.profit:.2f}"
+            )
+            try:
+                self.bridge.close_order(pos.ticket)
+                direction = "BUY" if is_buy else "SELL"
+                self._record_close(pos.ticket, pos.profit, pos.magic, direction)
+                closed += 1
+            except Exception as e:
+                logger.error(f"[协调器] 平仓失败 ticket={pos.ticket}: {e}")
+
+        if closed > 0:
+            logger.info(f"[协调器] 本轮联动平仓 {closed} 单")
+
+    def _check_trend_reverse_tp(self):
+        """M15/M5 反向止盈：短周期趋势反转时平盈利单"""
+        try:
+            coord = settings.COORDINATOR_CONFIG
+        except AttributeError:
+            return
+
+        if not coord.get("enabled", False):
+            return
+
+        timeframes = []
+        if coord.get("m15_reverse_tp_enabled", False):
+            timeframes.append("M15")
+        if coord.get("m5_reverse_tp_enabled", False):
+            timeframes.append("M5")
+        if not timeframes:
+            return
+
+        try:
+            positions = self.bridge.get_positions(settings.SYMBOL)
+        except Exception as e:
+            logger.warning(f"[反向止盈] 获取持仓失败: {e}")
+            return
+
+        if not positions:
+            return
+
+        # 策略名 → magic 映射
+        strategy_names = {}
+        for name, cfg in settings.STRATEGY_POOL.items():
+            strategy_names[cfg["magic"]] = name
+
+        closed_this_tick: set[int] = set()  # 防止同 tick 重复平仓
+
+        for tf in timeframes:
+            count = 60 if tf == "M15" else 120  # M15≈15h, M5≈10h
+            try:
+                candles = self.bridge.get_candles(settings.SYMBOL, tf, count)
+            except Exception as e:
+                logger.warning(f"[反向止盈] 获取{tf}数据失败: {e}")
+                continue
+            if not candles or len(candles) < count:
+                continue
+
+            closes = [c.close for c in candles]
+
+            # 计算 EMA20 斜率（最近 3 根）
+            k = 2.0 / 21
+            ema = closes[0]
+            ema_values = [ema]
+            for p in closes[1:]:
+                ema = (p - ema) * k + ema
+                ema_values.append(ema)
+
+            if len(ema_values) < 6:
+                continue
+
+            ema_slope = ema_values[-1] - ema_values[-4]  # 最近 3 根
+            trend_up = ema_slope > 0
+            trend_down = ema_slope < 0
+
+            for pos in positions:
+                if pos.ticket in closed_this_tick:
+                    continue
+                if pos.profit <= 0:
+                    continue
+                is_buy = pos.order_type in ("OP_BUY", "BUY")
+                name = strategy_names.get(pos.magic, f"Magic={pos.magic}")
+
+                # 空单但 M15/M5 趋势转多 → 止盈
+                if not is_buy and trend_up:
+                    logger.info(
+                        f"[反向止盈] {name} {tf}转多 ticket={pos.ticket} "
+                        f"盈利=${pos.profit:.2f} → 平仓"
+                    )
+                    try:
+                        self.bridge.close_order(pos.ticket)
+                        self._record_close(pos.ticket, pos.profit, pos.magic, "SELL")
+                        closed_this_tick.add(pos.ticket)
+                    except Exception as e:
+                        logger.error(f"[反向止盈] 平仓失败 ticket={pos.ticket}: {e}")
+
+                # 多单但 M15/M5 趋势转空 → 止盈
+                elif is_buy and trend_down:
+                    logger.info(
+                        f"[反向止盈] {name} {tf}转空 ticket={pos.ticket} "
+                        f"盈利=${pos.profit:.2f} → 平仓"
+                    )
+                    try:
+                        self.bridge.close_order(pos.ticket)
+                        self._record_close(pos.ticket, pos.profit, pos.magic, "BUY")
+                        closed_this_tick.add(pos.ticket)
+                    except Exception as e:
+                        logger.error(f"[反向止盈] 平仓失败 ticket={pos.ticket}: {e}")
 
     def _check_floating_loss_blocks(self):
         """检查并更新各策略浮动亏损状态（警告 + 阻断）"""
@@ -548,7 +741,8 @@ class TradingEngine:
             logger.info(f"[{strategy.name}] 策略出场 Ticket={pos.ticket}")
             self.bridge.close_order(pos.ticket)
             # 记录平仓：已实现盈亏 + 快速出场检测
-            self._record_close(pos.ticket, pnl, strategy.magic)
+            direction = "BUY" if pos.order_type in ("OP_BUY", "BUY") else "SELL"
+            self._record_close(pos.ticket, pnl, strategy.magic, direction)
 
             # 记录已平仓明细到内存 + JSONL 文件
             close_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -631,6 +825,19 @@ class TradingEngine:
         signal = strategy.on_tick()
         if not signal:
             return
+
+        # 止盈冷却检查：盈利平仓后 N 小时内不再开同向单
+        signal_dir = "BUY" if "BUY" in signal else "SELL"
+        cool = self._profit_exit_cooldown.get(strategy.magic, {})
+        if signal_dir in cool:
+            elapsed = time.time() - cool[signal_dir]
+            cooldown_sec = settings.PROFIT_EXIT_COOLDOWN_HOURS * 3600
+            if elapsed < cooldown_sec:
+                remain_h = (cooldown_sec - elapsed) / 3600
+                logger.info(f"[{strategy.name}] {signal_dir} 止盈冷却中（剩余 {remain_h:.1f}h），跳过开仓")
+                return
+            else:
+                cool.pop(signal_dir, None)
 
         logger.info(f"[{strategy.name}] 收到信号: {signal}")
 
@@ -751,7 +958,8 @@ class TradingEngine:
                 f"入场={entry:.2f} 盈亏=${pnl:.2f} 原因={reason}"
             )
             self.bridge.close_order(pos.ticket)
-            self._record_close(pos.ticket, pnl, strategy.magic)
+            direction = "BUY" if pos.order_type in ("OP_BUY", "BUY") else "SELL"
+            self._record_close(pos.ticket, pnl, strategy.magic, direction)
             # 记录已平仓明细
             close_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             hold_sec = int(time.time() - pos.open_time)

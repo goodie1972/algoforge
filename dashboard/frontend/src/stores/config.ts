@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getConfig, updateConfig, resetConfig, getStrategyPool, updateStrategyPool as updatePoolApi } from '@/api/client'
+import { getConfig, updateConfig, resetConfig, getStrategyPool, updateStrategyPool as updatePoolApi, updateCoordinator as updateCoordApi } from '@/api/client'
 
 export const useConfigStore = defineStore('config', () => {
   const items = ref<Record<string, any>>({})
@@ -51,10 +51,21 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
+  async function updateCoordinator(cfg: Record<string, any>) {
+    error.value = null
+    try {
+      await updateCoordApi(cfg)
+      await fetch()
+    } catch (e: any) {
+      error.value = e?.message || '更新协调器失败'
+      throw e
+    }
+  }
+
   async function reset(key?: string) {
     await resetConfig(key)
     await fetch()
   }
 
-  return { items, loading, error, fetch, fetchConfig, update, updateStrategyPool, fetchStrategyPool, reset }
+  return { items, loading, error, fetch, fetchConfig, update, updateStrategyPool, fetchStrategyPool, updateCoordinator, reset }
 })

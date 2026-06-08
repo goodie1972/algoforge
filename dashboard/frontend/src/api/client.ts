@@ -65,6 +65,16 @@ export async function updateStrategyPool(pool: Record<string, any>): Promise<voi
   await http.post('/config/strategy-pool', { pool })
 }
 
+// === 协调器 ===
+export async function getCoordinator(): Promise<Record<string, any>> {
+  const { data } = await http.get('/config/coordinator')
+  return data
+}
+
+export async function updateCoordinator(cfg: Record<string, any>): Promise<void> {
+  await http.post('/config/coordinator', { config: cfg })
+}
+
 // === 行情 ===
 export async function getPrice(): Promise<TickPrice> {
   const { data } = await http.get('/market/price')

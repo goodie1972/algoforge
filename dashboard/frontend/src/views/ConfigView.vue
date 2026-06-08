@@ -6,6 +6,7 @@ import StrategyConfig from '@/components/config/StrategyConfig.vue'
 import RiskConfig from '@/components/config/RiskConfig.vue'
 import ConnectionConfig from '@/components/config/ConnectionConfig.vue'
 import NewsFilterConfig from '@/components/config/NewsFilterConfig.vue'
+import CoordinatorConfig from '@/components/config/CoordinatorConfig.vue'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -39,6 +40,9 @@ async function resetAll() {
         </n-tab-pane>
         <n-tab-pane name="news" tab="新闻过滤">
           <NewsFilterConfig />
+        </n-tab-pane>
+        <n-tab-pane name="coordinator" tab="协调器">
+          <CoordinatorConfig />
         </n-tab-pane>
       </n-tabs>
 
