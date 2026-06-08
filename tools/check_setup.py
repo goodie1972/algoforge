@@ -49,8 +49,8 @@ def check_project_files():
     print("项目文件:")
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     required = [
-        "main.py",
-        "run.py",
+        "engine_standalone/main.py",
+        "engine_standalone/run.py",
         "config/settings.py",
         "core/bridge.py",
         "core/freemt4_bridge.py",
@@ -168,9 +168,9 @@ def main():
     elif not data_ok:
         print("  下一步: 从 MT4 导出历史数据到 data/ 目录")
     else:
-        print("  一切就绪! 运行 python run.py 启动交易引擎")
+        print("  一切就绪! 运行 python engine_standalone/run.py 启动交易引擎")
         print("  默认策略: V6 Hybrid（双向网格 + ATR 止损）")
-        print("  也可通过 python main.py --strategy 选择其他策略")
+        print("  也可通过 python engine_standalone/main.py --strategy 选择其他策略")
     print(f"{'='*50}\n")
 
 

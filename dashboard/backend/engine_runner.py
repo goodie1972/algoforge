@@ -169,7 +169,8 @@ class EngineRunner:
 
         # 导入多策略引擎（用 importlib 避开 module 缓存冲突 'main'）
         try:
-            main_path = os.path.join(project_root, "main.py")
+            # main.py 已移至 engine_standalone/ 子目录
+            main_path = os.path.join(project_root, "engine_standalone", "main.py")
             spec = importlib.util.spec_from_file_location("xauusd_trading_engine", main_path)
             if spec is None or spec.loader is None:
                 self.logger.error(f"无法加载 TradingEngine: {main_path} 不存在或格式错误")
