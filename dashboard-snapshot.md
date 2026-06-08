@@ -1,0 +1,117 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - heading "XAUUSD" [level=2] [ref=e7]
+      - text: 量化交易仪表盘
+    - generic [ref=e8]:
+      - superscript [ref=e10]
+      - generic [ref=e11]: 引擎已停止
+    - menu [ref=e12]:
+      - menuitem "仪表板" [ref=e13]:
+        - img [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+        - text: 仪表板
+      - menuitem "持仓管理" [ref=e23]:
+        - img [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+        - text: 持仓管理
+      - menuitem "运行配置" [ref=e29]:
+        - img [ref=e30] [cursor=pointer]:
+          - img [ref=e31]
+        - text: 运行配置
+      - menuitem "系统日志" [ref=e33]:
+        - img [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+        - text: 系统日志
+  - generic [ref=e40]:
+    - generic [ref=e41]:
+      - button [ref=e42] [cursor=pointer]:
+        - img [ref=e44]:
+          - img [ref=e45]
+      - navigation "Breadcrumb" [ref=e50]:
+        - list [ref=e51]:
+          - listitem [ref=e52]:
+            - generic [ref=e53] [cursor=pointer]: XAUUSD 量化交易系统
+            - generic [ref=e54]: /
+          - listitem [ref=e55]:
+            - generic [ref=e56]: 仪表板
+      - generic [ref=e58]: ○ 已停止
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - img [ref=e63]
+          - generic [ref=e64]: 引擎已停止
+        - button "启动引擎" [ref=e65] [cursor=pointer]:
+          - img [ref=e67]:
+            - img [ref=e68]
+          - generic [ref=e70]: 启动引擎
+      - generic [ref=e71]:
+        - heading "账户信息" [ref=e72]:
+          - heading "账户信息" [ref=e73]
+        - generic [ref=e74]:
+          - img [ref=e77]
+          - generic [ref=e81]:
+            - generic [ref=e82]: 获取账户信息失败
+            - generic [ref=e83]: Request failed with status code 503
+          - button "重试" [ref=e85] [cursor=pointer]:
+            - generic [ref=e86]: 重试
+      - generic [ref=e87]:
+        - generic [ref=e89]:
+          - heading "XAUUSD 价格图表 M5 M15 H1 H4 D1" [ref=e90]:
+            - heading "XAUUSD 价格图表" [ref=e91]
+            - generic [ref=e92]:
+              - button "M5" [ref=e93] [cursor=pointer]:
+                - generic [ref=e94]: M5
+              - button "M15" [ref=e95] [cursor=pointer]:
+                - generic [ref=e96]: M15
+              - button "H1" [ref=e97] [cursor=pointer]:
+                - generic [ref=e98]: H1
+              - button "H4" [ref=e99] [cursor=pointer]:
+                - generic [ref=e100]: H4
+              - button "D1" [ref=e101] [cursor=pointer]:
+                - generic [ref=e102]: D1
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - text: 买价
+              - strong [ref=e106]: "0.00"
+            - generic [ref=e107]:
+              - text: 卖价
+              - strong [ref=e109]: "0.00"
+            - generic [ref=e110]:
+              - text: 点差
+              - strong [ref=e111]: "0.00"
+            - generic [ref=e112]:
+              - text: 中间价
+              - strong [ref=e114]: "0.00"
+          - generic [ref=e116]:
+            - img [ref=e119]
+            - generic [ref=e123]:
+              - generic [ref=e124]: 暂无数据
+              - generic [ref=e125]: 连接 MT4 后自动加载 K 线数据
+        - generic [ref=e127]:
+          - heading "策略信号" [ref=e128]:
+            - heading "策略信号" [ref=e129]
+          - generic [ref=e131]: 双均线策略
+          - heading "等待信号" [level=2] [ref=e133]
+          - table [ref=e136]:
+            - rowgroup [ref=e137]:
+              - row "当前价格 0.00 买/卖价 0.00 / 0.00" [ref=e138]:
+                - rowheader "当前价格" [ref=e139]
+                - cell "0.00" [ref=e140]
+                - rowheader "买/卖价" [ref=e141]
+                - cell "0.00 / 0.00" [ref=e142]
+              - row "点差 0.00 K 线周期 H1" [ref=e143]:
+                - rowheader "点差" [ref=e144]
+                - cell "0.00" [ref=e145]
+                - rowheader "K 线周期" [ref=e146]
+                - cell "H1" [ref=e147]
+      - generic [ref=e150]:
+        - heading "当前持仓 多头 0 空头 0 总计 $0.00" [ref=e151]:
+          - heading "当前持仓" [ref=e152]
+          - generic [ref=e153]:
+            - generic [ref=e155]: 多头 0
+            - generic [ref=e157]: 空头 0
+            - generic [ref=e159]: 总计 $0.00
+        - generic [ref=e160]:
+          - img [ref=e163]
+          - generic [ref=e166]: 暂无持仓

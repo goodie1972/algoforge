@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7 策略多周期全量回测分析报告 — 2026-06-06</title>
+<style>
+  :root{--bg:#f5f7fa;--card:#ffffff;--accent:#2563eb;--green:#16a34a;--red:#dc2626;--gray:#64748b;--border:#e2e8f0;--amber:#d97706}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:#1e293b;padding:20px;line-height:1.6}
+  .container{max-width:1100px;margin:0 auto}
+  h1{font-size:2rem;font-weight:700;margin-bottom:4px}
+  .sub{color:var(--gray);font-size:.95rem;margin-bottom:24px}
+  h2{font-size:1.35rem;font-weight:600;margin:32px 0 16px;padding-bottom:8px;border-bottom:2px solid var(--accent)}
+  .meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+  .meta-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+  .meta-card .num{font-size:1.5rem;font-weight:700;color:var(--accent);display:block}
+  .meta-card .lab{font-size:.8rem;color:var(--gray)}
+  .table-wrap{overflow-x:auto;margin-bottom:24px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  table{width:100%;border-collapse:collapse;background:var(--card)}
+  th,td{padding:9px 10px;text-align:right;font-size:.82rem;border-bottom:1px solid var(--border);white-space:nowrap}
+  th{background:#f1f5f9;font-weight:600;color:#475569}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:inherit}
+  tr:last-child td{border-bottom:none}
+  .pos{color:var(--green);font-weight:600}
+  .neg{color:var(--red);font-weight:600}
+  .best{background:#f0fdf4!important}
+  .best th,.best td{background:#f0fdf4!important}
+  .best2{background:#fffbeb!important}
+  .best2 th,.best2 td{background:#fffbeb!important}
+  .pct{font-size:.75rem;opacity:.7}
+  .tf-sep{border-left:2px solid var(--border)}
+  .tf-cell{padding:9px 6px!important;font-size:.8rem!important}
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;margin-right:4px}
+  .tag-1{background:#dbeafe;color:#1d4ed8}
+  .tag-2{background:#fef3c7;color:#b45309}
+  .tag-3{background:#fce7f3;color:#be185d}
+  .strategy-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .strategy-card h3{font-size:1.1rem;font-weight:600;margin-bottom:6px}
+  .strategy-card .meta{font-size:.85rem;color:var(--gray);margin-bottom:10px}
+  .strategy-card .meta a{color:var(--accent);text-decoration:none}
+  .strategy-card .meta a:hover{text-decoration:underline}
+  .strategy-card .row{display:flex;flex-wrap:wrap;gap:20px;margin-top:12px}
+  .strategy-card .stat{flex:1;min-width:100px;font-size:.85rem}
+  .strategy-card .stat strong{display:block;font-size:1.1rem}
+  .strategy-card .logic{background:#f8fafc;border-radius:8px;padding:12px;margin-top:10px;font-size:.85rem;line-height:1.7}
+  .strategy-card .logic code{background:#e2e8f0;padding:1px 5px;border-radius:3px;font-size:.8rem}
+  .strategy-card .mtf-table{width:100%;margin-top:10px;font-size:.8rem}
+  .strategy-card .mtf-table td{padding:4px 10px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600}
+  .badge-p{background:#dcfce7;color:var(--green)}
+  .badge-n{background:#fee2e2;color:var(--red)}
+  .badge-w{background:#fef9c3;color:#a16207}
+  .fn{font-size:.85rem;color:var(--gray);margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;font-size:.85rem;margin:12px 0}
+  .note strong{color:var(--amber)}
+  @media(max-width:600px){th,td{padding:6px 4px;font-size:.75rem}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>XAUUSD 7 策略多周期全量回测分析报告</h1>
+<p class="sub">
+  数据源: <code>data/market_data.db</code> (SQLite) &nbsp;|&nbsp; M30: 2026-03-24 ~ 06-06 (2445 根) &nbsp;|&nbsp;
+  H1: 2024-01-01 ~ 2026-06-06 (8645 根) &nbsp;|&nbsp; H4: 2025-01-27 ~ 2026-06-05 (2095 根) &nbsp;|&nbsp; 端口偏移: +100
+</p>
+
+<div class="meta-grid">
+  <div class="meta-card"><span class="num">3</span><span class="lab">测试周期</span></div>
+  <div class="meta-card"><span class="num">M30/H1/H4</span><span class="lab">时间框架</span></div>
+  <div class="meta-card"><span class="num">0.01</span><span class="lab">固定手数</span></div>
+  <div class="meta-card"><span class="num">$10,000</span><span class="lab">初始资金</span></div>
+  <div class="meta-card"><span class="num">$0.50</span><span class="lab">每笔佣金</span></div>
+</div>
+
+<div class="note">
+  <strong>注意:</strong> M30 数据仅覆盖 2026-03-24 ~ 2026-06-06 (约 2.5 个月), H1 覆盖 2024-01-01 ~ 2026-06-06 (约 2.5 年),
+  H4 覆盖 2025-01-27 ~ 2026-06-05 (约 1.3 年)。三周期数据窗口不同, 绝对值不可直接对标, 但<strong>策略在各周期的相对表现</strong>具有参考价值。
+</div>
+
+<h2>一、三周期综合对比</h2>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+  <th rowspan="2">策略</th>
+  <th colspan="3" class="tf-sep">M30 (2.5 月)</th>
+  <th colspan="3" class="tf-sep">H1 (2.5 年)</th>
+  <th colspan="3" class="tf-sep">H4 (1.3 年)</th>
+</tr>
+<tr>
+  <th class="tf-cell">交易</th><th class="tf-cell">盈亏</th><th class="tf-cell">收益率</th>
+  <th class="tf-cell">交易</th><th class="tf-cell">盈亏</th><th class="tf-cell">收益率</th>
+  <th class="tf-cell">交易</th><th class="tf-cell">盈亏</th><th class="tf-cell">收益率</th>
+</tr>
+</thead>
+<tbody>
+<tr class="best"><td>ML-Score</td>
+  <td>53</td><td class="pos">+$230</td><td class="pos">+2.30%</td>
+  <td>274</td><td class="pos"><strong>+$3,951</strong></td><td class="pos"><strong>+39.51%</strong></td>
+  <td>59</td><td class="neg">-$1,311</td><td class="neg">-13.11%</td></tr>
+<tr><td>GoldTraderEA</td>
+  <td>43</td><td class="neg">-$49</td><td class="neg">-0.49%</td>
+  <td>123</td><td class="pos"><strong>+$2,492</strong></td><td class="pos"><strong>+24.92%</strong></td>
+  <td>29</td><td class="pos">+$362</td><td class="pos">+3.62%</td></tr>
+<tr><td>SMC-ICT</td>
+  <td>6</td><td class="pos">+$278</td><td class="pos">+2.78%</td>
+  <td>4</td><td class="pos">+$2,278</td><td class="pos">+22.78%</td>
+  <td>26</td><td class="neg">-$739</td><td class="neg">-7.39%</td></tr>
+<tr><td>Stochastic</td>
+  <td>18</td><td class="neg">-$547</td><td class="neg">-5.47%</td>
+  <td>6</td><td class="pos">+$2,240</td><td class="pos">+22.40%</td>
+  <td>6</td><td class="pos">+$497</td><td class="pos">+4.97%</td></tr>
+<tr><td>ORB</td>
+  <td>7</td><td class="pos">+$121</td><td class="pos">+1.21%</td>
+  <td>11</td><td class="pos">+$2,215</td><td class="pos">+22.15%</td>
+  <td>7</td><td class="pos">+$549</td><td class="pos">+5.49%</td></tr>
+<tr><td>RSI-MR</td>
+  <td>7</td><td class="neg">-$36</td><td class="neg">-0.36%</td>
+  <td>10</td><td class="pos">+$2,215</td><td class="pos">+22.15%</td>
+  <td>25</td><td class="neg">-$829</td><td class="neg">-8.29%</td></tr>
+<tr><td>Grid</td>
+  <td>178</td><td class="neg">-$717</td><td class="neg">-7.17%</td>
+  <td>239</td><td class="pos">+$154</td><td class="pos">+1.54%</td>
+  <td>116</td><td class="pos"><strong>+$1,503</strong></td><td class="pos"><strong>+15.03%</strong></td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>二、各周期最佳策略详情</h2>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:24px">
+
+<div class="strategy-card" style="margin:0">
+<div style="font-size:.8rem;color:var(--accent);font-weight:600;margin-bottom:4px">M30 最佳</div>
+<div style="font-size:1.5rem;font-weight:700">SMC-ICT</div>
+<div style="font-size:.9rem;margin:4px 0">+$277.57 (+2.78%)</div>
+<div style="font-size:.8rem;color:var(--gray)">6 交易 | 16.7% 胜率 | PF 2.04 | DD $266 (2.7%)</div>
+<div style="font-size:.8rem;color:var(--gray)">ML-Score 次之: +$230 (+2.30%, 53 笔)</div>
+</div>
+
+<div class="strategy-card" style="margin:0">
+<div style="font-size:.8rem;color:var(--green);font-weight:600;margin-bottom:4px">H1 最佳</div>
+<div style="font-size:1.5rem;font-weight:700">ML-Score</div>
+<div style="font-size:.9rem;margin:4px 0">+$3,950.96 (+39.51%)</div>
+<div style="font-size:.8rem;color:var(--gray)">274 交易 | 36.1% 胜率 | PF 2.60 | DD $383 (3.8%)</div>
+<div style="font-size:.8rem;color:var(--gray)">GoldTraderEA 次之: +$2,492 (+24.92%, 123 笔)</div>
+</div>
+
+<div class="strategy-card" style="margin:0">
+<div style="font-size:.8rem;color:var(--amber);font-weight:600;margin-bottom:4px">H4 最佳</div>
+<div style="font-size:1.5rem;font-weight:700">Grid</div>
+<div style="font-size:.9rem;margin:4px 0">+$1,503.12 (+15.03%)</div>
+<div style="font-size:.8rem;color:var(--gray)">116 交易 | 80.2% 胜率 | PF 1.38</div>
+<div style="font-size:.8rem;color:var(--gray)">ORB 次之: +$549 (+5.49%, 7 笔)</div>
+</div>
+
+</div>
+
+<h2>三、各策略详情</h2>
+
+<!-- 1. ML-Score -->
+<div class="strategy-card">
+<h3>7. ML-Score 多因子评分 <span class="tag tag-1">H1 最佳</span></h3>
+<div class="meta"><strong>来源</strong>: 基于多因子评分框架自研</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H1 +$3,951</strong>最佳 (+39.51%)</div>
+  <div class="stat"><strong>274</strong>H1 交易次数</div>
+  <div class="stat"><strong>36.1%</strong>H1 胜率</div>
+  <div class="stat"><strong>2.60</strong>H1 利润因子</div>
+  <div class="stat"><strong class="pos">$383 (3.8%)</strong>H1 回撤</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th><th>DD</th></tr>
+<tr><td>M30</td><td>53</td><td class="pos">+$230</td><td>+2.30%</td><td>41.5%</td><td>1.20</td><td>$342 (3.4%)</td></tr>
+<tr><td>H1</td><td>274</td><td class="pos">+$3,951</td><td>+39.51%</td><td>36.1%</td><td>2.60</td><td>$383 (3.8%)</td></tr>
+<tr><td>H4</td><td>59</td><td class="neg">-$1,311</td><td>-13.11%</td><td>28.8%</td><td>0.64</td><td>$1,704 (17.0%)</td></tr>
+</table>
+<div class="logic">
+  <strong>评分体系 (满分 13):</strong><br>
+  <code>趋势 (4分)</code> SMA200 方向 ±2; EMA50 位置 ±2<br>
+  <code>动能 (3分)</code> MACD 正负 ±1; Stoch 超买/卖 ±2<br>
+  <code>超买超卖 (4分)</code> RSI14 &lt;30/&gt;70 ±2; Stoch &lt;25/&gt;75 +2<br>
+  <code>波动率 (4分)</code> BB 触及 ±2; Keltner 通道 ±1; 10 周期价格位置 +1<br>
+  <strong>入场: BUY 评分 ≥5 且 &gt; SELL 评分</strong>
+</div>
+</div>
+
+<!-- 2. GoldTraderEA -->
+<div class="strategy-card">
+<h3>2. GoldTraderEA <span class="tag tag-2">H1 次佳</span></h3>
+<div class="meta"><strong>来源</strong>: MQL5 Codebase — GoldTraderEA</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H1 +$2,492</strong> (+24.92%)</div>
+  <div class="stat"><strong>123</strong>H1 交易次数</div>
+  <div class="stat"><strong>33.3%</strong>H1 胜率</div>
+  <div class="stat"><strong>2.29</strong>H1 利润因子</div>
+  <div class="stat"><strong class="pos">$541 (5.4%)</strong>H1 回撤</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th><th>DD</th></tr>
+<tr><td>M30</td><td>43</td><td class="neg">-$49</td><td>-0.49%</td><td>34.9%</td><td>0.93</td><td>$363 (3.6%)</td></tr>
+<tr><td>H1</td><td>123</td><td class="pos">+$2,492</td><td>+24.92%</td><td>33.3%</td><td>2.29</td><td>$541 (5.4%)</td></tr>
+<tr><td>H4</td><td>29</td><td class="pos">+$362</td><td>+3.62%</td><td>34.5%</td><td>1.25</td><td>$619 (6.2%)</td></tr>
+</table>
+<div class="logic">
+  BB(20,2.5) 突破 + EMA50 趋势过滤。价格&nbsp;&gt;&nbsp;BB上轨 + &gt;&nbsp;EMA50 → BUY; &lt;&nbsp;BB下轨 + &lt;&nbsp;EMA50 → SELL。ATR 移动止损。
+</div>
+</div>
+
+<!-- 3. ORB -->
+<div class="strategy-card">
+<h3>1. ORB — 开盘区间突破</h3>
+<div class="meta"><strong>来源</strong>: MQL5 Codebase — Opening Range Breakout EA</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H1 +$2,215</strong> (+22.15%)</div>
+  <div class="stat"><strong>11</strong>H1 交易</div>
+  <div class="stat"><strong>9.1%</strong>胜率</div>
+  <div class="stat"><strong>37.8</strong>PF</div>
+  <div class="stat"><strong class="pos">$60 (0.6%)</strong>DD</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th></tr>
+<tr><td>M30</td><td>7</td><td class="pos">+$121</td><td>+1.21%</td><td>14.3%</td><td>1.56</td></tr>
+<tr><td>H1</td><td>11</td><td class="pos">+$2,215</td><td>+22.15%</td><td>9.1%</td><td>37.8</td></tr>
+<tr><td>H4</td><td>7</td><td class="pos">+$549</td><td>+5.49%</td><td>14.3%</td><td>2.39</td></tr>
+</table>
+<div class="logic">
+  突破当日开盘区间 + EMA20 趋势过滤。仅亚洲/欧美早盘交易。三周期均盈利但信号稀疏 (7~11 笔)。
+</div>
+</div>
+
+<!-- 4. SMC-ICT -->
+<div class="strategy-card">
+<h3>3. SMC/ICT — 流动性狩猎</h3>
+<div class="meta"><strong>来源</strong>: MQL5 Community — Smart Money Concepts / ICT Concepts</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H1 +$2,278</strong> (+22.78%)</div>
+  <div class="stat"><strong>4</strong>H1 交易</div>
+  <div class="stat"><strong>25%</strong>胜率</div>
+  <div class="stat"><strong>98.7</strong>PF</div>
+  <div class="stat"><strong class="pos">$23 (0.2%)</strong>DD</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th></tr>
+<tr><td>M30</td><td>6</td><td class="pos">+$278</td><td>+2.78%</td><td>16.7%</td><td>2.04</td></tr>
+<tr><td>H1</td><td>4</td><td class="pos">+$2,278</td><td>+22.78%</td><td>25.0%</td><td>98.7</td></tr>
+<tr><td>H4</td><td>26</td><td class="neg">-$739</td><td>-7.39%</td><td>3.8%</td><td>0.60</td></tr>
+</table>
+<div class="logic">
+  20 周期高低点扫荡后假突破反转。H1/M30 少量信号即获得高收益 (靠巨幅盈亏比驱动), H4 信号增多但亏损。
+</div>
+</div>
+
+<!-- 5. Stochastic -->
+<div class="strategy-card">
+<h3>4. Stochastic 随机指标交叉</h3>
+<div class="meta"><strong>来源</strong>: MQL5 Codebase — Stochastic Scalper / Stoch Cross EA</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H1 +$2,240</strong> (+22.40%)</div>
+  <div class="stat"><strong>6</strong>H1 交易</div>
+  <div class="stat"><strong>16.7%</strong>胜率</div>
+  <div class="stat"><strong>62.9</strong>PF</div>
+  <div class="stat"><strong class="pos">$36 (0.4%)</strong>DD</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th></tr>
+<tr><td>M30</td><td>18</td><td class="neg">-$547</td><td>-5.47%</td><td>5.6%</td><td>0.20</td></tr>
+<tr><td>H1</td><td>6</td><td class="pos">+$2,240</td><td>+22.40%</td><td>16.7%</td><td>62.9</td></tr>
+<tr><td>H4</td><td>6</td><td class="pos">+$497</td><td>+4.97%</td><td>16.7%</td><td>2.54</td></tr>
+</table>
+<div class="logic">
+  Stoch(9,3,3) K&lt;20 上穿 D + EMA50 趋势过滤 → BUY; K&gt;80 下穿 D → SELL。H1/H4 盈利但 M30 亏损。
+</div>
+</div>
+
+<!-- 6. RSI-MR -->
+<div class="strategy-card">
+<h3>5. RSI 均值回归</h3>
+<div class="meta"><strong>来源</strong>: MQL5 Codebase + 经典均值回归策略</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H1 +$2,215</strong> (+22.15%)</div>
+  <div class="stat"><strong>10</strong>H1 交易</div>
+  <div class="stat"><strong>10.0%</strong>胜率</div>
+  <div class="stat"><strong>39.3</strong>PF</div>
+  <div class="stat"><strong class="pos">$58 (0.6%)</strong>DD</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th></tr>
+<tr><td>M30</td><td>7</td><td class="neg">-$36</td><td>-0.36%</td><td>14.3%</td><td>0.87</td></tr>
+<tr><td>H1</td><td>10</td><td class="pos">+$2,215</td><td>+22.15%</td><td>10.0%</td><td>39.3</td></tr>
+<tr><td>H4</td><td>25</td><td class="neg">-$829</td><td>-8.29%</td><td>4.0%</td><td>0.57</td></tr>
+</table>
+<div class="logic">
+  RSI14 &lt;25 超卖 + EMA20 下方 → BUY; &gt;75 超买 + EMA20 上方 → SELL。H1 因极端行情抓到大趋势, H4 连续亏损。
+</div>
+</div>
+
+<!-- 7. Grid -->
+<div class="strategy-card">
+<h3>6. Grid 网格交易 <span class="tag tag-3">H4 最佳</span></h3>
+<div class="meta"><strong>来源</strong>: 经典网格/马丁格尔策略</div>
+<div class="row">
+  <div class="stat"><strong class="pos">H4 +$1,503</strong> (+15.03%)</div>
+  <div class="stat"><strong>116</strong>H4 交易</div>
+  <div class="stat"><strong>80.2%</strong>胜率</div>
+  <div class="stat"><strong>1.38</strong>PF</div>
+  <div class="stat"><strong class="pos">$—</strong>DD (持续)</div>
+</div>
+<table class="mtf-table">
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>收益率</th><th>胜率</th><th>PF</th></tr>
+<tr><td>M30</td><td>178</td><td class="neg">-$717</td><td>-7.17%</td><td>69.7%</td><td>0.75</td></tr>
+<tr><td>H1</td><td>239</td><td class="pos">+$154</td><td>+1.54%</td><td>74.5%</td><td>1.03</td></tr>
+<tr><td>H4</td><td>116</td><td class="pos">+$1,503</td><td>+15.03%</td><td>80.2%</td><td>1.38</td></tr>
+</table>
+<div class="logic">
+  等间距加仓 (M30=12点/H1=25/H4=50), 最多 3 层, 首层 TP 止盈 / 末层 SL 止损。H4 表现最佳, 因趋势在 H4 上更平稳。
+</div>
+</div>
+
+<h2>四、回测方法</h2>
+<div class="strategy-card" style="margin-top:0">
+<div class="logic" style="margin-top:0">
+  <strong>数据:</strong> SQLite <code>data/market_data.db</code> — M30 2445 根 / H1 8645 根 / H4 2095 根<br>
+  <strong>引擎:</strong> 矢量指标预计算 + 事件驱动逐 K 线回测<br>
+  <strong>佣金:</strong> 每笔 $0.50 | <strong>滑点:</strong> BUY +0.2 点 | <strong>仓位:</strong> 固定 0.01 lot 不复利<br>
+  <strong>止损:</strong> ATR 倍数止蚀 (2.0x ~ 2.5x) | <strong>追踪:</strong> GoldTraderEA &amp; ML-Score 3.0x ATR<br>
+  <strong>预热:</strong> 前 260 根或 N/3 (取小)<br>
+  <strong>端口偏移:</strong> 所有 MT4 端口 +100 (原 23232 → 23332)
+</div>
+</div>
+
+<h2>五、多周期分析结论</h2>
+<div class="strategy-card" style="margin-top:0">
+<div class="logic" style="margin-top:0">
+  <strong>1. H1 最优周期</strong> — 多数策略在 H1 上表现最好 (8645 根 / 2.5 年数据)。H1 平衡了信号频率与趋势持续性, 是黄金<strong>回测首选周期</strong>。<br><br>
+  <strong>2. ML-Score &amp; GoldTraderEA H1 扛鼎</strong> — ML-Score (+39.51%, 274 笔) 和 GoldTraderEA (+24.92%, 123 笔) 在 H1 上统计量充足、回撤可控。但两者在 H4 均出现亏损, 提示<strong>策略存在最佳时间窗口</strong>, 不可跨周期混用。<br><br>
+  <strong>3. ORB 三周期一直盈利</strong> — 唯一在三周期均盈利且盈亏比稳定的策略 (4~11 笔)。信号虽少但胜在一致性, 适合作为<strong>辅助过滤器</strong>使用。<br><br>
+  <strong>4. Grid H4 逆袭</strong> — Grid 在 M30 (-7.17%) 和 H1 (+1.54%) 表现不佳, 但在 H4 (+15.03%) 大放异彩。大周期网格间距更匹配黄金波动节奏。<br><br>
+  <strong>5. M30 数据短、参考价值有限</strong> — 仅 2.5 个月窗口无法支持统计结论, M30 回测更多反映近期行情特征。<br><br>
+  <strong>6. H4 逆势策略集体崩溃</strong> — RSI-MR (-8.29%)、SMC-ICT (-7.39%)、ML-Score (-13.11%) 在 H4 均大幅亏损。逆势逻辑在大周期上风险陡增。<br><br>
+  <strong>核心建议:</strong> 以 H1 为主周期部署 ML-Score 或 GoldTraderEA, 用 ORB 做辅助过滤, Grid H4 可做单独模块但需严密风控。
+</div>
+</div>
+
+<h2>六、推荐优先级 (H1 主周期)</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>优先级</th><th>策略</th><th>H1 收益</th><th>H1 交易</th><th>回撤</th><th>理由</th><th>下一步</th></tr></thead>
+<tbody>
+<tr class="best"><td><span class="badge badge-p">P0</span></td><td>ML-Score</td><td class="pos">+39.51%</td><td>274</td><td class="pos">3.8%</td><td>信号充足, 盈亏比优异, 因子可解释</td><td>优化权重, 模拟盘</td></tr>
+<tr class="best2"><td><span class="badge badge-p">P1</span></td><td>GoldTraderEA</td><td class="pos">+24.92%</td><td>123</td><td class="pos">5.4%</td><td>经典逻辑, H1 稳定, 参数空间清晰</td><td>参数测试, 波动率过滤</td></tr>
+<tr><td><span class="badge badge-w">P2</span></td><td>ORB</td><td class="pos">+22.15%</td><td>11</td><td class="pos">0.6%</td><td>三周期均盈利, 一致性强</td><td>放宽入场条件, 增加信号</td></tr>
+<tr><td><span class="badge badge-w">P2</span></td><td>Grid (H4)</td><td class="pos">+15.03%</td><td>116</td><td>—</td><td>H4 表现最佳, 信号量充足</td><td>单独模块, 严控风控</td></tr>
+<tr><td><span class="badge badge-n">P3</span></td><td>SMC / Stoch / RSI</td><td>—</td><td>4~18</td><td>—</td><td>信号稀疏或跨周期不一致</td><td>M15 测试或放宽参数</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="fn">
+  报告生成: 2026-06-06 &nbsp;|&nbsp; 脚本: <code>backtest/db_backtest_mtf.py</code> + <code>backtest/db_backtest_7strategies.py</code>
+  &nbsp;|&nbsp; 数据库: <code>data/market_data.db</code> &nbsp;|&nbsp; 端口偏移: +100
+</div>
+
+</div>
+</body>
+</html>
