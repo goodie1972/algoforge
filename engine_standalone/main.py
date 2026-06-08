@@ -15,6 +15,11 @@ from dataclasses import dataclass, field
 from collections import deque
 from typing import Optional
 
+# 当从 engine_standalone/ 运行时，将项目根加入 sys.path
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from config import settings
 from core.bridge import create_bridge, OrderType
 from services.news_filter import NewsFilter
