@@ -12,6 +12,8 @@ const params = computed(() => ({
   stop_loss_pips: store.items.stop_loss_pips ?? 50,
   take_profit_pips: store.items.take_profit_pips ?? 100,
   slippage: store.items.slippage ?? 30,
+  // 止盈冷却
+  profit_exit_cooldown_hours: store.items.profit_exit_cooldown_hours ?? 2,
   // 全局硬止损
   max_daily_loss_pct: store.items.max_daily_loss_pct ?? 12.0,
   // 浮动亏损
@@ -65,6 +67,11 @@ async function update(updates: Record<string, any>) {
         <n-form-item label="允许滑点 (Points)">
           <n-input-number :value="params.slippage" :min="0" :max="100"
             @update:value="(v: any) => v !== null && update({ slippage: v })" style="width:100%;" />
+        </n-form-item>
+        <n-form-item label="止盈冷却时间 (小时)">
+          <n-input-number :value="params.profit_exit_cooldown_hours" :min="0" :max="48" :step="0.5"
+            @update:value="(v: any) => v !== null && update({ profit_exit_cooldown_hours: v })" style="width:100%;" />
+          <template #feedback>盈利平仓后 N 小时内不再开同向单，0 为不限制</template>
         </n-form-item>
       </n-space>
     </n-grid-item>

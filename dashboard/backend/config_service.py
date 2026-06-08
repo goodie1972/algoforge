@@ -24,6 +24,7 @@ _ENGINE_KEYS = {
     "max_rapid_exits", "rapid_exit_window_seconds", "rapid_exit_cooldown_seconds",
     "safety_lock_timeout_minutes",
     "per_strategy_realized_loss_amount", "max_consecutive_losses", "consecutive_loss_cooldown_hours",
+    "profit_exit_cooldown_hours",
     "news_filter_enabled", "news_before_minutes", "news_after_minutes",
     "news_impact_filter", "news_currency_filter",
 }
@@ -111,6 +112,7 @@ class RuntimeConfig:
             "per_strategy_realized_loss_amount": "PER_STRATEGY_REALIZED_LOSS_AMOUNT",
             "max_consecutive_losses": "MAX_CONSECUTIVE_LOSSES",
             "consecutive_loss_cooldown_hours": "CONSECUTIVE_LOSS_COOLDOWN_HOURS",
+            "profit_exit_cooldown_hours": "PROFIT_EXIT_COOLDOWN_HOURS",
         }
         attr = key_map.get(key)
         if attr and hasattr(settings, attr):
@@ -131,6 +133,7 @@ class RuntimeConfig:
         for key in all_keys:
             result[key] = self.get(key)
         result["strategy_pool"] = self.get_strategy_pool()
+        result["coordinator"] = self.get_coordinator_config()
         result["symbol"] = getattr(settings, 'SYMBOL', 'XAUUSD')
         return result
 
@@ -153,6 +156,20 @@ class RuntimeConfig:
             self._overrides["strategy_pool"] = dict(pool)
             self._save()
         return self.get_strategy_pool()
+
+    def get_coordinator_config(self) -> dict:
+        """获取协调器配置（覆盖优先）"""
+        with self._data_lock:
+            if "coordinator" in self._overrides:
+                return dict(self._overrides["coordinator"])
+        return dict(getattr(settings, 'COORDINATOR_CONFIG', {"enabled": False}))
+
+    def set_coordinator_config(self, cfg: dict) -> dict:
+        """设置协调器配置"""
+        with self._data_lock:
+            self._overrides["coordinator"] = dict(cfg)
+            self._save()
+        return self.get_coordinator_config()
 
     def get_engine_params(self) -> dict[str, Any]:
         """获取引擎运行时参数"""

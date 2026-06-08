@@ -136,6 +136,27 @@ NEWS_IMPACT_FILTER = "High"       # 影响级别: "High" | "High,Medium"
 NEWS_CURRENCY_FILTER = "USD"      # 关注货币: "USD" | "USD,EUR"
 
 # ============================================================
+# 多策略协调器配置 — 策略间信号联动出场
+# ============================================================
+COORDINATOR_CONFIG = {
+    "enabled": False,                              # 总开关
+    # 功能①：跨策略联动出场（信号策略盈利时平目标策略同向单）
+    "cross_exit_enabled": False,
+    "signal_strategy": "H1_v6_hybrid",             # 信号源策略名
+    "signal_direction": "BUY",                     # 信号方向 (BUY/SELL)
+    "target_strategies": [
+        "M30_rsi_bb", "sanqing_h1", "gold_auto_research",
+    ],  # 被影响的策略列表
+    "target_direction": "SELL",                    # 关闭的目标方向
+    # 功能②：短周期反向止盈（EMA20 斜率反转时平盈利单）
+    "m15_reverse_tp_enabled": False,   # M15 周期
+    "m5_reverse_tp_enabled": False,    # M5 周期
+}
+
+# === 止盈冷却时间（策略盈利平仓后，N 小时内不再开同向单） ===
+PROFIT_EXIT_COOLDOWN_HOURS = 2
+
+# ============================================================
 # 回测配置
 # ============================================================
 BACKTEST_START_DATE = "2024-01-01"

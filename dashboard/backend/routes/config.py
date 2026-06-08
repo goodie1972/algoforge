@@ -18,12 +18,36 @@ class StrategyPoolUpdate(BaseModel):
     pool: dict[str, dict]
 
 
+class CoordinatorUpdate(BaseModel):
+    config: dict
+
+
 @router.get("/strategy-pool")
 async def get_strategy_pool():
     """获取策略池配置（在 /{key} 之前注册，避免被捕获）"""
     if not config_service:
         raise HTTPException(500, "配置服务未初始化")
     return config_service.get_strategy_pool()
+
+
+@router.get("/coordinator")
+async def get_coordinator():
+    """获取协调器配置"""
+    if not config_service:
+        raise HTTPException(500, "配置服务未初始化")
+    return config_service.get_coordinator_config()
+
+
+@router.post("/coordinator")
+async def update_coordinator(req: CoordinatorUpdate):
+    """更新协调器配置"""
+    if not config_service:
+        raise HTTPException(500, "配置服务未初始化")
+    try:
+        updated = config_service.set_coordinator_config(req.config)
+        return {"message": "协调器已更新", "config": updated}
+    except Exception as e:
+        raise HTTPException(422, f"协调器更新失败: {e}")
 
 
 @router.get("")
