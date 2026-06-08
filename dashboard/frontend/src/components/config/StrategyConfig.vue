@@ -17,10 +17,19 @@ function toggleStrategy(name: string) {
   if (pool.value[name]) {
     delete pool.value[name]
   } else {
+    const defaults: Record<string, { magic: number; timeframe: string }> = {
+      M30_rsi_bb: { magic: 777001, timeframe: 'M30' },
+      double_ma: { magic: 101, timeframe: 'H1' },
+      atr_breakout: { magic: 102, timeframe: 'H1' },
+      combined: { magic: 103, timeframe: 'H1' },
+      rsi_bollinger: { magic: 777777, timeframe: 'H1' },
+      stoch_bollinger: { magic: 888888, timeframe: 'H4' },
+    }
+    const d = defaults[name] || { magic: 666666, timeframe: 'H1' }
     pool.value[name] = {
       enabled: true,
-      magic: name === 'stoch_bollinger' ? 888888 : 777777,
-      timeframe: name === 'stoch_bollinger' ? 'H4' : 'H1',
+      magic: d.magic,
+      timeframe: d.timeframe,
       double_first: true,
       max_positions: 2,
     }
@@ -61,11 +70,14 @@ async function savePool() {
 }
 
 const strategyOptions = [
-  { label: '双均线 (Double MA)', value: 'double_ma' },
+  { label: 'M30 RSI+BB（当前实盘）', value: 'M30_rsi_bb' },
+  { label: '— 历史策略 —', value: '' },
+  { label: 'V6 Hybrid（已归档）', value: 'H1_v6_hybrid' },
+  { label: '双均线', value: 'double_ma' },
   { label: 'ATR 突破', value: 'atr_breakout' },
-  { label: '双均线+ATR 双确认', value: 'combined' },
-  { label: 'RSI+布林带 均值回归', value: 'rsi_bollinger' },
-  { label: 'Stoch+布林带 均值回归', value: 'stoch_bollinger' },
+  { label: '双确认', value: 'combined' },
+  { label: 'RSI+布林带', value: 'rsi_bollinger' },
+  { label: 'Stoch+布林带', value: 'stoch_bollinger' },
 ]
 
 const timeframeOptions = [

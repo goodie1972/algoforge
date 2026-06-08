@@ -263,7 +263,18 @@ def _generate_signals(df, strategy_name: str) -> list[int]:
     close = df["close"].values
     signals = [0] * len(df)
 
-    if strategy_name == "double_ma":
+    if strategy_name == "v6_hybrid":
+        # V6 Hybrid 简化信号：KDJ超卖/超买 + 布林带
+        if len(close) < 50:
+            return signals
+        stoch_k_val = _calc_stoch(df, 14)
+        for i in range(50, len(close)):
+            if stoch_k_val[i] < 30 and close[i] < close[i - 1]:
+                signals[i] = 1
+            elif stoch_k_val[i] > 65 and close[i] > close[i - 1]:
+                signals[i] = -1
+
+    elif strategy_name == "double_ma":
         fast = 20
         slow = 60
         if len(close) <= slow:

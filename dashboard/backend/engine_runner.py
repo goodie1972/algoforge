@@ -162,6 +162,11 @@ class EngineRunner:
         self.logger.info("XAUUSD Web Dashboard - 启动多策略交易引擎")
         self.logger.info("=" * 60)
 
+        # 强制重载配置，确保引擎使用最新的 settings.py
+        import config.settings as _cfg_reload
+        importlib.reload(_cfg_reload)
+        self.logger.info(f"[配置] STRATEGY_POOL: {list(_cfg_reload.STRATEGY_POOL.keys())}")
+
         # 导入多策略引擎（用 importlib 避开 module 缓存冲突 'main'）
         try:
             main_path = os.path.join(project_root, "main.py")

@@ -88,8 +88,11 @@ class MT4BridgeBase(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def get_candles(self, symbol: str, timeframe: str, count: int) -> list[Candle]:
-        """获取K线数据"""
+    def get_candles(self, symbol: str, timeframe: str, count: int, offset: int = 0) -> list[Candle]:
+        """获取K线数据
+        Args:
+            offset: 从最右端偏移的根数，0=最新K线，5000=更老的5000根
+        """
         ...
 
     @abc.abstractmethod

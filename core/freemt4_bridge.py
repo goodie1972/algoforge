@@ -177,9 +177,9 @@ class FreeMT4Bridge(MT4BridgeBase):
         ask = float(data[1]) if len(data) > 1 else 0
         return bid, ask
 
-    def get_candles(self, symbol: str, timeframe: str, count: int) -> list[Candle]:
+    def get_candles(self, symbol: str, timeframe: str, count: int, offset: int = 0) -> list[Candle]:
         tf = TF_MAP.get(timeframe, TF_MAP["H1"])
-        data = self._send_cmd(f"F042#4#{symbol}#{tf}#0#{count}#")
+        data = self._send_cmd(f"F042#4#{symbol}#{tf}#{offset}#{count}#")
         if not data:
             return []
 

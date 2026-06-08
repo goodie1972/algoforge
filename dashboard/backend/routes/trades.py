@@ -15,20 +15,20 @@ run_bridge = None
 logger = logging.getLogger(__name__)
 
 MAGIC_TO_STRATEGY = {
-    777777: "H1_rsi_bollinger",
-    777888: "M30_rsi_turn",
-    888888: "H4_stoch_bollinger",
+    777001: "M30_rsi_bb",
 }
 
 
 @router.get("/history")
 async def get_trade_history(limit: int = 100):
-    """获取最近 N 条已平仓记录"""
+    """获取最近 N 条已平仓记录（按平仓时间倒序）"""
     if not engine_runner or not engine_runner._engine:
         return []
     try:
-        trades = engine_runner._engine.closed_trades
-        return trades[-limit:]
+        trades = list(engine_runner._engine.closed_trades)
+        # 按 close_time 倒序排列（最新的在前）
+        trades.sort(key=lambda t: t.get("close_time", ""), reverse=True)
+        return trades[:limit]
     except Exception as e:
         raise HTTPException(502, f"获取历史成交失败: {e}")
 
