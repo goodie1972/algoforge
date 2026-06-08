@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(PYTHONPATH=\"D:\\\\backup\\\\BaoBao\\\\PythonProgram\\\\xauusd\" python *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(rm -f /D/backup/BaoBao/PythonProgram/xauusd/.git/index.lock)",
+      "Bash(git reset *)"
     ]
   }
 }

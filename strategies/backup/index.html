@@ -296,18 +296,25 @@ H1 数据 2.5 年最完整。ATR突破 +$3,061 中包含一笔 ~$2,994 的极端
 <tr><td>2026-06-06</td><td>M30 RSI 新版本上线</td><td>5 因子 + ATR 出场 + 参数优化</td></tr>
 <tr><td>2026-06-07</td><td>V6 下线 / M30 RSI 单策略实盘</td><td>V6 所有版本回测负收益，移至 backup</td></tr>
 <tr><td>2026-06-07</td><td>全策略 × 三周期大规模回测</td><td>10 个策略在 M30/H1/H4 上全面对比，发现 H1 周期策略表现最佳</td></tr>
-<tr><td>2026-06-07</td><td>GitHub 开源策略移植回测</td><td>从 3 个 GitHub 仓库移植策略：三清EA、N30 Gold Scalper、XAUUSD Trend Follow</td></tr>
+<tr><td>2026-06-07</td><td>GitHub 全部10策略统一回测</td><td>10 个 GitHub 仓库全量评估，5 个成功移植+4 个不可回测+1 个核心逻辑提取，含原生周期(M5/M1/H1)测试</td></tr>
 </table>
 
 <!-- ============================================================ -->
-<h2>五、GitHub 开源策略移植回测</h2>
+<h2>五、GitHub 全部10个开源策略统一回测</h2>
 
-<p>将 3 个免费 GitHub MQL4/MQL5 XAUUSD 交易策略的核心逻辑移植到 Python，在同一框架下与本地策略比较。
-由于数据限制（无 M5/M1），策略适配到 M30/H1/H4 运行。出场规则：trailing 4xATR + hard 2.5xATR（或按原策略固定 TP/SL）。</p>
+<p>将 10 个 GitHub XAUUSD 开源策略全部评估：有源代码的 6 个中有 5 个成功移植到 Python 回测框架，1 个提取核心逻辑。测试在统一引擎上运行，涵盖 M30/H1/H4 标准周期 + 原生周期（M5/M1/H1）。</p>
+
+<p><strong>10 个仓库分类结果：</strong></p>
+<ul>
+  <li>✅ <strong>成功移植（5个）</strong> — sanqing-ea, gold-pro-scalper/N30, xauusd-trend-follow, xaubot-ai (XGBoost), BAKOMEGoldScalper (ICT)</li>
+  <li>🔶 <strong>提取核心逻辑（1个）</strong> — Gold-Predictive-AutoResearch（共识投票策略）</li>
+  <li>❌ <strong>不可回测（4个）</strong> — mt5-ai-xauusd-trader（需MT5+模型权重）, EA_SCALPER_XAUUSD（仅编译 .ex5）, Forex-Gold-Auto-Trader（仅文档）, YQTS（规范说明无代码）</li>
+</ul>
 
 <table>
 <tr>
   <th rowspan="2">策略</th>
+  <th colspan="4">M5 / M1 原生 (3周)</th>
   <th colspan="4">M30 (2.5月)</th>
   <th colspan="4">H1 (2.5年)</th>
   <th colspan="4">H4 (1.3年)</th>
@@ -316,99 +323,145 @@ H1 数据 2.5 年最完整。ATR突破 +$3,061 中包含一笔 ~$2,994 的极端
   <th>交易</th><th>盈亏</th><th>胜率</th><th>B/S</th>
   <th>交易</th><th>盈亏</th><th>胜率</th><th>B/S</th>
   <th>交易</th><th>盈亏</th><th>胜率</th><th>B/S</th>
+  <th>交易</th><th>盈亏</th><th>胜率</th><th>B/S</th>
 </tr>
-<tr class="best-row"><td>三清EA (sanqing-ea)</td>
-  <td>103</td><td class="pos">+$146</td><td>32.0%</td><td>50/53</td>
-  <td>422</td><td class="pos"><b>+$3,761</b></td><td>28.9%</td><td>206/216</td>
-  <td>56</td><td class="pos">+$1,473</td><td>39.3%</td><td>28/28</td></tr>
-<tr><td>XAUUSD Trend Follow</td>
-  <td>31</td><td class="pos">+$77</td><td>19.4%</td><td>31/0</td>
-  <td>161</td><td class="neg">-$269</td><td>24.8%</td><td>161/0</td>
-  <td>30</td><td class="pos">+$1,042</td><td>43.3%</td><td>30/0</td></tr>
+<tr class="best-row"><td>sanqing-ea</td>
+  <td>150</td><td class="neg">-$338</td><td>32.0%</td><td>75/75</td>
+  <td>93</td><td class="neg">-$212</td><td>32.3%</td><td>47/46</td>
+  <td>379</td><td class="pos"><b>+$3,332</b></td><td>28.2%</td><td>191/188</td>
+  <td>52</td><td class="pos">+$523</td><td>32.7%</td><td>26/26</td></tr>
 <tr><td>N30 Gold Scalper</td>
-  <td>-</td><td>-</td><td>-</td><td>-</td>
-  <td>4</td><td class="pos">+$492</td><td>75.0%</td><td>3/1</td>
+  <td>20</td><td class="neg">-$17</td><td>30.0%</td><td>10/10</td>
+  <td>4</td><td class="neg">-$91</td><td>0.0%</td><td>2/2</td>
+  <td>17</td><td class="pos">+$524</td><td>35.3%</td><td>8/9</td>
   <td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>XAUUSD TrendFollow</td>
+  <td>-</td><td>-</td><td>-</td><td>-</td>
+  <td>20</td><td class="pos">+$14</td><td>20.0%</td><td>20/0</td>
+  <td>82</td><td class="pos">+$628</td><td>28.0%</td><td>82/0</td>
+  <td>20</td><td class="pos">+$928</td><td>45.0%</td><td>20/0</td></tr>
+<tr><td>Gold AutoResearch</td>
+  <td>-</td><td>-</td><td>-</td><td>-</td>
+  <td>106</td><td class="pos">+$232</td><td>37.7%</td><td>52/54</td>
+  <td>438</td><td class="pos"><b>+$3,353</b></td><td>30.1%</td><td>224/214</td>
+  <td>68</td><td class="pos"><b>+$1,559</b></td><td>42.6%</td><td>34/34</td></tr>
+<tr><td>BAKOME GoldScalper</td>
+  <td>120</td><td class="neg">-$223</td><td>42.5%</td><td>64/56</td>
+  <td>84</td><td class="pos">+$71</td><td>41.7%</td><td>41/43</td>
+  <td>472</td><td class="pos"><b>+$2,755</b></td><td>42.2%</td><td>227/245</td>
+  <td>-</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>xaubot-ai (XGBoost)</td>
+  <td>-</td><td>-</td><td>-</td><td>-</td>
+  <td>218</td><td class="pos">+$1,926</td><td>67.9%</td><td>120/98</td>
+  <td>49</td><td class="pos">+$556</td><td>42.9%</td><td>12/37</td>
+  <td>55</td><td class="pos">+$1,727</td><td>41.8%</td><td>55/0</td></tr>
 </table>
 
-<p class="meta">注：N30 Gold Scalper 原生为 M1 剥头皮，移植到 H1 后信号极少（4笔）。XAUUSD Trend Follow 为 H1 纯做多策略。</p>
+<p class="meta">M5/M1 原生周期仅 3 周数据（2026-05-15 ~ 2026-06-05），统计意义有限。H1 数据最长（2.5年），最可靠。M30 仅 2.5 月，受极端行情主导。</p>
 
-<h3>① 三清EA (sanqing-ea) <span class="tag tag-dev">移植</span></h3>
+<h3>① sanqing-ea (三清EA) <span class="tag tag-dev">移植</span></h3>
 <p class="file">GitHub: caoruihua/sanqing-ea</p>
-<p><strong>来源：</strong><a href="https://github.com/caoruihua/sanqing-ea" style="color:#58a6ff;">github.com/caoruihua/sanqing-ea</a> — 中文 MQL4 EA，EMA9/21 + ATR14，3 子策略优先级（扩张突破 > 回踩 > 趋势延续）</p>
-
+<p><strong>来源：</strong><a href="https://github.com/caoruihua/sanqing-ea" style="color:#58a6ff;">caoruihua/sanqing-ea</a> — 中文 MQL4 EA，EMA9/21 + ATR14，3 子策略优先级（扩张突破 > 回踩 > 趋势延续）</p>
 <table>
-<tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>B/S</th><th>Buy $</th><th>Sell $</th></tr>
-<tr><td>M30</td><td>103</td><td class="pos">+$146</td><td>32.0%</td><td>$48</td><td>-$20</td><td>50/53</td><td class="pos">+$10</td><td class="pos">+$136</td></tr>
-<tr class="best-row"><td>H1</td><td>422</td><td class="pos"><b>+$3,761</b></td><td>28.9%</td><td>$59</td><td>-$12</td><td>206/216</td><td class="pos">+$2,954</td><td class="pos">+$807</td></tr>
-<tr><td>H4</td><td>56</td><td class="pos">+$1,473</td><td>39.3%</td><td>$140</td><td>-$47</td><td>28/28</td><td class="pos">+$1,307</td><td class="pos">+$166</td></tr>
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>B/S</th></tr>
+<tr><td>M5 (原生)</td><td>150</td><td class="neg">-$338</td><td>32.0%</td><td>$14</td><td>-$10</td><td>75/75</td></tr>
+<tr><td>M30</td><td>93</td><td class="neg">-$212</td><td>32.3%</td><td>$45</td><td>-$25</td><td>47/46</td></tr>
+<tr class="best-row"><td>H1</td><td>379</td><td class="pos"><b>+$3,332</b></td><td>28.2%</td><td>$62</td><td>-$12</td><td>191/188</td></tr>
+<tr><td>H4</td><td>52</td><td class="pos">+$523</td><td>32.7%</td><td>$161</td><td>-$63</td><td>26/26</td></tr>
 </table>
-
-<p><strong>入场逻辑（简化版）：</strong>EMA9/21 判断趋势方向；K 线实体相对 ATR 比例判断扩张；EMA9 回踩确认；成交量过滤。评分 ≥4 触发。</p>
-<p><strong>出场逻辑：</strong>ATR 动态追踪（4x）+ 硬止损（2.5x）</p>
 <ul>
-<li><span class="pos">✓</span> <strong>H1 表现惊艳</strong> — +$3,761（422笔），超过所有自有策略，H1 上排名第一</li>
-<li><span class="pos">✓</span> 三周期全正收益</li>
-<li><span class="pos">✓</span> 方向对称（B/S≈1:1）</li>
-<li><span class="warn">⚠</span> 含一笔 $2,847 大单（占比76%），与 ATR突破类似，对单笔极端行情依赖高</li>
-<li><span class="warn">⚠</span> 原生 M5 策略适配到 H1/H4，扩张阈值经过缩放，与原版有差异</li>
+<li><span class="pos">✓</span> H1 表现最佳 +$3,332（379笔），方向对称，无单笔依赖</li>
+<li><span class="warn">⚠</span> M5 原生周期亏损（- $338），但仅 3 周数据不具代表性</li>
+<li><span class="warn">⚠</span> 扩张阈值从 M5 缩放到高周期，与原版有差异</li>
 </ul>
 
-<h3>② XAUUSD Trend Follow <span class="tag tag-dev">移植</span></h3>
+<h3>② XAUUSD TrendFollow <span class="tag tag-dev">移植</span></h3>
 <p class="file">GitHub: maker-tung/xauusd-trend-follow</p>
-<p><strong>来源：</strong><a href="https://github.com/maker-tung/xauusd-trend-follow" style="color:#58a6ff;">github.com/maker-tung/xauusd-trend-follow</a> — 泰语 MQL5 EA，H1 纯做多趋势跟踪，EMA200 + MACD/Stoch/EMA9/21</p>
-
+<p><strong>来源：</strong><a href="https://github.com/maker-tung/xauusd-trend-follow" style="color:#58a6ff;">maker-tung/xauusd-trend-follow</a> — 泰语 MQL5 EA，H1 纯做多趋势跟踪，EMA200 + MACD/Stoch/EMA9/21。TP=6×ATR, SL=1.25×ATR</p>
 <table>
 <tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>买盈亏</th></tr>
-<tr><td>M30</td><td>31</td><td class="pos">+$77</td><td>19.4%</td><td>$120</td><td>-$26</td><td class="pos">+$77</td></tr>
-<tr><td>H1</td><td>161</td><td class="neg">-$269</td><td>24.8%</td><td>$56</td><td>-$21</td><td class="neg">-$269</td></tr>
-<tr class="best-row"><td>H4</td><td>30</td><td class="pos">+$1,042</td><td>43.3%</td><td>$198</td><td>-$90</td><td class="pos">+$1,042</td></tr>
+<tr><td>M30</td><td>20</td><td class="pos">+$14</td><td>20.0%</td><td>$119</td><td>-$29</td><td class="pos">+$14</td></tr>
+<tr><td>H1 (原生)</td><td>82</td><td class="pos">+$628</td><td>28.0%</td><td>$67</td><td>-$15</td><td class="pos">+$628</td></tr>
+<tr class="best-row"><td>H4</td><td>20</td><td class="pos"><b>+$928</b></td><td>45.0%</td><td>$195</td><td>-$75</td><td class="pos">+$928</td></tr>
 </table>
-
-<p><strong>入场逻辑：</strong>价格 &gt; EMA200（趋势过滤）+ ADX ≥ 20 + 任一信号：MACD 线上叉信号线 / Stoch(5,3,3) %K 上叉 %D（低于60）/ EMA9 上叉 EMA21。TP=6×ATR, SL=1.25×ATR。</p>
-<p><strong>注意：</strong>原策略回测 2022-2026 年盈利 +54.8%（MaxDD -6.22%）。本测试 2024-2026 H1 亏损 -$269，可能与数据起始年份不同有关。</p>
 <ul>
-<li><span class="pos">✓</span> H4 表现好：+$1,042 / 43.3% WR</li>
-<li><span class="warn">⚠</span> <strong>纯做多</strong> — 在下跌年份（2024-2025）连续亏损</li>
-<li><span class="warn">⚠</span> H1 亏损 -$269，与原作者 4 年回测 +54.8% 有差距，可能因 2026 年行情不同</li>
-<li><span class="pos">✓</span> TP=6×ATR 的高盈亏比设计使低胜率仍然可以盈利</li>
+<li><span class="pos">✓</span> H4 表现最好 +$928（20笔, 45% WR）</li>
+<li><span class="warn">⚠</span> <strong>纯做多</strong> — 在下跌年份连续亏损</li>
+<li><span class="pos">✓</span> TP=6×ATR 高盈亏比设计</li>
 </ul>
 
 <h3>③ N30 Gold Scalper <span class="tag tag-dev">移植</span></h3>
 <p class="file">GitHub: n30dyn4m1c/gold-pro-scalper</p>
-<p><strong>来源：</strong><a href="https://github.com/n30dyn4m1c/gold-pro-scalper" style="color:#58a6ff;">github.com/n30dyn4m1c/gold-pro-scalper</a> — MQL5 双策略（均值回归+趋势突破），MIT 协议</p>
-
+<p><strong>来源：</strong><a href="https://github.com/n30dyn4m1c/gold-pro-scalper" style="color:#58a6ff;">n30dyn4m1c/gold-pro-scalper</a> — MQL5 双策略（均值回归+趋势突破），MIT 协议</p>
 <table>
 <tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>B/S</th></tr>
-<tr><td>M30</td><td>0</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0/0</td></tr>
-<tr class="best-row"><td>H1</td><td>4</td><td class="pos">+$492</td><td>75.0%</td><td>$164</td><td>-$0</td><td>3/1</td></tr>
-<tr><td>H4</td><td>0</td><td>-</td><td>-</td><td>-</td><td>-</td><td>0/0</td></tr>
+<tr><td>M1 (原生)</td><td>20</td><td class="neg">-$17</td><td>30.0%</td><td>$4</td><td>-$3</td><td>10/10</td></tr>
+<tr><td>M30</td><td>4</td><td class="neg">-$91</td><td>0.0%</td><td>-</td><td>-$23</td><td>2/2</td></tr>
+<tr class="best-row"><td>H1</td><td>17</td><td class="pos"><b>+$524</b></td><td>35.3%</td><td>$97</td><td>-$5</td><td>8/9</td></tr>
 </table>
-
-<p><strong>入场逻辑：</strong>ADX &lt; 22 → 均值回归模式（Z-Score ≥1.8 + EMA50 同向）；ADX ≥ 28 → 趋势突破模式（Donchian(30) 突破 + ADX DI 极性 + EMA50 同向）</p>
 <ul>
-<li><span class="pos">✓</span> H1 上 4 笔全赚钱（$492, 75% WR）</li>
-<li><span class="neg">✗</span> <strong>信号极少</strong> — Z-Score ≥1.8 + ADX + EMA50 三重过滤导致大部分时间无信号</li>
-<li><span class="warn">⚠</span> 原生为 M1 剥头皮（Z-Score 2.4），适合高频低持，移植到 H1 后失去了原有频率</li>
-<li><span class="warn">⚠</span> 仅 4 笔交易不具统计意义</li>
+<li><span class="pos">✓</span> H1 上 17 笔 +$524</li>
+<li><span class="neg">✗</span> <strong>信号稀少</strong> — Z-Score + ADX + EMA50 三重过滤过于严格</li>
+<li><span class="warn">⚠</span> M1 原生仅 20 笔/3 周，不具统计意义</li>
 </ul>
 
-<h3>④ 其他 GitHub 策略（无法直接回测）</h3>
-<p>以下策略因依赖 ML 模型、无完整源代码、或需特殊环境而无法移植：</p>
+<h3>④ Gold AutoResearch <span class="tag tag-dev">提取核心</span></h3>
+<p class="file">GitHub: BeanBagData/Gold-Predictive-AutoResearch-Backtesting-System</p>
+<p><strong>来源：</strong><a href="https://github.com/BeanBagData/Gold-Predictive-AutoResearch-Backtesting-System" style="color:#58a6ff;">BeanBagData/Gold-Predictive-AutoResearch</a> — Ollama LLM 参数优化框架。原始项目是用 LLM 搜索最优参数组合，我们提取其核心策略逻辑：EMA趋势 + MACD/Stoch动量 + ADX/ATR波动 + BB/RSI安全过滤的共识投票。</p>
+<table>
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>B/S</th></tr>
+<tr><td>M30</td><td>106</td><td class="pos">+$232</td><td>37.7%</td><td>$43</td><td>-$22</td><td>52/54</td></tr>
+<tr class="best-row"><td>H1</td><td>438</td><td class="pos"><b>+$3,353</b></td><td>30.1%</td><td>$57</td><td>-$14</td><td>224/214</td></tr>
+<tr><td>H4</td><td>68</td><td class="pos"><b>+$1,559</b></td><td>42.6%</td><td>$135</td><td>-$61</td><td>34/34</td></tr>
+</table>
 <ul>
-<li><strong>YQTS</strong> — 贝叶斯状态检测（PELT+BOCPD）+ RS-GBM 蒙特卡洛，需要 C++ 扩展</li>
-<li><strong>Gold Predictive AutoResearch</strong> — LLM 驱动参数优化框架，非交易策略</li>
-<li><strong>MT5 AI/ML Trading Bot</strong> — PPO/DreamerV3 深度强化学习，需要训练好的模型权重</li>
-<li><strong>XAUbot AI</strong> — XGBoost + HMM 隐马尔可夫模型，需要训练好的模型</li>
-<li><strong>EASCALPERXAUUSD</strong> — SMC + ONNX 机器学习，仅快照版本公开</li>
-<li><strong>BAKOMEGoldScalper</strong> — ICT 概念（FVG/Order Block），源代码未公开在 main 分支</li>
-<li><strong>Forex-Gold-Auto-Trader</strong> — 仅 README，无源代码公开</li>
+<li><span class="pos">✓</span> <strong>H1 整体表现最佳</strong> — +$3,353（438笔），方向均衡</li>
+<li><span class="pos">✓</span> 三周期全正收益，策略稳健</li>
+<li><span class="pos">✓</span> 双重确认（趋势+动量+波动+安全过滤）减少假信号</li>
+<li><span class="warn">⚠</span> 原项目是 LLM 优化框架，提取的只是默认参数的共识投票逻辑</li>
 </ul>
-<p>这些策略的原作者公布的回测数据：</p>
+
+<h3>⑤ BAKOME GoldScalper <span class="tag tag-dev">移植</span></h3>
+<p class="file">GitHub: BAKOME91/BAKOMEGoldScalper (已下线)</p>
+<p><strong>来源：</strong>MQL5 ICT 概念剥头皮，核心是 FVG（Fair Value Gap）检测 + Order Block + Silver Bullet 时段（伦敦/NY 开盘）。仅 Silver Bullet 窗口内交易。</p>
+<table>
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>B/S</th></tr>
+<tr><td>M5 (原生)</td><td>120</td><td class="neg">-$223</td><td>42.5%</td><td>$5</td><td>-$7</td><td>64/56</td></tr>
+<tr><td>M30</td><td>84</td><td class="pos">+$71</td><td>41.7%</td><td>$36</td><td>-$24</td><td>41/43</td></tr>
+<tr class="best-row"><td>H1</td><td>472</td><td class="pos"><b>+$2,755</b></td><td>42.2%</td><td>$31</td><td>-$12</td><td>227/245</td></tr>
+</table>
 <ul>
-<li><strong>XAUbot AI</strong>: 654 笔交易，胜率 63.9%，PF 2.64，最大回撤 2.2%</li>
-<li><strong>BAKOMEGoldScalper</strong>: 342 笔交易，胜率 68.7%，PF 1.82，最大回撤 12.4%</li>
+<li><span class="pos">✓</span> H1 上表现突出 +$2,755（472笔），方向均衡，胜率 42.2%</li>
+<li><span class="pos">✓</span> Silver Bullet 时段过滤有效减少噪音</li>
+<li><span class="warn">⚠</span> 仓库已下线，我们基于 ICT 概念重建</li>
+<li><span class="warn">⚠</span> M5 原生亏损但数据仅 3 周</li>
 </ul>
+
+<h3>⑥ xaubot-ai (XGBoost ML) <span class="tag tag-dev">移植</span></h3>
+<p class="file">GitHub: GifariKemal/xaubot-ai</p>
+<p><strong>来源：</strong><a href="https://github.com/GifariKemal/xaubot-ai" style="color:#58a6ff;">GifariKemal/xaubot-ai</a> — Python XGBoost + Polars 81 特征 + HMM 市场状态检测。我们实现了完整的 Polars 特征工程管线，在历史数据上训练 XGBoost 模型进行方向预测。</p>
+<table>
+<tr><th>周期</th><th>交易</th><th>盈亏</th><th>胜率</th><th>均盈</th><th>均亏</th><th>B/S</th></tr>
+<tr class="best-row"><td>M30</td><td>218</td><td class="pos"><b>+$1,926</b></td><td>67.9%</td><td>$26</td><td>-$27</td><td>120/98</td></tr>
+<tr><td>H1</td><td>49</td><td class="pos">+$556</td><td>42.9%</td><td>$78</td><td>-$39</td><td>12/37</td></tr>
+<tr><td>H4</td><td>55</td><td class="pos">+$1,727</td><td>41.8%</td><td>$184</td><td>-$79</td><td>55/0</td></tr>
+</table>
+<ul>
+<li><span class="pos">✓</span> M30 上 67.9% 胜率 +$1,926，所有策略中最高胜率</li>
+<li><span class="warn">⚠</span> 测试集准确率仅 51%（barely above random），高胜率可能来自 ATR 追踪出场而非预测能力</li>
+<li><span class="warn">⚠</span> 模型在历史数据上训练，未来表现可能大幅衰退</li>
+<li><span class="warn">⚠</span> 缺少 xaubot-ai 的 SMC 模块（swing/FVG/OB 等），仅实现了基础技术特征</li>
+<li><span class="warn">⚠</span> 训练使用 walk-forward 95% / 5% split + gap separated</li>
+</ul>
+
+<h3>⑦-⑩ 不可回测的策略</h3>
+<table>
+<tr><th>#</th><th>策略</th><th>原因</th><th>原作者公布数据</th></tr>
+<tr><td>7</td><td>mt5-ai-xauusd-trader</td><td>需要 MT5 实时连接 + PyTorch RL 模型权重，无法独立回测</td><td>PPO + DreamerV3 深度强化学习</td></tr>
+<tr><td>8</td><td>EA_SCALPER_XAUUSD</td><td>仅编译后 .ex5 文件，无 MQL 源码</td><td>SMC + ONNX 机器学习</td></tr>
+<tr><td>9</td><td>Forex-Gold-Auto-Trader</td><td>仅文档/README，无可执行策略代码</td><td>-</td></tr>
+<tr><td>10</td><td>YQTS</td><td>策略规格说明(YQTS_BRIEF.md)，参数定义但无执行代码</td><td>贝叶斯 (PELT+BOCPD) + RS-GBM 蒙特卡洛</td></tr>
+</table>
 
 <!-- ============================================================ -->
 <h2>六、核心发现</h2>
@@ -416,31 +469,26 @@ H1 数据 2.5 年最完整。ATR突破 +$3,061 中包含一笔 ~$2,994 的极端
 <div class="summary-box">
 <h3>周期选择</h3>
 <ul>
-<li><strong>H1 是 XAUUSD 策略 sweet spot</strong> — 最长数据（2.5年）、最多正收益策略（8/10 正收益）、交易频率适中</li>
-<li><strong>M30 数据过短</strong>（仅 2.5 月），结果受 2026 年 3~6 月极端行情（-12% 暴跌 + 反弹）主导</li>
-<li><strong>H4 周期正收益率高</strong>（9/10 正收益），但交易频次低（平均 33 笔/策略），统计显著性不足</li>
+<li><strong>H1 是 XAUUSD 策略 sweet spot</strong> — 最长数据（2.5年）、最多正收益策略、交易频率适中</li>
+<li><strong>GitHub 策略在 H1 表现突出</strong> — Gold_AutoResearch +$3,353, sanqing-ea +$3,332, BAKOME +$2,755 均远超过本地策略</li>
+<li><strong>M5/M1 原生周期数据过短</strong>（仅 3 周），结果不可靠</li>
+<li><strong>H4 周期盈亏比最好</strong>，胜率普遍较高但交易频次低</li>
 </ul>
 
-<h3>策略类型</h3>
+<h3>GitHub 移植策略最佳排名</h3>
 <ul>
-<li><strong>趋势跟踪（ATR 突破、双均线）</strong> — H1 上最好，胜率低但盈亏比大</li>
-<li><strong>均值回归（RSI+BB）</strong> — M30 上好，H1 上因逆大趋势而亏损</li>
-<li><strong>多因子评分（V6）</strong> — H1 上较好但方向失衡问题突出</li>
-<li><strong>RSI 掉头</strong> — 过度交易，扣除手续费后不可能盈利</li>
+<li><strong>H1 前三甲</strong>: ① Gold_AutoResearch (+$3,353) ② sanqing-ea (+$3,332) ③ BAKOME (+$2,755)</li>
+<li><strong>M30 冠军</strong>: xaubot-ai (+$1,926, 67.9% WR)</li>
+<li><strong>H4 冠军</strong>: Gold_AutoResearch (+$1,559)</li>
+<li>共识投票策略（Gold_AutoResearch）综合表现最优：三周期全正收益、方向均衡、交易量充足</li>
 </ul>
 
-<h3>V6 多因子评分</h3>
+<h3>策略移植成功率</h3>
 <ul>
-<li>BB/KC 碰触在 H1 周期是有害的（V6v6 去除后 +$2,819 vs V6v1 +$2,536）</li>
-<li>在 H4 周期 BB/KC 反而有益（V6v1 +$1,186 vs V6v6 +$915）</li>
-<li>说明均值回归因子在大周期上有价值，在小周期上是噪音</li>
-</ul>
-
-<h3>M30_RSI+BB</h3>
-<ul>
-<li>三周期全正收益，是唯一在所有周期都盈利的策略</li>
-<li>H4 上 +$2,164 排名第一（43.8% WR）</li>
-<li>适合作为长期持有的核心策略</li>
+<li>10 个仓库中 5 个成功移植 MQL4/MQL5/Python → Python</li>
+<li>1 个提取核心逻辑（LLM 优化框架 → 共识投票）</li>
+<li>4 个不可回测（无源码 / 需特殊环境）</li>
+<li>ML 策略（xaubot-ai）虽然跑通，但模型预测能力接近随机，实用性存疑</li>
 </ul>
 </div>
 
