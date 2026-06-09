@@ -139,34 +139,39 @@ class BAKOMEBackupStrategy(BaseStrategy):
 
     # ─────────────── Signal generation ───────────────
 
-    def generate_signal(self) -> Optional[OrderType]:
+    def generate_signal(self):
         candles = self.candles
         if len(candles) < 30:
-            return None
+            return (None, 0, 0, [], [], {})
 
         # 1. Silver Bullet session check
         session = self._is_silver_bullet()
         if not session:
-            return None
+            return (None, 0, 0, [], [], {})
 
         # 2. ATR filter
         atr_val = self._calc_atr(14)
         if atr_val is None or atr_val <= 0:
-            return None
+            return (None, 0, 0, [], [], {})
 
         # 3. Check FVG
+        indicator_values = {"close": round(self.candles[-1].close, 2), "atr": round(atr_val, 2)}
         fvg_sig = self._detect_fvg()
         if fvg_sig is not None:
             logger.info(f"[{self.name}] FVG {fvg_sig.value} in {session} session, ATR={atr_val:.2f}")
-            return fvg_sig
+            indicator_values["pattern"] = "FVG"
+            indicator_values["session"] = session
+            return (fvg_sig, 1, 0, [session, "FVG"], [], indicator_values)
 
         # 4. Check Order Block
         ob_sig = self._detect_order_block()
         if ob_sig is not None:
             logger.info(f"[{self.name}] OB {ob_sig.value} in {session} session, ATR={atr_val:.2f}")
-            return ob_sig
+            indicator_values["pattern"] = "OB"
+            indicator_values["session"] = session
+            return (ob_sig, 1, 0, [session, "OB"], [], indicator_values)
 
-        return None
+        return (None, 0, 0, [], [], indicator_values)
 
     # ─────────────── SL/TP and Exit ───────────────
 

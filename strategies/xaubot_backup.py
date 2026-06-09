@@ -334,14 +334,15 @@ class XAUBotBackupStrategy(BaseStrategy):
             f"train_acc={train_acc:.1%}, test_acc={test_acc:.1%}"
         )
 
-    def _predict(self) -> Optional[OrderType]:
-        """Generate signal from trained model using latest candle data."""
+    def _predict(self) -> tuple[Optional[OrderType], float, float]:
+        """Generate signal from trained model using latest candle data.
+        Returns (signal, prob_up, prob_down)."""
         if not self.fitted or self.model is None:
-            return None
+            return (None, 0.0, 0.0)
 
         # Build Polars DataFrame from current candles
         if len(self.candles) < 30:
-            return None
+            return (None, 0.0, 0.0)
         records = []
         for c in self.candles:
             ts = c.time
@@ -363,12 +364,12 @@ class XAUBotBackupStrategy(BaseStrategy):
 
         df = pl.DataFrame(records)
         if df.height < 30:
-            return None
+            return (None, 0.0, 0.0)
         df_feat = self._fe.calculate_all(df, include_ml=True)
 
         avail = [c for c in self.feature_cols if c in df_feat.columns]
         if len(avail) != len(self.feature_cols):
-            return None
+            return (None, 0.0, 0.0)
 
         last = df_feat.tail(1).select(self.feature_cols)
         X = last.to_numpy()
@@ -387,15 +388,19 @@ class XAUBotBackupStrategy(BaseStrategy):
         if sig:
             logger.info(f"[{self.name}] ML signal: {sig.value} (up={prob_up:.3f}, down={prob_down:.3f})")
 
-        return sig
+        return (sig, prob_up, prob_down)
 
     # ─────────────── Signal generation ───────────────
 
-    def generate_signal(self) -> Optional[OrderType]:
+    def generate_signal(self):
         if not self.fitted:
-            # Fall back to simple EMA crossover if model not trained
-            return None
-        return self._predict()
+            return (None, 0, 0, [], [], {})
+        signal, prob_up, prob_down = self._predict()
+        indicator_values = {
+            "close": round(self.candles[-1].close, 2) if self.candles else 0,
+            "confidence": round(prob_up, 4),
+        }
+        return (signal, 0, 0, [], [], indicator_values, prob_up)
 
     # ─────────────── SL/TP and Exit ───────────────
 

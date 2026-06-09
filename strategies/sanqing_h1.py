@@ -185,11 +185,38 @@ class SanQingH1Strategy(BaseStrategy):
             f"Price={close:.2f} EMA9={ema9:.2f} EMA21={ema21:.2f} ATR={atr_val:.2f}"
         )
 
+        # 构建因子明细
+        long_factors = []
+        if uptrend: long_factors.append("EMA-UP")
+        elif cross_up: long_factors.append("EMA-CROSS-UP")
+        if low <= ema9 * 1.002 and close > ema9: long_factors.append("TOUCH-EMA9")
+        if body_atr_ratio > 1.0: long_factors.append("BODY-ATR")
+        if avg_vol > 0 and volume > avg_vol * 1.3: long_factors.append("HIGH-VOL")
+        if body_median_ratio >= 1.5 and body / prev_body_max >= 1.5 and candle_range > 0 and body / candle_range >= 0.5:
+            long_factors.append("ENGULF")
+
+        short_factors = []
+        if downtrend: short_factors.append("EMA-DN")
+        elif cross_dn: short_factors.append("EMA-CROSS-DN")
+        if high >= ema9 * 0.998 and close < ema9: short_factors.append("TOUCH-EMA9")
+        if body_atr_ratio > 1.0: short_factors.append("BODY-ATR")
+        if avg_vol > 0 and volume > avg_vol * 1.3: short_factors.append("HIGH-VOL")
+        if body_median_ratio >= 1.5 and body / prev_body_max >= 1.5 and candle_range > 0 and body / candle_range >= 0.5:
+            short_factors.append("ENGULF")
+
+        indicator_values = {
+            "close": round(close, 2), "ema9": round(ema9, 2), "ema21": round(ema21, 2),
+            "atr": round(atr_val, 2), "body_atr_ratio": round(body_atr_ratio, 2),
+            "volume_ratio": round(volume / avg_vol, 2) if avg_vol > 0 else 0,
+            "body_median_ratio": round(body_median_ratio, 2),
+        }
+
+        signal = None
         if buy_score >= self.score_threshold:
-            return OrderType.BUY
-        if sell_score >= self.score_threshold:
-            return OrderType.SELL
-        return None
+            signal = OrderType.BUY
+        elif sell_score >= self.score_threshold:
+            signal = OrderType.SELL
+        return (signal, buy_score, sell_score, long_factors, short_factors, indicator_values)
 
     # ─────────────── Trend-aware exit multipliers ───────────────
 

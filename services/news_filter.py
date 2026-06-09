@@ -23,7 +23,8 @@ class NewsFilter:
     def __init__(self):
         self._cache: list[dict] = []
         self._cache_time: float = 0.0
-        self._cache_ttl: float = 3600  # 1小时缓存
+        self._cache_ttl: float = 43200  # 12小时缓存
+        self._retry_after: float = 0.0  # 429后不重试直到这个时间
         self._blackout_windows: list[tuple[datetime, datetime, str]] = []
         self._windows_computed_at: float = 0.0
 
@@ -38,9 +39,11 @@ class NewsFilter:
         }
 
     def fetch_calendar(self) -> list[dict]:
-        """获取本周经济日历（带缓存）"""
+        """获取本周经济日历（带缓存 + 429 退避）"""
         now = time.time()
         if self._cache and (now - self._cache_time) < self._cache_ttl:
+            return self._cache
+        if now < self._retry_after:
             return self._cache
 
         try:
@@ -50,9 +53,18 @@ class NewsFilter:
             if isinstance(data, list):
                 self._cache = data
                 self._cache_time = now
+                self._retry_after = 0.0
                 logger.info(f"[新闻过滤] 获取经济日历成功: {len(data)} 个事件")
             else:
                 logger.warning(f"[新闻过滤] 日历数据格式异常: {type(data)}")
+        except requests.exceptions.HTTPError as e:
+            if resp.status_code == 429:
+                self._retry_after = now + 3600  # 被限流后 1 小时内不重试
+                logger.warning(f"[新闻过滤] API 限流，1 小时内不重试")
+            else:
+                logger.warning(f"[新闻过滤] 获取经济日历失败: {e}")
+            if self._cache:
+                logger.info("[新闻过滤] 使用缓存数据")
         except requests.RequestException as e:
             logger.warning(f"[新闻过滤] 获取经济日历失败: {e}")
             if self._cache:

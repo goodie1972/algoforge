@@ -139,6 +139,54 @@ class EngineRunner:
         except Exception as e:
             self.logger.warning(f"[数据同步] 跳过（模块未就绪: {e}）")
 
+    # ======================== 缓存更新（引擎线程调用，避免与广播任务抢 bridge socket） ========================
+
+    def _update_caches(self, engine):
+        """从引擎线程更新 dashboard 缓存，消除并发 bridge 访问"""
+        from config import settings as _cfg
+        # 价格
+        try:
+            bid, ask = engine.bridge.get_tick_price(_cfg.SYMBOL)
+            if bid > 0:
+                self._cached_price = {"bid": bid, "ask": ask}
+        except Exception:
+            pass
+        # 持仓
+        try:
+            positions = engine.bridge.get_positions(_cfg.SYMBOL)
+            self._cached_positions = [
+                {
+                    "ticket": p.ticket,
+                    "order_type": p.order_type,
+                    "volume": p.volume,
+                    "open_price": p.open_price,
+                    "current_price": p.current_price,
+                    "profit": round(p.profit, 2),
+                    "stop_loss": p.stop_loss,
+                    "take_profit": p.take_profit,
+                    "magic": p.magic,
+                    "comment": getattr(p, "comment", ""),
+                }
+                for p in positions
+            ]
+        except Exception:
+            pass
+        # 账户
+        try:
+            info = engine.bridge.get_account_info()
+            if info:
+                self._cached_account = {
+                    "login": info.login,
+                    "balance": info.balance,
+                    "equity": info.equity,
+                    "margin": info.margin,
+                    "free_margin": info.free_margin,
+                    "currency": info.currency,
+                    "leverage": info.leverage,
+                }
+        except Exception:
+            pass
+
     # ======================== 引擎主循环 ========================
 
     def _run(self):
@@ -244,6 +292,7 @@ class EngineRunner:
                         self.logger.error(f"[桥接] 重连失败: {e2}")
 
                 engine._tick()
+                self._update_caches(engine)
             except Exception as e:
                 self.logger.exception(f"主循环异常: {e}")
                 time.sleep(60)

@@ -1,10 +1,12 @@
 """
 /api/engine/* 路由 - 引擎启停、状态查询、动态策略管理、健康检查
 """
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import settings
+from data import database as db
 
 router = APIRouter(prefix="/api/engine", tags=["engine"])
 
@@ -98,7 +100,7 @@ async def remove_strategy(req: RemoveStrategyRequest):
 
 @router.get("/health")
 async def get_health():
-    """Consolidated health check — engine, bridge, account, positions, risk"""
+    """Consolidated health check — engine, bridge, account, positions, risk, database, exit systems"""
     engine_block = _build_engine_block()
     bridge_block = _build_bridge_block()
     strategies_block = _build_strategies_block()
@@ -106,10 +108,14 @@ async def get_health():
     positions_block = _build_positions_block()
     risk_block = _build_risk_block()
     signals_block = _build_signals_block()
+    database_block = _build_database_block()
+    exit_block = _build_exit_systems_block()
 
     # Derive overall verdict from all blocks
     verdict, reason = _compute_verdict(
-        engine_block, bridge_block, risk_block, account_block
+        engine_block, bridge_block, risk_block, account_block,
+        database_block=database_block,
+        positions_block=positions_block,
     )
 
     return {
@@ -122,6 +128,8 @@ async def get_health():
         "risk": risk_block,
         "strategies": strategies_block.get("running", []),
         "signals": signals_block,
+        "database": database_block,
+        "exit_systems": exit_block,
     }
 
 
@@ -263,11 +271,76 @@ def _build_signals_block() -> dict:
     }
 
 
+def _build_database_block() -> dict:
+    """Check SQLite database status — table existence, data freshness."""
+    import time
+    try:
+        stats = db.get_db_stats()
+        timeframes = list(stats.keys()) if stats else []
+        total_candles = sum(v["count"] for v in stats.values()) if stats else 0
+        most_recent = max((v["to"] for v in stats.values()), default=0)
+        staleness = int(time.time() - most_recent) if most_recent else -1
+        return {
+            "initialized": len(timeframes) > 0,
+            "timeframes_populated": timeframes,
+            "total_candles": total_candles,
+            "most_recent_timestamp": most_recent,
+            "staleness_seconds": staleness,
+        }
+    except Exception as e:
+        return {
+            "initialized": False,
+            "timeframes_populated": [],
+            "total_candles": 0,
+            "most_recent_timestamp": 0,
+            "staleness_seconds": -1,
+            "error": str(e),
+        }
+
+
+def _build_exit_systems_block() -> dict:
+    """Audit all exit systems across strategies."""
+    if not engine_runner or not engine_runner._engine:
+        return {"strategies_with_exits": [], "has_positions": False, "global_loss_blocked": False}
+
+    engine = engine_runner._engine
+    has_positions = False
+    try:
+        positions = getattr(engine_runner, "_cached_positions", []) or []
+        has_positions = len(positions) > 0
+    except Exception:
+        pass
+
+    global_loss_blocked = getattr(engine, "_global_loss_blocked", False)
+
+    strategies_with_exits = []
+    with engine._strategies_lock:
+        for s in engine.strategies:
+            exit_cfg = {
+                "name": s.name,
+                "magic": s.magic,
+                "timeframe": s.timeframe,
+            }
+            # Extract ATR exit multipliers (common naming across strategies)
+            for attr in ("hard_mult", "trail_mult", "profit_trail_mult", "hard_stop_mult"):
+                if hasattr(s, attr):
+                    exit_cfg[attr] = getattr(s, attr)
+            strategies_with_exits.append(exit_cfg)
+
+    return {
+        "strategies_with_exits": strategies_with_exits,
+        "has_positions": has_positions,
+        "global_loss_blocked": global_loss_blocked,
+    }
+
+
 def _compute_verdict(
     engine_block: dict,
     bridge_block: dict,
     risk_block: dict,
     account_block: dict | None,
+    database_block: dict | None = None,
+    positions_block: dict | None = None,
 ) -> tuple:
     """Return (verdict: str, reason: str) based on current state."""
     reasons: list[str] = []
@@ -311,6 +384,27 @@ def _compute_verdict(
                 reasons.append(f"Margin level low ({margin_level:.0f}%)")
             if margin_level < 100:
                 return "RED", f"Margin call level ({margin_level:.0f}%)"
+
+    # --- Database health check ---
+    if database_block:
+        if not database_block.get("initialized", False):
+            reasons.append("Database not initialized")
+        else:
+            staleness = database_block.get("staleness_seconds", 0)
+            if staleness > 600:  # 10 min stale
+                reasons.append(f"Database data stale ({staleness}s old)")
+            timeframes = database_block.get("timeframes_populated", [])
+            # Engine has strategies but database has no data for any timeframe
+            if engine_runner and engine_runner._engine and not timeframes:
+                reasons.append("No timeframe data in database")
+
+    # --- Exit systems check: positions open but no exit config? ---
+    if positions_block and positions_block.get("count", 0) > 0:
+        # If there are open positions, we expect exit configs
+        if not engine_runner or not engine_runner._engine:
+            reasons.append("Positions exist but engine not running")
+        elif getattr(engine_runner._engine, "_global_loss_blocked", False):
+            pass  # already RED above
 
     if reasons:
         return "YELLOW", "; ".join(reasons)

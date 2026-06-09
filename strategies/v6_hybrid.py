@@ -553,7 +553,17 @@ class V6HybridStrategy(BaseStrategy):
             f"K={k_curr:.1f} D={d_curr:.1f} RSI={rsi:.2f} ATR={atr_val:.2f}"
         )
 
-        return signal
+        indicator_values = {
+            "close": round(close, 2), "sma200": round(sma200, 2),
+            "stoch_k": round(k_curr, 2), "stoch_d": round(d_curr, 2),
+            "rsi": round(rsi, 2), "atr": round(atr_val, 2),
+            "atr_sma": round(atr_sma_val, 2),
+            "bb_upper": round(bb.get("upper", 0), 2),
+            "bb_lower": round(bb_lower, 2),
+            "kc_upper": round(kc_upper, 2), "kc_lower": round(kc_lower, 2),
+            "m30_dir": m30_dir,
+        }
+        return (signal, long_score, short_score, long_detail, short_detail, indicator_values)
 
     # ──────────────────────────────────────────────
     # Trend-aware exit multipliers

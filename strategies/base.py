@@ -24,6 +24,8 @@ class BaseStrategy(abc.ABC):
         self.timeframe = timeframe or _settings.TIMEFRAME
         self.candles: list[Candle] = []
         self._trail_sl: dict[int, float] = {}
+        # 最近一次信号详情（供引擎写入 DB）
+        self._last_signal: Optional[dict] = None
 
     def refresh_data(self, count: int = 200):
         """刷新K线数据，转为时间顺序（旧→新）"""
@@ -35,10 +37,16 @@ class BaseStrategy(abc.ABC):
         return [c.close for c in self.candles]
 
     @abc.abstractmethod
-    def generate_signal(self) -> Optional[OrderType]:
+    def generate_signal(self):
         """
-        生成交易信号
-        返回: OrderType.BUY / OrderType.SELL / None（不操作）
+        生成交易信号。
+        返回: tuple[Optional[OrderType], int, int, list, list, dict]
+          - signal: BUY / SELL / None
+          - score_long: 多头评分
+          - score_short: 空头评分
+          - factors_long: 多头因子列表
+          - factors_short: 空头因子列表
+          - indicator_values: 指标值字典（可 JSON 序列化）
         """
         ...
 
@@ -52,7 +60,31 @@ class BaseStrategy(abc.ABC):
             logger.warning(f"[{self.name}] K线数据不足: {len(self.candles)}")
             return None
 
-        signal = self.generate_signal()
+        result = self.generate_signal()
+        signal = result[0] if isinstance(result, tuple) else result
+
+        # 存储信号详情（供引擎写入数据库）
+        if isinstance(result, tuple):
+            self._last_signal = {
+                "signal": signal.value if signal else None,
+                "score_long": result[1],
+                "score_short": result[2],
+                "factors_long": result[3],
+                "factors_short": result[4],
+                "indicator_values": result[5],
+            }
+            # 如果有额外项（confidence 等）
+            if len(result) > 6:
+                self._last_signal["confidence"] = result[6]
+        else:
+            # 向后兼容：旧策略只返回 OrderType
+            self._last_signal = {
+                "signal": signal.value if signal else None,
+                "score_long": 0, "score_short": 0,
+                "factors_long": [], "factors_short": [],
+                "indicator_values": {},
+            }
+
         if signal:
             return f"信号: {signal.value}"
         return None

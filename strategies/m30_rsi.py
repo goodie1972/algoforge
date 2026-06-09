@@ -256,7 +256,13 @@ class M30RSIStrategy(BaseStrategy):
             f"RSI={rsi_val:.1f} ATR={atr_val:.2f} H1={h1_trend}"
         )
 
-        return signal
+        indicator_values = {
+            "close": round(close, 2), "rsi": round(rsi_val, 2),
+            "atr": round(atr_val, 2), "bb_upper": round(bb["upper"], 2),
+            "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
+            "h1_trend": h1_trend, "m30_rsi_dir": m30_rsi_dir, "low_vol": low_vol,
+        }
+        return (signal, long_score, short_score, long_detail, short_detail, indicator_values)
 
     # ─────────────── Trend-aware exit multipliers ───────────────
 

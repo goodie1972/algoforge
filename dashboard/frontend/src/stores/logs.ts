@@ -16,9 +16,9 @@ export const useLogStore = defineStore('logs', () => {
   })
 
   function append(entry: LogEntry) {
-    entries.value.push(entry)
+    entries.value.unshift(entry)  // 最新在最前
     if (entries.value.length > maxEntries) {
-      entries.value = entries.value.slice(-maxEntries)
+      entries.value = entries.value.slice(0, maxEntries)
     }
   }
 
@@ -32,7 +32,7 @@ export const useLogStore = defineStore('logs', () => {
         }
       }
       if (entries.value.length > maxEntries) {
-        entries.value = entries.value.slice(-maxEntries)
+        entries.value = entries.value.slice(0, maxEntries)
       }
     } catch { /* ignore */ }
   }

@@ -310,12 +310,38 @@ class GoldAutoResearchStrategy(BaseStrategy):
             f"Price={close:.2f} EMA10={ema10:.2f} EMA20={ema20:.2f}"
         )
 
-        if trend_up and mom_up and vol_active and safe_up:
-            return OrderType.BUY
-        if trend_dn and mom_dn and vol_active and safe_dn:
-            return OrderType.SELL
+        indicator_values = {
+            "close": round(close, 2), "ema10": round(ema10, 2), "ema20": round(ema20, 2),
+            "macd_val": round(macd_val, 4) if macd_val else 0,
+            "macd_sig": round(macd_sig, 4) if macd_sig else 0,
+            "stoch_k": round(stoch_k, 2) if stoch_k else 0,
+            "stoch_d": round(stoch_d, 2) if stoch_d else 0,
+            "adx": round(adx_val, 2) if adx_val else 0,
+            "atr": round(atr_val, 2) if atr_val else 0,
+            "rsi": round(rsi_val, 2) if rsi_val else 0,
+            "bb_mid": round(bb_mid, 2) if bb_mid else 0,
+            "bb_std": round(bb_std, 2) if bb_std else 0,
+        }
 
-        return None
+        long_factors = []
+        if trend_up: long_factors.append("TREND-UP")
+        if mom_up: long_factors.append("MOM-UP")
+        if vol_active: long_factors.append("VOL-ACTIVE")
+        if safe_up: long_factors.append("SAFE-UP")
+
+        short_factors = []
+        if trend_dn: short_factors.append("TREND-DN")
+        if mom_dn: short_factors.append("MOM-DN")
+        if vol_active: short_factors.append("VOL-ACTIVE")
+        if safe_dn: short_factors.append("SAFE-DN")
+
+        signal = None
+        if trend_up and mom_up and vol_active and safe_up:
+            signal = OrderType.BUY
+        elif trend_dn and mom_dn and vol_active and safe_dn:
+            signal = OrderType.SELL
+
+        return (signal, len(long_factors), len(short_factors), long_factors, short_factors, indicator_values)
 
     # ─────────────── Trend-aware exit multipliers ───────────────
 

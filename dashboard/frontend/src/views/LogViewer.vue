@@ -18,15 +18,15 @@ onMounted(() => store.fetchHistory())
 
 const displayLogs = computed(() => store.filteredEntries)
 
-function scrollToBottom() {
+function scrollToNewest() {
   if (autoScroll.value && logContainer.value) {
     nextTick(() => {
-      logContainer.value!.scrollTop = logContainer.value!.scrollHeight
+      logContainer.value!.scrollTop = 0
     })
   }
 }
 
-watch(() => store.entries.length, scrollToBottom)
+watch(() => store.entries.length, scrollToNewest)
 
 function logStyle(level: string) {
   switch (level) {
