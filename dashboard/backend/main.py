@@ -55,25 +55,13 @@ from dashboard.backend.routes import news as route_news
 from dashboard.backend.routes import backtest as route_backtest
 from dashboard.backend.routes import trades as route_trades
 from dashboard.backend.routes import data as route_data
+from dashboard.backend.routes import signals as route_signals
 
-route_engine.engine_runner = engine_runner
-# 注入可用策略列表（来自 main.py 的 STRATEGY_MAP）
-try:
-    _main_module = __import__('main')
-    route_engine.available_strategies = {k: True for k in _main_module.STRATEGY_MAP}
-except Exception:
-    route_engine.available_strategies = {}
-route_account.engine_runner = engine_runner
+# run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
-route_positions.engine_runner = engine_runner
 route_positions.run_bridge = run_bridge
-route_config.config_service = config_service
-route_market.engine_runner = engine_runner
 route_market.run_bridge = run_bridge
-route_logs.log_handler = log_handler
-route_trades.engine_runner = engine_runner
 route_trades.run_bridge = run_bridge
-route_data.engine_runner = engine_runner
 route_data.run_bridge = run_bridge
 
 
@@ -84,69 +72,40 @@ class PollerState:
 
 
 async def broadcast_prices():
-    """每 2 秒推送一次价格"""
+    """每 2 秒推送一次价格（从引擎线程缓存读取，不直接访问 bridge）"""
     while PollerState.running:
         try:
-            if engine_runner.is_running and engine_runner.bridge:
-                bid, ask = await run_bridge(engine_runner.bridge.get_tick_price, "XAUUSD")
-                if bid > 0:
-                    engine_runner._cached_price = {"bid": bid, "ask": ask}
-                    await ws_manager.broadcast("prices", {
-                        "bid": bid,
-                        "ask": ask,
-                        "spread": round(ask - bid, 2),
-                    })
+            cached = engine_runner._cached_price
+            if cached:
+                await ws_manager.broadcast("prices", {
+                    "bid": cached["bid"],
+                    "ask": cached["ask"],
+                    "spread": round(cached["ask"] - cached["bid"], 2),
+                })
         except Exception:
             pass
         await asyncio.sleep(2)
 
 
 async def broadcast_positions():
-    """每 5 秒推送一次持仓"""
+    """每 5 秒推送一次持仓（从引擎线程缓存读取）"""
     while PollerState.running:
         try:
-            if engine_runner.is_running and engine_runner.bridge:
-                positions = await run_bridge(engine_runner.bridge.get_positions, "XAUUSD")
-                pos_list = [
-                    {
-                        "ticket": p.ticket,
-                        "order_type": p.order_type,
-                        "volume": p.volume,
-                        "open_price": p.open_price,
-                        "current_price": p.current_price,
-                        "profit": round(p.profit, 2),
-                        "stop_loss": p.stop_loss,
-                        "take_profit": p.take_profit,
-                        "magic": p.magic,
-                        "comment": getattr(p, "comment", ""),
-                    }
-                    for p in positions
-                ]
-                engine_runner._cached_positions = pos_list
-                await ws_manager.broadcast("positions", pos_list)
+            positions = engine_runner._cached_positions
+            if positions:
+                await ws_manager.broadcast("positions", positions)
         except Exception:
             pass
         await asyncio.sleep(5)
 
 
 async def broadcast_account():
-    """每 10 秒推送一次账户信息"""
+    """每 10 秒推送一次账户信息（从引擎线程缓存读取）"""
     while PollerState.running:
         try:
-            if engine_runner.is_running and engine_runner.bridge:
-                info = await run_bridge(engine_runner.bridge.get_account_info)
-                if info:
-                    account_data = {
-                        "login": info.login,
-                        "balance": info.balance,
-                        "equity": info.equity,
-                        "margin": info.margin,
-                        "free_margin": info.free_margin,
-                        "currency": info.currency,
-                        "leverage": info.leverage,
-                    }
-                    engine_runner._cached_account = account_data
-                    await ws_manager.broadcast("account", account_data)
+            account = engine_runner._cached_account
+            if account:
+                await ws_manager.broadcast("account", account)
         except Exception:
             pass
         await asyncio.sleep(10)
@@ -218,6 +177,7 @@ app.include_router(route_news.router)
 app.include_router(route_backtest.router)
 app.include_router(route_trades.router)
 app.include_router(route_data.router)
+app.include_router(route_signals.router)
 
 
 # === WebSocket 端点 ===
@@ -234,6 +194,28 @@ async def websocket_endpoint(ws: WebSocket):
         await ws_manager.disconnect(ws)
     except Exception:
         await ws_manager.disconnect(ws)
+
+
+# === 路由依赖注入（必须放在 __name__ 守卫内） ===
+# 由于 backend/ 在 sys.path，__import__('main') 会导入自身，
+# 导致模块级代码递归执行产生两个 engine_runner 实例互相覆盖。
+# 通过 __name__ 守卫确保只注入一次。
+if __name__ == "__main__":
+    app.state.engine_runner = engine_runner
+    app.state.ws_manager = ws_manager
+    route_engine.engine_runner = engine_runner
+    route_account.engine_runner = engine_runner
+    route_positions.engine_runner = engine_runner
+    route_config.config_service = config_service
+    route_market.engine_runner = engine_runner
+    route_logs.log_handler = log_handler
+    route_trades.engine_runner = engine_runner
+    route_data.engine_runner = engine_runner
+    try:
+        from engine_standalone.main import STRATEGY_MAP
+        route_engine.available_strategies = {k: True for k in STRATEGY_MAP}
+    except Exception:
+        route_engine.available_strategies = {}
 
 
 # === 入口 ===

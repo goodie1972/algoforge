@@ -278,13 +278,22 @@ def patrol():
     # ---- 4. 错误日志 ----
     logs = api_get("/logs")
     if logs:
+        db_kw = ["database", "sqlite", "ohlcv", "no such table", "market_data.db"]
         errors = [
             l.get("message", "")
             for l in logs.get("logs", [])
-            if "ERROR" in l.get("message", "") or "exception" in l.get("message", "").lower()
+            if "ERROR" in l.get("message", "")
+            or "exception" in l.get("message", "").lower()
+            or ("WARNING" in l.get("message", "")
+                and any(kw in l.get("message", "").lower() for kw in db_kw))
         ]
         if errors:
-            logger.warning(f"检测到 {len(errors)} 条错误日志:")
+            err_count = sum(1 for e in errors if "ERROR" in e.upper() or "exception" in e.lower())
+            warn_count = len(errors) - err_count
+            label = f"{err_count} 条错误"
+            if warn_count:
+                label += f", {warn_count} 条数据库告警"
+            logger.warning(f"检测到 {label}:")
             for e in errors[-5:]:  # 最多显示 5 条
                 logger.warning(f"  {e}")
 

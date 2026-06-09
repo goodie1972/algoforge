@@ -106,6 +106,8 @@ class TradingEngine:
         self.running = False
         self._last_balance_check = 0
         self._daily_start_balance = 0.0
+        self._last_snapshot_time = 0.0
+        self._last_risk_save_time = 0.0
         self._global_loss_blocked = False
         self._last_report_time = 0
         self._report_interval = 4 * 3600
@@ -120,6 +122,8 @@ class TradingEngine:
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
         self._load_closed_trades()
+        db.init_db()  # 确保所有表存在
+        db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
 
     @property
     def closed_trades(self) -> list[dict]:
@@ -279,13 +283,17 @@ class TradingEngine:
             records.append(record)
             self._closed_trades.append(record)
 
-        # 追加到 JSONL 文件
+        # 追加到 JSONL 文件 + 数据库
         try:
             with open(self._trades_file, "a", encoding="utf-8") as f:
                 for r in records:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
         except OSError as e:
             logger.warning(f"[成交恢复] 写入文件失败: {e}")
+        try:
+            db.insert_trades_batch(records)
+        except Exception:
+            pass
 
         logger.info(f"[成交恢复] 补充 {len(records)} 条历史成交")
 
@@ -550,6 +558,26 @@ class TradingEngine:
         for s in self.strategies:
             self._init_risk_state(s.name, s.magic)
 
+        # 从数据库恢复风控阻断状态
+        try:
+            saved_states = db.load_risk_states()
+            for saved in saved_states:
+                magic = saved["magic"]
+                if magic in self._risk_states:
+                    rs = self._risk_states[magic]
+                    rs.realized_pnl = saved.get("realized_pnl", 0)
+                    rs.consecutive_losses = saved.get("consecutive_losses", 0)
+                    for flag in ("realized_loss_blocked", "floating_loss_blocked",
+                                 "rapid_exit_blocked", "realized_loss_amount_blocked",
+                                 "consecutive_loss_blocked"):
+                        if saved.get(flag):
+                            setattr(rs, flag, True)
+                            setattr(rs, f"{flag}_at", time.time())
+            if saved_states:
+                logger.info(f"[风控恢复] 已恢复 {len(saved_states)} 个策略的风控状态")
+        except Exception as e:
+            logger.warning(f"[风控恢复] 加载失败: {e}")
+
         # 接管现有持仓 + 填充 _entry_times
         for s in self.strategies:
             existing = self.bridge.takeover_existing_positions(settings.SYMBOL, s.magic)
@@ -639,6 +667,39 @@ class TradingEngine:
 
         # 更新浮动盈亏
         self._update_floating_pnl()
+
+        # 定期持久化账户快照和风控状态
+        now = time.time()
+        if now - self._last_snapshot_time >= 300:
+            self._last_snapshot_time = now
+            try:
+                info = self.bridge.get_account_info()
+                if info:
+                    db.insert_account_snapshot({
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "balance": info.balance, "equity": info.equity,
+                        "margin": info.margin, "free_margin": info.free_margin,
+                        "leverage": info.leverage, "floating_pnl": info.equity - info.balance,
+                    })
+            except Exception:
+                pass
+
+        if now - self._last_risk_save_time >= 60:
+            self._last_risk_save_time = now
+            for magic, state in self._risk_states.items():
+                try:
+                    db.save_risk_state(magic, state.name, {
+                        "realized_pnl": state.realized_pnl,
+                        "consecutive_losses": state.consecutive_losses,
+                        "realized_loss_blocked": state.realized_loss_blocked,
+                        "floating_loss_blocked": state.floating_loss_blocked,
+                        "rapid_exit_blocked": state.rapid_exit_blocked,
+                        "realized_loss_amount_blocked": state.realized_loss_amount_blocked,
+                        "consecutive_loss_blocked": state.consecutive_loss_blocked,
+                        "blocked_at": str(state.consecutive_loss_blocked_at) if state.consecutive_loss_blocked else "",
+                    })
+                except Exception:
+                    pass
 
         # ---- 阻断检查 ----
         global_blocked = self._check_global_loss()
@@ -972,6 +1033,10 @@ class TradingEngine:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
             except OSError:
                 pass
+            try:
+                db.insert_trade(record)
+            except Exception:
+                pass
 
     def _lock_new_entries(self, reason: str):
         """安全锁：暂停开新仓，已持仓仍可正常平仓"""
@@ -1041,6 +1106,28 @@ class TradingEngine:
                 cool.pop(signal_dir, None)
 
         logger.info(f"[{strategy.name}] 收到信号: {signal}")
+
+        # 写入信号记录到数据库
+        last_sig = getattr(strategy, "_last_signal", None)
+        if last_sig and last_sig.get("signal"):
+            try:
+                import json as _json
+                sig_record = {
+                    "strategy": strategy.name, "magic": strategy.magic,
+                    "timeframe": strategy.timeframe,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "signal": last_sig.get("signal"),
+                    "score_long": last_sig.get("score_long", 0),
+                    "score_short": last_sig.get("score_short", 0),
+                    "threshold": getattr(strategy, "score_threshold", 0),
+                    "factors_long": _json.dumps(last_sig.get("factors_long", []), ensure_ascii=False),
+                    "factors_short": _json.dumps(last_sig.get("factors_short", []), ensure_ascii=False),
+                    "indicator_values": _json.dumps(last_sig.get("indicator_values", {}), ensure_ascii=False),
+                    "confidence": last_sig.get("confidence"),
+                }
+                db.insert_signal(sig_record)
+            except Exception:
+                pass
 
         # 双倍首单
         if signal == "信号: BUY":
@@ -1208,6 +1295,10 @@ class TradingEngine:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
             except OSError:
                 pass
+            try:
+                db.insert_trade(record)
+            except Exception:
+                pass
 
     def _check_news_blackout(self) -> bool:
         """检查是否在新闻禁售期，每次主循环检查"""
@@ -1241,14 +1332,27 @@ class TradingEngine:
             return
 
         logger.info(f"[数据同步] 开始增量同步周期: {sorted(active_tfs)}")
+        all_empty = True
         for tf in sorted(active_tfs):
             try:
                 n = download_timeframe(self.bridge, tf, settings.SYMBOL)
                 if n > 0:
                     logger.info(f"[数据同步] {tf} 写入 {n} 条")
+                    all_empty = False
             except Exception as e:
                 logger.warning(f"[数据同步] {tf} 失败: {e}")
-        logger.info(f"[数据同步] 完成")
+        # 如果所有周期都未写入任何数据，检查数据库是否真为空
+        if all_empty:
+            try:
+                stats = db.get_db_stats()
+                if not stats:
+                    logger.error(f"[数据同步] 所有周期均未写入数据，数据库可能为空或未初始化")
+                else:
+                    logger.info(f"[数据同步] 完成，已有数据: {list(stats.keys())}")
+            except Exception as e:
+                logger.error(f"[数据同步] 数据库异常: {e}")
+        else:
+            logger.info(f"[数据同步] 完成")
 
     def _check_status_report(self):
         now = time.time()
