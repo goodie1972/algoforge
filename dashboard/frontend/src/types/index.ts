@@ -69,6 +69,7 @@ export interface PatrolAlert {
   time: string
   level: 'info' | 'warning' | 'critical'
   message: string
+  key?: string  // 去重/已读标识，clearAlerts 后同 key 不再出现
 }
 
 // 回测类型

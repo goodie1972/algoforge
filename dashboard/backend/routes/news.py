@@ -29,7 +29,9 @@ async def get_calendar():
         "blackout_reason": reason,
         "upcoming_events": events,
         "blackout_windows": [
-            {"start": s.strftime("%Y-%m-%d %H:%M"), "end": e.strftime("%Y-%m-%d %H:%M"), "title": t}
+            {"start": nf.to_local(s).strftime("%Y-%m-%d %H:%M"),
+             "end": nf.to_local(e).strftime("%Y-%m-%d %H:%M"),
+             "title": t}
             for s, e, t in windows
         ],
     }

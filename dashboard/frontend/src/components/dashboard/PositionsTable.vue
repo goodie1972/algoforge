@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, ref } from 'vue'
+import { h, ref, watch } from 'vue'
 import { usePositionStore } from '@/stores/positions'
 import { NButton, NTag, NSpace, NDataTable, useDialog, useMessage } from 'naive-ui'
 import { closePosition } from '@/api/client'
@@ -8,6 +8,15 @@ const store = usePositionStore()
 const dialog = useDialog()
 const message = useMessage()
 const loadingClose = ref<number | null>(null)
+
+const totalPnLFlash = ref(false)
+let _pLast = store.totalProfit, _pTimer: any = null
+watch(() => store.totalProfit, (n: number) => {
+  if (Math.abs(n - _pLast) < 0.01) return
+  _pLast = n; totalPnLFlash.value = true
+  if (_pTimer) clearTimeout(_pTimer)
+  _pTimer = setTimeout(() => { totalPnLFlash.value = false }, 600)
+})
 
 const columns = [
   { title: 'Ticket', key: 'ticket', width: 100 },
@@ -119,7 +128,8 @@ const summaryRows = () => {
       <n-space size="small">
         <n-tag :bordered="false" type="success" size="small">多头 {{ store.longCount }}</n-tag>
         <n-tag :bordered="false" type="error" size="small">空头 {{ store.shortCount }}</n-tag>
-        <n-tag :bordered="false" :type="store.totalProfit >= 0 ? 'success' : 'error'" size="small">
+        <n-tag :bordered="false" :type="store.totalProfit >= 0 ? 'success' : 'error'" size="small"
+          :class="{ 'flash-num': totalPnLFlash }">
           总计 ${{ store.totalProfit.toFixed(2) }}
         </n-tag>
       </n-space>

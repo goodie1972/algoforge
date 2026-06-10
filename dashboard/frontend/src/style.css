@@ -14,3 +14,12 @@ body {
 .price-up { color: #0ecb81 !important; }
 .price-down { color: #f6465d !important; }
 .price-gold { color: #f0b90b !important; }
+
+/* 数值变化闪烁 */
+.flash-num {
+  animation: flash-bg 0.6s ease-out !important;
+}
+@keyframes flash-bg {
+  0%   { background-color: rgba(240, 185, 11, 0.35); box-shadow: 0 0 6px 2px rgba(240, 185, 11, 0.25); }
+  100% { background-color: transparent; box-shadow: none; }
+}

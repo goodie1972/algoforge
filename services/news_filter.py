@@ -183,8 +183,15 @@ class NewsFilter:
 
         return False
 
+    @staticmethod
+    def to_local(dt: datetime) -> datetime:
+        """将 UTC datetime 转为本地时间（自动检测时区偏移）"""
+        offset = datetime.now() - datetime.utcnow()
+        offset_hours = round(offset.total_seconds() / 3600)
+        return dt + timedelta(hours=offset_hours)
+
     def get_upcoming_events(self, limit: int = 10) -> list[dict]:
-        """获取即将到来的高影响事件（供前端展示）"""
+        """获取即将到来的高影响事件（供前端展示，使用本地时间）"""
         cfg = self._read_config()
         self.fetch_calendar()
         if not self._cache:
@@ -208,16 +215,18 @@ class NewsFilter:
             if evt_dt is None:
                 continue
 
+            local_dt = self.to_local(evt_dt)
             result.append({
                 "title": evt.get("title", "Unknown"),
                 "country": currency,
                 "impact": impact,
-                "datetime": evt_dt.strftime("%Y-%m-%d %H:%M"),
+                "datetime": local_dt.strftime("%Y-%m-%d %H:%M"),
+                "datetime_utc": evt_dt.strftime("%Y-%m-%d %H:%M"),
                 "forecast": evt.get("forecast", ""),
                 "previous": evt.get("previous", ""),
             })
 
-        # 按时间排序，返回未来的
+        # 按时间排序，返回未来的（均使用本地时间）
         result.sort(key=lambda x: x["datetime"])
         future = [r for r in result if r["datetime"] >= now.strftime("%Y-%m-%d %H:%M")]
         return future[:limit]

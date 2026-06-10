@@ -6,7 +6,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import settings
+from dashboard.backend.config_service import RuntimeConfig
 from data import database as db
+
+_rtc = RuntimeConfig()  # singleton, 所有重叠配置走运行时
 
 router = APIRouter(prefix="/api/engine", tags=["engine"])
 
@@ -111,6 +114,8 @@ async def get_health():
     database_block = _build_database_block()
     exit_block = _build_exit_systems_block()
 
+    strategy_blocks_block = _build_strategy_blocks_block()
+
     # Derive overall verdict from all blocks
     verdict, reason = _compute_verdict(
         engine_block, bridge_block, risk_block, account_block,
@@ -130,6 +135,7 @@ async def get_health():
         "signals": signals_block,
         "database": database_block,
         "exit_systems": exit_block,
+        "strategy_blocks": strategy_blocks_block,
     }
 
 
@@ -334,6 +340,82 @@ def _build_exit_systems_block() -> dict:
     }
 
 
+def _build_strategy_blocks_block() -> list[dict]:
+    """Per-strategy risk blocking status — exposes exactly why each strategy
+    is or isn't allowed to open new positions."""
+    if not engine_runner or not engine_runner._engine:
+        return []
+
+    engine = engine_runner._engine
+    result = []
+
+    # Current positions grouped by magic (from cached data)
+    positions_by_magic: dict[int, int] = {}
+    cached_positions = engine_runner._cached_positions or []
+    for p in cached_positions:
+        m = p.get("magic")
+        if m is not None:
+            positions_by_magic[m] = positions_by_magic.get(m, 0) + 1
+
+    with engine._strategies_lock:
+        for s in engine.strategies:
+            item = {
+                "name": s.name,
+                "magic": s.magic,
+                "timeframe": s.timeframe,
+                "max_positions": getattr(s, "max_positions", 1),
+                "holdings": positions_by_magic.get(s.magic, 0),
+                "is_blocked": False,
+                "block_reason": None,
+            }
+
+            # Engine-level blocking check (risk states)
+            risk_state = engine._risk_states.get(s.magic)
+            if risk_state is not None:
+                item["floating_pnl"] = round(risk_state.floating_pnl, 2)
+                item["realized_pnl"] = round(risk_state.realized_pnl, 2)
+                item["consecutive_losses"] = risk_state.consecutive_losses
+
+                # Blocking states
+                now = __import__("time").time()
+                blocks = []
+
+                if risk_state.realized_loss_blocked:
+                    elapsed = now - risk_state.realized_loss_blocked_at
+                    remain_h = max(0, (_rtc.get("per_strategy_loss_block_hours") * 3600 - elapsed) / 3600)
+                    blocks.append(f"已实现亏损阻断，剩余 {remain_h:.1f}h")
+
+                if risk_state.floating_loss_blocked:
+                    blocks.append(f"浮动亏损阻断 (${abs(risk_state.floating_pnl):.2f})")
+
+                if risk_state.realized_loss_amount_blocked:
+                    elapsed = now - risk_state.realized_loss_amount_blocked_at
+                    remain_h = max(0, (_rtc.get("per_strategy_loss_block_hours") * 3600 - elapsed) / 3600)
+                    blocks.append(f"绝对亏损冷却，剩余 {remain_h:.1f}h")
+
+                if risk_state.consecutive_loss_blocked:
+                    elapsed = now - risk_state.consecutive_loss_blocked_at
+                    remain_h = max(0, (_rtc.get("consecutive_loss_cooldown_hours") * 3600 - elapsed) / 3600)
+                    blocks.append(f"连续亏损冷却，剩余 {remain_h:.1f}h")
+
+                if risk_state.rapid_exit_blocked:
+                    elapsed = now - risk_state.rapid_exit_blocked_at
+                    remain_m = max(0, (_rtc.get("rapid_exit_cooldown_seconds") - elapsed) / 60)
+                    blocks.append(f"快速出场阻断，剩余 {remain_m:.0f}min")
+
+                if blocks:
+                    item["is_blocked"] = True
+                    item["block_reason"] = "; ".join(blocks)
+            else:
+                item["floating_pnl"] = 0.0
+                item["realized_pnl"] = 0.0
+                item["consecutive_losses"] = 0
+
+            result.append(item)
+
+    return result
+
+
 def _compute_verdict(
     engine_block: dict,
     bridge_block: dict,
@@ -366,7 +448,7 @@ def _compute_verdict(
 
     # --- YELLOW conditions ---
     dd_pct = risk_block.get("drawdown_pct", 0.0)
-    max_dd = getattr(settings, "MAX_DAILY_LOSS_PCT", 12.0)
+    max_dd = _rtc.get("max_daily_loss_pct") or 12.0
     warning_dd = max_dd * 0.7  # 70 % of limit → YELLOW
 
     if dd_pct >= max_dd:

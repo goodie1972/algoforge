@@ -105,8 +105,8 @@ export async function getNewsCalendar(): Promise<{
 }
 
 // === 日志 ===
-export async function getLogs(level?: string, limit = 100): Promise<LogEntry[]> {
-  const { data } = await http.get('/logs', { params: { level, limit } })
+export async function getLogs(level?: string, limit = 100, since?: string): Promise<LogEntry[]> {
+  const { data } = await http.get('/logs', { params: { level, limit, since } })
   return data.logs
 }
 

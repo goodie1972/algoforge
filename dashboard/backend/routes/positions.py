@@ -43,10 +43,10 @@ def _pos_to_dict(pos):
 
 @router.get("")
 async def get_positions(symbol: Optional[str] = None):
-    """获取当前持仓（从广播缓存读取）"""
+    """获取当前持仓（用最新价格刷新 current_price）"""
     if not engine_runner:
         return []
-    return engine_runner._cached_positions
+    return engine_runner._fresh_positions()
 
 
 @router.post("/{ticket}/close")

@@ -1,7 +1,25 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { useAccountStore } from '@/stores/account'
 
 const account = useAccountStore()
+
+function flashOnChange(getter: () => number) {
+  const flash = ref(false)
+  let timer: any = null, last = getter()
+  watch(getter, (n) => {
+    if (Math.abs(n - last) < 0.01) return
+    last = n; flash.value = true
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => { flash.value = false }, 600)
+  })
+  return flash
+}
+
+const balFlash = flashOnChange(() => account.info?.balance ?? 0)
+const eqFlash = flashOnChange(() => account.info?.equity ?? 0)
+const marginFlash = flashOnChange(() => account.info?.margin ?? 0)
+const freeFlash = flashOnChange(() => account.info?.free_margin ?? 0)
 </script>
 
 <template>
@@ -31,24 +49,24 @@ const account = useAccountStore()
       <n-grid :cols="4" :x-gap="12" :y-gap="12">
         <n-gi>
           <n-statistic label="余额" tabular-nums>
-            <span class="price-gold">${{ account.info.balance.toFixed(2) }}</span>
+            <span class="price-gold" :class="{ 'flash-num': balFlash }" style="display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">${{ account.info.balance.toFixed(2) }}</span>
           </n-statistic>
         </n-gi>
         <n-gi>
           <n-statistic label="净值" tabular-nums>
-            <span :class="account.info.equity >= account.info.balance ? 'price-up' : 'price-down'">
+            <span :class="[account.info.equity >= account.info.balance ? 'price-up' : 'price-down', { 'flash-num': eqFlash }]" style="display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">
               ${{ account.info.equity.toFixed(2) }}
             </span>
           </n-statistic>
         </n-gi>
         <n-gi>
           <n-statistic label="已用保证金" tabular-nums>
-            ${{ account.info.margin.toFixed(2) }}
+            <span :class="{ 'flash-num': marginFlash }" style="display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">${{ account.info.margin.toFixed(2) }}</span>
           </n-statistic>
         </n-gi>
         <n-gi>
           <n-statistic label="可用保证金" tabular-nums>
-            ${{ account.info.free_margin.toFixed(2) }}
+            <span :class="{ 'flash-num': freeFlash }" style="display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">${{ account.info.free_margin.toFixed(2) }}</span>
           </n-statistic>
         </n-gi>
       </n-grid>

@@ -16,7 +16,7 @@ export const useLogStore = defineStore('logs', () => {
   })
 
   function append(entry: LogEntry) {
-    entries.value.unshift(entry)  // 最新在最前
+    entries.value.unshift(entry)
     if (entries.value.length > maxEntries) {
       entries.value = entries.value.slice(0, maxEntries)
     }

@@ -196,6 +196,11 @@ class RuntimeConfig:
             self._save()
         return updated
 
+    def reload(self):
+        """重新从 JSON 文件加载覆盖值（引擎 tick 中热重载用）"""
+        with self._data_lock:
+            self._load()
+
     def reset(self, key: str | None = None):
         """重置指定键或全部覆盖"""
         with self._data_lock:

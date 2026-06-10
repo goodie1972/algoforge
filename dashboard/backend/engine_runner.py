@@ -141,6 +141,21 @@ class EngineRunner:
 
     # ======================== 缓存更新（引擎线程调用，避免与广播任务抢 bridge socket） ========================
 
+    def _fresh_positions(self):
+        """用最新 cached_price 刷新持仓的 current_price（避免主循环缓存滞后）"""
+        positions = list(self._cached_positions)
+        price = self._cached_price
+        if not positions or not price:
+            return positions
+        bid = price.get("bid", 0)
+        ask = price.get("ask", 0)
+        fresh = []
+        for p in positions:
+            p = dict(p)
+            p["current_price"] = bid if "SELL" in p.get("order_type", "") else ask
+            fresh.append(p)
+        return fresh
+
     def _update_caches(self, engine):
         """从引擎线程更新 dashboard 缓存，消除并发 bridge 访问"""
         from config import settings as _cfg
@@ -154,13 +169,15 @@ class EngineRunner:
         # 持仓
         try:
             positions = engine.bridge.get_positions(_cfg.SYMBOL)
+            _bid = self._cached_price.get("bid", 0) if self._cached_price else 0
+            _ask = self._cached_price.get("ask", 0) if self._cached_price else 0
             self._cached_positions = [
                 {
                     "ticket": p.ticket,
                     "order_type": p.order_type,
                     "volume": p.volume,
                     "open_price": p.open_price,
-                    "current_price": p.current_price,
+                    "current_price": _bid if p.order_type == "SELL" else _ask,
                     "profit": round(p.profit, 2),
                     "stop_loss": p.stop_loss,
                     "take_profit": p.take_profit,
@@ -232,7 +249,7 @@ class EngineRunner:
             self._running = False
             return
 
-        engine = TradingEngine()
+        engine = TradingEngine(config_service=self.config_service)
         self._engine = engine
 
         # 连接 MT4（带重试）
@@ -277,6 +294,7 @@ class EngineRunner:
         self._sync_data_after_start(engine)
 
         # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
+        from config import settings as _cfg_fast
         while engine.running and not self._stop_requested:
             try:
                 # 桥接保活检测
@@ -296,6 +314,19 @@ class EngineRunner:
             except Exception as e:
                 self.logger.exception(f"主循环异常: {e}")
                 time.sleep(60)
+
+            # 高频价格采样：_tick() 处理策略逻辑较慢，
+            # 每个 tick 后快速补采几次价格，使前端 ~1s 更新而非 ~N 秒
+            for _ in range(3):
+                if not engine.running or self._stop_requested:
+                    break
+                time.sleep(0.3)
+                try:
+                    _b, _a = engine.bridge.get_tick_price(_cfg_fast.SYMBOL)
+                    if _b > 0:
+                        self._cached_price = {"bid": _b, "ask": _a}
+                except Exception:
+                    pass
 
         # 清理
         if engine.bridge:
