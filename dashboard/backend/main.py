@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 
 # 专用单线程执行器 — 所有 MT4 桥接调用串行化，避免共享线程池被锁竞争耗尽
 _bridge_executor = ThreadPoolExecutor(max_workers=4)
@@ -72,7 +74,7 @@ class PollerState:
 
 
 async def broadcast_prices():
-    """每 2 秒推送一次价格（从引擎线程缓存读取，不直接访问 bridge）"""
+    """每 1 秒推送一次价格（从引擎线程缓存读取）"""
     while PollerState.running:
         try:
             cached = engine_runner._cached_price
@@ -84,14 +86,14 @@ async def broadcast_prices():
                 })
         except Exception:
             pass
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
 
 
 async def broadcast_positions():
-    """每 5 秒推送一次持仓（从引擎线程缓存读取）"""
+    """每 5 秒推送一次持仓（用最新价格刷新 current_price）"""
     while PollerState.running:
         try:
-            positions = engine_runner._cached_positions
+            positions = engine_runner._fresh_positions()
             if positions:
                 await ws_manager.broadcast("positions", positions)
         except Exception:
@@ -196,6 +198,22 @@ async def websocket_endpoint(ws: WebSocket):
         await ws_manager.disconnect(ws)
 
 
+# === 前端静态文件服务（必须在 API 路由之后注册，避免拦截 /api/*）===
+FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+
+    @app.get("/{path:path}")
+    async def serve_frontend(path: str):
+        # 不拦截 API 和 WebSocket 路径
+        if path.startswith("api/") or path.startswith("ws"):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+
 # === 路由依赖注入（必须放在 __name__ 守卫内） ===
 # 由于 backend/ 在 sys.path，__import__('main') 会导入自身，
 # 导致模块级代码递归执行产生两个 engine_runner 实例互相覆盖。
@@ -223,7 +241,8 @@ if __name__ == "__main__":
     import uvicorn
     print("=" * 50)
     print("  XAUUSD Web Dashboard Backend")
-    print("  API: http://localhost:8000/api")
-    print("  WS:  ws://localhost:8000/ws")
+    print("  API:  http://localhost:1783/api")
+    print("  Web:  http://localhost:1783  (frontend)")
+    print("  WS:   ws://localhost:1783/ws")
     print("=" * 50)
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(app, host="127.0.0.1", port=1783, reload=False)

@@ -12,7 +12,7 @@ echo.
 
 REM 清理残留进程
 echo [清理] 检查并清理残留进程...
-for /f "tokens=5" %%a in ('netstat -ano ^| find ":8000 " ^| find "LISTENING"') do (
+for /f "tokens=5" %%a in ('netstat -ano ^| find ":1783 " ^| find "LISTENING"') do (
     echo   发现后端进程 PID=%%a，正在终止...
     taskkill /F /PID %%a >nul 2>&1
 )
@@ -29,11 +29,11 @@ start "XAUUSD-Backend" /B python backend\main.py > backend.log 2>&1
 echo   Waiting for backend...
 :wait_backend
 timeout /t 3 /nobreak >nul
-curl -s http://localhost:8000/api/engine/status >nul 2>&1
+curl -s http://localhost:1783/api/engine/status >nul 2>&1
 if errorlevel 1 goto wait_backend
 
-echo   [OK] API:      http://localhost:8000/api
-echo        WebSocket: ws://localhost:8000/ws
+echo   [OK] API:      http://localhost:1783/api
+echo        WebSocket: ws://localhost:1783/ws
 echo.
 
 echo [2/3] 启动前端开发服务器...

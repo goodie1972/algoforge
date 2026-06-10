@@ -100,8 +100,8 @@ def main():
         print("  [FAIL] 后端启动失败")
         sys.exit(1)
     _print_output(backend, "backend")
-    if wait_for_port(8000):
-        print("  [OK] 后端 API: http://localhost:8000/api")
+    if wait_for_port(1783):
+        print("  [OK] 后端 API: http://localhost:1783/api")
     else:
         print("  [FAIL] 后端启动超时")
         _cleanup()

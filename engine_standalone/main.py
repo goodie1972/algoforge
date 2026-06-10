@@ -77,10 +77,12 @@ class StrategyRiskState:
     rapid_exit_blocked_at: float = 0.0
 
 
-def create_strategies(bridge):
+def create_strategies(bridge, pool=None):
     """从 STRATEGY_POOL 创建策略实例列表"""
+    if pool is None:
+        pool = settings.STRATEGY_POOL
     strategies = []
-    for name, cfg in settings.STRATEGY_POOL.items():
+    for name, cfg in pool.items():
         cls = STRATEGY_MAP.get(name)
         if cls is None:
             logger.warning(f"未知策略: {name}，跳过")
@@ -98,9 +100,11 @@ def create_strategies(bridge):
 class TradingEngine:
     """多策略交易引擎"""
 
-    def __init__(self):
+    def __init__(self, config_service=None):
+        self._config_service = config_service
         self.bridge = create_bridge()
-        self.strategies = create_strategies(self.bridge)
+        pool = self._get_strategy_pool()
+        self.strategies = create_strategies(self.bridge, pool)
         self._strategies_lock = threading.Lock()
         self.news_filter = NewsFilter()
         self.running = False
@@ -124,6 +128,50 @@ class TradingEngine:
         self._load_closed_trades()
         db.init_db()  # 确保所有表存在
         db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
+
+    # ── 运行时配置读取（RuntimeConfig 优先，settings.py 回退）────────
+
+    _RT_FALLBACK = {
+        "lot_size": "LOT_SIZE",
+        "stop_loss_pips": "STOP_LOSS_PIPS",
+        "take_profit_pips": "TAKE_PROFIT_PIPS",
+        "max_daily_loss_pct": "MAX_DAILY_LOSS_PCT",
+        "floating_loss_warn_pct": "FLOATING_LOSS_WARN_PCT",
+        "floating_loss_block_pct": "FLOATING_LOSS_BLOCK_PCT",
+        "per_strategy_realized_loss_pct": "PER_STRATEGY_REALIZED_LOSS_PCT",
+        "per_strategy_loss_block_hours": "PER_STRATEGY_LOSS_BLOCK_HOURS",
+        "max_rapid_exits": "MAX_RAPID_EXITS",
+        "rapid_exit_window_seconds": "RAPID_EXIT_WINDOW_SECONDS",
+        "rapid_exit_cooldown_seconds": "RAPID_EXIT_COOLDOWN_SECONDS",
+        "safety_lock_timeout_minutes": "SAFETY_LOCK_TIMEOUT_MINUTES",
+        "per_strategy_realized_loss_amount": "PER_STRATEGY_REALIZED_LOSS_AMOUNT",
+        "max_consecutive_losses": "MAX_CONSECUTIVE_LOSSES",
+        "consecutive_loss_cooldown_hours": "CONSECUTIVE_LOSS_COOLDOWN_HOURS",
+        "profit_exit_cooldown_hours": "PROFIT_EXIT_COOLDOWN_HOURS",
+    }
+
+    def _rt(self, key):
+        """读取运行时配置（RuntimeConfig 优先），回退到 settings.py"""
+        if self._config_service is not None:
+            val = self._config_service.get(key)
+            if val is not None:
+                return val
+        attr = self._RT_FALLBACK.get(key)
+        if attr and hasattr(settings, attr):
+            return getattr(settings, attr)
+        return None
+
+    def _get_strategy_pool(self):
+        """获取策略池，RuntimeConfig 覆盖优先"""
+        if self._config_service is not None:
+            return self._config_service.get_strategy_pool()
+        return dict(settings.STRATEGY_POOL)
+
+    def _get_coordinator(self):
+        """获取协调器配置，RuntimeConfig 覆盖优先"""
+        if self._config_service is not None:
+            return self._config_service.get_coordinator_config()
+        return dict(settings.COORDINATOR_CONFIG)
 
     @property
     def closed_trades(self) -> list[dict]:
@@ -371,16 +419,16 @@ class TradingEngine:
         now = time.time()
         state.exit_timestamps.append(now)
         # 清除窗口外的旧时间戳
-        while state.exit_timestamps and state.exit_timestamps[0] < now - settings.RAPID_EXIT_WINDOW_SECONDS:
+        while state.exit_timestamps and state.exit_timestamps[0] < now - self._rt('rapid_exit_window_seconds'):
             state.exit_timestamps.popleft()
 
-        if len(state.exit_timestamps) >= settings.MAX_RAPID_EXITS:
+        if len(state.exit_timestamps) >= self._rt('max_rapid_exits'):
             state.rapid_exit_blocked = True
             state.rapid_exit_blocked_at = now
             logger.error(
-                f"[{state.name}] 快速出场阻断: {settings.RAPID_EXIT_WINDOW_SECONDS//60}min 内 "
-                f"{len(state.exit_timestamps)} 次平仓（上限 {settings.MAX_RAPID_EXITS}），"
-                f"冷却 {settings.RAPID_EXIT_COOLDOWN_SECONDS//60}min"
+                f"[{state.name}] 快速出场阻断: {self._rt('rapid_exit_window_seconds')//60}min 内 "
+                f"{len(state.exit_timestamps)} 次平仓（上限 {self._rt('max_rapid_exits')}），"
+                f"冷却 {self._rt('rapid_exit_cooldown_seconds')//60}min"
             )
 
         # 连续亏损跟踪
@@ -388,14 +436,14 @@ class TradingEngine:
             state.consecutive_losses += 1
             logger.info(
                 f"[{state.name}] 连续亏损 {state.consecutive_losses} 次 "
-                f"（上限 {settings.MAX_CONSECUTIVE_LOSSES}）"
+                f"（上限 {self._rt('max_consecutive_losses')}）"
             )
-            if state.consecutive_losses >= settings.MAX_CONSECUTIVE_LOSSES and not state.consecutive_loss_blocked:
+            if state.consecutive_losses >= self._rt('max_consecutive_losses') and not state.consecutive_loss_blocked:
                 state.consecutive_loss_blocked = True
                 state.consecutive_loss_blocked_at = now
                 logger.error(
                     f"[{state.name}] 连续亏损 {state.consecutive_losses} 次，"
-                    f"冷却 {settings.CONSECUTIVE_LOSS_COOLDOWN_HOURS}h"
+                    f"冷却 {self._rt('consecutive_loss_cooldown_hours')}h"
                 )
         elif pnl > 0:
             state.consecutive_losses = 0
@@ -406,17 +454,17 @@ class TradingEngine:
                 self._profit_exit_cooldown[magic][direction] = time.time()
                 logger.info(
                     f"[止盈冷却] {state.name} {direction} 盈利 ${pnl:.2f}，"
-                    f"{settings.PROFIT_EXIT_COOLDOWN_HOURS}h 内不再开同向单"
+                    f"{self._rt('profit_exit_cooldown_hours')}h 内不再开同向单"
                 )
 
         # 绝对亏损阻断：已实现亏损 ≥$30 触发 12h 冷却
-        if state.realized_pnl <= -settings.PER_STRATEGY_REALIZED_LOSS_AMOUNT and not state.realized_loss_amount_blocked:
+        if state.realized_pnl <= -self._rt('per_strategy_realized_loss_amount') and not state.realized_loss_amount_blocked:
             state.realized_loss_amount_blocked = True
             state.realized_loss_amount_blocked_at = now
             logger.error(
                 f"[{state.name}] 已实现亏损 ${abs(state.realized_pnl):.2f} "
-                f"（≥${settings.PER_STRATEGY_REALIZED_LOSS_AMOUNT}），"
-                f"冷却 {settings.PER_STRATEGY_LOSS_BLOCK_HOURS}h"
+                f"（≥${self._rt('per_strategy_realized_loss_amount')}），"
+                f"冷却 {self._rt('per_strategy_loss_block_hours')}h"
             )
         # 亏损回正自动解除
         if state.realized_pnl > 0 and state.realized_loss_amount_blocked:
@@ -427,13 +475,13 @@ class TradingEngine:
         balance = self._get_balance()
         if balance > 0:
             loss_pct = abs(state.realized_pnl) / balance * 100
-            threshold = settings.PER_STRATEGY_REALIZED_LOSS_PCT
+            threshold = self._rt('per_strategy_realized_loss_pct')
             if state.realized_pnl < 0 and loss_pct >= threshold and not state.realized_loss_blocked:
                 state.realized_loss_blocked = True
                 state.realized_loss_blocked_at = now
                 logger.error(
                     f"[{state.name}] 已实现亏损 {loss_pct:.2f}%（≥{threshold}%），"
-                    f"该策略暂停开仓 {settings.PER_STRATEGY_LOSS_BLOCK_HOURS}h"
+                    f"该策略暂停开仓 {self._rt('per_strategy_loss_block_hours')}h"
                 )
 
     def _check_global_loss(self) -> bool:
@@ -449,11 +497,11 @@ class TradingEngine:
             return True
 
         loss_pct = (self._daily_start_balance - balance) / self._daily_start_balance * 100 if self._daily_start_balance else 0
-        if loss_pct >= settings.MAX_DAILY_LOSS_PCT:
+        if loss_pct >= self._rt('max_daily_loss_pct'):
             if not self._global_loss_blocked:
                 logger.error(
                     f"[全局硬止损] 已实现亏损 {loss_pct:.2f}% "
-                    f"（上限 {settings.MAX_DAILY_LOSS_PCT}%），全策略停开仓"
+                    f"（上限 {self._rt('max_daily_loss_pct')}%），全策略停开仓"
                 )
             self._global_loss_blocked = True
             return True
@@ -474,13 +522,13 @@ class TradingEngine:
         # 已实现亏损阻断 — 12h 自动解
         if state.realized_loss_blocked:
             elapsed = now - state.realized_loss_blocked_at
-            if elapsed >= settings.PER_STRATEGY_LOSS_BLOCK_HOURS * 3600:
+            if elapsed >= self._rt('per_strategy_loss_block_hours') * 3600:
                 state.realized_loss_blocked = False
                 logger.info(
                     f"[{state.name}] 已实现亏损阻断到期（{elapsed/3600:.1f}h），恢复开仓"
                 )
             else:
-                remain_h = (settings.PER_STRATEGY_LOSS_BLOCK_HOURS * 3600 - elapsed) / 3600
+                remain_h = (self._rt('per_strategy_loss_block_hours') * 3600 - elapsed) / 3600
                 return f"已实现亏损阻断，剩余 {remain_h:.1f}h"
 
         # 浮动亏损阻断 — 降到 10% 以下自动恢复
@@ -488,7 +536,7 @@ class TradingEngine:
             balance = self._get_balance()
             if balance > 0:
                 floating_pct = abs(state.floating_pnl) / balance * 100
-                if floating_pct < settings.FLOATING_LOSS_BLOCK_PCT:
+                if floating_pct < self._rt('floating_loss_block_pct'):
                     state.floating_loss_blocked = False
                     logger.info(
                         f"[{state.name}] 浮动亏损已降至 {floating_pct:.2f}%，恢复开仓"
@@ -499,37 +547,37 @@ class TradingEngine:
         # 绝对亏损阻断 — 12h 自动解
         if state.realized_loss_amount_blocked:
             elapsed = now - state.realized_loss_amount_blocked_at
-            if elapsed >= settings.PER_STRATEGY_LOSS_BLOCK_HOURS * 3600:
+            if elapsed >= self._rt('per_strategy_loss_block_hours') * 3600:
                 state.realized_loss_amount_blocked = False
                 logger.info(
                     f"[{state.name}] 绝对亏损冷却到期（{elapsed/3600:.1f}h），恢复开仓"
                 )
             else:
-                remain_h = (settings.PER_STRATEGY_LOSS_BLOCK_HOURS * 3600 - elapsed) / 3600
+                remain_h = (self._rt('per_strategy_loss_block_hours') * 3600 - elapsed) / 3600
                 return f"绝对亏损冷却，剩余 {remain_h:.1f}h"
 
         # 连续亏损阻断 — 4h 自动解
         if state.consecutive_loss_blocked:
             elapsed = now - state.consecutive_loss_blocked_at
-            if elapsed >= settings.CONSECUTIVE_LOSS_COOLDOWN_HOURS * 3600:
+            if elapsed >= self._rt('consecutive_loss_cooldown_hours') * 3600:
                 state.consecutive_loss_blocked = False
                 logger.info(
                     f"[{state.name}] 连续亏损冷却到期（{elapsed/3600:.1f}h），恢复开仓"
                 )
             else:
-                remain_h = (settings.CONSECUTIVE_LOSS_COOLDOWN_HOURS * 3600 - elapsed) / 3600
+                remain_h = (self._rt('consecutive_loss_cooldown_hours') * 3600 - elapsed) / 3600
                 return f"连续亏损冷却，剩余 {remain_h:.1f}h"
 
         # 快速出场阻断 — 2h 自动解
         if state.rapid_exit_blocked:
             elapsed = now - state.rapid_exit_blocked_at
-            if elapsed >= settings.RAPID_EXIT_COOLDOWN_SECONDS:
+            if elapsed >= self._rt('rapid_exit_cooldown_seconds'):
                 state.rapid_exit_blocked = False
                 logger.info(
                     f"[{state.name}] 快速出场冷却到期（{elapsed/60:.0f}min），恢复开仓"
                 )
             else:
-                remain_m = (settings.RAPID_EXIT_COOLDOWN_SECONDS - elapsed) / 60
+                remain_m = (self._rt('rapid_exit_cooldown_seconds') - elapsed) / 60
                 return f"快速出场阻断，剩余 {remain_m:.0f}min"
 
         return None
@@ -537,7 +585,7 @@ class TradingEngine:
     def start(self):
         logger.info("=" * 60)
         logger.info("XAUUSD 多策略交易系统 启动")
-        logger.info(f"品种: {settings.SYMBOL} | 手数: {settings.LOT_SIZE}")
+        logger.info(f"品种: {settings.SYMBOL} | 手数: {self._rt('lot_size')}")
         for s in self.strategies:
             logger.info(f"  策略: {s.name} | Magic={s.magic} | TF={s.timeframe} | "
                         f"双倍首单={s.double_first} | 最大仓位={s.max_positions}")
@@ -735,11 +783,7 @@ class TradingEngine:
 
     def _coordinated_exits(self, snapshot: list):
         """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""
-        try:
-            coord = settings.COORDINATOR_CONFIG
-        except AttributeError:
-            return
-
+        coord = self._get_coordinator()
         if not coord.get("enabled", False) or not coord.get("cross_exit_enabled", False):
             return
 
@@ -753,7 +797,7 @@ class TradingEngine:
         # 策略名 → magic 映射
         signal_magic = None
         target_magics: set[int] = set()
-        for name, cfg in settings.STRATEGY_POOL.items():
+        for name, cfg in self._get_strategy_pool().items():
             if name == signal_name:
                 signal_magic = cfg["magic"]
             if name in target_names:
@@ -817,11 +861,7 @@ class TradingEngine:
 
     def _check_trend_reverse_tp(self):
         """M15/M5 反向止盈：短周期趋势反转时平盈利单"""
-        try:
-            coord = settings.COORDINATOR_CONFIG
-        except AttributeError:
-            return
-
+        coord = self._get_coordinator()
         if not coord.get("enabled", False):
             return
 
@@ -844,7 +884,7 @@ class TradingEngine:
 
         # 策略名 → magic 映射
         strategy_names = {}
-        for name, cfg in settings.STRATEGY_POOL.items():
+        for name, cfg in self._get_strategy_pool().items():
             strategy_names[cfg["magic"]] = name
 
         closed_this_tick: set[int] = set()  # 防止同 tick 重复平仓
@@ -859,9 +899,9 @@ class TradingEngine:
             if not candles or len(candles) < count:
                 continue
 
-            closes = [c.close for c in candles]
+            closes = [c.close for c in candles[:-1]]  # 排除当前未完成 bar
 
-            # 计算 EMA20 斜率（最近 3 根）
+            # 计算 EMA20 斜率（最近 3 根，仅已收盘 bar）
             k = 2.0 / 21
             ema = closes[0]
             ema_values = [ema]
@@ -921,19 +961,19 @@ class TradingEngine:
             loss_pct = abs(state.floating_pnl) / balance * 100
 
             # 阻断线
-            if loss_pct >= settings.FLOATING_LOSS_BLOCK_PCT:
+            if loss_pct >= self._rt('floating_loss_block_pct'):
                 if not state.floating_loss_blocked:
                     logger.warning(
                         f"[{state.name}] 浮动亏损 {loss_pct:.2f}% >= "
-                        f"{settings.FLOATING_LOSS_BLOCK_PCT}%，阻断开仓"
+                        f"{self._rt('floating_loss_block_pct')}%，阻断开仓"
                     )
                 state.floating_loss_blocked = True
             # 警告线
-            elif loss_pct >= settings.FLOATING_LOSS_WARN_PCT:
+            elif loss_pct >= self._rt('floating_loss_warn_pct'):
                 if not state.floating_loss_blocked:
                     logger.info(
                         f"[{state.name}] 浮动亏损 {loss_pct:.2f}% >= "
-                        f"{settings.FLOATING_LOSS_WARN_PCT}%（仅警告，不阻断）"
+                        f"{self._rt('floating_loss_warn_pct')}%（仅警告，不阻断）"
                     )
 
     def _run_exits(self, strategy):
@@ -955,10 +995,10 @@ class TradingEngine:
             hold_sec = now - self._entry_times.get(pos.ticket, now)
             if pos.order_type in ("OP_BUY", "BUY"):
                 exit_price = bid
-                pnl = (bid - entry) * settings.LOT_SIZE * 100
+                pnl = (bid - entry) * self._rt('lot_size') * 100
             else:
                 exit_price = ask
-                pnl = (entry - ask) * settings.LOT_SIZE * 100
+                pnl = (entry - ask) * self._rt('lot_size') * 100
 
             logger.info(
                 f"[平仓试算] Ticket={pos.ticket} {pos.order_type} "
@@ -1052,10 +1092,10 @@ class TradingEngine:
         try:
             if os.path.exists(SAFETY_LOCK_FILE):
                 mtime = os.path.getmtime(SAFETY_LOCK_FILE)
-                timeout = settings.SAFETY_LOCK_TIMEOUT_MINUTES * 60
+                timeout = self._rt('safety_lock_timeout_minutes') * 60
                 if time.time() - mtime > timeout:
                     os.remove(SAFETY_LOCK_FILE)
-                    logger.info(f"[安全锁] 已自动清除（超过 {settings.SAFETY_LOCK_TIMEOUT_MINUTES}min）")
+                    logger.info(f"[安全锁] 已自动清除（超过 {self._rt('safety_lock_timeout_minutes')}min）")
                     return False
                 return True
         except OSError:
@@ -1097,7 +1137,7 @@ class TradingEngine:
         cool = self._profit_exit_cooldown.get(strategy.magic, {})
         if signal_dir in cool:
             elapsed = time.time() - cool[signal_dir]
-            cooldown_sec = settings.PROFIT_EXIT_COOLDOWN_HOURS * 3600
+            cooldown_sec = self._rt('profit_exit_cooldown_hours') * 3600
             if elapsed < cooldown_sec:
                 remain_h = (cooldown_sec - elapsed) / 3600
                 logger.info(f"[{strategy.name}] {signal_dir} 止盈冷却中（剩余 {remain_h:.1f}h），跳过开仓")
@@ -1144,16 +1184,16 @@ class TradingEngine:
         if hasattr(strategy, 'get_dynamic_sl_tp'):
             sl, tp = strategy.get_dynamic_sl_tp(OrderType.BUY, ask)
             if sl is None or tp is None:
-                sl = ask - settings.STOP_LOSS_PIPS * 0.01
-                tp = ask + settings.TAKE_PROFIT_PIPS * 0.01
+                sl = ask - self._rt('stop_loss_pips') * 0.01
+                tp = ask + self._rt('take_profit_pips') * 0.01
         else:
-            sl = ask - settings.STOP_LOSS_PIPS * 0.01
-            tp = ask + settings.TAKE_PROFIT_PIPS * 0.01
+            sl = ask - self._rt('stop_loss_pips') * 0.01
+            tp = ask + self._rt('take_profit_pips') * 0.01
 
         ticket = self.bridge.open_order(
             symbol=settings.SYMBOL,
             order_type=OrderType.BUY,
-            volume=settings.LOT_SIZE,
+            volume=self._rt('lot_size'),
             price=ask,
             sl=sl,
             tp=tp,
@@ -1163,7 +1203,7 @@ class TradingEngine:
         if ticket:
             self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
             logger.info(f"[{strategy.name}] 开多仓 Magic={strategy.magic} "
-                        f"{settings.LOT_SIZE}手 @ {ask:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
+                        f"{self._rt('lot_size')}手 @ {ask:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
@@ -1173,16 +1213,16 @@ class TradingEngine:
         if hasattr(strategy, 'get_dynamic_sl_tp'):
             sl, tp = strategy.get_dynamic_sl_tp(OrderType.SELL, bid)
             if sl is None or tp is None:
-                sl = bid + settings.STOP_LOSS_PIPS * 0.01
-                tp = bid - settings.TAKE_PROFIT_PIPS * 0.01
+                sl = bid + self._rt('stop_loss_pips') * 0.01
+                tp = bid - self._rt('take_profit_pips') * 0.01
         else:
-            sl = bid + settings.STOP_LOSS_PIPS * 0.01
-            tp = bid - settings.TAKE_PROFIT_PIPS * 0.01
+            sl = bid + self._rt('stop_loss_pips') * 0.01
+            tp = bid - self._rt('take_profit_pips') * 0.01
 
         ticket = self.bridge.open_order(
             symbol=settings.SYMBOL,
             order_type=OrderType.SELL,
-            volume=settings.LOT_SIZE,
+            volume=self._rt('lot_size'),
             price=bid,
             sl=sl,
             tp=tp,
@@ -1192,7 +1232,7 @@ class TradingEngine:
         if ticket:
             self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
             logger.info(f"[{strategy.name}] 开空仓 Magic={strategy.magic} "
-                        f"{settings.LOT_SIZE}手 @ {bid:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
+                        f"{self._rt('lot_size')}手 @ {bid:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
@@ -1236,10 +1276,10 @@ class TradingEngine:
         for pos in my_positions:
             entry = pos.open_price
             if pos.order_type in ("OP_BUY", "BUY"):
-                pnl = (bid - entry) * settings.LOT_SIZE * 100
+                pnl = (bid - entry) * self._rt('lot_size') * 100
                 exit_price = bid
             else:
-                pnl = (entry - ask) * settings.LOT_SIZE * 100
+                pnl = (entry - ask) * self._rt('lot_size') * 100
                 exit_price = ask
             logger.warning(
                 f"[新闻风控] 强制平仓 Ticket={pos.ticket} {pos.order_type} "
@@ -1323,7 +1363,7 @@ class TradingEngine:
             for s in self.strategies:
                 active_tfs.add(s.timeframe)
         # 协调器反向止盈需要的短周期
-        coord = getattr(settings, 'COORDINATOR_CONFIG', {})
+        coord = self._get_coordinator()
         if coord.get("m15_reverse_tp_enabled", False):
             active_tfs.add("M15")
         if coord.get("m5_reverse_tp_enabled", False):

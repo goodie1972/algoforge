@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { darkTheme, NIcon } from 'naive-ui'
 import {
   AnalyticsOutline, WalletOutline, SettingsOutline, DocumentTextOutline,
-  BarChartOutline, PowerOutline, PlayOutline, StopOutline, TimeOutline,
+  BarChartOutline, PowerOutline, PlayOutline, StopOutline,
   ReaderOutline,
 } from '@vicons/ionicons5'
 import { useAccountStore } from '@/stores/account'
@@ -25,6 +25,13 @@ const logStore = useLogStore()
 const patrolStore = usePatrolStore()
 
 const engineStatus = ref<'running' | 'stopped'>('stopped')
+const wsPulse = ref(false)
+let pulseTimer: ReturnType<typeof setTimeout> | null = null
+function triggerPulse() {
+  wsPulse.value = true
+  if (pulseTimer) clearTimeout(pulseTimer)
+  pulseTimer = setTimeout(() => { wsPulse.value = false }, 400)
+}
 const collapsed = ref(false)
 
 function renderIcon(icon: any) {
@@ -35,7 +42,6 @@ const menuOptions = [
   { label: '交易终端', key: '/', icon: renderIcon(AnalyticsOutline) },
   { label: '账户持仓', key: '/positions', icon: renderIcon(WalletOutline) },
   { label: '策略中心', key: '/strategies', icon: renderIcon(BarChartOutline) },
-  { label: '监控告警', key: '/patrol', icon: renderIcon(TimeOutline) },
   { label: '历史成交', key: '/trades', icon: renderIcon(ReaderOutline) },
   { label: '运行配置', key: '/config', icon: renderIcon(SettingsOutline) },
   { label: '系统日志', key: '/logs', icon: renderIcon(DocumentTextOutline) },
@@ -61,8 +67,8 @@ onMounted(() => {
   logStore.fetchHistory()
 
   wsClient.connect()
-  wsClient.on('prices', (msg) => priceStore.updateTick(msg.data.bid, msg.data.ask))
-  wsClient.on('positions', (msg) => positionStore.updateFromWs(msg.data))
+  wsClient.on('prices', (msg) => { priceStore.updateTick(msg.data.bid, msg.data.ask); triggerPulse() })
+  wsClient.on('positions', (msg) => { positionStore.updateFromWs(msg.data); triggerPulse() })
   wsClient.on('account', (msg) => accountStore.updateFromWs(msg.data))
   wsClient.on('logs', (msg) => logStore.append(msg.data))
   wsClient.on('status', (msg) => {
@@ -98,18 +104,6 @@ onUnmounted(() => {
                 <n-text v-if="!collapsed" depth="3" style="font-size: 11px;">量化交易仪表盘</n-text>
               </div>
 
-              <!-- 引擎状态指示器 -->
-              <div style="padding: 8px 16px 12px; display: flex; align-items: center; gap: 8px;"
-                   :style="collapsed ? 'justify-content:center;' : ''">
-                <n-badge :type="engineStatus === 'running' ? 'success' : 'default'" dot />
-                <n-text v-if="!collapsed" depth="3" style="font-size: 12px;">
-                  {{ engineStatus === 'running' ? '引擎运行中' : '引擎已停止' }}
-                </n-text>
-              </div>
-
-              <!-- 监控状态 -->
-              <PatrolIndicator v-if="!collapsed" />
-
               <n-menu :value="route.path" :options="menuOptions" :collapsed="collapsed"
                       :collapsed-width="64" :collapsed-icon-size="22"
                       @update:value="handleMenuUpdate" />
@@ -128,8 +122,10 @@ onUnmounted(() => {
                   <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'strategies' ? '策略' : route.name === 'logs' ? '日志' : route.name === 'patrol' ? '监控' : '仪表板' }}</n-breadcrumb-item>
                 </n-breadcrumb>
                 <div style="flex:1;"></div>
+                <PatrolIndicator />
                 <n-tag :type="engineStatus === 'running' ? 'success' : 'default'" size="small" :bordered="false">
-                  {{ engineStatus === 'running' ? '● 运行中' : '○ 已停止' }}
+                  <span class="status-dot" :class="{ 'pulse-flash': wsPulse }" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:4px;vertical-align:middle;transition:box-shadow .15s;"></span>
+                  {{ engineStatus === 'running' ? '运行中' : '已停止' }}
                 </n-tag>
               </n-layout-header>
 
@@ -145,3 +141,9 @@ onUnmounted(() => {
     </n-message-provider>
   </n-config-provider>
 </template>
+
+<style scoped>
+.status-dot.pulse-flash {
+  box-shadow: 0 0 8px 3px rgba(34,197,94,.8);
+}
+</style>

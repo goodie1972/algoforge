@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePriceStore } from '@/stores/prices'
+import { useFlashOnChange } from '@/composables/useFlashOnChange'
 import { createChart, ColorType, type UTCTimestamp } from 'lightweight-charts'
 import {
   calcEMA, calcSMA, calcBollinger, calcRSI, calcStoch,
@@ -51,11 +52,11 @@ const tfIndicatorPresets: Record<string, Record<string, boolean>> = {
 }
 
 function getRefreshInterval(tf: string): number {
-  if (tf === 'M1') return 15_000
-  if (tf === 'M5' || tf === 'M15') return 30_000
-  if (tf === 'M30' || tf === 'H1') return 30_000
-  if (tf === 'H4') return 60_000
-  return 120_000 // D1, W1
+  if (tf === 'M1') return 5_000
+  if (tf === 'M5' || tf === 'M15') return 10_000
+  if (tf === 'M30' || tf === 'H1') return 10_000
+  if (tf === 'H4') return 30_000
+  return 60_000 // D1, W1
 }
 
 function stopAutoRefresh() {
@@ -220,6 +221,47 @@ onUnmounted(() => {
   stopAutoRefresh()
   chart?.remove()
   Object.values(paneCharts).forEach(pc => pc.remove())
+})
+
+// 数值闪烁 — 内联实现，直接 watch store
+const bidFlash = ref(false)
+let _bTimer: any = null
+let _bLast = store.bid
+watch(() => store.bid, (n) => {
+  if (Math.abs(n - _bLast) < 0.01) return
+  _bLast = n
+  bidFlash.value = true
+  if (_bTimer) clearTimeout(_bTimer)
+  _bTimer = setTimeout(() => { bidFlash.value = false }, 600)
+})
+
+const askFlash = ref(false)
+let _aTimer: any = null
+let _aLast = store.ask
+watch(() => store.ask, (n) => {
+  if (Math.abs(n - _aLast) < 0.01) return
+  _aLast = n
+  askFlash.value = true
+  if (_aTimer) clearTimeout(_aTimer)
+  _aTimer = setTimeout(() => { askFlash.value = false }, 600)
+})
+
+const spreadFlash = ref(false)
+let _sTimer: any = null
+let _sLast = store.spread
+watch(() => store.spread, (n) => {
+  if (Math.abs(n - _sLast) < 0.01) return
+  _sLast = n
+  spreadFlash.value = true
+  if (_sTimer) clearTimeout(_sTimer)
+  _sTimer = setTimeout(() => { spreadFlash.value = false }, 600)
+})
+
+// K 线实时跳动：每个 WebSocket tick 更新当前 bar 的 close，不等 10s 定时器
+watch(() => store.midPrice, (price) => {
+  if (!candleSeries || price <= 0) return
+  const lastTime = (store.candles[store.candles.length - 1]?.time || 0) as UTCTimestamp
+  candleSeries.update({ time: lastTime, close: price })
 })
 
 function getCandleData(): CandleData[] {
@@ -631,9 +673,9 @@ function clearAllPanes() {
 
     <!-- 实时价格栏 -->
     <n-grid :cols="4" :x-gap="16" style="margin-bottom: 6px;">
-      <n-gi><n-text depth="3" style="font-size:12px;">买价</n-text> <span class="price-up" style="font-size:13px;"><strong>{{ store.bid.toFixed(2) }}</strong></span></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">卖价</n-text> <span class="price-down" style="font-size:13px;"><strong>{{ store.ask.toFixed(2) }}</strong></span></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">点差</n-text> <strong style="font-size:13px;">{{ store.spread.toFixed(2) }}</strong></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">买价</n-text> <span class="price-up" :class="{ 'flash-num': bidFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.bid.toFixed(2) }}</strong></span></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">卖价</n-text> <span class="price-down" :class="{ 'flash-num': askFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.ask.toFixed(2) }}</strong></span></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">点差</n-text> <strong :class="{ 'flash-num': spreadFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">{{ store.spread.toFixed(2) }}</strong></n-gi>
       <n-gi><n-text depth="3" style="font-size:12px;">中间价</n-text> <span class="price-gold" style="font-size:13px;"><strong>{{ store.midPrice.toFixed(2) }}</strong></span></n-gi>
     </n-grid>
 

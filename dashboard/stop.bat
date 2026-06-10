@@ -11,7 +11,7 @@ echo.
 
 REM 停止后端 FastAPI (port 8000)
 echo [1/2] 停止后端 API...
-for /f "tokens=5" %%a in ('netstat -ano ^| find ":8000 " ^| find "LISTENING"') do (
+for /f "tokens=5" %%a in ('netstat -ano ^| find ":1783 " ^| find "LISTENING"') do (
     echo   发现 PID=%%a (backend)，正在终止...
     taskkill /F /PID %%a >nul 2>&1 && echo   [OK] 后端已停止 || echo   [!] 后端停止失败
     goto :check_backend_done
