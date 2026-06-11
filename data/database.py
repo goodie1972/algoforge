@@ -133,6 +133,17 @@ CREATE TABLE IF NOT EXISTS metadata (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS strategy_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategy_name TEXT NOT NULL,
+    magic INTEGER NOT NULL,
+    version TEXT NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sv_magic ON strategy_versions(magic);
 """
 
 
@@ -649,6 +660,50 @@ def set_metadata(key: str, value: str) -> int:
         return 1
     except Exception:
         return 0
+    finally:
+        conn.close()
+
+
+# ── Strategy Versions ───────────────────────────────────
+
+def upsert_strategy_version(magic: int, strategy_name: str, version: str,
+                             date: str, description: str) -> int:
+    """写入或更新策略版本记录（以 magic 为唯一键）"""
+    conn = get_conn()
+    try:
+        conn.execute(
+            """INSERT INTO strategy_versions (strategy_name, magic, version, date, description)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(magic) DO UPDATE SET
+                 strategy_name=excluded.strategy_name,
+                 version=excluded.version,
+                 date=excluded.date,
+                 description=excluded.description""",
+            (strategy_name, magic, version, date, description),
+        )
+        conn.commit()
+        return 1
+    except Exception as e:
+        logger.warning(f"[DB] 写入策略版本失败 magic={magic}: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_strategy_versions(strategy_name: str = None) -> list[dict]:
+    """获取策略版本历史记录"""
+    conn = get_conn()
+    try:
+        if strategy_name:
+            rows = conn.execute(
+                "SELECT * FROM strategy_versions WHERE strategy_name=? ORDER BY magic",
+                (strategy_name,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM strategy_versions ORDER BY strategy_name, magic"
+            ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 

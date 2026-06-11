@@ -19,15 +19,14 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v6"
-STRATEGY_MAGIC = 880306
+STRATEGY_VERSION = "v5"
+STRATEGY_MAGIC = 880305
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 880301, "date": "2026-06-08", "desc": "初始上线：4因子共识投票，ATR跟踪止损 trail=3.5 hard=2.0"},
     {"version": "v2", "magic": 880302, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
     {"version": "v3", "magic": 880303, "date": "2026-06-09", "desc": "双重止盈：trail=1.0 hard=2.0，新增 profit_drawdown_pct=0.25，新增 indicator_values 返回"},
     {"version": "v4", "magic": 880304, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控"},
     {"version": "v5", "magic": 880305, "date": "2026-06-11", "desc": "SAFE-DN改为RSI≤35独立封空，防止接近超卖区开空"},
-    {"version": "v6", "magic": 880306, "date": "2026-06-11", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
 ]
 
 
@@ -39,7 +38,6 @@ class GoldAutoResearchStrategy(BaseStrategy):
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
-        self._last_exit_detail: Optional[dict] = None
         self._cached_atr_values: Optional[list[float]] = None
         self._cached_atr_key: int = 0
         self._cached_adx: Optional[dict] = None
@@ -314,32 +312,13 @@ class GoldAutoResearchStrategy(BaseStrategy):
                 if rsi_val <= 35:
                     safe_dn = False
 
-        # ── ⑤ Position gate: 极端位置不做逆势交易 ──
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10:
-            safe_dn = False  # 区间底部 10% 禁止开空
-            short_factors_extra = "BOTTOM-GATE"
-        else:
-            short_factors_extra = None
-        if price_position > 0.90:
-            safe_up = False  # 区间顶部 10% 禁止开多
-            long_factors_extra = "TOP-GATE"
-        else:
-            long_factors_extra = None
-
         # ── Consensus ──
         logger.info(
             f"[{self.name}] Trend={'UP' if trend_up else 'DOWN'} "
             f"Mom={'UP' if mom_up else 'DOWN'} "
             f"Vol={'ACTIVE' if vol_active else 'QUIET'} "
             f"RSI={rsi_val:.1f} ADX={adx_val} "
-            f"Price={close:.2f} Pos={price_position:.1%} "
-            f"EMA10={ema10:.2f} EMA20={ema20:.2f}"
+            f"Price={close:.2f} EMA10={ema10:.2f} EMA20={ema20:.2f}"
         )
 
         indicator_values = {
@@ -353,8 +332,6 @@ class GoldAutoResearchStrategy(BaseStrategy):
             "rsi": round(rsi_val, 2) if rsi_val else 0,
             "bb_mid": round(bb_mid, 2) if bb_mid else 0,
             "bb_std": round(bb_std, 2) if bb_std else 0,
-            "price_position": round(price_position, 3),
-            "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
         }
 
         long_factors = []
@@ -362,16 +339,12 @@ class GoldAutoResearchStrategy(BaseStrategy):
         if mom_up: long_factors.append("MOM-UP")
         if vol_active: long_factors.append("VOL-ACTIVE")
         if safe_up: long_factors.append("SAFE-UP")
-        if long_factors_extra:
-            long_factors.append(long_factors_extra)
 
         short_factors = []
         if trend_dn: short_factors.append("TREND-DN")
         if mom_dn: short_factors.append("MOM-DN")
         if vol_active: short_factors.append("VOL-ACTIVE")
         if safe_dn: short_factors.append("SAFE-DN")
-        if short_factors_extra:
-            short_factors.append(short_factors_extra)
 
         signal = None
         if trend_up and mom_up and vol_active and safe_up:
@@ -458,20 +431,17 @@ class GoldAutoResearchStrategy(BaseStrategy):
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
                 drawdown = td["highest"] - bid
                 if drawdown > atr_val * trail_mult:
                     logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
                 # 亏损 → 只走硬止损
                 if loss > atr_val * hard_mult:
                     logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
         else:
@@ -487,22 +457,18 @@ class GoldAutoResearchStrategy(BaseStrategy):
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
                 rally = ask - td["lowest"]
                 if rally > atr_val * trail_mult:
                     logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
                 # 亏损 → 只走硬止损
                 if loss > atr_val * hard_mult:
                     logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
 
-        self._last_exit_detail = None
         return False

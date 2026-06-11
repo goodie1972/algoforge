@@ -38,7 +38,6 @@ class M30RSIStrategy(BaseStrategy):
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
-        self._last_exit_detail: Optional[dict] = None
 
         # Entry params (from optimization)
         self.rsi_oversold = 30
@@ -366,20 +365,17 @@ class M30RSIStrategy(BaseStrategy):
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
                 drawdown = td["highest"] - bid
                 if drawdown > atr_val * trail_mult:
                     logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
                 # 亏损 → 只走硬止损
                 if loss > atr_val * hard_mult:
                     logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
         else:
@@ -395,22 +391,18 @@ class M30RSIStrategy(BaseStrategy):
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
                 rally = ask - td["lowest"]
                 if rally > atr_val * trail_mult:
                     logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
                 # 亏损 → 只走硬止损
                 if loss > atr_val * hard_mult:
                     logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
 
-        self._last_exit_detail = None
         return False
