@@ -53,7 +53,7 @@ if not logging.getLogger().handlers:
     )
 logger = logging.getLogger(__name__)
 
-SAFETY_LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "safety_lock.txt")
+SAFETY_LOCK_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "safety_lock.txt")
 MIN_HOLD_SECONDS = 30  # 持仓小于此时间被平仓视为可疑
 
 
