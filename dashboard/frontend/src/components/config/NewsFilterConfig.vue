@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted, watch } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { getNewsCalendar } from '@/api/client'
+import { useMessage } from 'naive-ui'
 
 const store = useConfigStore()
+const message = useMessage()
 
-const params = computed(() => ({
+const local = reactive({
+  news_filter_enabled: store.items.news_filter_enabled ?? true,
+  news_before_minutes: store.items.news_before_minutes ?? 30,
+  news_after_minutes: store.items.news_after_minutes ?? 30,
+  news_impact_filter: store.items.news_impact_filter ?? 'High',
+  news_currency_filter: store.items.news_currency_filter ?? 'USD',
+})
+
+const original = computed(() => ({
   news_filter_enabled: store.items.news_filter_enabled ?? true,
   news_before_minutes: store.items.news_before_minutes ?? 30,
   news_after_minutes: store.items.news_after_minutes ?? 30,
@@ -13,8 +23,22 @@ const params = computed(() => ({
   news_currency_filter: store.items.news_currency_filter ?? 'USD',
 }))
 
-async function update(updates: Record<string, any>) {
-  await store.update(updates)
+const changed = computed(() => JSON.stringify(local) !== JSON.stringify(original.value))
+
+// 同步外部 store 变化到本地（如其他组件修改时）
+watch(() => store.items, () => {
+  Object.assign(local, {
+    news_filter_enabled: store.items.news_filter_enabled ?? true,
+    news_before_minutes: store.items.news_before_minutes ?? 30,
+    news_after_minutes: store.items.news_after_minutes ?? 30,
+    news_impact_filter: store.items.news_impact_filter ?? 'High',
+    news_currency_filter: store.items.news_currency_filter ?? 'USD',
+  })
+}, { deep: true })
+
+async function save() {
+  await store.update({ ...local })
+  message.success('新闻配置已保存')
 }
 
 const calendar = ref<any>(null)
@@ -45,25 +69,29 @@ const impactOptions = [
     <n-grid-item>
       <n-space vertical size="medium">
         <n-form-item label="启用新闻过滤">
-          <n-switch :value="params.news_filter_enabled"
-            @update:value="(v: boolean) => update({ news_filter_enabled: v })" />
+          <n-switch :value="local.news_filter_enabled"
+            @update:value="(v: boolean) => local.news_filter_enabled = v" />
         </n-form-item>
 
         <n-divider title-position="left">禁售时间窗口</n-divider>
 
         <n-form-item label="发布前 (分钟)">
-          <n-input-number :value="params.news_before_minutes" :min="0" :max="120"
-            @update:value="(v: any) => v !== null && update({ news_before_minutes: v })"
+          <n-input-number :value="local.news_before_minutes" :min="0" :max="999"
+            @update:value="(v: any) => v !== null && (local.news_before_minutes = v)"
             style="width:100%;" />
           <template #feedback>数据发布前 N 分钟停止开新仓</template>
         </n-form-item>
 
         <n-form-item label="发布后 (分钟)">
-          <n-input-number :value="params.news_after_minutes" :min="0" :max="120"
-            @update:value="(v: any) => v !== null && update({ news_after_minutes: v })"
+          <n-input-number :value="local.news_after_minutes" :min="0" :max="999"
+            @update:value="(v: any) => v !== null && (local.news_after_minutes = v)"
             style="width:100%;" />
           <template #feedback>数据发布后 N 分钟恢复交易</template>
         </n-form-item>
+
+        <n-button type="primary" :disabled="!changed" @click="save" block>
+          保存新闻配置
+        </n-button>
       </n-space>
     </n-grid-item>
 
@@ -73,13 +101,13 @@ const impactOptions = [
         <n-divider title-position="left">事件筛选</n-divider>
 
         <n-form-item label="影响级别">
-          <n-select :value="params.news_impact_filter" :options="impactOptions"
-            @update:value="(v: string) => update({ news_impact_filter: v })" />
+          <n-select :value="local.news_impact_filter" :options="impactOptions"
+            @update:value="(v: string) => local.news_impact_filter = v" />
         </n-form-item>
 
         <n-form-item label="关注货币">
-          <n-input :value="params.news_currency_filter"
-            @update:value="(v: string) => update({ news_currency_filter: v })"
+          <n-input :value="local.news_currency_filter"
+            @update:value="(v: string) => local.news_currency_filter = v"
             style="width:100%;" />
           <template #feedback>默认 USD，多个用逗号分隔</template>
         </n-form-item>

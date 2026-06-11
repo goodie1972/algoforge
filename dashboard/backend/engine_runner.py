@@ -268,6 +268,9 @@ class EngineRunner:
         # 暴露 bridge 供 Dashboard WebSocket 轮询使用
         self.bridge = engine.bridge
 
+        # 校准 MT4 服务器时间 vs 本机 UTC
+        engine._calibrate_mt4_time()
+
         # 初始化策略风控状态
         for s in engine.strategies:
             engine._init_risk_state(s.name, s.magic)

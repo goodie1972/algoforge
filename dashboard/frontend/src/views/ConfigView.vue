@@ -23,7 +23,7 @@ async function resetAll() {
 <template>
   <n-space vertical size="large">
     <n-h2>运行时配置</n-h2>
-    <n-text depth="3">修改后自动保存，引擎将在下一个 tick 周期（约 60 秒内）自动生效</n-text>
+    <n-text depth="3">修改后点击"保存"按钮提交，引擎将在下一个 tick 周期（约 60 秒内）自动生效</n-text>
 
     <n-spin v-if="store.loading" style="padding: 40px;" />
     <n-alert v-else-if="store.error" type="error" :title="store.error" closable />

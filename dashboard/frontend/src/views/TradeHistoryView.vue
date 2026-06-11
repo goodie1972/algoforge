@@ -3,11 +3,23 @@ import { h, ref, computed, onMounted, watch, reactive } from 'vue'
 import { useTradeStore } from '@/stores/trades'
 import { getTradeStats, getTradeAnalysis } from '@/api/client'
 import type { TradeStats } from '@/types'
-import { NTag, NButton, NDataTable, NEmpty, NSkeleton, NAlert, NSpace, NTabs, NTabPane, NGrid, NGi, NStatistic, NCard, NSelect, NDatePicker, NIcon, NSpin } from 'naive-ui'
+import { NTag, NButton, NDataTable, NEmpty, NSkeleton, NAlert, NSpace, NTabs, NTabPane, NGrid, NGi, NStatistic, NCard, NSelect, NDatePicker, NIcon, NSpin, NInput } from 'naive-ui'
 
 const store = useTradeStore()
 const refreshLoading = ref(false)
 const activeTab = ref('history')
+
+// ── 搜索过滤 ──
+const searchQuery = ref('')
+const filteredData = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return store.items
+  return store.items.filter((t: any) =>
+    (t.strategy && t.strategy.toLowerCase().includes(q)) ||
+    (t.magic && t.magic.toString().includes(q)) ||
+    (t.ticket && t.ticket.toString().includes(q))
+  )
+})
 
 // ── 成交明细标签页（原代码）────────────────────────────
 
@@ -99,8 +111,8 @@ const columns = [
     width: 40,
     renderExpand: (row: any) => renderAnalysis(row),
   },
-  { title: 'Ticket', key: 'ticket', width: 80 },
-  { title: '策略', key: 'strategy', width: 100,
+  { title: 'Ticket', key: 'ticket', width: 80, sortable: true, sorter: (a: any, b: any) => a.ticket - b.ticket },
+  { title: '策略', key: 'strategy', width: 100, sortable: true,
     render(row: any) {
       return h(NTag, { size: 'small', type: row.strategy?.includes('stoch') ? 'info' : 'warning' },
         { default: () => row.strategy }
@@ -108,7 +120,7 @@ const columns = [
     }
   },
   {
-    title: '方向', key: 'order_type', width: 70,
+    title: '方向', key: 'order_type', width: 70, sortable: true,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
       return h(NTag, { type: isBuy ? 'success' : 'error', size: 'small' },
@@ -116,15 +128,15 @@ const columns = [
       )
     }
   },
-  { title: '手数', key: 'volume', width: 60 },
-  { title: '开仓价', key: 'entry_price', width: 100,
+  { title: '手数', key: 'volume', width: 60, sortable: true },
+  { title: '开仓价', key: 'entry_price', width: 100, sortable: true,
     render(row: any) { return row.entry_price?.toFixed(2) }
   },
-  { title: '平仓价', key: 'exit_price', width: 100,
+  { title: '平仓价', key: 'exit_price', width: 100, sortable: true,
     render(row: any) { return row.exit_price?.toFixed(2) }
   },
   {
-    title: '盈亏', key: 'pnl', width: 100,
+    title: '盈亏', key: 'pnl', width: 100, sortable: true,
     render(row: any) {
       const val = row.pnl ?? 0
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -318,8 +330,17 @@ const statsColumns = [
     </div>
 
     <n-tabs v-model:value="activeTab" type="line" animated>
-      <!-- ═══ 成交明细 ═══ -->
+    <!-- ═══ 成交明细 ═══ -->
       <n-tab-pane name="history" tab="成交明细">
+        <n-space style="margin-bottom: 12px;">
+          <n-input v-model:value="searchQuery" placeholder="搜索: 策略名 / Magic / Ticket"
+                   clearable style="width: 360px;">
+            <template #prefix>
+              <n-icon :component="SearchOutline" />
+            </template>
+          </n-input>
+          <n-tag :bordered="false" type="info">共 {{ filteredData.length }} 笔</n-tag>
+        </n-space>
         <n-data-table v-if="store.loading" :columns="columns" :data="[]" :loading="true" :bordered="true" :max-height="600" />
         <n-empty v-else-if="store.items.length === 0" description="暂无历史成交">
           <template #extra>
@@ -327,7 +348,7 @@ const statsColumns = [
           </template>
         </n-empty>
         <n-alert v-else-if="store.error" type="error" :title="store.error" closable />
-        <n-data-table v-else :columns="columns" :data="store.items" :bordered="true"
+        <n-data-table v-else :columns="columns" :data="filteredData" :bordered="true"
                       :max-height="700" striped :single-line="false"
                       v-model:expanded-row-keys="expandedRowKeys"
                       :row-key="(row: any) => row.ticket" />

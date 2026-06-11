@@ -32,6 +32,10 @@ config_service = RuntimeConfig()
 ws_manager = WebSocketManager()
 log_handler = LogCaptureHandler()
 
+# 提前初始化 NewsFilter 单例，引擎启动前加载 DB 缓存
+from services.news_filter import NewsFilter
+NewsFilter()
+
 # 配置日志
 log_handler.setFormatter(logging.Formatter(
     "%(asctime)s [%(levelname)s] %(name)s - %(message)s"

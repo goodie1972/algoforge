@@ -1,9 +1,8 @@
 """
-News Filter 新闻过滤服务
-从 ForexFactory JSON 订阅源获取经济日历，计算禁售时间窗口
+News Filter 新闻过滤服务 — 单例，SQLite 持久化，24h 自动拉取
 """
-
 import logging
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Optional
@@ -15,77 +14,153 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 FF_CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+FETCH_INTERVAL = 86400  # 24 小时
 
 
 class NewsFilter:
-    """新闻过滤服务 — 重大数据发布前后暂停开仓"""
+    """新闻过滤服务 — 单例，线程安全"""
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        self._data_lock = threading.Lock()
         self._cache: list[dict] = []
         self._cache_time: float = 0.0
-        self._cache_ttl: float = 43200  # 12小时缓存
-        self._retry_after: float = 0.0  # 429后不重试直到这个时间
+        self._cache_ttl: float = 43200  # 12h 内存缓存
+        self._retry_after: float = 0.0
+        self._next_fetch: float = 0.0
         self._blackout_windows: list[tuple[datetime, datetime, str]] = []
         self._windows_computed_at: float = 0.0
+
+        # 从 DB 恢复缓存
+        self._load_from_db()
+
+        # 检查是否需要立即拉取
+        last_fetch = self._get_last_fetch_time()
+        now = time.time()
+        if last_fetch == 0 or (now - last_fetch) >= FETCH_INTERVAL:
+            logger.info("[新闻过滤] 日历过期或缺失，启动时拉取")
+            self._do_fetch(now)
+        else:
+            elapsed = now - last_fetch
+            self._next_fetch = last_fetch + FETCH_INTERVAL
+            logger.info(f"[新闻过滤] 日历有效（{elapsed/3600:.1f}h 前拉取），"
+                       f"下次拉取: {datetime.fromtimestamp(self._next_fetch).strftime('%m-%d %H:%M')}")
 
     def _read_config(self):
         """读取最新配置"""
         return {
             "enabled": getattr(settings, "NEWS_FILTER_ENABLED", True),
-            "before_min": int(getattr(settings, "NEWS_PRE_TIGHTEN_MINUTES", 120)),
+            "before_min": int(getattr(settings, "NEWS_BEFORE_MINUTES", 30)),
             "after_min": int(getattr(settings, "NEWS_AFTER_MINUTES", 120)),
             "impact": getattr(settings, "NEWS_IMPACT_FILTER", "High"),
             "currency": getattr(settings, "NEWS_CURRENCY_FILTER", "USD"),
         }
 
-    def fetch_calendar(self) -> list[dict]:
-        """获取本周经济日历（带缓存 + 429 退避）"""
-        now = time.time()
-        if self._cache and (now - self._cache_time) < self._cache_ttl:
-            return self._cache
-        if now < self._retry_after:
-            return self._cache
+    # ── DB 持久化 ──────────────────────────────────────────
 
+    def _load_from_db(self):
+        """从 SQLite 加载日历缓存"""
+        try:
+            from data import database as db
+            db.init_db()
+            events = db.load_news_events()
+            if events:
+                with self._data_lock:
+                    self._cache = events
+                    self._cache_time = time.time()
+                logger.info(f"[新闻过滤] 从 DB 加载 {len(events)} 个事件")
+        except Exception as e:
+            logger.warning(f"[新闻过滤] DB 加载失败: {e}")
+
+    def _save_to_db(self, events: list[dict]):
+        """将事件持久化到 SQLite"""
+        try:
+            from data import database as db
+            db.clear_news_calendar()
+            now = time.time()
+            db.insert_news_events(events, now)
+            db.set_metadata("news_last_fetch_time", str(now))
+            logger.info(f"[新闻过滤] 已持久化 {len(events)} 个事件")
+        except Exception as e:
+            logger.warning(f"[新闻过滤] DB 持久化失败: {e}")
+
+    def _get_last_fetch_time(self) -> float:
+        """读取上次成功拉取的时间戳"""
+        try:
+            from data import database as db
+            val = db.get_metadata("news_last_fetch_time")
+            if val:
+                return float(val)
+        except (ValueError, TypeError, Exception):
+            pass
+        return 0.0
+
+    # ── 定时拉取 ──────────────────────────────────────────
+
+    def try_scheduled_fetch(self):
+        """每个 tick 调用，到期自动拉取。is_in_blackout 不触发 HTTP"""
+        now = time.time()
+        if now < self._retry_after:
+            return
+        if self._next_fetch > 0 and now < self._next_fetch:
+            return
+        self._do_fetch(now)
+
+    def _do_fetch(self, now: float):
+        """执行 HTTP 拉取，成功后更新 DB 和定时器"""
         try:
             resp = requests.get(FF_CALENDAR_URL, timeout=15)
             resp.raise_for_status()
             data = resp.json()
             if isinstance(data, list):
-                self._cache = data
-                self._cache_time = now
+                with self._data_lock:
+                    self._cache = data
+                    self._cache_time = now
                 self._retry_after = 0.0
-                logger.info(f"[新闻过滤] 获取经济日历成功: {len(data)} 个事件")
+                self._next_fetch = now + FETCH_INTERVAL
+                self._save_to_db(data)
+                logger.info(f"[新闻过滤] HTTP 拉取成功: {len(data)} 个事件, "
+                           f"下次拉取: {datetime.fromtimestamp(self._next_fetch).strftime('%m-%d %H:%M')}")
             else:
-                logger.warning(f"[新闻过滤] 日历数据格式异常: {type(data)}")
+                logger.warning(f"[新闻过滤] 日历格式异常: {type(data)}")
+                self._next_fetch = now + 3600  # 1h 后重试
         except requests.exceptions.HTTPError as e:
             if resp.status_code == 429:
-                self._retry_after = now + 3600  # 被限流后 1 小时内不重试
-                logger.warning(f"[新闻过滤] API 限流，1 小时内不重试")
+                self._retry_after = now + 3600
+                logger.warning("[新闻过滤] API 限流，1h 内不重试")
             else:
-                logger.warning(f"[新闻过滤] 获取经济日历失败: {e}")
-            if self._cache:
-                logger.info("[新闻过滤] 使用缓存数据")
+                logger.warning(f"[新闻过滤] HTTP 失败: {e}")
+            self._next_fetch = now + 3600
         except requests.RequestException as e:
-            logger.warning(f"[新闻过滤] 获取经济日历失败: {e}")
-            if self._cache:
-                logger.info("[新闻过滤] 使用缓存数据")
+            logger.warning(f"[新闻过滤] HTTP 失败: {e}")
+            self._next_fetch = now + 3600
 
-        return self._cache
+    # ── 禁售检查（只读，不触发 HTTP）────────────────────
 
     def get_blackout_windows(self) -> list[tuple[datetime, datetime, str]]:
-        """返回当前应生效的禁售窗口列表 [(start, end, event_title), ...]"""
+        """返回当前应生效的禁售窗口列表"""
         cfg = self._read_config()
         if not cfg["enabled"]:
             return []
 
-        self.fetch_calendar()
         if not self._cache:
             return []
 
-        # 解析影响级别过滤
         impact_filter = set(cfg["impact"].replace(" ", "").split(","))
         currency_filter = set(cfg["currency"].replace(" ", "").split(","))
-
         before_delta = timedelta(minutes=cfg["before_min"])
         after_delta = timedelta(minutes=cfg["after_min"])
         now = datetime.utcnow()
@@ -96,63 +171,57 @@ class NewsFilter:
             impact = (evt.get("impact") or "").strip()
             title = evt.get("title", "Unknown")
 
-            if currency not in currency_filter:
-                continue
-            if impact not in impact_filter:
+            if currency not in currency_filter or impact not in impact_filter:
                 continue
 
             evt_dt = self._parse_event_datetime(evt)
             if evt_dt is None:
                 continue
-
-            # 窗口已过则跳过
             if evt_dt + after_delta < now:
                 continue
 
-            start = evt_dt - before_delta
-            end = evt_dt + after_delta
-            windows.append((start, end, title))
+            windows.append((evt_dt - before_delta, evt_dt + after_delta, title))
 
-        self._blackout_windows = windows
-        self._windows_computed_at = time.time()
+        with self._data_lock:
+            self._blackout_windows = windows
+            self._windows_computed_at = time.time()
         return windows
 
     def is_in_blackout(self, now: Optional[datetime] = None) -> tuple[bool, str]:
-        """检查当前时间是否在禁售窗口内，返回 (True/False, 原因)"""
+        """检查是否在禁售窗口内。空缓存 → 安全默认 True"""
         cfg = self._read_config()
         if not cfg["enabled"]:
             return False, ""
+
+        if not self._cache:
+            return True, "日历数据未加载"
 
         if now is None:
             now = datetime.utcnow()
 
         windows = self.get_blackout_windows()
-
         for start, end, title in windows:
             if start <= now <= end:
                 return True, title
-
         return False, ""
 
     def is_in_pre_tighten(self, now: Optional[datetime] = None) -> bool:
-        """检查是否在事件前收紧窗口 [event-2h, event-15min]，是则策略应收紧止损"""
         return self._is_in_window(now, "pre_tighten")
 
     def is_in_force_close(self, now: Optional[datetime] = None) -> bool:
-        """检查是否在事件前强平窗口 [event-15min, event]，是则应平所有持仓"""
         return self._is_in_window(now, "force_close")
 
     def _is_in_window(self, now: Optional[datetime], mode: str) -> bool:
-        """通用窗口检查，mode='pre_tighten' 或 'force_close'"""
+        """通用窗口检查。空缓存 → 安全默认 True"""
         cfg = self._read_config()
         if not cfg["enabled"]:
             return False
+
+        if not self._cache:
+            return True
+
         if now is None:
             now = datetime.utcnow()
-
-        self.fetch_calendar()
-        if not self._cache:
-            return False
 
         impact_filter = set(cfg["impact"].replace(" ", "").split(","))
         currency_filter = set(cfg["currency"].replace(" ", "").split(","))
@@ -180,35 +249,31 @@ class NewsFilter:
 
             if start <= now <= end:
                 return True
-
         return False
+
+    # ── 前端展示 ──────────────────────────────────────────
 
     @staticmethod
     def to_local(dt: datetime) -> datetime:
-        """将 UTC datetime 转为本地时间（自动检测时区偏移）"""
         offset = datetime.now() - datetime.utcnow()
         offset_hours = round(offset.total_seconds() / 3600)
         return dt + timedelta(hours=offset_hours)
 
     def get_upcoming_events(self, limit: int = 10) -> list[dict]:
-        """获取即将到来的高影响事件（供前端展示，使用本地时间）"""
+        """获取即将到来的高影响事件（供前端展示）"""
         cfg = self._read_config()
-        self.fetch_calendar()
         if not self._cache:
             return []
 
         impact_filter = set(cfg["impact"].replace(" ", "").split(","))
         currency_filter = set(cfg["currency"].replace(" ", "").split(","))
-
         now = datetime.now()
+
         result = []
         for evt in self._cache:
             currency = (evt.get("country") or "").upper()
             impact = (evt.get("impact") or "").strip()
-
-            if currency not in currency_filter:
-                continue
-            if impact not in impact_filter:
+            if currency not in currency_filter or impact not in impact_filter:
                 continue
 
             evt_dt = self._parse_event_datetime(evt)
@@ -226,24 +291,22 @@ class NewsFilter:
                 "previous": evt.get("previous", ""),
             })
 
-        # 按时间排序，返回未来的（均使用本地时间）
         result.sort(key=lambda x: x["datetime"])
         future = [r for r in result if r["datetime"] >= now.strftime("%Y-%m-%d %H:%M")]
         return future[:limit]
 
+    # ── 日期时间解析 ──────────────────────────────────────
+
     @staticmethod
     def _parse_event_datetime(evt: dict) -> Optional[datetime]:
-        """解析事件的 datetime，支持多种格式，统一返回 naive datetime"""
         date_str = evt.get("date", "")
         time_str = evt.get("time", "")
 
         if not date_str:
             return None
 
-        # ISO 8601 带时区: "2026-05-28T08:30:00-04:00"
         try:
             dt = datetime.strptime(date_str[:19], "%Y-%m-%dT%H:%M:%S")
-            # 处理时区偏移，转换为 UTC naive datetime
             tz_part = date_str[19:]
             if tz_part and tz_part[0] in "+-" and len(tz_part) == 6:
                 sign = 1 if tz_part[0] == "+" else -1
@@ -255,13 +318,11 @@ class NewsFilter:
         except (ValueError, IndexError):
             pass
 
-        # ISO 8601 无时区: "2026-05-28T08:30:00"
         try:
             return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
         except ValueError:
             pass
 
-        # "MM-DD-YYYY HH:MM" 或 "YYYY-MM-DD HH:MM"
         if not time_str or time_str in ("All Day", "Tentative"):
             time_str = "00:00"
 
