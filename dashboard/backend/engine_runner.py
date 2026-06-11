@@ -35,7 +35,7 @@ class EngineRunner:
         # K 线实时缓存：按 timeframe 缓存，最后一根 K 线由实时价格扩展
         self._cached_candles: dict[str, list] = {}
         self._cached_candles_ts: dict[str, float] = {}
-        self._cached_mid: float = 0.0
+        self._cached_bid: float = 0.0
 
     @property
     def is_running(self) -> bool:
@@ -256,18 +256,18 @@ class EngineRunner:
                 "H1": 3600, "H4": 14400, "D1": 86400, "W1": 604800}
 
     def get_cached_candles(self, timeframe: str, count: int = 500) -> Optional[list]:
-        """返回缓存的 K 线（最后一根已用实时价格扩展），None 表示缓存未就绪"""
+        """返回缓存的 K 线（最后一根已用实时 BID 扩展），None 表示缓存未就绪"""
         candles = self._cached_candles.get(timeframe)
         if not candles or len(candles) < 3:
             return None
-        # 用最新中间价扩展最后一根 K 线
+        # 用最新 BID 扩展最后一根 K 线（MT4 K 线基于 BID 价格）
         result = list(candles)
         last = dict(result[-1])
-        mid = self._cached_mid
-        if mid > 0:
-            last["high"] = round(max(last["high"], mid), 2)
-            last["low"] = round(min(last["low"], mid), 2)
-            last["close"] = round(mid, 2)
+        bid = self._cached_bid
+        if bid > 0:
+            last["high"] = round(max(last["high"], bid), 2)
+            last["low"] = round(min(last["low"], bid), 2)
+            last["close"] = round(bid, 2)
         result[-1] = last
         return result[-count:]
 
@@ -429,7 +429,7 @@ class EngineRunner:
                     _b, _a = engine.bridge.get_tick_price(_cfg_fast.SYMBOL)
                     if _b > 0:
                         self._cached_price = {"bid": _b, "ask": _a}
-                        self._cached_mid = round((_b + _a) / 2, 2)
+                        self._cached_bid = _b
                 except Exception:
                     pass
 
