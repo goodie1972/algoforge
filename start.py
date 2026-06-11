@@ -159,8 +159,11 @@ def main():
                 if line:
                     text = line.decode("utf-8", errors="replace").rstrip()
                     if text:
-                        safe = text.encode("utf-8", errors="replace").decode("gbk", errors="replace")
-                        print(f"  [{time.strftime('%H:%M:%S')}] {safe}")
+                        try:
+                            print(f"  [{time.strftime('%H:%M:%S')}] {text}")
+                        except UnicodeEncodeError:
+                            safe = text.encode("utf-8", errors="replace").decode("gbk", errors="replace")
+                            print(f"  [{time.strftime('%H:%M:%S')}] {safe}")
             else:
                 time.sleep(1)
     except KeyboardInterrupt:
