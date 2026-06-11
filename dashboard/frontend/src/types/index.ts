@@ -180,7 +180,20 @@ export interface StrategyStats {
   total_swap: number
 }
 
+export interface StrategyVersionStats extends StrategyStats {
+  magic: number
+  strategy: string
+  version: string
+}
+
+export interface StrategyFamilyStats extends StrategyStats {
+  magic: string  // 4-digit PPNN
+  strategy: string
+  versions: StrategyVersionStats[]
+}
+
 export interface TradeStats {
   summary: StrategyStats
   by_magic: Record<string, StrategyStats & { magic: number; strategy: string }>
+  by_strategy: Record<string, StrategyFamilyStats>
 }

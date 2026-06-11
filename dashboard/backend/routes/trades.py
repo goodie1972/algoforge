@@ -16,7 +16,22 @@ run_bridge = None
 logger = logging.getLogger(__name__)
 
 MAGIC_TO_STRATEGY = {
-    777001: "M30_rsi_bb",
+    # 新版 magic (PPNNVV)
+    660701: "M30_rsi_bb", 660702: "M30_rsi_bb", 660703: "M30_rsi_bb", 660704: "M30_rsi_bb",
+    660601: "H1_v6_hybrid", 660602: "H1_v6_hybrid", 660603: "H1_v6_hybrid", 660604: "H1_v6_hybrid",
+    880101: "sanqing_h1", 880102: "sanqing_h1", 880103: "sanqing_h1", 880104: "sanqing_h1",
+    880301: "gold_auto_research", 880302: "gold_auto_research", 880303: "gold_auto_research",
+    880304: "gold_auto_research", 880305: "gold_auto_research",
+    # 旧版 magic 兼容
+    777001: "M30_rsi_bb", 777002: "H1_v6_hybrid", 777003: "gold_auto_research",
+}
+
+# 4位 PPNN → 策略名（用于 by_strategy 分组）
+PPNN_TO_STRATEGY = {
+    "6607": "M30_rsi_bb",
+    "6606": "H1_v6_hybrid",
+    "8801": "sanqing_h1",
+    "8803": "gold_auto_research",
 }
 
 
@@ -177,18 +192,15 @@ async def get_trade_history(limit: int = 100):
 
 @router.get("/stats")
 async def get_trade_stats(strategies: str = "", from_date: str = "", to_date: str = ""):
-    """策略收益统计（透视表），支持按策略名和时间范围筛选"""
-    if not engine_runner or not engine_runner._engine:
-        return {"summary": _empty_stats(), "by_strategy": {}}
-
-    trades = list(engine_runner._engine.closed_trades)
+    """策略收益统计（透视表），从 SQLite 读取"""
+    trades = db.get_trades(limit=10000)
 
     # 按策略名筛选
     if strategies:
         strat_list = [s.strip() for s in strategies.split(",") if s.strip()]
         trades = [t for t in trades if t.get("strategy", "") in strat_list]
 
-    # 按 close_time 日期范围筛选（close_time 统一为 YYYY-MM-DD HH:MM:SS 格式）
+    # 按 close_time 日期范围筛选
     if from_date:
         trades = [t for t in trades if str(t.get("close_time", ""))[:10] >= from_date[:10]]
     if to_date:
@@ -197,12 +209,11 @@ async def get_trade_stats(strategies: str = "", from_date: str = "", to_date: st
     # 汇总
     summary = _calc_stats(trades)
 
-    # 分策略（按魔术号分组，魔术号稳定不变）
+    # 分策略（按魔术号分组）
     by_magic = {}
     magic_set = sorted(set(t.get("magic") for t in trades if t.get("magic") is not None))
     for magic in magic_set:
         s_trades = [t for t in trades if t.get("magic") == magic]
-        # 先用策略池解析策略名，取不到再用该魔术号最近交易的 strategy 字段
         strategy_name = _resolve_strategy_name(magic)
         if strategy_name.startswith("magic_"):
             s_trades_sorted = sorted(s_trades, key=lambda t: str(t.get("close_time", "")), reverse=True)
@@ -212,7 +223,37 @@ async def get_trade_stats(strategies: str = "", from_date: str = "", to_date: st
         stats["strategy"] = strategy_name
         by_magic[str(magic)] = stats
 
-    return {"summary": summary, "by_magic": by_magic}
+    # 分策略族（按4位PPNN分组，versions按6位magic细分）
+    by_strategy = {}
+    for magic_key, version_stats in by_magic.items():
+        magic = int(magic_key)
+        magic_str = str(magic)
+        if len(magic_str) == 6 and magic_str[:4] in PPNN_TO_STRATEGY:
+            group_key = magic_str[:4]
+            strategy_name = PPNN_TO_STRATEGY[group_key]
+        else:
+            strategy_name = version_stats.get("strategy") or _resolve_strategy_name(magic)
+            group_key = magic_str[:4] if len(magic_str) >= 4 else magic_str
+
+        if strategy_name not in by_strategy:
+            family_trades = [
+                t for t in trades
+                if _resolve_strategy_name(t.get("magic", 0), t.get("strategy", "")) == strategy_name
+            ]
+            family_stats = _calc_stats(family_trades)
+            family_stats["magic"] = group_key
+            family_stats["strategy"] = strategy_name
+            family_stats["versions"] = []
+            by_strategy[strategy_name] = family_stats
+
+        version_item = dict(version_stats)
+        version_item["version"] = f"v{magic % 100:02d}" if len(magic_str) == 6 else "legacy"
+        by_strategy[strategy_name]["versions"].append(version_item)
+
+    for stats in by_strategy.values():
+        stats["versions"].sort(key=lambda x: x.get("magic", 0))
+
+    return {"summary": summary, "by_magic": by_magic, "by_strategy": by_strategy}
 
 
 # ── 从 MT4 恢复历史成交 ───────────────────────────────
@@ -473,23 +514,55 @@ async def get_trade_analysis(ticket: int):
     sl = trade.get("stop_loss", 0)
     tp = trade.get("take_profit", 0)
 
-    # 开仓逻辑
-    strategy_lower = strategy.lower()
-    if "m30_rsi" in strategy_lower or "rsi_bb" in strategy_lower:
-        entry = _analyze_entry_m30_rsi_bb(direction, entry_price)
-    elif "sanqing" in strategy_lower:
-        entry = _analyze_entry_sanqing_h1(direction, entry_price)
-    elif "v6_hybrid" in strategy_lower or "666666" in str(magic):
-        entry = _analyze_entry_h1_v6_hybrid(direction, entry_price)
-    elif "gold_auto" in strategy_lower or "777003" in str(magic):
-        entry = _analyze_entry_gold_auto_research(direction, entry_price)
+    # 尝试从 indicator_snapshot 读取实际开仓/平仓数据
+    snapshot_raw = trade.get("indicator_snapshot", "")
+    if snapshot_raw:
+        try:
+            snapshot = json.loads(snapshot_raw) if isinstance(snapshot_raw, str) else snapshot_raw
+        except (json.JSONDecodeError, TypeError):
+            snapshot = {}
     else:
-        entry = {"system": "未知策略", "likely_conditions": []}
+        snapshot = {}
 
-    # 平仓逻辑
-    exit_info = _analyze_exit(exit_reason, pnl, direction, strategy)
+    entry_factors = snapshot.get("entry_factors", {})
+    exit_detail = snapshot.get("exit_detail", {})
 
-    return {
+    if entry_factors.get("long") or entry_factors.get("short"):
+        scores = snapshot.get("scores", {})
+        indicator_values = snapshot.get("indicator_values", {})
+        entry = {
+            "system": "实时评分记录",
+            "score_long": scores.get("long", 0),
+            "score_short": scores.get("short", 0),
+            "long_factors": entry_factors.get("long", []),
+            "short_factors": entry_factors.get("short", []),
+            "indicator_values": indicator_values,
+            "likely_conditions": entry_factors.get("long", []) if "BUY" in direction.upper() else entry_factors.get("short", []),
+        }
+    else:
+        strategy_lower = strategy.lower()
+        if "m30_rsi" in strategy_lower or "rsi_bb" in strategy_lower:
+            entry = _analyze_entry_m30_rsi_bb(direction, entry_price)
+        elif "sanqing" in strategy_lower:
+            entry = _analyze_entry_sanqing_h1(direction, entry_price)
+        elif "v6_hybrid" in strategy_lower or str(magic).startswith("6606") or magic == 777002:
+            entry = _analyze_entry_h1_v6_hybrid(direction, entry_price)
+        elif "gold_auto" in strategy_lower or str(magic).startswith("8803") or magic == 777003:
+            entry = _analyze_entry_gold_auto_research(direction, entry_price)
+        else:
+            entry = {"system": "未知策略", "likely_conditions": []}
+
+    if exit_detail:
+        exit_info = {
+            "label": "实时出场记录",
+            "exit_detail": exit_detail,
+            "pnl": round(pnl, 2),
+            "is_loss": pnl < 0,
+        }
+    else:
+        exit_info = _analyze_exit(exit_reason, pnl, direction, strategy)
+
+    result = {
         "ticket": ticket,
         "strategy": strategy,
         "magic": magic,
@@ -503,3 +576,8 @@ async def get_trade_analysis(ticket: int):
         "entry_analysis": entry,
         "exit_analysis": exit_info,
     }
+
+    if snapshot.get("indicator_values"):
+        result["indicator_snapshot"] = snapshot
+
+    return result
