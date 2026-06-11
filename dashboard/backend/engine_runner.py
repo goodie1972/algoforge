@@ -32,6 +32,10 @@ class EngineRunner:
         self._cached_account: Optional[dict] = None
         self._cached_price: Optional[dict] = None
         self._cached_positions: list = []
+        # K 线实时缓存：按 timeframe 缓存，最后一根 K 线由实时价格扩展
+        self._cached_candles: dict[str, list] = {}
+        self._cached_candles_ts: dict[str, float] = {}
+        self._cached_mid: float = 0.0
 
     @property
     def is_running(self) -> bool:
@@ -246,6 +250,56 @@ class EngineRunner:
         except Exception:
             pass
 
+    # ======================== K 线实时缓存 ========================
+
+    _TF_SECS = {"M1": 60, "M5": 300, "M15": 900, "M30": 1800,
+                "H1": 3600, "H4": 14400, "D1": 86400, "W1": 604800}
+
+    def get_cached_candles(self, timeframe: str, count: int = 500) -> Optional[list]:
+        """返回缓存的 K 线（最后一根已用实时价格扩展），None 表示缓存未就绪"""
+        candles = self._cached_candles.get(timeframe)
+        if not candles or len(candles) < 3:
+            return None
+        # 用最新中间价扩展最后一根 K 线
+        result = list(candles)
+        last = dict(result[-1])
+        mid = self._cached_mid
+        if mid > 0:
+            last["high"] = round(max(last["high"], mid), 2)
+            last["low"] = round(min(last["low"], mid), 2)
+            last["close"] = round(mid, 2)
+        result[-1] = last
+        return result[-count:]
+
+    def _refresh_candle_cache(self, engine):
+        """从桥接刷新 K 线缓存（仅在数据过期时真正拉取）"""
+        from config import settings as _cfg
+        now = time.time()
+        # 无论哪个 timeframe 过期都一起刷
+        for tf, interval in self._TF_SECS.items():
+            last_ts = self._cached_candles_ts.get(tf, 0)
+            # 首次缓存或超过 120s 刷新
+            if now - last_ts < 120 and tf in self._cached_candles:
+                continue
+            try:
+                raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 500)
+                raw_rev = list(reversed(raw))
+                offset = int(self.mt4_offset)
+                self._cached_candles[tf] = [
+                    {
+                        "time": int(c.time) - offset,
+                        "open": c.open,
+                        "high": c.high,
+                        "low": c.low,
+                        "close": c.close,
+                        "volume": c.volume,
+                    }
+                    for c in raw_rev
+                ]
+                self._cached_candles_ts[tf] = now
+            except Exception:
+                pass
+
     # ======================== 引擎主循环 ========================
 
     def _run(self):
@@ -359,6 +413,8 @@ class EngineRunner:
 
                 engine._tick()
                 self._update_caches(engine)
+                # K 线缓存也在此周期刷新（120s 过期）
+                self._refresh_candle_cache(engine)
             except Exception as e:
                 self.logger.exception(f"主循环异常: {e}")
                 time.sleep(60)
@@ -373,6 +429,7 @@ class EngineRunner:
                     _b, _a = engine.bridge.get_tick_price(_cfg_fast.SYMBOL)
                     if _b > 0:
                         self._cached_price = {"bid": _b, "ask": _a}
+                        self._cached_mid = round((_b + _a) / 2, 2)
                 except Exception:
                     pass
 

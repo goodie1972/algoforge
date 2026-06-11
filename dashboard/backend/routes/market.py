@@ -33,14 +33,20 @@ async def get_candles(
     timeframe: str = Query(default=settings.TIMEFRAME),
     count: int = Query(default=100, le=1000, ge=3),
 ):
-    """获取 K 线数据（已纠正 MT4 时区偏移）"""
-    if not engine_runner or not engine_runner.bridge:
+    """获取 K 线数据（从引擎实时缓存读取，最后一根已用现价扩展）"""
+    if not engine_runner:
+        return []
+    # 优先从缓存读取（更快，且包含实时价格扩展）
+    cached = engine_runner.get_cached_candles(timeframe, count)
+    if cached is not None:
+        return cached
+    # 缓存未就绪 → 回退到桥接直接获取
+    if not engine_runner.bridge:
         return []
     try:
         candles = await run_bridge(engine_runner.bridge.get_candles, settings.SYMBOL, timeframe, count)
-        # MT4 返回最新在前，lightweight-charts 要求最旧在前
         candles = list(reversed(candles))
-        offset = int(engine_runner.mt4_offset)  # 引擎已校准的 MT4 与 UTC 偏移
+        offset = int(engine_runner.mt4_offset)
         return [
             {
                 "time": int(c.time) - offset,
