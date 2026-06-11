@@ -272,33 +272,28 @@ class EngineRunner:
         return result[-count:]
 
     def _refresh_candle_cache(self, engine):
-        """从桥接刷新 K 线缓存（仅在数据过期时真正拉取）"""
+        """从桥接刷新 K 线缓存（每 tick 最多刷一个周期，避免堵塞快速采样）"""
         from config import settings as _cfg
         now = time.time()
-        # 无论哪个 timeframe 过期都一起刷
-        for tf, interval in self._TF_SECS.items():
+        # 按优先级依次刷新：H1 > M30 > M15 > M5 > H4 > D1 > W1 > M1
+        priority = ["H1", "M30", "M15", "M5", "H4", "D1", "W1", "M1"]
+        for tf in priority:
             last_ts = self._cached_candles_ts.get(tf, 0)
-            # 首次缓存或超过 120s 刷新
-            if now - last_ts < 120 and tf in self._cached_candles:
-                continue
-            try:
-                raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 500)
-                raw_rev = list(reversed(raw))
-                offset = int(self.mt4_offset)
-                self._cached_candles[tf] = [
-                    {
-                        "time": int(c.time) - offset,
-                        "open": c.open,
-                        "high": c.high,
-                        "low": c.low,
-                        "close": c.close,
-                        "volume": c.volume,
-                    }
-                    for c in raw_rev
-                ]
-                self._cached_candles_ts[tf] = now
-            except Exception:
-                pass
+            if now - last_ts >= 120 or tf not in self._cached_candles:
+                try:
+                    raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 500)
+                    raw_rev = list(reversed(raw))
+                    offset = int(self.mt4_offset)
+                    self._cached_candles[tf] = [
+                        {"time": int(c.time) - offset, "open": c.open,
+                         "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
+                        for c in raw_rev
+                    ]
+                    self._cached_candles_ts[tf] = now
+                except Exception:
+                    pass
+                return  # 只刷一个周期就退出，下个 tick 再刷下一个
+
 
     # ======================== 引擎主循环 ========================
 
@@ -413,18 +408,22 @@ class EngineRunner:
 
                 engine._tick()
                 self._update_caches(engine)
-                # K 线缓存也在此周期刷新（120s 过期）
-                self._refresh_candle_cache(engine)
             except Exception as e:
                 self.logger.exception(f"主循环异常: {e}")
                 time.sleep(60)
 
+            # K 线缓存后台刷新（放在独立 try 里，不影响价格采样循环）
+            try:
+                self._refresh_candle_cache(engine)
+            except Exception:
+                pass
+
             # 高频价格采样：_tick() 处理策略逻辑较慢，
-            # 每个 tick 后快速补采几次价格，使前端 ~1s 更新而非 ~N 秒
-            for _ in range(3):
+            # 每个 tick 后快速补采几次价格，使前端 ~0.1s 更新精度
+            for _ in range(9):
                 if not engine.running or self._stop_requested:
                     break
-                time.sleep(0.3)
+                time.sleep(0.1)
                 try:
                     _b, _a = engine.bridge.get_tick_price(_cfg_fast.SYMBOL)
                     if _b > 0:
