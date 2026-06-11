@@ -78,7 +78,7 @@ class PollerState:
 
 
 async def broadcast_prices():
-    """每 1 秒推送一次价格（从引擎线程缓存读取）"""
+    """每 0.3 秒推送一次价格（引擎高速采样缓存，使前端 K 线实时跳动）"""
     while PollerState.running:
         try:
             cached = engine_runner._cached_price
@@ -90,7 +90,7 @@ async def broadcast_prices():
                 })
         except Exception:
             pass
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.3)
 
 
 async def broadcast_positions():
