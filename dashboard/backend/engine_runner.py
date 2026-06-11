@@ -36,6 +36,8 @@ class EngineRunner:
         self._cached_candles: dict[str, list] = {}
         self._cached_candles_ts: dict[str, float] = {}
         self._cached_bid: float = 0.0
+        # 独立价格轮询线程（不受 _tick 阻塞影响）
+        self._price_thread: Optional[threading.Thread] = None
 
     @property
     def is_running(self) -> bool:
@@ -295,6 +297,26 @@ class EngineRunner:
                 return  # 只刷一个周期就退出，下个 tick 再刷下一个
 
 
+    # ======================== 独立价格轮询线程 ========================
+
+    def _start_price_poller(self, engine):
+        """启动独立价格轮询线程（0.1s 间隔，不受 _tick 阻塞影响）"""
+        if self._price_thread and self._price_thread.is_alive():
+            return
+        from config import settings as _cfg
+        def _poll():
+            while not self._stop_requested:
+                try:
+                    _b, _a = engine.bridge.get_tick_price(_cfg.SYMBOL)
+                    if _b > 0:
+                        self._cached_price = {"bid": _b, "ask": _a}
+                        self._cached_bid = _b
+                except Exception:
+                    pass
+                time.sleep(0.1)
+        self._price_thread = threading.Thread(target=_poll, daemon=True, name="price_poller")
+        self._price_thread.start()
+
     # ======================== 引擎主循环 ========================
 
     def _run(self):
@@ -359,6 +381,9 @@ class EngineRunner:
         # 暴露 bridge 供 Dashboard WebSocket 轮询使用
         self.bridge = engine.bridge
 
+        # 启动独立价格轮询（0.1s 间隔，不受 _tick 阻塞）
+        self._start_price_poller(engine)
+
         # 校准 MT4 服务器时间 vs 本机 UTC
         engine._calibrate_mt4_time()
 
@@ -391,7 +416,7 @@ class EngineRunner:
         self._sync_strategy_versions()
 
         # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
-        from config import settings as _cfg_fast
+        # 价格采样由独立线程 _price_poller 负责（0.1s 间隔）
         while engine.running and not self._stop_requested:
             try:
                 # 桥接保活检测
@@ -412,25 +437,11 @@ class EngineRunner:
                 self.logger.exception(f"主循环异常: {e}")
                 time.sleep(60)
 
-            # K 线缓存后台刷新（放在独立 try 里，不影响价格采样循环）
+            # K 线缓存后台刷新
             try:
                 self._refresh_candle_cache(engine)
             except Exception:
                 pass
-
-            # 高频价格采样：_tick() 处理策略逻辑较慢，
-            # 每个 tick 后快速补采几次价格，使前端 ~0.1s 更新精度
-            for _ in range(9):
-                if not engine.running or self._stop_requested:
-                    break
-                time.sleep(0.1)
-                try:
-                    _b, _a = engine.bridge.get_tick_price(_cfg_fast.SYMBOL)
-                    if _b > 0:
-                        self._cached_price = {"bid": _b, "ask": _a}
-                        self._cached_bid = _b
-                except Exception:
-                    pass
 
         # 清理
         if engine.bridge:
