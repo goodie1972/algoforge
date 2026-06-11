@@ -254,22 +254,9 @@ watch(() => store.spread, (n) => {
   _sTimer = setTimeout(() => { spreadFlash.value = false }, 600)
 })
 
-// K 线实时跳动：每个 WebSocket tick 更新当前 bar 的 close
-// 时区校准由后端 API 负责，前端直接用 store 中最后一条的 time
-watch(() => store.bid, (price) => {
-  if (!candleSeries || price <= 0 || store.candles.length === 0) return
-  const last = store.candles[store.candles.length - 1]
-  if (!last || !last.time) return
-  try {
-    candleSeries.update({
-      time: last.time as UTCTimestamp,
-      close: price,
-    })
-    last.close = price
-  } catch (e) {
-    // lightweight-charts 时间戳校验不通过时跳过
-  }
-})
+// K 线实时跳动：每 2s setData 覆盖全量 K 线（含后端按中间价扩展的最后一条）
+// 不由 WebSocket tick 更新，避免 lightweight-charts update 时间戳不兼容
+// 现价与 K 线 close 的统一由后端 get_cached_candles 保证
 
 function getCandleData(): CandleData[] {
   return store.candles.map(c => ({
