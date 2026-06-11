@@ -57,7 +57,7 @@ MAX_CONSECUTIVE_LOSSES = 3                  # 连续亏损 N 次后触发冷却
 CONSECUTIVE_LOSS_COOLDOWN_HOURS = 4         # 连续亏损冷却时长
 
 # === 安全锁 ===
-SAFETY_LOCK_TIMEOUT_MINUTES = 90        # 自动过期时间（分钟）
+SAFETY_LOCK_TIMEOUT_MINUTES = 240       # 自动过期时间（分钟，今晚22:00前不建仓）
 
 STOP_LOSS_PIPS = 50         # 默认止损点数
 TAKE_PROFIT_PIPS = 100      # 默认止盈点数
@@ -68,26 +68,26 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # ============================================================
 STRATEGY_POOL = {
     "M30_rsi_bb": {
-        "magic": 777001,
+        "magic": 660704,
         "timeframe": "M30",
         "double_first": False,
         "max_positions": 1,
     },
     "H1_v6_hybrid": {
-        "magic": 666666,
+        "magic": 660605,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
     # === 新增实盘策略 (来自 GitHub 开源回测) ===
     "sanqing_h1": {
-        "magic": 777002,
+        "magic": 880105,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
     "gold_auto_research": {
-        "magic": 777003,
+        "magic": 880306,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
@@ -112,7 +112,7 @@ MAX_POSITIONS = int(len(STRATEGY_POOL) * 1.5)  # 1策略 → 1
 
 # 向后兼容
 STRATEGY = "M30_rsi_bb"
-MAGIC_NUMBER = 777001       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
+MAGIC_NUMBER = 660704       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
 # 通用指标参数（供工具脚本使用）
 BB_PERIOD = 20              # 布林带周期
 BB_STD = 2.0                # 布林带标准差倍数

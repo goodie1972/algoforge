@@ -15,14 +15,13 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v5"
-STRATEGY_MAGIC = 880105
+STRATEGY_VERSION = "v4"
+STRATEGY_MAGIC = 880104
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 880101, "date": "2026-06-08", "desc": "初始上线：6因子评分≥5，ATR跟踪止损 trail=4.0 hard=2.5"},
     {"version": "v2", "magic": 880102, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
     {"version": "v3", "magic": 880103, "date": "2026-06-09", "desc": "双重止盈：trail=1.0 hard=2.0，新增 profit_drawdown_pct=0.25，新增 indicator_values 返回"},
     {"version": "v4", "magic": 880104, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控"},
-    {"version": "v5", "magic": 880105, "date": "2026-06-11", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
 ]
 
 
@@ -34,7 +33,6 @@ class SanQingH1Strategy(BaseStrategy):
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
-        self._last_exit_detail: Optional[dict] = None
         self._cached_atr_values: Optional[list[float]] = None
         self._cached_atr_key: int = 0
 
@@ -215,29 +213,11 @@ class SanQingH1Strategy(BaseStrategy):
         if body_median_ratio >= 1.5 and body / prev_body_max >= 1.5 and candle_range > 0 and body / candle_range >= 0.5:
             short_factors.append("ENGULF")
 
-        # ── Position gate: 极端位置不做逆势交易 ──
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10 and sell_score >= self.score_threshold:
-            short_factors.append("BOTTOM-GATE")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={sell_score})")
-            sell_score = 0
-        elif price_position > 0.90 and buy_score >= self.score_threshold:
-            long_factors.append("TOP-GATE")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={buy_score})")
-            buy_score = 0
-
         indicator_values = {
             "close": round(close, 2), "ema9": round(ema9, 2), "ema21": round(ema21, 2),
             "atr": round(atr_val, 2), "body_atr_ratio": round(body_atr_ratio, 2),
             "volume_ratio": round(volume / avg_vol, 2) if avg_vol > 0 else 0,
             "body_median_ratio": round(body_median_ratio, 2),
-            "price_position": round(price_position, 3),
-            "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
         }
 
         signal = None
@@ -324,20 +304,17 @@ class SanQingH1Strategy(BaseStrategy):
                             f"[{self.name}] BUY ProfitStop ticket={ticket} "
                             f"profit ${current_profit:.2f} peak ${td['peak_profit']:.2f}"
                         )
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
                 drawdown = td["highest"] - bid
                 if drawdown > atr_val * trail_mult:
                     logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
                 # 亏损 → 只走硬止损
                 if loss > atr_val * hard_mult:
                     logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
         else:
@@ -356,22 +333,18 @@ class SanQingH1Strategy(BaseStrategy):
                             f"[{self.name}] SELL ProfitStop ticket={ticket} "
                             f"profit ${current_profit:.2f} peak ${td['peak_profit']:.2f}"
                         )
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
                 rally = ask - td["lowest"]
                 if rally > atr_val * trail_mult:
                     logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
                 # 亏损 → 只走硬止损
                 if loss > atr_val * hard_mult:
                     logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
 
-        self._last_exit_detail = None
         return False

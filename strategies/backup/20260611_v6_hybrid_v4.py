@@ -17,14 +17,13 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v5"
-STRATEGY_MAGIC = 660605
+STRATEGY_VERSION = "v4"
+STRATEGY_MAGIC = 660604
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660601, "date": "2026-06-08", "desc": "初始上线：8因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660602, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
     {"version": "v3", "magic": 660603, "date": "2026-06-09", "desc": "双重止盈：trail=1.0 hard=2.0，新增 profit_drawdown_pct=0.25，新增 indicator_values 返回"},
     {"version": "v4", "magic": 660604, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控；RSI分层过滤"},
-    {"version": "v5", "magic": 660605, "date": "2026-06-11", "desc": "趋势门禁：M30=DOWN+价<SMA200时做多阈值4→5，M30=UP+价>SMA200时做空阈值3→4"},
 ]
 
 
@@ -38,7 +37,6 @@ class V6HybridStrategy(BaseStrategy):
         self._prev_k: Optional[float] = None
         self._prev_d: Optional[float] = None
         self._trail_data: dict[int, dict] = {}
-        self._last_exit_detail: Optional[dict] = None
         self._m30_candles: list[Candle] = []
         self._m30_closes: list[float] = []
 
@@ -538,23 +536,13 @@ class V6HybridStrategy(BaseStrategy):
                 short_score -= 1
                 short_detail.append("M30-UP↑")
 
-        # ── Trend gate: 逆势时提高阈值 ──
-        buy_threshold = 4
-        sell_threshold = 3
-        if m30_dir == 'DOWN' and close < sma200:
-            buy_threshold = 5
-            long_detail.append("TREND-GATE↑")
-        if m30_dir == 'UP' and close > sma200:
-            sell_threshold = 4
-            short_detail.append("TREND-GATE↑")
-
         # ── Decision ──
         signal = None
         signal_str = "无信号"
-        if long_score >= buy_threshold:
+        if long_score >= 4:
             signal = OrderType.BUY
             signal_str = "LONG"
-        elif short_score >= sell_threshold:
+        elif short_score >= 3:
             signal = OrderType.SELL
             signal_str = "SELL"
 
@@ -687,7 +675,6 @@ class V6HybridStrategy(BaseStrategy):
                             f"profit ${current_profit:.2f} peak ${td['peak_profit']:.2f} "
                             f"ratio {profit_ratio:.1%} < {1-pdd:.0%}"
                         )
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
 
@@ -698,7 +685,6 @@ class V6HybridStrategy(BaseStrategy):
                         f"[{self.name}] BUY TrailStop ticket={ticket} "
                         f"drawdown={drawdown:.2f} > {atr_val * trail_mult:.2f}"
                     )
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
@@ -708,7 +694,6 @@ class V6HybridStrategy(BaseStrategy):
                         f"[{self.name}] BUY HardStop ticket={ticket} "
                         f"loss={loss:.2f} > {atr_val * hard_mult:.2f}"
                     )
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
         else:
@@ -729,7 +714,6 @@ class V6HybridStrategy(BaseStrategy):
                             f"profit ${current_profit:.2f} peak ${td['peak_profit']:.2f} "
                             f"ratio {profit_ratio:.1%} < {1-pdd:.0%}"
                         )
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
 
@@ -740,7 +724,6 @@ class V6HybridStrategy(BaseStrategy):
                         f"[{self.name}] SELL TrailStop ticket={ticket} "
                         f"rally={rally:.2f} > {atr_val * trail_mult:.2f}"
                     )
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                     del self._trail_data[ticket]
                     return True
             else:
@@ -750,9 +733,7 @@ class V6HybridStrategy(BaseStrategy):
                         f"[{self.name}] SELL HardStop ticket={ticket} "
                         f"loss={loss:.2f} > {atr_val * hard_mult:.2f}"
                     )
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
                     del self._trail_data[ticket]
                     return True
 
-        self._last_exit_detail = None
         return False

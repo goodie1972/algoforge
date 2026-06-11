@@ -3,7 +3,9 @@ import { h, ref, computed, onMounted, watch, reactive } from 'vue'
 import { useTradeStore } from '@/stores/trades'
 import { getTradeStats, getTradeAnalysis } from '@/api/client'
 import type { TradeStats } from '@/types'
-import { NTag, NButton, NDataTable, NEmpty, NSkeleton, NAlert, NSpace, NTabs, NTabPane, NGrid, NGi, NStatistic, NCard, NSelect, NDatePicker, NIcon, NSpin, NInput } from 'naive-ui'
+import { NTag, NButton, NDataTable, NEmpty, NSkeleton, NAlert, NSpace, NTabs, NTabPane, NGrid, NGi, NStatistic, NCard, NSelect, NDatePicker, NIcon, NSpin, NInput, NModal, NProgress } from 'naive-ui'
+import { SearchOutline } from '@vicons/ionicons5'
+import StrategyRadar from '@/components/dashboard/StrategyRadar.vue'
 
 const store = useTradeStore()
 const refreshLoading = ref(false)
@@ -176,6 +178,8 @@ const columns = [
 const statsData = ref<TradeStats | null>(null)
 const statsLoading = ref(false)
 const statsError = ref<string | null>(null)
+const selectedStrategy = ref('')
+const selectedVersion = ref('')
 
 // 筛选器
 const selectedStrategies = ref<string[]>([])
@@ -201,6 +205,12 @@ async function loadStats() {
       params.to_date = fmtDate(dateRange.value[1])
     }
     statsData.value = await getTradeStats(params)
+    // 默认选中第一个策略
+    if (!selectedStrategy.value) {
+      const by = statsData.value?.by_strategy || {}
+      const entries = Object.entries(by)
+      if (entries.length) selectedStrategy.value = entries[0][0]
+    }
   } catch (e: any) {
     statsError.value = e?.message || '获取统计失败'
   } finally {
@@ -224,26 +234,63 @@ const summaryCards = computed(() => {
   const s = statsData.value?.summary
   if (!s) return []
   return [
-    { label: '总净盈亏', value: s.total_net_profit, fmt: (v: number) => `${v >= 0 ? '+' : ''}$${v.toFixed(2)}`, color: s.total_net_profit >= 0 ? '#0ecb81' : '#f6465d' },
+    { label: '总净盈亏', value: s.total_net_profit, fmt: (v: any) => `${v >= 0 ? '+' : ''}$${Number(v).toFixed(2)}`, color: s.total_net_profit >= 0 ? '#0ecb81' : '#f6465d' },
     { label: 'Profit Factor', value: s.profit_factor, fmt: (v: any) => v, color: undefined },
-    { label: '总交易次数', value: s.total_trades, fmt: (v: number) => v.toString(), color: undefined },
-    { label: '胜率', value: s.win_rate, fmt: (v: number) => `${v}%`, color: s.win_rate >= 50 ? '#0ecb81' : '#f6465d' },
-    { label: 'Expected Payoff', value: s.expected_payoff, fmt: (v: number) => `${v >= 0 ? '+' : ''}$${v.toFixed(2)}`, color: s.expected_payoff >= 0 ? '#0ecb81' : '#f6465d' },
-    { label: '最大连亏', value: s.max_consecutive_losses, fmt: (v: number) => `${v} 次`, color: undefined },
+    { label: '总交易次数', value: s.total_trades, fmt: (v: any) => String(v), color: undefined },
+    { label: '胜率', value: s.win_rate, fmt: (v: any) => `${v}%`, color: s.win_rate >= 50 ? '#0ecb81' : '#f6465d' },
+    { label: 'Expected Payoff', value: s.expected_payoff, fmt: (v: any) => `${v >= 0 ? '+' : ''}$${Number(v).toFixed(2)}`, color: s.expected_payoff >= 0 ? '#0ecb81' : '#f6465d' },
+    { label: '最大连亏', value: s.max_consecutive_losses, fmt: (v: any) => `${v} 次`, color: undefined },
   ]
 })
 
-// 分策略透视表
+// 分策略透视表（按策略族分组，4位PPNN）
+const statsExpandedRowKeys = ref<string[]>([])
+
+function renderStatsExpand(row: any) {
+  if (!row.versions?.length) return '无版本明细'
+  const cols = [
+    { title: 'Magic', key: 'magic' },
+    { title: '版本', key: 'version' },
+    { title: '总盈亏', key: 'total_net_profit', render(r: any) {
+      const v = r.total_net_profit ?? 0
+      return h('span', { style: { color: v >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
+        `${v >= 0 ? '+' : ''}$${v.toFixed(2)}`)
+    }},
+    { title: '交易次数', key: 'total_trades' },
+    { title: '胜率', key: 'win_rate', render(r: any) { return `${r.win_rate}%` }},
+    { title: 'PF', key: 'profit_factor', render(r: any) { return r.profit_factor }},
+    { title: '平均盈利', key: 'avg_profit_trade', render(r: any) { return `$${r.avg_profit_trade?.toFixed(2)}` }},
+    { title: '平均亏损', key: 'avg_loss_trade', render(r: any) { return `$${r.avg_loss_trade?.toFixed(2)}` }},
+  ]
+  return h('div', { style: 'padding: 8px 24px;' }, [
+    h(NDataTable, {
+      columns: cols,
+      data: row.versions,
+      size: 'small',
+      bordered: false,
+      striped: true,
+      'single-line': false,
+      maxHeight: 400,
+    })
+  ])
+}
+
 const statsTableData = computed(() => {
-  const by = statsData.value?.by_magic || {}
-  return Object.entries(by).map(([magic, s]: [string, any]) => ({
-    magic,
+  const by = statsData.value?.by_strategy || {}
+  return Object.entries(by).map(([name, s]: [string, any]) => ({
     ...s,
-  }))
+    strategy: name,
+    key: name,
+  })) as any[]
 })
 
 const statsColumns = [
-  { title: 'Magic', key: 'magic', width: 80, fixed: 'left' as const },
+  {
+    type: 'expand' as const,
+    width: 40,
+    renderExpand: renderStatsExpand,
+  },
+  { title: 'Magic', key: 'magic', width: 70, fixed: 'left' as const },
   {
     title: '策略', key: 'strategy', width: 130,
     render(row: any) {
@@ -392,6 +439,12 @@ const statsColumns = [
 
         <!-- 数据态 -->
         <template v-else>
+          <!-- 策略雷达评估 -->
+          <StrategyRadar :stats="statsData" :selected-strategy="selectedStrategy"
+            :selected-version="selectedVersion"
+            @select="(v: string) => { selectedStrategy = v; selectedVersion = '' }"
+            @select-version="(v: string) => selectedVersion = v" />
+
           <!-- 汇总指标卡片 -->
           <n-card size="small" :bordered="true" style="margin-bottom: 12px;">
             <n-grid :cols="6" :x-gap="16" :y-gap="12">
@@ -410,7 +463,9 @@ const statsColumns = [
           <n-card size="small" :bordered="true">
             <n-data-table :columns="statsColumns" :data="statsTableData" :bordered="true"
                           :max-height="600" striped :single-line="false" size="small"
-                          :scroll-x="1600" />
+                          :scroll-x="1600"
+                          v-model:expanded-row-keys="statsExpandedRowKeys"
+                          :row-key="(row: any) => row.key || row.strategy" />
           </n-card>
         </template>
       </n-tab-pane>

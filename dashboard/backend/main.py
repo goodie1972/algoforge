@@ -138,7 +138,9 @@ async def broadcast_engine_status():
 # === FastAPI 生命周期 ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动/关闭事件"""
+    """启动/关闭事件 — 自动启动引擎线程"""
+    # 在后台线程启动引擎（不阻塞 asyncio 事件循环）
+    await asyncio.to_thread(engine_runner.start)
     poller_state.running = True
     tasks = [
         asyncio.create_task(broadcast_prices()),
