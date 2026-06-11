@@ -88,6 +88,7 @@ xauusd/
 │   ├── bridge.py                # 桥接抽象基类 + 数据类型
 │   ├── freemt4_bridge.py        # FreeMT4 Socket 桥接
 │   └── metaapi_bridge.py        # MetaApi 云端桥接（预留）
+├── start.py                    # 一键启动脚本（端口清理+API+引擎）
 ├── engine_standalone/
 │   ├── main.py                  # TradingEngine 交易引擎主循环
 │   └── run.py                   # 启动前置检查 + 引擎启动
@@ -164,16 +165,18 @@ xauusd/
 ### 3.3 启动交易系统
 
 ```bash
-# 方式一：启动菜单
-start.bat
+# 方式一（推荐）★：一键启动 — 自动清理端口 + 启动后端 + 启动引擎 + 等待 MT4 连接
+python start.py
 
-# 方式二：直接启动引擎
+# 方式二：直接启动后端（引擎在 lifespan 中自动启动，无需额外 API 调用）
+python dashboard/backend/main.py
+
+# 方式三：仅启动交易引擎（无 Web 仪表盘）
 python engine_standalone/run.py
-
-# 方式三：启动完整仪表盘
-python -m dashboard.backend.main
-cd dashboard/frontend && npm run dev
 ```
+
+> **说明**：从 v6 版本开始，`main.py` 的 FastAPI 生命周期（lifespan）会自动调用 `engine_runner.start()`，
+> 不再需要手动调用 `POST /api/engine/start`。`start.py` 在此基础上增加了端口检测/清理、子进程管理等运维功能。`
 
 ### 3.4 前置检查
 
