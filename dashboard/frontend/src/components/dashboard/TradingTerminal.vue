@@ -52,11 +52,10 @@ const tfIndicatorPresets: Record<string, Record<string, boolean>> = {
 }
 
 function getRefreshInterval(tf: string): number {
-  if (tf === 'M1') return 5_000
-  if (tf === 'M5' || tf === 'M15') return 10_000
-  if (tf === 'M30' || tf === 'H1') return 10_000
-  if (tf === 'H4') return 30_000
-  return 60_000 // D1, W1
+  if (tf === 'M1' || tf === 'M5' || tf === 'M15') return 2_000
+  if (tf === 'M30' || tf === 'H1') return 2_000
+  if (tf === 'H4') return 10_000
+  return 30_000 // D1, W1
 }
 
 function stopAutoRefresh() {
@@ -71,17 +70,15 @@ function startAutoRefresh() {
   const ms = getRefreshInterval(activeTf.value)
   refreshTimer = setInterval(async () => {
     if (!candleSeries) return
-    const data = await store.fetchLatestCandles(activeTf.value, 10)
-    if (!data || data.length === 0) return
-    for (const c of data) {
-      candleSeries.update({
-        time: c.time as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      })
-    }
+    await store.fetchCandles(activeTf.value, 500)
+    if (store.candles.length === 0) return
+    candleSeries.setData(store.candles.map(c => ({
+      time: c.time as UTCTimestamp,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    })))
     afterDataLoad()
     nextTick(() => {
       scrollAllToRealTime()
@@ -257,28 +254,20 @@ watch(() => store.spread, (n) => {
   _sTimer = setTimeout(() => { spreadFlash.value = false }, 600)
 })
 
-// K 线实时跳动：每个 WebSocket tick 更新当前 bar 的 OHLC，不等 10s 定时器
+// K 线实时跳动：每个 WebSocket tick 更新当前 bar 的 close
+// 时区校准由后端 API 负责，前端直接用 store 中最后一条的 time
 watch(() => store.bid, (price) => {
   if (!candleSeries || price <= 0 || store.candles.length === 0) return
   const last = store.candles[store.candles.length - 1]
   if (!last || !last.time) return
-  // 只更新当前周期的未完成 bar，不改已完成 bar
-  const tfSec: Record<string, number> = { M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400, W1:604800 }
-  const period = tfSec[activeTf.value] || 3600
-  const currentBarStart = Math.floor(Date.now() / 1000 / period) * period
-  if (last.time !== currentBarStart) return
-  candleSeries.update({
-    time: last.time as UTCTimestamp,
-    high: Math.max(last.high, price),
-    low: Math.min(last.low, price),
-    close: price,
-  })
-  // 同步更新 store 中最后一条的 H/L/C，使 refreshData 的 candleSeries.update 不会回退
-  store.candles[store.candles.length - 1] = {
-    ...last,
-    high: Math.max(last.high, price),
-    low: Math.min(last.low, price),
-    close: price,
+  try {
+    candleSeries.update({
+      time: last.time as UTCTimestamp,
+      close: price,
+    })
+    last.close = price
+  } catch (e) {
+    // lightweight-charts 时间戳校验不通过时跳过
   }
 })
 
