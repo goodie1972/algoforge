@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS risk_states (
     strategy TEXT NOT NULL,
     realized_pnl REAL DEFAULT 0,
     consecutive_losses INTEGER DEFAULT 0,
+    exit_timestamps TEXT DEFAULT '[]',
     realized_loss_blocked INTEGER DEFAULT 0,
     floating_loss_blocked INTEGER DEFAULT 0,
     rapid_exit_blocked INTEGER DEFAULT 0,
@@ -113,6 +114,25 @@ CREATE TABLE IF NOT EXISTS logs (
 );
 CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
+
+CREATE TABLE IF NOT EXISTS news_calendar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    time TEXT DEFAULT '',
+    title TEXT NOT NULL,
+    country TEXT DEFAULT '',
+    impact TEXT DEFAULT '',
+    forecast TEXT DEFAULT '',
+    previous TEXT DEFAULT '',
+    fetched_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_news_country ON news_calendar(country);
+CREATE INDEX IF NOT EXISTS idx_news_impact ON news_calendar(impact);
+
+CREATE TABLE IF NOT EXISTS metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -331,6 +351,19 @@ def get_trade_stats(strategy: str = None, from_date: str = "",
         conn.close()
 
 
+def get_trades(limit: int = 100) -> list[dict]:
+    """获取最近 N 条成交记录（按平仓时间倒序）"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM trades ORDER BY close_time DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 # ── Signals ─────────────────────────────────────────────
 
 def insert_signal(record: dict) -> int:
@@ -436,13 +469,14 @@ def save_risk_state(magic: int, strategy: str, state: dict) -> int:
     try:
         conn.execute(
             """INSERT OR REPLACE INTO risk_states
-               (magic, strategy, realized_pnl, consecutive_losses,
+               (magic, strategy, realized_pnl, consecutive_losses, exit_timestamps,
                 realized_loss_blocked, floating_loss_blocked, rapid_exit_blocked,
                 realized_loss_amount_blocked, consecutive_loss_blocked, blocked_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 magic, strategy,
                 state.get("realized_pnl", 0), state.get("consecutive_losses", 0),
+                state.get("exit_timestamps", "[]"),
                 int(state.get("realized_loss_blocked", False)),
                 int(state.get("floating_loss_blocked", False)),
                 int(state.get("rapid_exit_blocked", False)),
@@ -542,6 +576,79 @@ def prune_logs(max_rows: int = 100000, max_days: int = 7) -> int:
         if deleted:
             conn.commit()
         return deleted
+    finally:
+        conn.close()
+
+
+# ── News Calendar ───────────────────────────────────────
+
+def clear_news_calendar():
+    """清空新闻日历表（每次拉取后全量替换）"""
+    conn = get_conn()
+    try:
+        conn.execute("DELETE FROM news_calendar")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def insert_news_events(events: list[dict], fetched_at: float) -> int:
+    """批量插入新闻事件。返回插入条数"""
+    conn = get_conn()
+    inserted = 0
+    try:
+        for evt in events:
+            conn.execute(
+                """INSERT INTO news_calendar
+                   (date, time, title, country, impact, forecast, previous, fetched_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    evt.get("date", ""), evt.get("time", ""),
+                    evt.get("title", "Unknown"),
+                    (evt.get("country") or "").upper(),
+                    (evt.get("impact") or "").strip(),
+                    evt.get("forecast", ""), evt.get("previous", ""),
+                    fetched_at,
+                ),
+            )
+            inserted += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return inserted
+
+
+def load_news_events() -> list[dict]:
+    """加载所有新闻日历事件"""
+    conn = get_conn()
+    try:
+        rows = conn.execute("SELECT * FROM news_calendar ORDER BY date, time").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+# ── Metadata (key-value) ────────────────────────────────
+
+def get_metadata(key: str) -> str | None:
+    """读取元数据"""
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT value FROM metadata WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+    finally:
+        conn.close()
+
+
+def set_metadata(key: str, value: str) -> int:
+    """写入或更新元数据"""
+    conn = get_conn()
+    try:
+        conn.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", (key, value))
+        conn.commit()
+        return 1
+    except Exception:
+        return 0
     finally:
         conn.close()
 

@@ -240,8 +240,19 @@ class M30RSIStrategy(BaseStrategy):
             signal = OrderType.BUY
             signal_str = "LONG"
         elif short_score >= self.score_threshold and h1_trend == 'DOWN':
-            signal = OrderType.SELL
-            signal_str = "SELL"
+            # RSI < 20 完全禁空，20~30 空头扣一分
+            if rsi_val < 20:
+                signal_str = "RSI深超卖禁空"
+            elif rsi_val < self.rsi_oversold:
+                short_score -= 1
+                if short_score >= self.score_threshold:
+                    signal = OrderType.SELL
+                    signal_str = "SELL(罚)"
+                else:
+                    signal_str = f"RSI扣分({short_score}分)"
+            else:
+                signal = OrderType.SELL
+                signal_str = "SELL"
 
         # ── Logging ──
         detail_parts = []

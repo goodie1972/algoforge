@@ -13,7 +13,8 @@ import { usePriceStore } from '@/stores/prices'
 import { useLogStore } from '@/stores/logs'
 import { usePatrolStore } from '@/stores/patrol'
 import { wsClient } from '@/api/websocket'
-import { getEngineStatus } from '@/api/client'
+import { getEngineStatus, startEngine, stopEngine } from '@/api/client'
+import { useMessage, useDialog } from 'naive-ui'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
 
 const router = useRouter()
@@ -25,6 +26,9 @@ const logStore = useLogStore()
 const patrolStore = usePatrolStore()
 
 const engineStatus = ref<'running' | 'stopped'>('stopped')
+const toggleLoading = ref(false)
+const message = useMessage()
+const dialog = useDialog()
 const wsPulse = ref(false)
 let pulseTimer: ReturnType<typeof setTimeout> | null = null
 function triggerPulse() {
@@ -58,6 +62,45 @@ async function checkEngineStatus() {
   } catch { /* ignore */ }
 }
 
+async function toggleEngine(checked: boolean) {
+  if (!checked) {
+    // 停止 → 需要确认
+    dialog.warning({
+      title: '确认停止引擎',
+      content: '停止引擎后所有策略暂停运行，确定继续？',
+      positiveText: '确定',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        toggleLoading.value = true
+        try {
+          await stopEngine()
+          engineStatus.value = 'stopped'
+          message.success('引擎已停止')
+        } catch (e: any) {
+          message.error(e?.response?.data?.detail || '停止失败')
+          engineStatus.value = 'running'
+        }
+        toggleLoading.value = false
+      },
+      onNegativeClick: () => {
+        engineStatus.value = 'running'
+      }
+    })
+  } else {
+    // 启动
+    toggleLoading.value = true
+    try {
+      await startEngine()
+      engineStatus.value = 'running'
+      message.success('引擎启动成功')
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || '启动失败')
+      engineStatus.value = 'stopped'
+    }
+    toggleLoading.value = false
+  }
+}
+
 onMounted(() => {
   checkEngineStatus()
   // 启动前端巡检（每 30 秒自动检测引擎/价格/持仓/日志异常）
@@ -73,6 +116,7 @@ onMounted(() => {
   wsClient.on('logs', (msg) => logStore.append(msg.data))
   wsClient.on('status', (msg) => {
     engineStatus.value = msg.data?.status === 'running' ? 'running' : 'stopped'
+    toggleLoading.value = false
   })
 })
 
@@ -123,10 +167,12 @@ onUnmounted(() => {
                 </n-breadcrumb>
                 <div style="flex:1;"></div>
                 <PatrolIndicator />
-                <n-tag :type="engineStatus === 'running' ? 'success' : 'default'" size="small" :bordered="false">
-                  <span class="status-dot" :class="{ 'pulse-flash': wsPulse }" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:4px;vertical-align:middle;transition:box-shadow .15s;"></span>
-                  {{ engineStatus === 'running' ? '运行中' : '已停止' }}
-                </n-tag>
+                <n-switch :value="engineStatus === 'running'" size="large" :round="true"
+                  :loading="toggleLoading" @update:value="toggleEngine">
+                  <template #checked-icon>
+                    <span class="engine-dot" :class="{ 'pulse-flash': wsPulse }" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;"></span>
+                  </template>
+                </n-switch>
               </n-layout-header>
 
               <n-layout-content content-style="padding: 20px 24px;" :native-scrollbar="false"

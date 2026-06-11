@@ -530,7 +530,7 @@ class V6HybridStrategy(BaseStrategy):
         # ── Decision ──
         signal = None
         signal_str = "无信号"
-        if long_score >= 3:
+        if long_score >= 4:
             signal = OrderType.BUY
             signal_str = "LONG"
         elif short_score >= 3:

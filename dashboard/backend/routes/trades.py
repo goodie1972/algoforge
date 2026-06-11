@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
+from data import database as db
 
 router = APIRouter(prefix="/api/trades", tags=["trades"])
 
@@ -164,13 +165,10 @@ def _calc_stats(trades: list[dict]) -> dict:
 
 @router.get("/history")
 async def get_trade_history(limit: int = 100):
-    """获取最近 N 条已平仓记录（按平仓时间倒序）"""
-    if not engine_runner or not engine_runner._engine:
-        return []
+    """获取最近 N 条已平仓记录（从 SQLite 读取，按平仓时间倒序）"""
     try:
-        trades = list(engine_runner._engine.closed_trades)
-        trades.sort(key=lambda t: t.get("close_time", ""), reverse=True)
-        return trades[:limit]
+        trades = db.get_trades(limit=limit)
+        return trades
     except Exception as e:
         raise HTTPException(502, f"获取历史成交失败: {e}")
 

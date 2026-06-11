@@ -119,6 +119,8 @@ class TradingEngine:
         self._last_news_check = 0.0
         self._last_data_sync = 0.0
         self._data_sync_interval = 300  # 每300秒（5分钟）同步一次数据
+        self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
+        self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
         self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
@@ -172,6 +174,27 @@ class TradingEngine:
         if self._config_service is not None:
             return self._config_service.get_coordinator_config()
         return dict(settings.COORDINATOR_CONFIG)
+
+    def _calibrate_mt4_time(self):
+        """启动时校准 MT4 服务器时间 vs 本机 UTC 时间"""
+        try:
+            mt4_ts = self.bridge.get_server_time()
+            if mt4_ts <= 0:
+                logger.warning("[时间校准] MT4 服务器时间获取失败，跳过校准")
+                return
+            now_utc = int(time.time())
+            self._mt4_offset = mt4_ts - now_utc
+            sign = "+" if self._mt4_offset >= 0 else ""
+            logger.info(f"[时间校准] MT4: {mt4_ts} | 本机UTC: {now_utc} | "
+                       f"偏移: {sign}{self._mt4_offset/3600:.1f}h")
+        except Exception as e:
+            logger.warning(f"[时间校准] 失败: {e}")
+
+    def _mt4_to_local(self, mt4_ts: int):
+        """将 MT4 时间戳转为本地 datetime（校准后）"""
+        from datetime import datetime
+        corrected = mt4_ts - self._mt4_offset
+        return datetime.fromtimestamp(corrected)
 
     @property
     def closed_trades(self) -> list[dict]:
@@ -312,8 +335,8 @@ class TradingEngine:
                 if s.magic == magic:
                     strategy = s.name
                     break
-            open_dt = datetime.fromtimestamp(order["open_time"])
-            close_dt = datetime.fromtimestamp(order["close_time"])
+            open_dt = self._mt4_to_local(order["open_time"])
+            close_dt = self._mt4_to_local(order["close_time"])
             hold_sec = int(order["close_time"] - order["open_time"])
             record = {
                 "ticket": order["ticket"], "symbol": order["symbol"],
@@ -615,6 +638,17 @@ class TradingEngine:
                     rs = self._risk_states[magic]
                     rs.realized_pnl = saved.get("realized_pnl", 0)
                     rs.consecutive_losses = saved.get("consecutive_losses", 0)
+                    # 恢复快速出场计数器（重启不丢）
+                    et_raw = saved.get("exit_timestamps", "[]")
+                    try:
+                        et_list = json.loads(et_raw) if isinstance(et_raw, str) else et_raw
+                        now = time.time()
+                        window = self._rt('rapid_exit_window_seconds')
+                        # 只恢复窗口内的有效时间戳
+                        valid = [t for t in et_list if now - t < window]
+                        rs.exit_timestamps = deque(valid)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
                     for flag in ("realized_loss_blocked", "floating_loss_blocked",
                                  "rapid_exit_blocked", "realized_loss_amount_blocked",
                                  "consecutive_loss_blocked"):
@@ -637,6 +671,9 @@ class TradingEngine:
 
         self._daily_start_balance = self._get_balance()
         self.running = True
+
+        # 校准 MT4 服务器时间 vs 本机 UTC
+        self._calibrate_mt4_time()
 
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
@@ -700,6 +737,9 @@ class TradingEngine:
 
         self._check_status_report()
 
+        # ---- 日历定时拉取检查（24h 一次） ----
+        self.news_filter.try_scheduled_fetch()
+
         # ---- 新闻风险处理：收紧止损 or 强制平仓 ----
         self._handle_news_risk(snapshot)
 
@@ -739,6 +779,7 @@ class TradingEngine:
                     db.save_risk_state(magic, state.name, {
                         "realized_pnl": state.realized_pnl,
                         "consecutive_losses": state.consecutive_losses,
+                        "exit_timestamps": json.dumps(list(state.exit_timestamps)),
                         "realized_loss_blocked": state.realized_loss_blocked,
                         "floating_loss_blocked": state.floating_loss_blocked,
                         "rapid_exit_blocked": state.rapid_exit_blocked,
@@ -840,13 +881,14 @@ class TradingEngine:
             is_buy = pos.order_type in ("OP_BUY", "BUY")
             if is_buy != target_is_buy:
                 continue
-            if pos.profit <= 0:
+            net_profit = pos.profit - abs(pos.commission) - abs(pos.swap)
+            if net_profit <= 0:
                 continue
 
             logger.info(
                 f"[协调器] {signal_name} {signal_dir}盈利 ${signal_profit:.2f} → "
                 f"平 Magic={pos.magic} {target_dir} ticket={pos.ticket} "
-                f"盈利 ${pos.profit:.2f}"
+                f"盈利=${net_profit:.2f}(毛={pos.profit:.2f})"
             )
             try:
                 self.bridge.close_order(pos.ticket)
@@ -899,7 +941,7 @@ class TradingEngine:
             if not candles or len(candles) < count:
                 continue
 
-            closes = [c.close for c in candles[:-1]]  # 排除当前未完成 bar
+            closes = [c.close for c in candles[1:]]  # 排除当前未完成 bar (index 0)
 
             # 计算 EMA20 斜率（最近 3 根，仅已收盘 bar）
             k = 2.0 / 21
@@ -916,10 +958,22 @@ class TradingEngine:
             trend_up = ema_slope > 0
             trend_down = ema_slope < 0
 
+            # 确定当前 tf 的 bar 起始时间（同一根 bar 内不重复止盈）
+            now_mt4 = int(time.time()) + int(self._mt4_offset)
+            tf_sec = 900 if tf == "M15" else 300
+            current_bar = (now_mt4 // tf_sec) * tf_sec
+
             for pos in positions:
                 if pos.ticket in closed_this_tick:
                     continue
-                if pos.profit <= 0:
+                # 同一根 bar 内每个 magic 只允许一次反向止盈
+                if pos.magic in self._last_reverse_tp_bar:
+                    last_bar = self._last_reverse_tp_bar[pos.magic].get(tf, 0)
+                    if last_bar == current_bar:
+                        continue
+
+                net_profit = pos.profit - abs(pos.commission) - abs(pos.swap)
+                if net_profit <= 0:
                     continue
                 is_buy = pos.order_type in ("OP_BUY", "BUY")
                 name = strategy_names.get(pos.magic, f"Magic={pos.magic}")
@@ -928,12 +982,16 @@ class TradingEngine:
                 if not is_buy and trend_up:
                     logger.info(
                         f"[反向止盈] {name} {tf}转多 ticket={pos.ticket} "
-                        f"盈利=${pos.profit:.2f} → 平仓"
+                        f"净利=${net_profit:.2f}(毛={pos.profit:.2f}) → 平仓"
                     )
                     try:
                         self.bridge.close_order(pos.ticket)
                         self._record_close(pos.ticket, pos.profit, pos.magic, "SELL")
                         closed_this_tick.add(pos.ticket)
+                        # 记录此 bar 已对本 magic 执行过止盈
+                        if pos.magic not in self._last_reverse_tp_bar:
+                            self._last_reverse_tp_bar[pos.magic] = {}
+                        self._last_reverse_tp_bar[pos.magic][tf] = current_bar
                     except Exception as e:
                         logger.error(f"[反向止盈] 平仓失败 ticket={pos.ticket}: {e}")
 
@@ -941,12 +999,15 @@ class TradingEngine:
                 elif is_buy and trend_down:
                     logger.info(
                         f"[反向止盈] {name} {tf}转空 ticket={pos.ticket} "
-                        f"盈利=${pos.profit:.2f} → 平仓"
+                        f"净利=${net_profit:.2f}(毛={pos.profit:.2f}) → 平仓"
                     )
                     try:
                         self.bridge.close_order(pos.ticket)
                         self._record_close(pos.ticket, pos.profit, pos.magic, "BUY")
                         closed_this_tick.add(pos.ticket)
+                        if pos.magic not in self._last_reverse_tp_bar:
+                            self._last_reverse_tp_bar[pos.magic] = {}
+                        self._last_reverse_tp_bar[pos.magic][tf] = current_bar
                     except Exception as e:
                         logger.error(f"[反向止盈] 平仓失败 ticket={pos.ticket}: {e}")
 

@@ -177,6 +177,16 @@ class FreeMT4Bridge(MT4BridgeBase):
         ask = float(data[1]) if len(data) > 1 else 0
         return bid, ask
 
+    def get_server_time(self, symbol: str = "XAUUSD") -> int:
+        """获取 MT4 服务器当前的 Unix 时间戳（用于时区校准）"""
+        data = self._send_cmd(f"F020#1#{symbol}#")
+        if not data or len(data) < 1:
+            return 0
+        try:
+            return int(data[0])
+        except (ValueError, IndexError):
+            return 0
+
     def get_candles(self, symbol: str, timeframe: str, count: int, offset: int = 0) -> list[Candle]:
         tf = TF_MAP.get(timeframe, TF_MAP["H1"])
         data = self._send_cmd(f"F042#4#{symbol}#{tf}#{offset}#{count}#")
