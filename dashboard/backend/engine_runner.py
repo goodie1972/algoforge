@@ -258,18 +258,19 @@ class EngineRunner:
                 "H1": 3600, "H4": 14400, "D1": 86400, "W1": 604800}
 
     def get_cached_candles(self, timeframe: str, count: int = 500) -> Optional[list]:
-        """返回缓存的 K 线（最后一根已用实时 BID 扩展），None 表示缓存未就绪"""
+        """返回缓存的 K 线（最后一根已用实时中间价扩展），None 表示缓存未就绪"""
         candles = self._cached_candles.get(timeframe)
         if not candles or len(candles) < 3:
             return None
-        # 用最新 BID 扩展最后一根 K 线（MT4 K 线基于 BID 价格）
+        # 用最新中间价 (bid+ask)/2 扩展最后一根 K 线，与页面"现价"一致
         result = list(candles)
         last = dict(result[-1])
-        bid = self._cached_bid
-        if bid > 0:
-            last["high"] = round(max(last["high"], bid), 2)
-            last["low"] = round(min(last["low"], bid), 2)
-            last["close"] = round(bid, 2)
+        price = self._cached_price
+        if price and price.get("bid", 0) > 0:
+            mid = round((price["bid"] + price["ask"]) / 2, 2)
+            last["high"] = round(max(last["high"], mid), 2)
+            last["low"] = round(min(last["low"], mid), 2)
+            last["close"] = mid
         result[-1] = last
         return result[-count:]
 
