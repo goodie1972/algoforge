@@ -45,17 +45,34 @@ TF_SECONDS = {
 TARGET_TS = int(datetime(2024, 1, 1, tzinfo=timezone.utc).timestamp())
 
 
-def download_timeframe(bridge, timeframe: str, symbol: str = "XAUUSD") -> int:
-    """增量同步（引擎用）：只拉最新缺口，不回溯历史"""
+def download_timeframe(bridge, timeframe: str, symbol: str = "XAUUSD",
+                       now_ts: int | None = None) -> int:
+    """增量同步（引擎用）：只拉最新缺口，不回溯历史
+
+    Args:
+        now_ts: 可选的"当前时间"时间戳，用于按 MT4 服务器时间计算缺口。
+                不传则用 time.time()（UTC）。
+    """
     latest = get_latest_timestamp(timeframe)
-    now_ts = int(time.time())
+    if now_ts is None:
+        now_ts = int(time.time())
+
+    # 最小批量和默认全量
+    min_batch = {"M1": 500, "M5": 500, "M15": 300, "M30": 200, "H1": 200, "H4": 100, "D1": 50, "W1": 30}
+    default_count = PAGE_SIZE.get(timeframe, 1000)
+    safe_min = min_batch.get(timeframe, 100)
 
     if latest:
         gap = now_ts - latest
-        needed = max(10, min(PAGE_SIZE.get(timeframe, 1000), gap // TF_SECONDS.get(timeframe, 3600) + 5))
-        logger.info(f"[{timeframe}] 增量同步: 已有 {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}，拉取 {needed} 根")
+        # 当缺口为负（MT4 服务器时间快于 UTC）或太小，用最小保底批
+        if gap <= 0:
+            needed = safe_min
+            logger.info(f"[{timeframe}] 增量同步（保底）: 已有 {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}，拉取 {needed} 根")
+        else:
+            needed = max(safe_min, min(default_count, gap // TF_SECONDS.get(timeframe, 3600) + 5))
+            logger.info(f"[{timeframe}] 增量同步: 已有 {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}，拉取 {needed} 根")
     else:
-        needed = PAGE_SIZE.get(timeframe, 1000)
+        needed = default_count
         logger.info(f"[{timeframe}] 首次初始下载，拉取 {needed} 根")
 
     candles = bridge.get_candles(symbol, timeframe, needed)

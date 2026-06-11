@@ -38,6 +38,13 @@ class EngineRunner:
         return self._running and self.engine_thread is not None and self.engine_thread.is_alive()
 
     @property
+    def mt4_offset(self) -> float:
+        """MT4 服务器时间与 UTC 的偏移秒数（引擎校准后的值）"""
+        if self._engine and hasattr(self._engine, '_mt4_offset'):
+            return self._engine._mt4_offset
+        return 0.0
+
+    @property
     def uptime(self) -> float:
         if self._start_time and self.is_running:
             return (datetime.now() - self._start_time).total_seconds()
@@ -82,6 +89,39 @@ class EngineRunner:
         if self._engine:
             return self._engine.remove_strategy(name, close_positions)
         return False
+
+    # ======================== 策略版本写入数据库 ========================
+
+    def _sync_strategy_versions(self):
+        """将各策略文件中的 STRATEGY_CHANGELOG 写入 strategy_versions 表"""
+        try:
+            from data.database import upsert_strategy_version
+            import importlib
+            strategy_modules = [
+                ("strategies.m30_rsi", "M30_rsi_bb"),
+                ("strategies.v6_hybrid", "H1_v6_hybrid"),
+                ("strategies.sanqing_h1", "sanqing_h1"),
+                ("strategies.gold_autoresearch_h1", "gold_auto_research"),
+            ]
+            total = 0
+            for mod_name, strat_name in strategy_modules:
+                try:
+                    mod = importlib.import_module(mod_name)
+                    changelog = getattr(mod, "STRATEGY_CHANGELOG", [])
+                    for entry in changelog:
+                        upsert_strategy_version(
+                            magic=entry["magic"],
+                            strategy_name=strat_name,
+                            version=entry["version"],
+                            date=entry["date"],
+                            description=entry["desc"],
+                        )
+                        total += 1
+                except Exception as e:
+                    self.logger.warning(f"[版本同步] {mod_name} 失败: {e}")
+            self.logger.info(f"[版本同步] 写入 {total} 条版本记录")
+        except Exception as e:
+            self.logger.warning(f"[版本同步] 跳过: {e}")
 
     # ======================== 数据库数据完整性检查 ========================
 
@@ -183,6 +223,8 @@ class EngineRunner:
                     "take_profit": p.take_profit,
                     "magic": p.magic,
                     "comment": getattr(p, "comment", ""),
+                    "open_time": getattr(p, "open_time", ""),
+                    "strategy": getattr(p, "comment", ""),
                 }
                 for p in positions
             ]
@@ -295,6 +337,9 @@ class EngineRunner:
 
         # 引擎启动后检查数据库数据完整性，自动补漏
         self._sync_data_after_start(engine)
+
+        # 将各策略 STRATEGY_CHANGELOG 写入数据库 strategy_versions 表
+        self._sync_strategy_versions()
 
         # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
         from config import settings as _cfg_fast

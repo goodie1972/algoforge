@@ -259,9 +259,15 @@ watch(() => store.spread, (n) => {
 
 // K 线实时跳动：每个 WebSocket tick 更新当前 bar 的 close，不等 10s 定时器
 watch(() => store.midPrice, (price) => {
-  if (!candleSeries || price <= 0) return
-  const lastTime = (store.candles[store.candles.length - 1]?.time || 0) as UTCTimestamp
-  candleSeries.update({ time: lastTime, close: price })
+  if (!candleSeries || price <= 0 || store.candles.length === 0) return
+  const last = store.candles[store.candles.length - 1]
+  if (!last || !last.time) return
+  // 只更新当前周期的未完成 bar，不改已完成 bar 的收盘价
+  const tfSec: Record<string, number> = { M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400, W1:604800 }
+  const period = tfSec[activeTf.value] || 3600
+  const currentBarStart = Math.floor(Date.now() / 1000 / period) * period
+  if (last.time !== currentBarStart) return
+  candleSeries.update({ time: last.time as UTCTimestamp, close: price })
 })
 
 function getCandleData(): CandleData[] {

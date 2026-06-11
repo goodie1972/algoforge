@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { h, onMounted } from 'vue'
+import { NTag } from 'naive-ui'
 import { usePositionStore } from '@/stores/positions'
 import { usePriceStore } from '@/stores/prices'
 import TradingTerminal from '@/components/dashboard/TradingTerminal.vue'
@@ -79,6 +80,14 @@ onMounted(() => {
             },
             { title: '止盈', key: 'take_profit', width: 90,
               render(row: any) { return row.take_profit || '-' }
+            },
+            { title: '开仓时间', key: 'open_time', width: 150,
+              render(row: any) {
+                if (!row.open_time) return '-'
+                const ts = typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)
+                if (isNaN(ts)) return row.open_time
+                return new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false })
+              }
             },
             { title: '盈亏', key: 'profit', width: 100,
               render(row: any) {

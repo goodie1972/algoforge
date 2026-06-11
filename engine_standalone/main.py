@@ -122,6 +122,7 @@ class TradingEngine:
         self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
         self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
         self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
+        self._entry_signal_data: dict[int, dict] = {}      # ticket → 开仓时信号数据
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
         self._closed_trades: list[dict] = []               # 已平仓记录（内存）
@@ -1109,6 +1110,17 @@ class TradingEngine:
                 else:
                     open_time_str, open_ts = self._pos_open_time(pos)
                     actual_hold = max(0, int(time.time() - open_ts)) if open_ts > 0 else round(hold_sec)
+
+            # 组装入场/出场数据
+            entry_data = self._entry_signal_data.pop(pos.ticket, {})
+            exit_detail = getattr(strategy, "_last_exit_detail", None) or {}
+            snapshot = {
+                "entry_factors": entry_data.get("entry_factors", {}),
+                "indicator_values": entry_data.get("indicator_values", {}),
+                "scores": entry_data.get("scores", {}),
+                "exit_detail": exit_detail,
+            }
+
             record = dict(
                 ticket=pos.ticket,
                 symbol=pos.symbol,
@@ -1127,6 +1139,7 @@ class TradingEngine:
                 close_time=close_time_str,
                 hold_seconds=actual_hold,
                 exit_reason="strategy_exit",
+                indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
             try:
@@ -1266,6 +1279,15 @@ class TradingEngine:
             logger.info(f"[{strategy.name}] 开多仓 Magic={strategy.magic} "
                         f"{self._rt('lot_size')}手 @ {ask:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
+            last_sig = getattr(strategy, "_last_signal", None) or {}
+            self._entry_signal_data[ticket] = {
+                "entry_factors": {
+                    "long": last_sig.get("factors_long", []),
+                    "short": last_sig.get("factors_short", []),
+                },
+                "indicator_values": last_sig.get("indicator_values", {}),
+                "scores": {"long": last_sig.get("score_long", 0), "short": last_sig.get("score_short", 0)},
+            }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
 
@@ -1295,6 +1317,15 @@ class TradingEngine:
             logger.info(f"[{strategy.name}] 开空仓 Magic={strategy.magic} "
                         f"{self._rt('lot_size')}手 @ {bid:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
+            last_sig = getattr(strategy, "_last_signal", None) or {}
+            self._entry_signal_data[ticket] = {
+                "entry_factors": {
+                    "long": last_sig.get("factors_long", []),
+                    "short": last_sig.get("factors_short", []),
+                },
+                "indicator_values": last_sig.get("indicator_values", {}),
+                "scores": {"long": last_sig.get("score_long", 0), "short": last_sig.get("score_short", 0)},
+            }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
 
@@ -1379,6 +1410,15 @@ class TradingEngine:
                 else:
                     open_time_str, open_ts = self._pos_open_time(pos)
                     hold_sec = max(0, int(time.time() - open_ts)) if open_ts > 0 else 0
+
+            entry_data = self._entry_signal_data.pop(pos.ticket, {})
+            snapshot = {
+                "entry_factors": entry_data.get("entry_factors", {}),
+                "indicator_values": entry_data.get("indicator_values", {}),
+                "scores": entry_data.get("scores", {}),
+                "exit_detail": {"exit_type": reason},
+            }
+
             record = dict(
                 ticket=pos.ticket, symbol=pos.symbol,
                 order_type=pos.order_type, volume=pos.volume,
@@ -1389,6 +1429,7 @@ class TradingEngine:
                 strategy=strategy.name, open_time=open_time_str,
                 close_time=close_time_str, hold_seconds=hold_sec,
                 exit_reason=reason,
+                indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
             try:
@@ -1434,9 +1475,11 @@ class TradingEngine:
 
         logger.info(f"[数据同步] 开始增量同步周期: {sorted(active_tfs)}")
         all_empty = True
+        # 使用 MT4 服务器时间计算缺口
+        mt4_now = int(time.time()) + int(self._mt4_offset)
         for tf in sorted(active_tfs):
             try:
-                n = download_timeframe(self.bridge, tf, settings.SYMBOL)
+                n = download_timeframe(self.bridge, tf, settings.SYMBOL, now_ts=mt4_now)
                 if n > 0:
                     logger.info(f"[数据同步] {tf} 写入 {n} 条")
                     all_empty = False
