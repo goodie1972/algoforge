@@ -6,6 +6,7 @@ import type { TradeStats } from '@/types'
 import { NTag, NButton, NDataTable, NEmpty, NSkeleton, NAlert, NSpace, NTabs, NTabPane, NGrid, NGi, NStatistic, NCard, NSelect, NDatePicker, NIcon, NSpin, NInput, NModal, NProgress } from 'naive-ui'
 import { SearchOutline } from '@vicons/ionicons5'
 import StrategyRadar from '@/components/dashboard/StrategyRadar.vue'
+import { getSignals } from '@/api/client'
 
 const store = useTradeStore()
 const refreshLoading = ref(false)
@@ -218,8 +219,42 @@ async function loadStats() {
   }
 }
 
+// 废票数据
+const voidedSignals = ref<any[]>([])
+const voidedLoading = ref(false)
+const voidedExpandedKeys = ref<(string | number)[]>([])
+
+const voidedColumns = [
+  { type: 'expand', width: 35, renderExpand: (row: any) => {
+    const fl = row.factors_long ? JSON.parse(row.factors_long) : []
+    const fs = row.factors_short ? JSON.parse(row.factors_short) : []
+    return h('div', { style: 'padding: 8px 20px; font-size: 12px; line-height: 1.6;' }, [
+      h('div', {}, `做多因子: ${fl.join(', ') || '无'}`),
+      h('div', {}, `做空因子: ${fs.join(', ') || '无'}`),
+      h('div', {}, `多空评分: ${row.score_long}/${row.score_short}`),
+      row.indicator_values ? h('div', { style: 'color:#888;margin-top:4px;' }, `指标快照: ${row.indicator_values}`) : null,
+    ])
+  }},
+  { title: '信号ID', key: 'id', width: 70 },
+  { title: '策略', key: 'strategy', width: 100 },
+  { title: '方向', key: 'signal', width: 60,
+    render(row: any) { return h('span', { style: { color: row.signal?.includes('BUY') ? '#0ecb81' : '#f6465d' } }, row.signal) }
+  },
+  { title: '时间', key: 'timestamp', width: 150 },
+  { title: '废票原因', key: 'void_reason', width: 120 },
+]
+
+async function loadVoided() {
+  voidedLoading.value = true
+  try {
+    voidedSignals.value = await getSignals({ status: 'voided', limit: 200 })
+  } catch { voidedSignals.value = [] }
+  finally { voidedLoading.value = false }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'stats' && !statsData.value) loadStats()
+  if (tab === 'voided') loadVoided()
 })
 
 // 展开行时自动请求分析
@@ -468,6 +503,20 @@ const statsColumns = [
                           :row-key="(row: any) => row.key || row.strategy" />
           </n-card>
         </template>
+      </n-tab-pane>
+
+      <!-- 废票 -->
+      <n-tab-pane name="voided" tab="废票">
+        <n-space vertical size="small">
+          <n-tag :bordered="false" type="warning">共 {{ voidedSignals.length }} 条</n-tag>
+          <n-data-table v-if="voidedLoading"
+            :columns="voidedColumns" :data="[]" :loading="true" :bordered="true" :max-height="500" />
+          <n-empty v-else-if="voidedSignals.length === 0" description="暂无废票记录" />
+          <n-data-table v-else :columns="voidedColumns" :data="voidedSignals" :bordered="true"
+            :max-height="500" striped :single-line="false"
+            v-model:expanded-row-keys="voidedExpandedKeys"
+            :row-key="(row: any) => row.id" />
+        </n-space>
       </n-tab-pane>
     </n-tabs>
   </n-space>
