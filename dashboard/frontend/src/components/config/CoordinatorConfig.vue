@@ -29,9 +29,7 @@ function defaults() {
     target_strategies: store.items?.coordinator?.target_strategies ?? [],
     target_direction: store.items?.coordinator?.target_direction ?? 'SELL',
     m15_reverse_tp_enabled: store.items?.coordinator?.m15_reverse_tp_enabled ?? false,
-    m5_reverse_tp_enabled: store.items?.coordinator?.m5_reverse_tp_enabled ?? false,
     m15_reverse_tp_sensitivity: store.items?.coordinator?.m15_reverse_tp_sensitivity ?? 0.5,
-    m5_reverse_tp_sensitivity: store.items?.coordinator?.m5_reverse_tp_sensitivity ?? 0.5,
   }
 }
 
@@ -109,14 +107,10 @@ const directionOptions = [
                 <n-text code>{{ local.target_direction === 'SELL' ? '空单' : '多单' }}</n-text>
                 盈利单。
               </div>
-              <div v-if="local.m15_reverse_tp_enabled || local.m5_reverse_tp_enabled">
-                当
-                <template v-if="local.m15_reverse_tp_enabled"><n-text code>M15</n-text></template>
-                <template v-if="local.m15_reverse_tp_enabled && local.m5_reverse_tp_enabled"> / </template>
-                <template v-if="local.m5_reverse_tp_enabled"><n-text code>M5</n-text></template>
-                EMA20 斜率反向时，平掉所有原方向盈利单。
+              <div v-if="local.m15_reverse_tp_enabled">
+                当 <n-text code>M15</n-text> EMA20 斜率超过归一化阈值时，平掉所有原方向盈利单。
               </div>
-              <div v-if="!local.cross_exit_enabled && !local.m15_reverse_tp_enabled && !local.m5_reverse_tp_enabled">
+              <div v-if="!local.cross_exit_enabled && !local.m15_reverse_tp_enabled">
                 请勾选右侧功能后启用
               </div>
             </n-alert>
@@ -151,18 +145,12 @@ const directionOptions = [
               </n-form-item>
             </template>
 
-            <n-divider title-position="left">功能②：短周期反向止盈</n-divider>
+            <n-divider title-position="left">功能②：M15 反向止盈</n-divider>
 
             <n-form-item label="M15 反向止盈">
               <n-switch :value="local.m15_reverse_tp_enabled"
                 @update:value="(v: boolean) => local.m15_reverse_tp_enabled = v" />
-              <template #feedback>M15 EMA20 斜率转势时平盈利单</template>
-            </n-form-item>
-
-            <n-form-item label="M5 反向止盈">
-              <n-switch :value="local.m5_reverse_tp_enabled"
-                @update:value="(v: boolean) => local.m5_reverse_tp_enabled = v" />
-              <template #feedback>M5 EMA20 斜率转势时平盈利单，反应最快但可能误触</template>
+              <template #feedback>M15 EMA20 斜率归一化反转时平盈利单（M5 过于敏感已移除）</template>
             </n-form-item>
 
             <template v-if="local.m15_reverse_tp_enabled">
@@ -171,17 +159,7 @@ const directionOptions = [
                   :options="sensitivityOptions"
                   @update:value="(v: number) => local.m15_reverse_tp_sensitivity = v"
                   style="width: 100%;" />
-                <template #feedback>斜率 / ATR ≥ 此值时触发，值越大越不敏感</template>
-              </n-form-item>
-            </template>
-
-            <template v-if="local.m5_reverse_tp_enabled">
-              <n-form-item label="M5 灵敏度">
-                <n-select :value="local.m5_reverse_tp_sensitivity"
-                  :options="sensitivityOptions"
-                  @update:value="(v: number) => local.m5_reverse_tp_sensitivity = v"
-                  style="width: 100%;" />
-                <template #feedback>斜率 / ATR ≥ 此值时触发，值越大越不敏感</template>
+                <template #feedback>斜率 / ATR ≥ 此值时触发，0.5=推荐 0=原版敏感逻辑</template>
               </n-form-item>
             </template>
           </template>
