@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
+let autoScrollScheduled = false
 function scheduleAutoScroll() {
+  if (autoScrollScheduled) return  // 防止 scrollAllToRealTime 触发的事件循环
   if (autoScrollTimer) clearTimeout(autoScrollTimer)
   autoScrollTimer = setTimeout(() => {
+    autoScrollScheduled = true
     scrollAllToRealTime()
-  }, 10000)  // 10 秒无操作自动回正
+    setTimeout(() => { autoScrollScheduled = false }, 500)
+  }, 10000)
 }
 import { usePriceStore } from '@/stores/prices'
 import { useFlashOnChange } from '@/composables/useFlashOnChange'
