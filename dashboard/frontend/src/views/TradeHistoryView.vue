@@ -231,22 +231,23 @@ const voidedColumns = [
     let iv: Record<string, any> = {}
     try { iv = row.indicator_values ? JSON.parse(row.indicator_values) : {} } catch {}
     const ivEntries = Object.entries(iv).filter(([k]) => !['recent_high','recent_low','price_position'].includes(k))
-    return h('div', { style: 'padding: 8px 20px; font-size: 12px;' }, [
-      h('div', { style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 12px;' }, [
+    const importantKeys = ['rsi','atr','close','ema9','ema21','adx','macd_val']
+    return h('div', { style: 'padding: 8px 20px; font-size: 13px;' }, [
+      h('div', { style: 'display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px;' }, [
         h('div', {}, [
-          h('div', { style: 'font-weight:700;color:#0ecb81;margin-bottom:4px;' }, '做多因子'),
-          h('div', {}, fl.length ? fl.join(' → ') : '无'),
-          h('div', { style: 'font-weight:700;color:#f6465d;margin:8px 0 4px;' }, '做空因子'),
-          h('div', {}, fs.length ? fs.join(' → ') : '无'),
-          h('div', { style: 'margin-top:8px;' }, `多空评分: ${row.score_long}/${row.score_short}`),
+          h('div', { style: 'font-weight:700;color:#0ecb81;margin-bottom:2px;' }, '做多因子'),
+          h('div', { style: 'font-size:13px;' }, fl.length ? fl.join(' → ') : '无'),
+          h('div', { style: 'font-weight:700;color:#f6465d;margin:6px 0 2px;' }, '做空因子'),
+          h('div', { style: 'font-size:13px;' }, fs.length ? fs.join(' → ') : '无'),
+          h('div', { style: 'margin-top:6px;font-weight:700;' }, `多空评分: ${row.score_long}/${row.score_short}`),
         ]),
         h('div', {}, [
-          h('div', { style: 'font-weight:700;margin-bottom:4px;' }, '指标快照'),
-          h('div', { style: 'display:grid; grid-template-columns:repeat(3,1fr); gap:4px;' },
+          h('div', { style: 'font-weight:700;margin-bottom:2px;' }, '指标快照'),
+          h('div', { style: 'display:grid; grid-template-columns:repeat(3,1fr); gap:3px;' },
             ivEntries.map(([k, v]) =>
-              h('div', { style: 'background:#1a1a2e;padding:2px 6px;border-radius:3px;font-size:11px;' },
-                `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`
-              )
+              h('div', {
+                style: `background:#1a1a2e;padding:2px 6px;border-radius:3px;font-size:12px;${importantKeys.includes(k) ? 'font-weight:700;color:#f0e68c;' : ''}`
+              }, `${k}=${typeof v === 'number' ? v.toFixed(2) : v}`)
             )
           ),
         ]),
