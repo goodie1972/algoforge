@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleAutoScroll() {
+  if (autoScrollTimer) clearTimeout(autoScrollTimer)
+  autoScrollTimer = setTimeout(() => {
+    scrollAllToRealTime()
+  }, 10000)  // 10 秒无操作自动回正
+}
 import { usePriceStore } from '@/stores/prices'
 import { useFlashOnChange } from '@/composables/useFlashOnChange'
 import { createChart, ColorType, type UTCTimestamp } from 'lightweight-charts'
@@ -205,10 +212,11 @@ onMounted(() => {
   // 双向时间轴同步：主图缩放 → 所有副图
   chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
     syncAllChartsFrom(chart!)
+    scheduleAutoScroll()
   })
-  // 十字光标时也同步
   chart.subscribeCrosshairMove(() => {
     syncAllChartsFrom(chart!)
+    scheduleAutoScroll()
   })
 
   startAutoRefresh()
