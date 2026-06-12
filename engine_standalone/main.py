@@ -1009,8 +1009,25 @@ class TradingEngine:
                 continue
 
             ema_slope = ema_values[-1] - ema_values[-4]  # 最近 3 根
-            trend_up = ema_slope > 0
-            trend_down = ema_slope < 0
+
+            # 斜率归一化：用 ATR 衡量斜率大小，避免微小波动触发平仓
+            sensitivity = coord.get('m15_reverse_tp_sensitivity', 0.5) if tf == 'M15' else coord.get('m5_reverse_tp_sensitivity', 0.5)
+            if sensitivity > 0:
+                tr_vals = []
+                for i in range(1, len(candles[1:])):
+                    c = candles[i]
+                    pc = candles[i-1].close
+                    tr_vals.append(max(c.high-c.low, abs(c.high-pc), abs(c.low-pc)))
+                atr14 = sum(tr_vals[:14])/14 if len(tr_vals) >= 14 else 0
+                if atr14 > 0:
+                    trend_up = ema_slope > atr14 * sensitivity
+                    trend_down = ema_slope < -atr14 * sensitivity
+                else:
+                    trend_up = ema_slope > 0
+                    trend_down = ema_slope < 0
+            else:
+                trend_up = ema_slope > 0
+                trend_down = ema_slope < 0
 
             # 确定当前 tf 的 bar 起始时间（同一根 bar 内不重复止盈）
             now_mt4 = int(time.time()) + int(self._mt4_offset)

@@ -6,6 +6,20 @@ import { useMessage } from 'naive-ui'
 const store = useConfigStore()
 const message = useMessage()
 
+const sensitivityOptions = [
+  { label: '0.0 (关闭归一化, 原版敏感逻辑)', value: 0 },
+  { label: '0.1 (触发率 82%)', value: 0.1 },
+  { label: '0.2 (触发率 63%)', value: 0.2 },
+  { label: '0.3 (触发率 50%)', value: 0.3 },
+  { label: '0.4 (触发率 38%)', value: 0.4 },
+  { label: '0.5 (触发率 25%, 推荐)', value: 0.5 },
+  { label: '0.6 (触发率 19%)', value: 0.6 },
+  { label: '0.7 (触发率 14%)', value: 0.7 },
+  { label: '0.8 (触发率 10%)', value: 0.8 },
+  { label: '0.9 (触发率 5%)', value: 0.9 },
+  { label: '1.0 (触发率 2%)', value: 1.0 },
+]
+
 function defaults() {
   return {
     enabled: store.items?.coordinator?.enabled ?? false,
@@ -16,6 +30,8 @@ function defaults() {
     target_direction: store.items?.coordinator?.target_direction ?? 'SELL',
     m15_reverse_tp_enabled: store.items?.coordinator?.m15_reverse_tp_enabled ?? false,
     m5_reverse_tp_enabled: store.items?.coordinator?.m5_reverse_tp_enabled ?? false,
+    m15_reverse_tp_sensitivity: store.items?.coordinator?.m15_reverse_tp_sensitivity ?? 0.5,
+    m5_reverse_tp_sensitivity: store.items?.coordinator?.m5_reverse_tp_sensitivity ?? 0.5,
   }
 }
 
@@ -148,6 +164,26 @@ const directionOptions = [
                 @update:value="(v: boolean) => local.m5_reverse_tp_enabled = v" />
               <template #feedback>M5 EMA20 斜率转势时平盈利单，反应最快但可能误触</template>
             </n-form-item>
+
+            <template v-if="local.m15_reverse_tp_enabled">
+              <n-form-item label="M15 灵敏度">
+                <n-select :value="local.m15_reverse_tp_sensitivity"
+                  :options="sensitivityOptions"
+                  @update:value="(v: number) => local.m15_reverse_tp_sensitivity = v"
+                  style="width: 100%;" />
+                <template #feedback>斜率 / ATR ≥ 此值时触发，值越大越不敏感</template>
+              </n-form-item>
+            </template>
+
+            <template v-if="local.m5_reverse_tp_enabled">
+              <n-form-item label="M5 灵敏度">
+                <n-select :value="local.m5_reverse_tp_sensitivity"
+                  :options="sensitivityOptions"
+                  @update:value="(v: number) => local.m5_reverse_tp_sensitivity = v"
+                  style="width: 100%;" />
+                <template #feedback>斜率 / ATR ≥ 此值时触发，值越大越不敏感</template>
+              </n-form-item>
+            </template>
           </template>
         </n-space>
       </n-grid-item>

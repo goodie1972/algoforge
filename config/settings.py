@@ -151,6 +151,11 @@ COORDINATOR_CONFIG = {
     # 功能②：短周期反向止盈（EMA20 斜率反转时平盈利单）
     "m15_reverse_tp_enabled": False,   # M15 周期
     "m5_reverse_tp_enabled": False,    # M5 周期
+    # 斜率归一化阈值：斜率/ATR 超过此值才算真反转
+    # 0.0 = 关闭归一化（原版逻辑，斜率>0即触发）
+    # 0.1~1.0 = 数值越大越不敏感，推荐 0.5（触发率约25%）
+    "m15_reverse_tp_sensitivity": 0.5,
+    "m5_reverse_tp_sensitivity": 0.5,
 }
 
 # === 止盈冷却时间（策略盈利平仓后，N 小时内不再开同向单） ===
