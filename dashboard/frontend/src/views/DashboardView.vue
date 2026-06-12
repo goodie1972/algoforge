@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted } from 'vue'
+import { h, ref, onMounted } from 'vue'
 import { NTag } from 'naive-ui'
 import { usePositionStore } from '@/stores/positions'
 import { usePriceStore } from '@/stores/prices'
@@ -8,6 +8,25 @@ import StrategySignals from '@/components/dashboard/StrategySignals.vue'
 
 const positionStore = usePositionStore()
 const priceStore = usePriceStore()
+
+const expandedRowKeys = ref<(string | number)[]>([])
+
+function renderPosExpand(row: any) {
+  return h('div', { style: 'padding: 8px 16px; font-size: 12px; line-height: 1.8; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;' }, [
+    h('div', {}, [
+      h('div', { style: 'font-weight: 700; color: #0ecb81;' }, '开仓信息'),
+      h('div', {}, `Magic: ${row.magic || '-'}`),
+      row.stop_loss ? h('div', {}, `止损距离: ${(Math.abs(row.open_price - row.stop_loss)).toFixed(2)}`) : null,
+      row.take_profit ? h('div', {}, `止盈距离: ${(Math.abs(row.take_profit - row.open_price)).toFixed(2)}`) : null,
+    ]),
+    h('div', {}, [
+      h('div', { style: 'font-weight: 700; color: #f0a020' }, '当前状态'),
+      h('div', {}, `入场: ${row.open_price?.toFixed(2)} / 现价: ${row.current_price?.toFixed(2)}`),
+      h('div', { style: { color: row.profit >= 0 ? '#0ecb81' : '#f6465d' } },
+        `浮动盈亏: ${row.profit >= 0 ? '+' : ''}$${row.profit?.toFixed(2)}`),
+    ]),
+  ])
+}
 
 onMounted(() => {
   positionStore.fetch()
@@ -39,6 +58,7 @@ onMounted(() => {
       <template v-else>
         <n-data-table
           :columns="[
+            { type: 'expand', width: 35, renderExpand: renderPosExpand },
             { title: 'Ticket', key: 'ticket', width: 90 },
             { title: '方向', key: 'order_type', width: 70,
               render(row: any) {
@@ -104,6 +124,8 @@ onMounted(() => {
           striped
           :single-line="false"
           size="small"
+          v-model:expanded-row-keys="expandedRowKeys"
+          :row-key="(row: any) => row.ticket"
         />
       </template>
     </n-card>
