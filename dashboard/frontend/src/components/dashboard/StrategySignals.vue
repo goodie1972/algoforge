@@ -177,46 +177,133 @@ const strategyColors: Record<string, string> = {
   'xaubot_backup': '#808080',
 }
 
-const strategyLogics: Record<string, { factors: string[]; desc: string }> = {
-  H1_v6_hybrid: {
-    desc: '多因子评分（≥5分开多，≥3分开空）',
-    factors: [
-      '① SMA200 趋势：收盘价 > SMA200 → +1',
-      '② KDJ 超卖：K < 30(超卖) → +1',
-      '③ 布林下轨：最低价 ≤ 布林下轨 → +1',
-      '④ Keltner 下轨：最低价 ≤ Keltner 下轨 → +1',
-      '⑤ MACD 底背离：价格新低 + MACD 抬升 → +2',
-      '⑥ RSI 超卖：RSI < 30 → +1',
-      '⑦ 低波动：ATR < SMA(ATR)×1.2 → +1',
-      '⑧ M30 方向：M30 EMA20 升/降 → ±1',
-    ],
-  },
+interface StratSide {
+  title: string; color: string; entry: string[]; exit: string[];
+}
+
+interface StratLogic {
+  desc: string; long: StratSide; short: StratSide;
+}
+
+const strategyLogics: Record<string, StratLogic> = {
   M30_rsi_bb: {
-    desc: 'RSI 超卖/超买 + 布林带触碰',
-    factors: [
-      '① RSI < 30 超卖 + 收盘价 ≤ 布林下轨 → BUY',
-      '② RSI > 70 超买 + 收盘价 ≥ 布林上轨 → SELL',
-      '③ EMA20 跟踪止损：突破均线反向 → 平仓',
-      '④ M30 周期，适合短线震荡行情',
-    ],
+    desc: 'M30 RSI+布林带均值回归',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['6因子评分 ≥3 入场',
+        'H1趋势(UP)→+1 | 触碰BB下轨→+1',
+        'RSI<30→+1 | M30 RSI上升→+1',
+        '低波动(ATR<均价×0.025)→+1',
+        '急跌>1.5%惩罚→−1',
+        '位置门禁: 顶部10%禁多'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR移动止盈(trail)',
+        '亏损: ATR硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['6因子评分 ≥3 入场',
+        'H1趋势(DOWN)→+1 | 触碰BB上轨→+1',
+        'RSI>65→+1 | M30 RSI下降→+1',
+        '低波动→+1 | 急涨>1.5%惩罚→−1',
+        'RSI<20完全禁空, 20~30扣1分',
+        '位置门禁: 底部10%禁空'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR移动止盈(trail)',
+        '亏损: ATR硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
+  },
+  H1_v6_hybrid: {
+    desc: 'H1 多因子评分 V6 混合策略',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['8因子评分 ≥4 入场（逆势≥5）',
+        'SMA200上→+1 | KDJ超卖→+1',
+        'BB下轨触碰→+1 | KC下轨触碰→+1',
+        'MACD底背离→+2 | RSI<30→+1',
+        '低波动(ATR<ATR_SMA×1.2)→+1',
+        'M30方向(UP→+1/DOWN→−1)',
+        '趋势门禁: M30↓+价<SMA200时阈值升为5'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR_SMA移动止盈(trail)',
+        '亏损: ATR_SMA硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['5因子评分 ≥3 入场（逆势≥4）',
+        '仅收盘价≤SMA200时才评分',
+        'KDJ超买→+1 | KC上轨触碰→+1',
+        'MACD顶背离→+2 | RSI>70→+1',
+        'M30方向(DOWN→+1/UP→−1)',
+        '趋势门禁: M30↑+价>SMA200时阈值升为4',
+        '位置门禁: 底部10%禁空'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR_SMA移动止盈(trail)',
+        '亏损: ATR_SMA硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
   },
   sanqing_h1: {
-    desc: '三清共振：趋势 + 动量 + 波动率',
-    factors: [
-      '① SMA50/200 趋势过滤：多头/空头排列',
-      '② MACD 金叉/死叉 + 柱体确认动量',
-      '③ ATR 波动率过滤：避免低波动假突破',
-      '④ H1 周期，适合日内波段交易',
-    ],
+    desc: 'H1 EMA9/21 趋势评分系统',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['6因子评分 ≥5 入场',
+        'EMA上升趋势→+2 (金叉→+1)',
+        '触碰EMA9反弹→+2',
+        '实体>ATR→+1',
+        '高成交量(>均量×1.3)→+1',
+        '吞没形态→+2',
+        '位置门禁: 顶部10%禁多'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR移动止盈(trail)',
+        '亏损: ATR硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['6因子评分 ≥5 入场',
+        'EMA下降趋势→+2 (死叉→+1)',
+        '触碰EMA9回落→+2',
+        '实体>ATR→+1 | 高成交量→+1',
+        '吞没形态→+2',
+        '位置门禁: 底部10%禁空'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR移动止盈(trail)',
+        '亏损: ATR硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
   },
   gold_auto_research: {
-    desc: '黄金自动研究：多指标综合判断',
-    factors: [
-      '① KDJ 超卖/超买区域判断',
-      '② 布林带上下轨支撑阻力',
-      '③ 价格 vs SMA200 大趋势方向',
-      '④ H1 周期，综合型交易策略',
-    ],
+    desc: 'H1 4因子共识投票策略',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['4因子必须全部为真',
+        '①趋势: EMA10 > EMA20',
+        '②动量: MACD>信号线 或 Stoch金叉',
+        '③波动: ADX>20 或 ATR上升',
+        '④安全: 非(BB上轨+RSI≥70)',
+        '顶部10%位置 → safe_up=false'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR移动止盈(trail)',
+        '亏损: ATR硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['4因子必须全部为真',
+        '①趋势: EMA10 < EMA20',
+        '②动量: MACD<信号线 或 Stoch死叉',
+        '③波动: ADX>20 或 ATR上升',
+        '④安全: RSI > 35',
+        'RSI≤35独立封空 | 底部10%→safe_dn=false'],
+      exit: ['盈利: 利润回撤25%止盈',
+        '盈利: ATR移动止盈(trail)',
+        '亏损: ATR硬止损(hard)',
+        '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
   },
 }
 
@@ -376,10 +463,31 @@ onUnmounted(() => {
           <n-text depth="2" style="font-size: 12px; display: block; margin-bottom: 6px;">
             {{ strategyLogics[s.name]?.desc || '' }}
           </n-text>
-          <div v-for="(f, fi) in strategyLogics[s.name]?.factors || []" :key="fi"
-            style="font-size: 11px; color: #8b8f97; padding: 2px 0;">
-            {{ f }}
-          </div>
+          <template v-if="strategyLogics[s.name]">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
+              <!-- 做空 -->
+              <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #f6465d;">
+                <div style="font-weight:700; color:#f6465d; font-size:12px; margin-bottom:4px;">▼ 做空</div>
+                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
+                <div v-for="(l, li) in strategyLogics[s.name]!.short.entry" :key="'se'+li"
+                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ l }}</div>
+                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
+                <div v-for="(l, li) in strategyLogics[s.name]!.short.exit" :key="'sx'+li"
+                  style="font-size:10px; color:#999; padding:1px 0;">{{ l }}</div>
+              </div>
+              <!-- 做多 -->
+              <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #0ecb81;">
+                <div style="font-weight:700; color:#0ecb81; font-size:12px; margin-bottom:4px;">▲ 做多</div>
+                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
+                <div v-for="(l, li) in strategyLogics[s.name]!.long.entry" :key="'le'+li"
+                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ l }}</div>
+                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
+                <div v-for="(l, li) in strategyLogics[s.name]!.long.exit" :key="'lx'+li"
+                  style="font-size:10px; color:#999; padding:1px 0;">{{ l }}</div>
+              </div>
+            </div>
+          </template>
+          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">暂无详细策略说明</div>
         </n-collapse-item>
         <n-empty v-if="!activeStrategies.length" description="暂无运行策略" />
       </n-collapse>
