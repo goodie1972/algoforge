@@ -68,13 +68,13 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # ============================================================
 STRATEGY_POOL = {
     "M30_rsi_bb": {
-        "magic": 660704,
+        "magic": 660705,
         "timeframe": "M30",
         "double_first": False,
         "max_positions": 1,
     },
     "H1_v6_hybrid": {
-        "magic": 660605,
+        "magic": 660606,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
@@ -112,7 +112,7 @@ MAX_POSITIONS = int(len(STRATEGY_POOL) * 1.5)  # 1策略 → 1
 
 # 向后兼容
 STRATEGY = "M30_rsi_bb"
-MAGIC_NUMBER = 660704       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
+MAGIC_NUMBER = 660705       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
 # 通用指标参数（供工具脚本使用）
 BB_PERIOD = 20              # 布林带周期
 BB_STD = 2.0                # 布林带标准差倍数
