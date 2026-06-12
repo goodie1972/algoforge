@@ -187,8 +187,7 @@ def migrate_signals_lifecycle():
         for col, dtype in additions.items():
             if col not in existing:
                 conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {dtype}")
-        # 回填旧信号：空status + 无ticket → voided（按时间区分）
-        conn.execute("UPDATE signals SET status='voided', void_reason='升级前记录' WHERE (status IS NULL OR status = '') AND (ticket IS NULL OR ticket = 0) AND timestamp LIKE '2026-06-12%'")
+        # 回填旧信号：空status + 无ticket → voided
         conn.execute("UPDATE signals SET status='voided', void_reason='历史记录' WHERE (status IS NULL OR status = '') AND (ticket IS NULL OR ticket = 0)")
         # 回填旧信号：空status + 有ticket → opened
         conn.execute("UPDATE signals SET status='opened' WHERE (status IS NULL OR status = '') AND ticket > 0")
