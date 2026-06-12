@@ -530,6 +530,7 @@ async def get_trade_analysis(ticket: int):
     if entry_factors.get("long") or entry_factors.get("short"):
         scores = snapshot.get("scores", {})
         indicator_values = snapshot.get("indicator_values", {})
+        factors_list = entry_factors.get("long", []) if "BUY" in direction.upper() else entry_factors.get("short", [])
         entry = {
             "system": "实时评分记录",
             "score_long": scores.get("long", 0),
@@ -537,7 +538,8 @@ async def get_trade_analysis(ticket: int):
             "long_factors": entry_factors.get("long", []),
             "short_factors": entry_factors.get("short", []),
             "indicator_values": indicator_values,
-            "likely_conditions": entry_factors.get("long", []) if "BUY" in direction.upper() else entry_factors.get("short", []),
+            "likely_conditions": factors_list,
+            "factors": [{"name": f, "desc": f} for f in factors_list],
         }
     else:
         strategy_lower = strategy.lower()
@@ -553,9 +555,17 @@ async def get_trade_analysis(ticket: int):
             entry = {"system": "未知策略", "likely_conditions": []}
 
     if exit_detail:
+        exit_type = exit_detail.get("exit_type", "")
+        exit_logic_map = {
+            "profit_drawdown": "利润回撤止盈",
+            "trail_stop": "ATR移动止盈",
+            "hard_stop": "ATR硬止损",
+        }
+        direction_label = "空单" if "SELL" in direction.upper() else "多单"
         exit_info = {
             "label": "实时出场记录",
             "exit_detail": exit_detail,
+            "logic": exit_logic_map.get(exit_type, f"策略出场({exit_type})"),
             "pnl": round(pnl, 2),
             "is_loss": pnl < 0,
         }
