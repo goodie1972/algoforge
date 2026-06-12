@@ -1095,8 +1095,14 @@ class TradingEngine:
         strategy.refresh_data()
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic == strategy.magic]
-        # 同步本地持仓计数（MT4 硬止损平仓后桥接不会通知引擎）
-        self._known_position_count[strategy.magic] = len(my_positions)
+        # 检测 MT4 硬止损平仓（桥接消失但引擎没记录）
+        prev_count = self._known_position_count.get(strategy.magic, 0)
+        now_count = len(my_positions)
+        if now_count < prev_count:
+            logger.warning(f"[{strategy.name}] 检测到 {prev_count - now_count} 张持仓消失，启动成交恢复...")
+            self._recover_missing_trades()
+        # 同步本地持仓计数
+        self._known_position_count[strategy.magic] = now_count
         if not my_positions:
             return
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
