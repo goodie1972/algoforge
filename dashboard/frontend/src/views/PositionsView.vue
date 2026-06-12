@@ -34,7 +34,36 @@ async function openFullHistory() {
   finally { loadingFullHistory.value = false }
 }
 
+const expandedRowKeys = ref<(string | number)[]>([])
+
+function renderPositionExpand(row: any) {
+  return h('div', { style: 'padding: 12px 24px; font-size: 13px; line-height: 1.8; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;' }, [
+    h('div', {}, [
+      h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #0ecb81;' }, '开仓信息'),
+      h('div', {}, `Magic: ${row.magic || '-'}`),
+      h('div', {}, `策略名: ${row.comment || row._strategy_name || '-'}`),
+      h('div', {}, `开仓时间: ${row.open_time ? new Date(row.open_time * 1000).toLocaleString() : '-'}`),
+      row.stop_loss ? h('div', {}, `止损距离: ${(Math.abs(row.open_price - row.stop_loss)).toFixed(2)}`) : null,
+      row.take_profit ? h('div', {}, `止盈距离: ${(Math.abs(row.take_profit - row.open_price)).toFixed(2)}`) : null,
+    ]),
+    h('div', {}, [
+      h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #f0a020;' }, '当前状态'),
+      h('div', {}, `入场价: ${row.open_price?.toFixed(2)}`),
+      h('div', {}, `现价: ${row.current_price?.toFixed(2)}`),
+      h('div', { style: { color: row.profit >= 0 ? '#0ecb81' : '#f6465d' } },
+        `浮动盈亏: ${row.profit >= 0 ? '+' : ''}$${row.profit?.toFixed(2)}`),
+      row.stop_loss ? h('div', {}, `止损位: ${row.stop_loss.toFixed(2)}`) : null,
+      row.take_profit ? h('div', {}, `止盈位: ${row.take_profit.toFixed(2)}`) : null,
+    ]),
+  ])
+}
+
 const columns = [
+  {
+    type: 'expand' as const,
+    width: 40,
+    renderExpand: renderPositionExpand,
+  },
   { title: 'Ticket', key: 'ticket', width: 90 },
   {
     title: '策略', key: 'strategy', width: 110,
@@ -256,7 +285,9 @@ async function handleModify() {
     <n-alert v-else-if="store.error" type="error" :title="store.error" closable />
     <!-- 数据态 -->
     <n-data-table v-else :columns="columns" :data="store.items" :bordered="true"
-                  :max-height="600" striped :single-line="false" />
+                  :max-height="600" striped :single-line="false"
+                  v-model:expanded-row-keys="expandedRowKeys"
+                  :row-key="(row: any) => row.ticket" />
 
     <!-- 最近成交 -->
     <n-card title="最近成交" size="small">
