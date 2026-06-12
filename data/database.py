@@ -172,7 +172,7 @@ def init_db():
 
 
 def migrate_signals_lifecycle():
-    """为 signals 表添加生命周期字段（安全 ALTER TABLE）"""
+    """为 signals 表添加生命周期字段（安全 ALTER TABLE）+ 回填旧数据"""
     conn = get_conn()
     try:
         existing = {row[1] for row in conn.execute("PRAGMA table_info('signals')").fetchall()}
@@ -187,6 +187,10 @@ def migrate_signals_lifecycle():
         for col, dtype in additions.items():
             if col not in existing:
                 conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {dtype}")
+        # 回填旧信号：空status + 无ticket → voided
+        conn.execute("UPDATE signals SET status='voided', void_reason='旧信号(未开仓)' WHERE (status IS NULL OR status = '') AND (ticket IS NULL OR ticket = 0)")
+        # 回填旧信号：空status + 有ticket → opened
+        conn.execute("UPDATE signals SET status='opened' WHERE (status IS NULL OR status = '') AND ticket > 0")
         conn.commit()
     finally:
         conn.close()
