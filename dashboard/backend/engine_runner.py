@@ -188,7 +188,7 @@ class EngineRunner:
     # ======================== 缓存更新（引擎线程调用，避免与广播任务抢 bridge socket） ========================
 
     def _fresh_positions(self):
-        """用最新 cached_price 刷新持仓的 current_price（避免主循环缓存滞后）"""
+        """用最新 cached_price 刷新持仓盈亏（每 0.1s 价格采样实时重算）"""
         positions = list(self._cached_positions)
         price = self._cached_price
         if not positions or not price:
@@ -198,7 +198,14 @@ class EngineRunner:
         fresh = []
         for p in positions:
             p = dict(p)
-            p["current_price"] = bid if "SELL" in p.get("order_type", "") else ask
+            entry = p.get("open_price", 0)
+            volume = p.get("volume", 0.01)
+            is_sell = "SELL" in p.get("order_type", "")
+            current = bid if is_sell else ask
+            p["current_price"] = current
+            if entry > 0 and current > 0:
+                diff = (entry - current) if is_sell else (current - entry)
+                p["profit"] = round(diff * volume * 100, 2)
             fresh.append(p)
         return fresh
 
