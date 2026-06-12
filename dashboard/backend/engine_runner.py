@@ -62,7 +62,7 @@ class EngineRunner:
             return False
 
         self._stop_requested = False
-        self.engine_thread = threading.Thread(target=self._run, daemon=True)
+        self.engine_thread = threading.Thread(target=self._run, daemon=False)
         self.engine_thread.start()
         time.sleep(3)  # 等待引擎初始化
         return True
