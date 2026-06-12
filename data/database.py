@@ -166,6 +166,66 @@ def init_db():
         ).fetchall()
         names = [r["name"] for r in tables]
         logger.info(f"数据库初始化完成: {DB_PATH} ({len(names)} 张表: {', '.join(names)})")
+        migrate_signals_lifecycle()
+    finally:
+        conn.close()
+
+
+def migrate_signals_lifecycle():
+    """为 signals 表添加生命周期字段（安全 ALTER TABLE）"""
+    conn = get_conn()
+    try:
+        existing = {row[1] for row in conn.execute("PRAGMA table_info('signals')").fetchall()}
+        additions = {
+            'status': "TEXT DEFAULT ''",
+            'void_reason': "TEXT DEFAULT ''",
+            'exit_reason': "TEXT DEFAULT ''",
+            'exit_pnl': "REAL DEFAULT 0",
+            'exit_price': "REAL DEFAULT 0",
+            'close_time': "TEXT DEFAULT ''",
+        }
+        for col, dtype in additions.items():
+            if col not in existing:
+                conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {dtype}")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def update_signal_status(signal_id: int, updates: dict) -> bool:
+    allowed = {'status', 'void_reason', 'exit_reason', 'exit_pnl', 'exit_price', 'close_time', 'ticket'}
+    sets = {k: v for k, v in updates.items() if k in allowed}
+    if not sets:
+        return False
+    conn = get_conn()
+    try:
+        conn.execute(
+            f"UPDATE signals SET {', '.join(f'{k}=?' for k in sets)} WHERE id=?",
+            [*sets.values(), signal_id]
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def get_signal_by_ticket(ticket: int) -> Optional[dict]:
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT * FROM signals WHERE ticket=?", (ticket,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_signals_by_status(status: str, limit: int = 100) -> list[dict]:
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM signals WHERE status=? ORDER BY id DESC LIMIT ?",
+            (status, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 

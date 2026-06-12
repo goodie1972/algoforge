@@ -131,6 +131,11 @@ export async function getTradeAnalysis(ticket: number): Promise<any> {
   return data
 }
 
+export async function getSignals(params?: { strategy?: string; status?: string; limit?: number }): Promise<any[]> {
+  const { data } = await http.get('/signals', { params })
+  return data
+}
+
 // === 回测 ===
 export async function runBacktest(params: BacktestRequest): Promise<{ job_id: string; status: string }> {
   const { data } = await http.post('/backtest/run', params)

@@ -10,11 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("")
-async def get_signals(strategy: str = "", limit: int = 50):
-    """查询信号历史"""
+async def get_signals(strategy: str = "", status: str = "", limit: int = 50):
+    """查询信号历史，可按 status 过滤"""
     try:
         from data import database as db
-        signals = db.get_signals(strategy=strategy or None, limit=min(limit, 200))
+        if status:
+            signals = db.get_signals_by_status(status, limit=min(limit, 200))
+        else:
+            signals = db.get_signals(strategy=strategy or None, limit=min(limit, 200))
         return signals
     except Exception as e:
         raise HTTPException(500, f"获取信号历史失败: {e}")

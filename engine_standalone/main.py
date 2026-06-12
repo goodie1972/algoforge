@@ -365,6 +365,19 @@ class TradingEngine:
             logger.warning(f"[成交恢复] 写入文件失败: {e}")
         try:
             db.insert_trades_batch(records)
+            for r in records:
+                try:
+                    sig = db.get_signal_by_ticket(r['ticket'])
+                    if sig and sig.get('id'):
+                        db.update_signal_status(sig['id'], {
+                            'status': 'closed',
+                            'exit_reason': 'mt4_hard_sl',
+                            'exit_pnl': r['pnl'],
+                            'exit_price': r['exit_price'],
+                            'close_time': r['close_time'],
+                        })
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -1190,6 +1203,16 @@ class TradingEngine:
                 pass
             try:
                 db.insert_trade(record)
+                try:
+                    sig = db.get_signal_by_ticket(pos.ticket)
+                    if sig and sig.get('id'):
+                        db.update_signal_status(sig['id'], {
+                            'status': 'closed',
+                            'exit_reason': str(exit_detail.get('exit_type', 'strategy_exit')),
+                            'exit_pnl': round(pnl, 2),
+                        })
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -1262,7 +1285,8 @@ class TradingEngine:
 
         logger.info(f"[{strategy.name}] 收到信号: {signal}")
 
-        # 写入信号记录到数据库
+        # 先写入信号记录（status=pending），再执行开仓
+        signal_id = 0
         last_sig = getattr(strategy, "_last_signal", None)
         if last_sig and last_sig.get("signal"):
             try:
@@ -1279,22 +1303,31 @@ class TradingEngine:
                     "factors_short": _json.dumps(last_sig.get("factors_short", []), ensure_ascii=False),
                     "indicator_values": _json.dumps(last_sig.get("indicator_values", {}), ensure_ascii=False),
                     "confidence": last_sig.get("confidence"),
+                    "status": "pending",
                 }
-                db.insert_signal(sig_record)
+                signal_id = db.insert_signal(sig_record)
             except Exception:
                 pass
 
-        # 双倍首单
+        # 执行开仓，传入 signal_id
+        ticket = 0
         if signal == "信号: BUY":
-            self._execute_buy(strategy)
-            if strategy.double_first:
-                self._execute_buy(strategy)
+            ticket = self._execute_buy(strategy, signal_id)
+            if strategy.double_first and ticket:
+                self._execute_buy(strategy, 0)
         elif signal == "信号: SELL":
-            self._execute_sell(strategy)
-            if strategy.double_first:
-                self._execute_sell(strategy)
+            ticket = self._execute_sell(strategy, signal_id)
+            if strategy.double_first and ticket:
+                self._execute_sell(strategy, 0)
 
-    def _execute_buy(self, strategy):
+        # 更新信号状态
+        if signal_id > 0:
+            if ticket > 0:
+                db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
+            else:
+                db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})
+
+    def _execute_buy(self, strategy, signal_id=0):
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
         if hasattr(strategy, 'get_dynamic_sl_tp'):
             sl, tp = strategy.get_dynamic_sl_tp(OrderType.BUY, ask)
@@ -1331,8 +1364,9 @@ class TradingEngine:
             }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
+        return ticket or 0
 
-    def _execute_sell(self, strategy):
+    def _execute_sell(self, strategy, signal_id=0):
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
         if hasattr(strategy, 'get_dynamic_sl_tp'):
             sl, tp = strategy.get_dynamic_sl_tp(OrderType.SELL, bid)
@@ -1369,6 +1403,7 @@ class TradingEngine:
             }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
+        return ticket or 0
 
     def _get_balance(self) -> float:
         info = self.bridge.get_account_info()
