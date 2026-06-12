@@ -119,6 +119,7 @@ class TradingEngine:
         self._last_news_check = 0.0
         self._last_data_sync = 0.0
         self._data_sync_interval = 300  # 每300秒（5分钟）同步一次数据
+        self._last_recover_time = 0.0   # 上次成交恢复时间
         self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
         self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
         self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
@@ -744,6 +745,11 @@ class TradingEngine:
         # ---- 新闻风险处理：收紧止损 or 强制平仓 ----
         self._handle_news_risk(snapshot)
 
+        # ---- 定期恢复遗漏成交（MT4 硬止损平仓后引擎不会自动记录） ----
+        if time.time() - self._last_recover_time > 300:
+            self._recover_missing_trades()
+            self._last_recover_time = time.time()
+
         # ---- 止损平仓：所有风控/新闻禁售不限制平仓 ----
         for strategy in snapshot:
             self._run_exits(strategy)
@@ -1043,6 +1049,8 @@ class TradingEngine:
         strategy.refresh_data()
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic == strategy.magic]
+        # 同步本地持仓计数（MT4 硬止损平仓后桥接不会通知引擎）
+        self._known_position_count[strategy.magic] = len(my_positions)
         if not my_positions:
             return
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
