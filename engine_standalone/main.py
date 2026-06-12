@@ -956,7 +956,7 @@ class TradingEngine:
             logger.info(f"[协调器] 本轮联动平仓 {closed} 单")
 
     def _check_trend_reverse_tp(self):
-        """M15/M5 反向止盈：短周期趋势反转时平盈利单"""
+        """M15 反向止盈：短周期趋势反转时平盈利单（M5 过于敏感已移除）"""
         coord = self._get_coordinator()
         if not coord.get("enabled", False):
             return
@@ -964,8 +964,6 @@ class TradingEngine:
         timeframes = []
         if coord.get("m15_reverse_tp_enabled", False):
             timeframes.append("M15")
-        if coord.get("m5_reverse_tp_enabled", False):
-            timeframes.append("M5")
         if not timeframes:
             return
 
