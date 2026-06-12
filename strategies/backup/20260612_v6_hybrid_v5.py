@@ -17,15 +17,14 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v6"
-STRATEGY_MAGIC = 660606
+STRATEGY_VERSION = "v5"
+STRATEGY_MAGIC = 660605
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660601, "date": "2026-06-08", "desc": "初始上线：8因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660602, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
     {"version": "v3", "magic": 660603, "date": "2026-06-09", "desc": "双重止盈：trail=1.0 hard=2.0，新增 profit_drawdown_pct=0.25，新增 indicator_values 返回"},
     {"version": "v4", "magic": 660604, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控；RSI分层过滤"},
     {"version": "v5", "magic": 660605, "date": "2026-06-11", "desc": "趋势门禁：M30=DOWN+价<SMA200时做多阈值4→5，M30=UP+价>SMA200时做空阈值3→4"},
-    {"version": "v6", "magic": 660606, "date": "2026-06-12", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
 ]
 
 
@@ -549,23 +548,7 @@ class V6HybridStrategy(BaseStrategy):
             sell_threshold = 4
             short_detail.append("TREND-GATE↑")
 
-        # --- Position gate: no trade in extreme 10% of 60-bar range ---
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10 and short_score >= sell_threshold:
-            short_detail.append(f"BOTTOM-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={short_score})")
-            short_score = 0
-        elif price_position > 0.90 and long_score >= buy_threshold:
-            long_detail.append(f"TOP-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={long_score})")
-            long_score = 0
-
-        # --- Decision ---
+        # ── Decision ──
         signal = None
         signal_str = "无信号"
         if long_score >= buy_threshold:
@@ -593,8 +576,6 @@ class V6HybridStrategy(BaseStrategy):
 
         indicator_values = {
             "close": round(close, 2), "sma200": round(sma200, 2),
-            "price_position": round(price_position, 3),
-            "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
             "stoch_k": round(k_curr, 2), "stoch_d": round(d_curr, 2),
             "rsi": round(rsi, 2), "atr": round(atr_val, 2),
             "atr_sma": round(atr_sma_val, 2),

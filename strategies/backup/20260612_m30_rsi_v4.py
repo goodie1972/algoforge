@@ -20,14 +20,13 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v5"
-STRATEGY_MAGIC = 660705
+STRATEGY_VERSION = "v4"
+STRATEGY_MAGIC = 660704
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660701, "date": "2026-06-08", "desc": "初始上线：5因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660702, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
     {"version": "v3", "magic": 660703, "date": "2026-06-09", "desc": "双重止盈：trail=1.0 hard=2.0，新增 profit_drawdown_pct=0.25，新增 indicator_values 返回"},
     {"version": "v4", "magic": 660704, "date": "2026-06-11", "desc": "RSI分层过滤：RSI<20禁空，RSI20-30空头扣1分；新增 tight_exit_mode 新闻风控"},
-    {"version": "v5", "magic": 660705, "date": "2026-06-12", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
 ]
 
 
@@ -256,22 +255,6 @@ class M30RSIStrategy(BaseStrategy):
             long_score -= 1
             long_detail.append(f"RALLY-{rally_pct:.1f}%")
 
-        # ── 位置门禁：60根K线区间底部10%禁空、顶部10%禁多 ──
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10 and short_score >= self.score_threshold:
-            short_detail.append(f"BOTTOM-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={short_score})")
-            short_score = 0
-        elif price_position > 0.90 and long_score >= self.score_threshold:
-            long_detail.append(f"TOP-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={long_score})")
-            long_score = 0
-
         # ── Decision（去掉 H1 趋势门禁，H1 趋势已作为因子①贡献评分）──
         signal = None
         signal_str = "无信号"
@@ -309,8 +292,6 @@ class M30RSIStrategy(BaseStrategy):
         indicator_values = {
             "close": round(close, 2), "rsi": round(rsi_val, 2),
             "atr": round(atr_val, 2), "bb_upper": round(bb["upper"], 2),
-            "price_position": round(price_position, 3),
-            "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
             "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
             "h1_trend": h1_trend, "m30_rsi_dir": m30_rsi_dir, "low_vol": low_vol,
         }
