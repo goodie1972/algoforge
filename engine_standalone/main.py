@@ -370,6 +370,39 @@ class TradingEngine:
 
         logger.info(f"[成交恢复] 补充 {len(records)} 条历史成交")
 
+    # ======================== 成交同步监督 ========================
+
+    def _check_trade_sync(self):
+        """轻量监督：对比 MT4 历史与本地数据库的成交数量，不一致时告警"""
+        try:
+            orders = self.bridge.get_order_history(settings.SYMBOL)
+            if not orders:
+                return
+        except Exception as e:
+            logger.warning(f"[成交监督] 获取MT4历史失败: {e}")
+            return
+
+        mt4_count = len(orders)
+        try:
+            db_count = db.get_conn().execute("SELECT COUNT(*) FROM trades").fetchone()[0]
+        except Exception:
+            return
+
+        if mt4_count > db_count:
+            missing = mt4_count - db_count
+            logger.warning(
+                f"[成交监督] MT4 有 {mt4_count} 笔，本地数据库 {db_count} 笔，"
+                f"缺失 {missing} 笔，启动恢复..."
+            )
+            self._recover_missing_trades()
+        elif mt4_count < db_count:
+            logger.warning(
+                f"[成交监督] 本地数据库 {db_count} 笔 > MT4 {mt4_count} 笔，"
+                f"可能是 MT4 历史被清理"
+            )
+        else:
+            logger.info(f"[成交监督] 数据一致 (MT4={mt4_count}, DB={db_count})")
+
     def add_strategy(self, name: str, cfg: dict) -> bool:
         """动态添加策略（运行中），返回是否成功"""
         with self._strategies_lock:
@@ -745,9 +778,9 @@ class TradingEngine:
         # ---- 新闻风险处理：收紧止损 or 强制平仓 ----
         self._handle_news_risk(snapshot)
 
-        # ---- 定期恢复遗漏成交（MT4 硬止损平仓后引擎不会自动记录） ----
-        if time.time() - self._last_recover_time > 300:
-            self._recover_missing_trades()
+        # ---- 成交同步监督：每小时检查一次 MT4 与本地数据一致性 ----
+        if time.time() - self._last_recover_time > 3600:
+            self._check_trade_sync()
             self._last_recover_time = time.time()
 
         # ---- 止损平仓：所有风控/新闻禁售不限制平仓 ----
