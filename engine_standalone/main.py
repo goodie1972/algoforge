@@ -123,6 +123,7 @@ class TradingEngine:
         self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
         self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
         self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
+        self._shutdown_requested = False                   # 优雅关闭标记
         self._entry_signal_data: dict[int, dict] = {}      # ticket → 开仓时信号数据
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）

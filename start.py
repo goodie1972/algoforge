@@ -49,6 +49,9 @@ def kill_port(port: int):
                 parts = line.strip().split()
                 if len(parts) >= 5 and "LISTENING" in line:
                     pid = parts[-1]
+                    subprocess.run(["taskkill", "/PID", pid],
+                                   capture_output=True, timeout=5)
+                    time.sleep(3)
                     subprocess.run(["taskkill", "/F", "/PID", pid],
                                    capture_output=True, timeout=5)
                     print(f"  已终止旧进程 PID={pid}")
