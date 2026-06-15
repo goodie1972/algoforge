@@ -13,7 +13,6 @@ M30 RSI + 布林带均值回归策略 — ATR动态出场
 
 import logging
 import math
-import time
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, OrderType
@@ -21,15 +20,14 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v6"
-STRATEGY_MAGIC = 660706
+STRATEGY_VERSION = "v5"
+STRATEGY_MAGIC = 660705
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660701, "date": "2026-06-08", "desc": "初始上线：5因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660702, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
     {"version": "v3", "magic": 660703, "date": "2026-06-09", "desc": "双重止盈：trail=1.0 hard=2.0，新增 profit_drawdown_pct=0.25，新增 indicator_values 返回"},
     {"version": "v4", "magic": 660704, "date": "2026-06-11", "desc": "RSI分层过滤：RSI<20禁空，RSI20-30空头扣1分；新增 tight_exit_mode 新闻风控"},
     {"version": "v5", "magic": 660705, "date": "2026-06-12", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
-    {"version": "v6", "magic": 660706, "date": "2026-06-15", "desc": "趋势判断改为M30自身SMA200（替代H1 SMA200），盈利平仓后同方向30分钟冷却"},
 ]
 
 
@@ -62,18 +60,41 @@ class M30RSIStrategy(BaseStrategy):
         self.rsi_period = 14
         self.atr_period = 20
 
-        # 盈利平仓冷却：盈利出场后同方向30分钟内不再开仓
-        self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
-        self._exit_cooldown_seconds: int = 1800  # 30分钟
+        # H1 data cache (loaded from SQLite)
+        self._h1_closes: list[float] = []
+        self._h1_candles_cache: list[Candle] = []
+        self._last_h1_load = 0
 
         # ATR cache
         self._cached_atr_values: Optional[list[float]] = None
         self._cached_atr_key: int = 0
 
     def refresh_data(self, count: int = 350):
+        """刷新M30 K线 + 加载H1趋势数据"""
         self._cached_atr_key = 0
         self._cached_atr_values = None
         super().refresh_data(count)
+        self._load_h1_data()
+
+    def _load_h1_data(self):
+        """从SQLite加载H1收盘价（由引擎每300s同步）"""
+        try:
+            from data.database import get_conn
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+                "WHERE timeframe='H1' ORDER BY timestamp"
+            ).fetchall()
+            conn.close()
+            self._h1_candles_cache = [
+                Candle(time=str(r[0]), open=r[1], high=r[2], low=r[3], close=r[4], volume=r[5])
+                for r in rows
+            ]
+            self._h1_closes = [c.close for c in self._h1_candles_cache]
+        except Exception as e:
+            logger.warning(f"[{self.name}] H1 data load failed: {e}")
+            self._h1_closes = []
+            self._h1_candles_cache = []
 
     # ─────────────── Indicator helpers ───────────────
 
@@ -143,13 +164,11 @@ class M30RSIStrategy(BaseStrategy):
         if vals is None or len(vals) == 0: return None
         return vals[-1]
 
-    def _get_m30_trend(self) -> str:
-        """M30 SMA200趋势判断（原H1 SMA200改为M30自身周期），返回 'UP' / 'DOWN' / 'NEUTRAL'"""
-        closes = self.get_close_prices()
-        if len(closes) < 200:
-            return 'NEUTRAL'
-        sma200 = sum(closes[-200:]) / 200
-        return 'UP' if closes[-1] > sma200 else 'DOWN'
+    def _get_h1_trend(self) -> str:
+        """H1 SMA200趋势判断，返回 'UP' / 'DOWN' / 'NEUTRAL'"""
+        if len(self._h1_closes) < 200: return 'NEUTRAL'
+        sma200 = sum(self._h1_closes[-200:]) / 200
+        return 'UP' if self._h1_closes[-1] > sma200 else 'DOWN'
 
     def _get_m30_rsi_direction(self) -> str:
         """M30 RSI方向: 最近2根完成K线RSI上升→up, 下降→down"""
@@ -185,7 +204,7 @@ class M30RSIStrategy(BaseStrategy):
         atr_val = self._calc_atr()
         if atr_val is None: return None
 
-        m30_trend = self._get_m30_trend()
+        h1_trend = self._get_h1_trend()
         m30_rsi_dir = self._get_m30_rsi_direction()
 
         # Low vol filter: ATR < recent avg price × 2.5%
@@ -196,11 +215,11 @@ class M30RSIStrategy(BaseStrategy):
         long_score = 0; long_detail = []
         short_score = 0; short_detail = []
 
-        # ① M30 trend（原H1 SMA200改为M30自身周期）
-        if m30_trend == 'UP':
-            long_score += 1; long_detail.append("M30-UP")
-        elif m30_trend == 'DOWN':
-            short_score += 1; short_detail.append("M30-DN")
+        # ① H1 trend
+        if h1_trend == 'UP':
+            long_score += 1; long_detail.append("H1-UP")
+        elif h1_trend == 'DOWN':
+            short_score += 1; short_detail.append("H1-DN")
 
         # ② BB touch
         if close <= bb['lower']:
@@ -253,23 +272,7 @@ class M30RSIStrategy(BaseStrategy):
             logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={long_score})")
             long_score = 0
 
-        now = time.time()
-
-        # ── 盈利平仓冷却：同方向30分钟内不开仓 ──
-        if long_score >= self.score_threshold:
-            remaining = self._exit_cooldown_seconds - (now - self._last_profit_exit_time.get("BUY", 0))
-            if remaining > 0:
-                long_detail.append(f"COOLDOWN({int(remaining)}s)")
-                logger.info(f"[{self.name}] BUY冷却中: 盈利平仓后还剩{int(remaining)}秒")
-                long_score = 0
-        if short_score >= self.score_threshold:
-            remaining = self._exit_cooldown_seconds - (now - self._last_profit_exit_time.get("SELL", 0))
-            if remaining > 0:
-                short_detail.append(f"COOLDOWN({int(remaining)}s)")
-                logger.info(f"[{self.name}] SELL冷却中: 盈利平仓后还剩{int(remaining)}秒")
-                short_score = 0
-
-        # ── Decision（去掉 H1 趋势门禁，M30 趋势已作为因子①贡献评分）──
+        # ── Decision（去掉 H1 趋势门禁，H1 趋势已作为因子①贡献评分）──
         signal = None
         signal_str = "无信号"
         if long_score >= self.score_threshold:
@@ -300,7 +303,7 @@ class M30RSIStrategy(BaseStrategy):
         )
         logger.info(
             f"[{self.name}] Price={close:.2f} BB={bb['lower']:.2f}/{bb['upper']:.2f} "
-            f"RSI={rsi_val:.1f} ATR={atr_val:.2f} M30={m30_trend}"
+            f"RSI={rsi_val:.1f} ATR={atr_val:.2f} H1={h1_trend}"
         )
 
         indicator_values = {
@@ -309,14 +312,14 @@ class M30RSIStrategy(BaseStrategy):
             "price_position": round(price_position, 3),
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
             "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
-            "m30_trend": m30_trend, "m30_rsi_dir": m30_rsi_dir, "low_vol": low_vol,
+            "h1_trend": h1_trend, "m30_rsi_dir": m30_rsi_dir, "low_vol": low_vol,
         }
         return (signal, long_score, short_score, long_detail, short_detail, indicator_values)
 
     # ─────────────── Trend-aware exit multipliers ───────────────
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
-        trend = self._get_m30_trend()
+        trend = self._get_h1_trend()
         if trend == 'UP':
             return (1.5, 3.0) if is_buy else (1.0, 2.0)
         elif trend == 'DOWN':
@@ -383,14 +386,12 @@ class M30RSIStrategy(BaseStrategy):
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
                         self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
-                        self._last_profit_exit_time["BUY"] = time.time()
                         del self._trail_data[ticket]
                         return True
                 drawdown = td["highest"] - bid
                 if drawdown > atr_val * trail_mult:
                     logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
                     self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
-                    self._last_profit_exit_time["BUY"] = time.time()
                     del self._trail_data[ticket]
                     return True
             else:
@@ -414,14 +415,12 @@ class M30RSIStrategy(BaseStrategy):
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
                         self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
-                        self._last_profit_exit_time["SELL"] = time.time()
                         del self._trail_data[ticket]
                         return True
                 rally = ask - td["lowest"]
                 if rally > atr_val * trail_mult:
                     logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
                     self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
-                    self._last_profit_exit_time["SELL"] = time.time()
                     del self._trail_data[ticket]
                     return True
             else:

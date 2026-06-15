@@ -4,7 +4,8 @@
 import json
 import logging
 import os
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 from data import database as db
@@ -17,11 +18,13 @@ logger = logging.getLogger(__name__)
 
 MAGIC_TO_STRATEGY = {
     # 新版 magic (PPNNVV)
-    660701: "M30_rsi_bb", 660702: "M30_rsi_bb", 660703: "M30_rsi_bb", 660704: "M30_rsi_bb",
+    660701: "M30_rsi_bb", 660702: "M30_rsi_bb", 660703: "M30_rsi_bb", 660704: "M30_rsi_bb", 660705: "M30_rsi_bb", 660706: "M30_rsi_bb",
     660601: "H1_v6_hybrid", 660602: "H1_v6_hybrid", 660603: "H1_v6_hybrid", 660604: "H1_v6_hybrid",
+    660605: "H1_v6_hybrid", 660606: "H1_v6_hybrid", 660607: "H1_v6_hybrid",
     880101: "sanqing_h1", 880102: "sanqing_h1", 880103: "sanqing_h1", 880104: "sanqing_h1",
+    880105: "sanqing_h1", 880106: "sanqing_h1", 880107: "sanqing_h1",
     880301: "gold_auto_research", 880302: "gold_auto_research", 880303: "gold_auto_research",
-    880304: "gold_auto_research", 880305: "gold_auto_research",
+    880304: "gold_auto_research", 880305: "gold_auto_research", 880306: "gold_auto_research",
     # 旧版 magic 兼容
     777001: "M30_rsi_bb", 777002: "H1_v6_hybrid", 777003: "gold_auto_research",
 }
@@ -254,6 +257,92 @@ async def get_trade_stats(strategies: str = "", from_date: str = "", to_date: st
         stats["versions"].sort(key=lambda x: x.get("magic", 0))
 
     return {"summary": summary, "by_magic": by_magic, "by_strategy": by_strategy}
+
+
+# ── 日报/周报 ────────────────────────────────────────────
+
+@router.get("/report")
+async def get_trade_report():
+    """日/周汇总：按 close_time 聚合 PnL"""
+    trades = db.get_trades(limit=10000)
+    if not trades:
+        return {"daily": [], "weekly": [], "summary": {"total_pnl": 0, "total_trades": 0, "win_rate": 0}}
+
+    daily_map = defaultdict(lambda: {"pnl": 0.0, "count": 0, "wins": 0, "losses": 0, "best": 0.0, "worst": 0.0})
+
+    for t in trades:
+        raw_close = t.get("close_time", "")
+        if not raw_close or not isinstance(raw_close, str) or len(raw_close) < 10:
+            continue
+        try:
+            dt = datetime.strptime(raw_close[:10], "%Y-%m-%d")
+        except ValueError:
+            continue
+        day_key = dt.strftime("%Y-%m-%d")
+        pnl = float(t.get("pnl", 0)) + float(t.get("swap", 0)) - abs(float(t.get("commission", 0)))
+        d = daily_map[day_key]
+        d["pnl"] += pnl
+        d["count"] += 1
+        if pnl > 0:
+            d["wins"] += 1
+        else:
+            d["losses"] += 1
+        d["best"] = max(d["best"], pnl)
+        d["worst"] = min(d["worst"], pnl)
+
+    daily_list = sorted(daily_map.items(), key=lambda x: x[0])
+    running = 0.0
+    daily_result = []
+    for day_key, d in daily_list:
+        running += d["pnl"]
+        daily_result.append({
+            "date": day_key,
+            "pnl": round(d["pnl"], 2),
+            "count": d["count"],
+            "wins": d["wins"],
+            "losses": d["losses"],
+            "win_rate": round(d["wins"] / d["count"] * 100, 1) if d["count"] else 0,
+            "best": round(d["best"], 2),
+            "worst": round(d["worst"], 2),
+            "cumulative": round(running, 2),
+        })
+
+    # 周报
+    weekly_map = defaultdict(lambda: {"pnl": 0.0, "count": 0, "wins": 0, "losses": 0})
+    for day_key, d in daily_map.items():
+        dt = datetime.strptime(day_key, "%Y-%m-%d")
+        week_start = (dt - timedelta(days=dt.weekday())).strftime("%Y-%m-%d")
+        w = weekly_map[week_start]
+        w["pnl"] += d["pnl"]
+        w["count"] += d["count"]
+        w["wins"] += d["wins"]
+        w["losses"] += d["losses"]
+
+    weekly_result = []
+    for week_key in sorted(weekly_map.keys()):
+        w = weekly_map[week_key]
+        weekly_result.append({
+            "week_start": week_key,
+            "pnl": round(w["pnl"], 2),
+            "count": w["count"],
+            "wins": w["wins"],
+            "losses": w["losses"],
+            "win_rate": round(w["wins"] / w["count"] * 100, 1) if w["count"] else 0,
+        })
+
+    total_pnl = sum(d["pnl"] for d in daily_map.values())
+    total_trades = sum(d["count"] for d in daily_map.values())
+    total_wins = sum(d["wins"] for d in daily_map.values())
+
+    return {
+        "daily": daily_result,
+        "weekly": weekly_result,
+        "summary": {
+            "total_pnl": round(total_pnl, 2),
+            "total_trades": total_trades,
+            "win_rate": round(total_wins / total_trades * 100, 1) if total_trades else 0,
+        },
+    }
 
 
 # ── 从 MT4 恢复历史成交 ───────────────────────────────

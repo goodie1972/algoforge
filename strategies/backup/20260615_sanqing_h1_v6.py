@@ -15,8 +15,8 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v7"
-STRATEGY_MAGIC = 880107
+STRATEGY_VERSION = "v6"
+STRATEGY_MAGIC = 880106
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 880101, "date": "2026-06-08", "desc": "初始上线：6因子评分≥5，ATR跟踪止损 trail=4.0 hard=2.5"},
     {"version": "v2", "magic": 880102, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
@@ -24,7 +24,6 @@ STRATEGY_CHANGELOG = [
     {"version": "v4", "magic": 880104, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控"},
     {"version": "v5", "magic": 880105, "date": "2026-06-11", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
     {"version": "v6", "magic": 880106, "date": "2026-06-12", "desc": "自适应回撤止盈：微利单profit_drawdown按peak_profit占比ATR动态放松至50%/40%"},
-    {"version": "v7", "magic": 880107, "date": "2026-06-15", "desc": "逆势评分：新增RSI-OB/OS(+2)和PRICE-HIGH/LOW(+1)逆势因子，趋势方向不再当门禁；逆势阈值提高至7"},
 ]
 
 
@@ -97,26 +96,6 @@ class SanQingH1Strategy(BaseStrategy):
         vals = self._calc_atr_values(period)
         return vals[-1] if vals else None
 
-    def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
-        if len(closes) < period + 1:
-            return None
-        gains, losses = [], []
-        for i in range(1, period + 1):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-        for i in range(period + 1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
-        if avg_loss == 0:
-            return 100.0
-        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
-
     def _get_opens(self) -> list[float]:
         return [c.open for c in self.candles]
 
@@ -164,9 +143,6 @@ class SanQingH1Strategy(BaseStrategy):
         atr_val = self._calc_atr(14)
         if atr_val is None or atr_val <= 0:
             return None
-
-        # RSI for counter-trend detection
-        rsi_val = self._calc_rsi(closes, 14)
 
         # Body analysis
         body = abs(close - opens_[-1])
@@ -240,38 +216,12 @@ class SanQingH1Strategy(BaseStrategy):
         if body_median_ratio >= 1.5 and body / prev_body_max >= 1.5 and candle_range > 0 and body / candle_range >= 0.5:
             short_factors.append("ENGULF")
 
-        # ── Counter-trend scoring (RSI overbought/oversold + price extension) ──
-        if rsi_val is not None and atr_val is not None:
-            if rsi_val < 30:
-                buy_score += 2
-                long_factors.append("RSI-OS")
-            elif rsi_val > 70:
-                sell_score += 2
-                short_factors.append("RSI-OB")
-
-            # Price extension from EMA9 (mean reversion signals)
-            if close < ema9 - atr_val:
-                buy_score += 1
-                long_factors.append("PRICE-LOW")
-            elif close > ema9 + atr_val:
-                sell_score += 1
-                short_factors.append("PRICE-HIGH")
-
-        # ── Position gate & Counter-trend threshold ──
+        # ── Position gate: 极端位置不做逆势交易 ──
         n_candles = len(candles)
         lookback = min(60, n_candles)
         recent_high = max(c.high for c in candles[-lookback:])
         recent_low = min(c.low for c in candles[-lookback:])
         price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        buy_threshold = self.score_threshold
-        sell_threshold = self.score_threshold
-        if downtrend:
-            buy_threshold = 7
-            long_factors.append("TREND-GATE↑")
-        elif uptrend:
-            sell_threshold = 7
-            short_factors.append("TREND-GATE↑")
 
         if price_position < 0.10 and sell_score >= self.score_threshold:
             short_factors.append("BOTTOM-GATE")
@@ -287,15 +237,14 @@ class SanQingH1Strategy(BaseStrategy):
             "atr": round(atr_val, 2), "body_atr_ratio": round(body_atr_ratio, 2),
             "volume_ratio": round(volume / avg_vol, 2) if avg_vol > 0 else 0,
             "body_median_ratio": round(body_median_ratio, 2),
-            "rsi": round(rsi_val, 2) if rsi_val is not None else 0,
             "price_position": round(price_position, 3),
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
         }
 
         signal = None
-        if buy_score >= buy_threshold:
+        if buy_score >= self.score_threshold:
             signal = OrderType.BUY
-        elif sell_score >= sell_threshold:
+        elif sell_score >= self.score_threshold:
             signal = OrderType.SELL
         return (signal, buy_score, sell_score, long_factors, short_factors, indicator_values)
 

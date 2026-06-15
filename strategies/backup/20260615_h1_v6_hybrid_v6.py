@@ -17,8 +17,8 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v7"
-STRATEGY_MAGIC = 660607
+STRATEGY_VERSION = "v6"
+STRATEGY_MAGIC = 660606
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660601, "date": "2026-06-08", "desc": "初始上线：8因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660602, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
@@ -26,7 +26,6 @@ STRATEGY_CHANGELOG = [
     {"version": "v4", "magic": 660604, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控；RSI分层过滤"},
     {"version": "v5", "magic": 660605, "date": "2026-06-11", "desc": "趋势门禁：M30=DOWN+价<SMA200时做多阈值4→5，M30=UP+价>SMA200时做空阈值3→4"},
     {"version": "v6", "magic": 660606, "date": "2026-06-12", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
-    {"version": "v7", "magic": 660607, "date": "2026-06-15", "desc": "SMA200改为双向因子(TREND+/TREND-)，取消空单SMA200硬门槛；阈值统一为3，逆势提至5；TOP/BOTTOM-GATE+RALLY/DROP防追高杀低"},
 ]
 
 
@@ -464,16 +463,11 @@ class V6HybridStrategy(BaseStrategy):
         # ── Long scoring ──
         long_score = 0
         long_detail = []
-        short_score = 0
-        short_detail = []
 
-        # ① SMA200 trend（双向因子：之上多头+1，之下空头+1）
+        # ① SMA200 trend
         if close > sma200:
             long_score += 1
             long_detail.append("TREND+")
-        elif close < sma200:
-            short_score += 1
-            short_detail.append("TREND-")
 
         # ② KDJ oversold
         if k_curr < self.oversold or k_prev < self.oversold:
@@ -516,39 +510,43 @@ class V6HybridStrategy(BaseStrategy):
             long_score -= 1
             long_detail.append("M30-DN↓")
 
-        # ── Short scoring ──
-        if k_curr > self.overbought:
-            short_score += 1
-            short_detail.append("KDJ-OB")
+        # ── Short scoring (only when below SMA200) ──
+        short_score = 0
+        short_detail = []
 
-        if high >= kc_upper:
-            short_score += 1
-            short_detail.append("KC-TOP")
+        if close <= sma200:
+            if k_curr > self.overbought:
+                short_score += 1
+                short_detail.append("KDJ-OB")
 
-        if top_div:
-            short_score += 2
-            short_detail.append("TOP-DIV")
+            if high >= kc_upper:
+                short_score += 1
+                short_detail.append("KC-TOP")
 
-        if rsi > 70:
-            short_score += 1
-            short_detail.append("RSI-OB")
+            if top_div:
+                short_score += 2
+                short_detail.append("TOP-DIV")
 
-        # M30 direction for short
-        if m30_down:
-            short_score += 1
-            short_detail.append("M30-DN")
-        elif m30_up:
-            short_score -= 1
-            short_detail.append("M30-UP↑")
+            if rsi > 70:
+                short_score += 1
+                short_detail.append("RSI-OB")
 
-        # ── Trend gate: 顺势阈值3，逆势提至5 ──
-        buy_threshold = 3
+            # M30 direction for short
+            if m30_down:
+                short_score += 1
+                short_detail.append("M30-DN")
+            elif m30_up:
+                short_score -= 1
+                short_detail.append("M30-UP↑")
+
+        # ── Trend gate: 逆势时提高阈值 ──
+        buy_threshold = 4
         sell_threshold = 3
         if m30_dir == 'DOWN' and close < sma200:
             buy_threshold = 5
             long_detail.append("TREND-GATE↑")
         if m30_dir == 'UP' and close > sma200:
-            sell_threshold = 5
+            sell_threshold = 4
             short_detail.append("TREND-GATE↑")
 
         # --- Position gate: no trade in extreme 10% of 60-bar range ---
