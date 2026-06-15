@@ -68,26 +68,33 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # ============================================================
 STRATEGY_POOL = {
     "M30_rsi_bb": {
-        "magic": 660705,
+        "magic": 660706,
         "timeframe": "M30",
         "double_first": False,
         "max_positions": 1,
     },
     "H1_v6_hybrid": {
-        "magic": 660606,
+        "magic": 660607,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
     # === 新增实盘策略 (来自 GitHub 开源回测) ===
     "sanqing_h1": {
-        "magic": 880105,
+        "magic": 880107,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
     "gold_auto_research": {
         "magic": 880306,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    # === 共振策略：H1+M15 TA-Lib 形态共振开仓 ===
+    "mtf_resonance_h1": {
+        "magic": 660801,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
@@ -112,7 +119,7 @@ MAX_POSITIONS = int(len(STRATEGY_POOL) * 1.5)  # 1策略 → 1
 
 # 向后兼容
 STRATEGY = "M30_rsi_bb"
-MAGIC_NUMBER = 660705       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
+MAGIC_NUMBER = 660706       # 向后兼容，新引擎用 STRATEGY_POOL 中的 magic
 # 通用指标参数（供工具脚本使用）
 BB_PERIOD = 20              # 布林带周期
 BB_STD = 2.0                # 布林带标准差倍数
@@ -154,6 +161,8 @@ COORDINATOR_CONFIG = {
     # 0.0 = 关闭归一化（原版逻辑，斜率>0即触发）
     # 0.1~1.0 = 数值越大越不敏感，推荐 0.5（触发率约25%）
     "m15_reverse_tp_sensitivity": 0.5,
+    # 功能③：MTF 共振方向门禁（H1+M15 TA-Lib 形态共振时限制开仓方向）
+    "mtf_resonance_enabled": True,  # H1+M15 共振方向门禁
 }
 
 # === 止盈冷却时间（策略盈利平仓后，N 小时内不再开同向单） ===

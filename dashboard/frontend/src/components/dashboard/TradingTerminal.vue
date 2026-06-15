@@ -155,9 +155,17 @@ function syncAllChartsFrom(source: any) {
   _syncLock = true
   const range = source.timeScale().getVisibleLogicalRange()
   if (range) {
-    if (chart && source !== chart) chart.timeScale().setVisibleLogicalRange(range)
-    for (const pc of Object.values(paneCharts)) {
-      if (pc !== source) pc.timeScale().setVisibleLogicalRange(range)
+    if (source === chart) {
+      // 主图→副图：用户缩放主图时同步所有副图
+      for (const pc of Object.values(paneCharts)) {
+        pc.timeScale().setVisibleLogicalRange(range)
+      }
+    } else {
+      // 副图→副图：只同步给其他副图，不回写主图
+      // 避免副图 setData 后的 auto-fit 把主图拉远
+      for (const pc of Object.values(paneCharts)) {
+        if (pc !== source) pc.timeScale().setVisibleLogicalRange(range)
+      }
     }
   }
   _syncLock = false
