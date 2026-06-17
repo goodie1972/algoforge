@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 STRATEGY_VERSION = "v6"
 STRATEGY_MAGIC = 660706
+STRATEGY_LEGACY_MAGICS = [660705]  # 旧版 magic，引擎启动时自动接管
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660701, "date": "2026-06-08", "desc": "初始上线：5因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660702, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
@@ -37,6 +38,7 @@ class M30RSIStrategy(BaseStrategy):
     """M30 RSI + 布林带均值回归 + ATR动态出场"""
 
     name = "M30_rsi_bb"
+    legacy_magics = STRATEGY_LEGACY_MAGICS
 
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
@@ -52,7 +54,7 @@ class M30RSIStrategy(BaseStrategy):
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 4.0）
         self.p_hard_atr = 2.0       # 硬止损 ATR×2（原为 3.0）
-        self.profit_drawdown_pct = 0.25  # 利润回撤 25% 止盈
+        # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
         # 新闻事件风控
         self.tight_exit_mode: bool = False
@@ -225,34 +227,6 @@ class M30RSIStrategy(BaseStrategy):
             long_score += 1; short_score += 1
             long_detail.append("LOW-VOL"); short_detail.append("LOW-VOL")
 
-        # ⑥ 急跌/急涨惩罚：暴跌后禁止追空，暴涨后禁止追多
-        recent_high = max(c.high for c in candles[-30:])
-        recent_low = min(c.low for c in candles[-30:])
-        drop_pct = (recent_high - close) / recent_high * 100
-        rally_pct = (close - recent_low) / recent_low * 100
-        if drop_pct > 1.5:
-            short_score -= 1
-            short_detail.append(f"DROP-{drop_pct:.1f}%")
-        if rally_pct > 1.5:
-            long_score -= 1
-            long_detail.append(f"RALLY-{rally_pct:.1f}%")
-
-        # ── 位置门禁：60根K线区间底部10%禁空、顶部10%禁多 ──
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10 and short_score >= self.score_threshold:
-            short_detail.append(f"BOTTOM-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={short_score})")
-            short_score = 0
-        elif price_position > 0.90 and long_score >= self.score_threshold:
-            long_detail.append(f"TOP-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={long_score})")
-            long_score = 0
-
         now = time.time()
 
         # ── 盈利平仓冷却：同方向30分钟内不开仓 ──
@@ -302,6 +276,14 @@ class M30RSIStrategy(BaseStrategy):
             f"[{self.name}] Price={close:.2f} BB={bb['lower']:.2f}/{bb['upper']:.2f} "
             f"RSI={rsi_val:.1f} ATR={atr_val:.2f} M30={m30_trend}"
         )
+
+        # Price position within BB bands
+        bb_range = bb["upper"] - bb["lower"]
+        price_position = (close - bb["lower"]) / bb_range if bb_range > 0 else 0.5
+        # Recent price extremes (20-bar lookback)
+        lookback = min(20, len(closes))
+        recent_high = max(closes[-lookback:])
+        recent_low = min(closes[-lookback:])
 
         indicator_values = {
             "close": round(close, 2), "rsi": round(rsi_val, 2),
@@ -378,7 +360,7 @@ class M30RSIStrategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
@@ -409,7 +391,7 @@ class M30RSIStrategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")

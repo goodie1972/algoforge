@@ -1,6 +1,7 @@
 """
 News Filter 新闻过滤服务 — 单例，SQLite 持久化，24h 自动拉取
 """
+import importlib
 import logging
 import threading
 import time
@@ -15,6 +16,22 @@ logger = logging.getLogger(__name__)
 
 FF_CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 FETCH_INTERVAL = 86400  # 24 小时
+
+# 内置高影响事件（ForexFactory 周历无法覆盖的远期事件，如 FOMC）
+# 格式与 ForexFactory 一致，_parse_event_datetime 可处理 ISO+时区
+BUILTIN_EVENTS = [
+    # 2026 FOMC 日程 — Day 2（利率决议 + 新闻发布会）
+    {"date": "2026-06-17T14:00:00-04:00", "time": "14:00", "title": "FOMC Interest Rate Decision (Warsh's 1st)", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-06-17T14:30:00-04:00", "time": "14:30", "title": "FOMC Press Conference", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-07-29T14:00:00-04:00", "time": "14:00", "title": "FOMC Interest Rate Decision", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-07-29T14:30:00-04:00", "time": "14:30", "title": "FOMC Press Conference", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-09-16T14:00:00-04:00", "time": "14:00", "title": "FOMC Interest Rate Decision + SEP + Dot Plot", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-09-16T14:30:00-04:00", "time": "14:30", "title": "FOMC Press Conference", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-10-28T14:00:00-04:00", "time": "14:00", "title": "FOMC Interest Rate Decision", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-10-28T14:30:00-04:00", "time": "14:30", "title": "FOMC Press Conference", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-12-09T14:00:00-04:00", "time": "14:00", "title": "FOMC Interest Rate Decision + SEP + Dot Plot", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+    {"date": "2026-12-09T14:30:00-04:00", "time": "14:30", "title": "FOMC Press Conference", "country": "USD", "impact": "High", "forecast": "", "previous": ""},
+]
 
 
 class NewsFilter:
@@ -81,6 +98,7 @@ class NewsFilter:
                 with self._data_lock:
                     self._cache = events
                     self._cache_time = time.time()
+                self._merge_builtin_events()
                 logger.info(f"[新闻过滤] 从 DB 加载 {len(events)} 个事件")
         except Exception as e:
             logger.warning(f"[新闻过滤] DB 加载失败: {e}")
@@ -96,6 +114,22 @@ class NewsFilter:
             logger.info(f"[新闻过滤] 已持久化 {len(events)} 个事件")
         except Exception as e:
             logger.warning(f"[新闻过滤] DB 持久化失败: {e}")
+
+    def _merge_builtin_events(self):
+        """将内置高影响事件（FOMC）合并到缓存，避免 ForexFactory 周历覆盖不到"""
+        if not self._cache:
+            self._cache = list(BUILTIN_EVENTS)
+            return
+        existing_keys = {(e.get("title", ""), e.get("date", "")) for e in self._cache}
+        added = 0
+        for evt in BUILTIN_EVENTS:
+            key = (evt["title"], evt["date"])
+            if key not in existing_keys:
+                self._cache.append(evt)
+                existing_keys.add(key)
+                added += 1
+        if added:
+            logger.info(f"[新闻过滤] 合并 {added} 个内置事件 (FOMC)")
 
     def _get_last_fetch_time(self) -> float:
         """读取上次成功拉取的时间戳"""
@@ -113,6 +147,7 @@ class NewsFilter:
     def try_scheduled_fetch(self):
         """每个 tick 调用，到期自动拉取。is_in_blackout 不触发 HTTP"""
         now = time.time()
+        self._run_bias_evaluation()
         if now < self._retry_after:
             return
         if self._next_fetch > 0 and now < self._next_fetch:
@@ -129,9 +164,11 @@ class NewsFilter:
                 with self._data_lock:
                     self._cache = data
                     self._cache_time = now
+                self._merge_builtin_events()
                 self._retry_after = 0.0
                 self._next_fetch = now + FETCH_INTERVAL
-                self._save_to_db(data)
+                merged = list(self._cache)
+                self._save_to_db(merged)
                 logger.info(f"[新闻过滤] HTTP 拉取成功: {len(data)} 个事件, "
                            f"下次拉取: {datetime.fromtimestamp(self._next_fetch).strftime('%m-%d %H:%M')}")
             else:
@@ -148,7 +185,54 @@ class NewsFilter:
             logger.warning(f"[新闻过滤] HTTP 失败: {e}")
             self._next_fetch = now + 3600
 
-    # ── 禁售检查（只读，不触发 HTTP）────────────────────
+    def force_refresh(self):
+        """强制重新拉取并合并内置事件，不依赖定时器"""
+        self._do_fetch(time.time())
+
+    # ── News-Bias 评估 ──────────────────────────────────
+
+    def _read_bias_config(self) -> dict:
+        """读取最新 NEWS_BIAS 配置（每次重新加载 settings，支持运行时修改）"""
+        try:
+            importlib.reload(settings)
+        except Exception:
+            pass
+        return {
+            "enabled": getattr(settings, "NEWS_BIAS_ENABLED", True),
+            "report_hours": getattr(settings, "NEWS_BIAS_REPORT_HOURS", "0,12"),
+        }
+
+    def _run_bias_evaluation(self):
+        """执行 news-bias 事后评估（受配置控制，每 10 分钟限频一次）"""
+        cfg = self._read_bias_config()
+        if not cfg["enabled"]:
+            return
+
+        now = time.time()
+        if now - getattr(self, '_last_bias_eval', 0) < 600:
+            return
+        self._last_bias_eval = now
+
+        try:
+            from services.news_bias import NewsBiasEvaluator
+            evaluator = NewsBiasEvaluator()
+            results = evaluator.evaluate_past_events(hours=6)
+            if results:
+                # 检查是否在报告时间点
+                current_hour = datetime.now().hour
+                report_hours = [
+                    int(h.strip()) for h in cfg["report_hours"].split(",")
+                    if h.strip().isdigit()
+                ]
+                is_report_time = current_hour in report_hours
+                summary = f"[NewsBias] 评估 {len(results)} 条事件"
+                if is_report_time:
+                    report = evaluator.get_report_data(hours=24)
+                    summary += (f", 报告: {report['directional']}笔方向性 "
+                                f"准确率{report['accuracy']}%")
+                logger.info(summary)
+        except Exception as e:
+            logger.warning(f"[NewsBias] 评估异常: {e}")
 
     def get_blackout_windows(self) -> list[tuple[datetime, datetime, str]]:
         """返回当前应生效的禁售窗口列表"""

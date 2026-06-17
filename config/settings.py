@@ -142,6 +142,15 @@ NEWS_PRE_CLOSE_MINUTES = 15       # 事件前 N 分钟强制平仓
 NEWS_IMPACT_FILTER = "High"       # 影响级别: "High" | "High,Medium"
 NEWS_CURRENCY_FILTER = "USD"      # 关注货币: "USD" | "USD,EUR"
 
+# News-Bias 事后评估（观察模式，不影响交易）
+NEWS_BIAS_ENABLED = True          # 是否执行评估
+NEWS_BIAS_REPORT_HOURS = "8,20"   # 生成报告的小时(北京时间)，逗号分隔，默认8点和20点
+
+# News-Bias 阻塞控制（影响开仓）
+BLOCK_LONG_WHEN_BIAS_BEARISH = False    # 新闻预判为看跌时，阻止所有策略开多
+BLOCK_SHORT_WHEN_BIAS_BULLISH = False   # 新闻预判为看涨时，阻止所有策略开空
+NEWS_BIAS_BLOCK_REFRESH_SECONDS = 60    # 引擎刷新最新 bias 方向的间隔
+
 # ============================================================
 # 多策略协调器配置 — 策略间信号联动出场
 # ============================================================
@@ -163,6 +172,19 @@ COORDINATOR_CONFIG = {
     "m15_reverse_tp_sensitivity": 0.5,
     # 功能③：MTF 共振方向门禁（H1+M15 TA-Lib 形态共振时限制开仓方向）
     "mtf_resonance_enabled": True,  # H1+M15 共振方向门禁
+    # 功能④：K线过滤器 — 每个过滤器独立开关，统一由 BaseStrategy 施加
+    # ① 位置门禁：N根K线区间底部 threshold 禁空、顶部 threshold 禁多
+    "position_gate_enabled": True,
+    "position_gate_lookback": 60,
+    "position_gate_bottom": 0.10,
+    "position_gate_top": 0.90,
+    # ② 急跌急涨惩罚：M30周期内从高/低点起算超过 threshold % 禁追
+    "rally_drop_enabled": True,
+    "rally_drop_lookback": 30,
+    "rally_drop_threshold": 1.5,
+    # ③ 利润回撤止盈：浮动盈利从峰值回撤 N% 即止盈（引擎出场逻辑）
+    "profit_drawdown_enabled": True,
+    "profit_drawdown_pct": 0.25,
 }
 
 # === 止盈冷却时间（策略盈利平仓后，N 小时内不再开同向单） ===

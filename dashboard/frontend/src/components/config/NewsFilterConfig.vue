@@ -3,6 +3,7 @@ import { computed, ref, reactive, onMounted, watch } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { getNewsCalendar } from '@/api/client'
 import { useMessage } from 'naive-ui'
+import BiasStateIndicator from './BiasStateIndicator.vue'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -13,6 +14,10 @@ const local = reactive({
   news_after_minutes: store.items.news_after_minutes ?? 30,
   news_impact_filter: store.items.news_impact_filter ?? 'High',
   news_currency_filter: store.items.news_currency_filter ?? 'USD',
+  news_bias_enabled: store.items.news_bias_enabled ?? true,
+  news_bias_report_hours: store.items.news_bias_report_hours ?? '0,12',
+  block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
+  block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
 })
 
 const original = computed(() => ({
@@ -21,6 +26,10 @@ const original = computed(() => ({
   news_after_minutes: store.items.news_after_minutes ?? 30,
   news_impact_filter: store.items.news_impact_filter ?? 'High',
   news_currency_filter: store.items.news_currency_filter ?? 'USD',
+  news_bias_enabled: store.items.news_bias_enabled ?? true,
+  news_bias_report_hours: store.items.news_bias_report_hours ?? '0,12',
+  block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
+  block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
 }))
 
 const changed = computed(() => JSON.stringify(local) !== JSON.stringify(original.value))
@@ -33,6 +42,10 @@ watch(() => store.items, () => {
     news_after_minutes: store.items.news_after_minutes ?? 30,
     news_impact_filter: store.items.news_impact_filter ?? 'High',
     news_currency_filter: store.items.news_currency_filter ?? 'USD',
+    news_bias_enabled: store.items.news_bias_enabled ?? true,
+    news_bias_report_hours: store.items.news_bias_report_hours ?? '0,12',
+    block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
+    block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
   })
 }, { deep: true })
 
@@ -87,6 +100,39 @@ const impactOptions = [
             @update:value="(v: any) => v !== null && (local.news_after_minutes = v)"
             style="width:100%;" />
           <template #feedback>数据发布后 N 分钟恢复交易</template>
+        </n-form-item>
+
+        <n-divider title-position="left">News-Bias 事后评估</n-divider>
+
+        <n-form-item label="启用评估">
+          <n-switch :value="local.news_bias_enabled"
+            @update:value="(v: boolean) => local.news_bias_enabled = v" />
+          <template #feedback>对高影响 USD 事件打方向标签，事后比对准确率</template>
+        </n-form-item>
+
+        <n-form-item label="报告时间 (UTC)">
+          <n-input :value="local.news_bias_report_hours"
+            @update:value="(v: string) => local.news_bias_report_hours = v"
+            style="width:100%;" />
+          <template #feedback>生成报告的小时，逗号分隔（如 "8,20" = 早8点和晚8点）</template>
+        </n-form-item>
+
+        <n-divider title-position="left">News-Bias 阻塞控制</n-divider>
+
+        <n-form-item label="看跌禁多">
+          <n-switch :value="local.block_long_when_bias_bearish"
+            @update:value="(v: boolean) => local.block_long_when_bias_bearish = v" />
+          <template #feedback>当 News-Bias 看跌时，阻止所有策略开多 (BUY)</template>
+        </n-form-item>
+
+        <n-form-item label="看涨禁空">
+          <n-switch :value="local.block_short_when_bias_bullish"
+            @update:value="(v: boolean) => local.block_short_when_bias_bullish = v" />
+          <template #feedback>当 News-Bias 看涨时，阻止所有策略开空 (SELL)</template>
+        </n-form-item>
+
+        <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" label="当前 Bias">
+          <BiasStateIndicator />
         </n-form-item>
 
         <n-button type="primary" :disabled="!changed" @click="save" block>

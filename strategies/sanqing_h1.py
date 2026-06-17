@@ -46,7 +46,7 @@ class SanQingH1Strategy(BaseStrategy):
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 4.0）
         self.p_hard_atr = 2.0    # 硬止损 ATR×2（原为 2.5）
-        self.profit_drawdown_pct = 0.25  # 利润回撤 25% 止盈
+        # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
         # 新闻事件风控
         self.tight_exit_mode: bool = False
@@ -257,13 +257,7 @@ class SanQingH1Strategy(BaseStrategy):
                 sell_score += 1
                 short_factors.append("PRICE-HIGH")
 
-        # ── Position gate & Counter-trend threshold ──
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
+        # ── Counter-trend threshold ──
         buy_threshold = self.score_threshold
         sell_threshold = self.score_threshold
         if downtrend:
@@ -273,23 +267,12 @@ class SanQingH1Strategy(BaseStrategy):
             sell_threshold = 7
             short_factors.append("TREND-GATE↑")
 
-        if price_position < 0.10 and sell_score >= self.score_threshold:
-            short_factors.append("BOTTOM-GATE")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={sell_score})")
-            sell_score = 0
-        elif price_position > 0.90 and buy_score >= self.score_threshold:
-            long_factors.append("TOP-GATE")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={buy_score})")
-            buy_score = 0
-
         indicator_values = {
             "close": round(close, 2), "ema9": round(ema9, 2), "ema21": round(ema21, 2),
             "atr": round(atr_val, 2), "body_atr_ratio": round(body_atr_ratio, 2),
             "volume_ratio": round(volume / avg_vol, 2) if avg_vol > 0 else 0,
             "body_median_ratio": round(body_median_ratio, 2),
             "rsi": round(rsi_val, 2) if rsi_val is not None else 0,
-            "price_position": round(price_position, 3),
-            "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
         }
 
         signal = None
@@ -369,7 +352,7 @@ class SanQingH1Strategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     # 自适应回撤: 微利单给更多浮动空间
                     if td["peak_profit"] < atr_val * 1.0:
                         pdd_used = 0.5
@@ -408,7 +391,7 @@ class SanQingH1Strategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     # 自适应回撤: 微利单给更多浮动空间
                     if td["peak_profit"] < atr_val * 1.0:
                         pdd_used = 0.5

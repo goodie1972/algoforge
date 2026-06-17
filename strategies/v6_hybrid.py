@@ -50,7 +50,7 @@ class V6HybridStrategy(BaseStrategy):
         self.div_lookback = 10
         self.p_trailing_atr = 1.0  # 回调超过 1 ATR 即止盈（原为 4.0）
         self.p_hard_atr = 2.0
-        self.profit_drawdown_pct = 0.25  # 利润回撤 25% 止盈
+        # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
         # 新闻事件风控
         self.tight_exit_mode: bool = False
@@ -551,22 +551,6 @@ class V6HybridStrategy(BaseStrategy):
             sell_threshold = 5
             short_detail.append("TREND-GATE↑")
 
-        # --- Position gate: no trade in extreme 10% of 60-bar range ---
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10 and short_score >= sell_threshold:
-            short_detail.append(f"BOTTOM-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={short_score})")
-            short_score = 0
-        elif price_position > 0.90 and long_score >= buy_threshold:
-            long_detail.append(f"TOP-GATE({price_position:.1%})")
-            logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={long_score})")
-            long_score = 0
-
         # --- Decision ---
         signal = None
         signal_str = "无信号"
@@ -592,6 +576,13 @@ class V6HybridStrategy(BaseStrategy):
             f"[{self.name}] Price={close:.2f} SMA200={sma200:.2f} "
             f"K={k_curr:.1f} D={d_curr:.1f} RSI={rsi:.2f} ATR={atr_val:.2f}"
         )
+
+        # Price position within recent range
+        closes_arr = self.get_close_prices()
+        lb = min(20, len(closes_arr))
+        recent_high = max(closes_arr[-lb:])
+        recent_low = min(closes_arr[-lb:])
+        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
 
         indicator_values = {
             "close": round(close, 2), "sma200": round(sma200, 2),
@@ -700,7 +691,7 @@ class V6HybridStrategy(BaseStrategy):
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
                 # ① 利润回撤止盈：利润从峰值回落 ≥25%
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(
@@ -742,7 +733,7 @@ class V6HybridStrategy(BaseStrategy):
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
                 # ① 利润回撤止盈
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(

@@ -48,7 +48,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 3.5）
         self.p_hard_atr = 2.0
-        self.profit_drawdown_pct = 0.25  # 利润回撤 25% 止盈
+        # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
         # 新闻事件风控
         self.tight_exit_mode: bool = False
@@ -314,31 +314,13 @@ class GoldAutoResearchStrategy(BaseStrategy):
                 if rsi_val <= 35:
                     safe_dn = False
 
-        # ── ⑤ Position gate: 极端位置不做逆势交易 ──
-        n_candles = len(candles)
-        lookback = min(60, n_candles)
-        recent_high = max(c.high for c in candles[-lookback:])
-        recent_low = min(c.low for c in candles[-lookback:])
-        price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
-
-        if price_position < 0.10:
-            safe_dn = False  # 区间底部 10% 禁止开空
-            short_factors_extra = "BOTTOM-GATE"
-        else:
-            short_factors_extra = None
-        if price_position > 0.90:
-            safe_up = False  # 区间顶部 10% 禁止开多
-            long_factors_extra = "TOP-GATE"
-        else:
-            long_factors_extra = None
-
         # ── Consensus ──
         logger.info(
             f"[{self.name}] Trend={'UP' if trend_up else 'DOWN'} "
             f"Mom={'UP' if mom_up else 'DOWN'} "
             f"Vol={'ACTIVE' if vol_active else 'QUIET'} "
             f"RSI={rsi_val:.1f} ADX={adx_val} "
-            f"Price={close:.2f} Pos={price_position:.1%} "
+            f"Price={close:.2f} "
             f"EMA10={ema10:.2f} EMA20={ema20:.2f}"
         )
 
@@ -353,8 +335,6 @@ class GoldAutoResearchStrategy(BaseStrategy):
             "rsi": round(rsi_val, 2) if rsi_val else 0,
             "bb_mid": round(bb_mid, 2) if bb_mid else 0,
             "bb_std": round(bb_std, 2) if bb_std else 0,
-            "price_position": round(price_position, 3),
-            "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
         }
 
         long_factors = []
@@ -362,16 +342,12 @@ class GoldAutoResearchStrategy(BaseStrategy):
         if mom_up: long_factors.append("MOM-UP")
         if vol_active: long_factors.append("VOL-ACTIVE")
         if safe_up: long_factors.append("SAFE-UP")
-        if long_factors_extra:
-            long_factors.append(long_factors_extra)
 
         short_factors = []
         if trend_dn: short_factors.append("TREND-DN")
         if mom_dn: short_factors.append("MOM-DN")
         if vol_active: short_factors.append("VOL-ACTIVE")
         if safe_dn: short_factors.append("SAFE-DN")
-        if short_factors_extra:
-            short_factors.append(short_factors_extra)
 
         signal = None
         if trend_up and mom_up and vol_active and safe_up:
@@ -454,7 +430,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
@@ -483,7 +459,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if td["peak_profit"] > atr_val * 0.5:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")

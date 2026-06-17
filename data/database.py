@@ -115,6 +115,42 @@ CREATE TABLE IF NOT EXISTS logs (
 CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
 
+CREATE TABLE IF NOT EXISTS news_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_title TEXT NOT NULL,
+    event_time TEXT NOT NULL,
+    event_country TEXT DEFAULT 'USD',
+    event_impact TEXT DEFAULT 'High',
+    expected_bias TEXT NOT NULL,
+    confidence TEXT DEFAULT 'low',
+    reason TEXT DEFAULT '',
+    pre_price REAL DEFAULT 0,
+    post_price_15m REAL DEFAULT 0,
+    post_price_1h REAL DEFAULT 0,
+    actual_move_15m REAL DEFAULT 0,
+    actual_move_1h REAL DEFAULT 0,
+    direction_match TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_news_eval_time ON news_evaluations(event_time);
+
+CREATE TABLE IF NOT EXISTS news_bias_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    news_items TEXT DEFAULT '[]',
+    variable_scores TEXT DEFAULT '{}',
+    market_context TEXT DEFAULT '{}',
+    prediction TEXT DEFAULT '{}',
+    entry_price REAL DEFAULT 0,
+    verify_price REAL DEFAULT 0,
+    verify_result TEXT DEFAULT '',
+    verify_at TEXT DEFAULT '',
+    popped_up INTEGER DEFAULT 0,
+    summary TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_nbr_created ON news_bias_reports(created_at);
+
 CREATE TABLE IF NOT EXISTS news_calendar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT NOT NULL,
@@ -144,6 +180,22 @@ CREATE TABLE IF NOT EXISTS strategy_versions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sv_magic ON strategy_versions(magic);
+
+CREATE TABLE IF NOT EXISTS reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT DEFAULT '',
+    content TEXT NOT NULL,
+    account_balance REAL DEFAULT 0,
+    account_equity REAL DEFAULT 0,
+    floating_pnl REAL DEFAULT 0,
+    daily_pnl REAL DEFAULT 0,
+    position_count INTEGER DEFAULT 0,
+    snapshot_id INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_reports_type_date ON reports(type, created_at);
 """
 
 
@@ -167,6 +219,7 @@ def init_db():
         names = [r["name"] for r in tables]
         logger.info(f"数据库初始化完成: {DB_PATH} ({len(names)} 张表: {', '.join(names)})")
         migrate_signals_lifecycle()
+        migrate_risk_states_exit_timestamps()
     finally:
         conn.close()
 
@@ -192,6 +245,19 @@ def migrate_signals_lifecycle():
         # 回填旧信号：空status + 有ticket → opened
         conn.execute("UPDATE signals SET status='opened' WHERE (status IS NULL OR status = '') AND ticket > 0")
         conn.commit()
+    finally:
+        conn.close()
+
+
+def migrate_risk_states_exit_timestamps():
+    """为 risk_states 表添加 exit_timestamps 列（安全 ALTER TABLE）"""
+    conn = get_conn()
+    try:
+        existing = {row[1] for row in conn.execute("PRAGMA table_info('risk_states')").fetchall()}
+        if 'exit_timestamps' not in existing:
+            conn.execute("ALTER TABLE risk_states ADD COLUMN exit_timestamps TEXT DEFAULT '[]'")
+            conn.commit()
+            logger.info("迁移: risk_states 表添加 exit_timestamps 列成功")
     finally:
         conn.close()
 
@@ -703,6 +769,164 @@ def load_news_events() -> list[dict]:
         conn.close()
 
 
+# ── News Evaluations ────────────────────────────────────
+
+def insert_news_evaluation(record: dict) -> int:
+    """写入一条 news-bias 评估记录。返回 1 表示成功"""
+    conn = get_conn()
+    try:
+        conn.execute(
+            """INSERT OR IGNORE INTO news_evaluations
+               (event_title, event_time, event_country, event_impact,
+                expected_bias, confidence, reason,
+                pre_price, post_price_15m, post_price_1h,
+                actual_move_15m, actual_move_1h, direction_match)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                record.get("event_title", ""), record.get("event_time", ""),
+                record.get("event_country", "USD"), record.get("event_impact", "High"),
+                record.get("expected_bias", "neutral"), record.get("confidence", "low"),
+                record.get("reason", ""),
+                record.get("pre_price", 0), record.get("post_price_15m", 0),
+                record.get("post_price_1h", 0),
+                record.get("actual_move_15m", 0), record.get("actual_move_1h", 0),
+                record.get("direction_match"),
+            ),
+        )
+        conn.commit()
+        return 1
+    except Exception as e:
+        logger.warning(f"[DB] 写入 news-evaluation 失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_news_evaluations(hours: int = 24) -> list[dict]:
+    """获取最近 N 小时的 news-bias 评估记录"""
+    conn = get_conn()
+    try:
+        cutoff = (datetime.now() - timedelta(hours=hours)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        rows = conn.execute(
+            """SELECT * FROM news_evaluations
+               WHERE created_at >= ? ORDER BY event_time DESC""",
+            (cutoff,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+# ── News-Bias 预测报告 ──────────────────────────────────
+
+def insert_news_bias_report(record: dict) -> int:
+    """写入一条 news-bias 预测报告，返回 id"""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            """INSERT INTO news_bias_reports
+               (title, created_at, news_items, variable_scores, market_context,
+                prediction, entry_price, verify_price, verify_result,
+                verify_at, popped_up, summary)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                record.get("title", ""),
+                record.get("created_at", ""),
+                record.get("news_items", "[]"),
+                record.get("variable_scores", "{}"),
+                record.get("market_context", "{}"),
+                record.get("prediction", "{}"),
+                record.get("entry_price", 0),
+                record.get("verify_price", 0),
+                record.get("verify_result", ""),
+                record.get("verify_at", ""),
+                int(record.get("popped_up", False)),
+                record.get("summary", ""),
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid or 0
+    except Exception as e:
+        logger.warning(f"[DB] 写入 news-bias 报告失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_news_bias_reports(date: str = "", page: int = 1, page_size: int = 50) -> list[dict]:
+    """获取预测报告列表"""
+    conn = get_conn()
+    try:
+        query = "SELECT id, title, prediction, entry_price, verify_price, verify_result, summary, created_at FROM news_bias_reports"
+        params: list = []
+        if date:
+            query += " WHERE created_at LIKE ?"
+            params.append(f"{date}%")
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([page_size, (page - 1) * page_size])
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_news_bias_report(report_id: int) -> dict | None:
+    """获取单条预测报告完整内容"""
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT * FROM news_bias_reports WHERE id=?", (report_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_news_bias_report(report_id: int, updates: dict) -> bool:
+    """更新预测报告（验证回填）"""
+    allowed = {"verify_price", "verify_result", "verify_at", "popped_up"}
+    sets = {k: v for k, v in updates.items() if k in allowed}
+    if not sets:
+        return False
+    conn = get_conn()
+    try:
+        conn.execute(
+            f"UPDATE news_bias_reports SET {', '.join(f'{k}=?' for k in sets)} WHERE id=?",
+            [*sets.values(), report_id],
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def get_unverified_reports() -> list[dict]:
+    """获取超过 12 小时仍未验证的报告"""
+    conn = get_conn()
+    try:
+        cutoff = (datetime.now() - timedelta(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+        rows = conn.execute(
+            """SELECT * FROM news_bias_reports
+               WHERE verify_result='' AND created_at <= ?""",
+            (cutoff,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_latest_news_bias_report() -> dict | None:
+    """获取最新一条预测报告"""
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM news_bias_reports ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
 # ── Metadata (key-value) ────────────────────────────────
 
 def get_metadata(key: str) -> str | None:
@@ -773,6 +997,103 @@ def get_strategy_versions(strategy_name: str = None) -> list[dict]:
 
 
 # ── Migration ───────────────────────────────────────────
+
+# ── Reports ────────────────────────────────────────────
+
+def insert_report(record: dict) -> int:
+    """写入一条报告记录。返回 id"""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            """INSERT INTO reports
+               (type, title, summary, content, account_balance, account_equity,
+                floating_pnl, daily_pnl, position_count, snapshot_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                record.get("type", "daily"),
+                record.get("title", ""),
+                record.get("summary", ""),
+                record.get("content", "{}"),
+                record.get("account_balance", 0),
+                record.get("account_equity", 0),
+                record.get("floating_pnl", 0),
+                record.get("daily_pnl", 0),
+                record.get("position_count", 0),
+                record.get("snapshot_id"),
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid or 0
+    except Exception as e:
+        logger.warning(f"[DB] 写入报告失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_reports(type: str = "daily", date_from: str = "",
+                date_to: str = "", page: int = 1,
+                page_size: int = 50) -> list[dict]:
+    """获取报告列表，按 created_at 倒序"""
+    conn = get_conn()
+    try:
+        query = "SELECT id, type, title, summary, account_balance, account_equity, floating_pnl, daily_pnl, position_count, created_at FROM reports WHERE type=?"
+        params: list = [type]
+        if date_from:
+            query += " AND created_at >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND created_at <= ?"
+            params.append(date_to)
+        query += " ORDER BY created_at DESC"
+        offset = (page - 1) * page_size
+        query += " LIMIT ? OFFSET ?"
+        params.extend([page_size, offset])
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_report(report_id: int) -> dict | None:
+    """获取单条报告的完整内容"""
+    conn = get_conn()
+    try:
+        row = conn.execute("SELECT * FROM reports WHERE id=?", (report_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_report_timeline(date: str, type: str = "daily") -> list[dict]:
+    """获取指定日期的时间轴列表（只含 id, title, summary, created_at）"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT id, type, title, summary, account_balance, account_equity,
+                      floating_pnl, daily_pnl, position_count, created_at
+               FROM reports WHERE type=? AND created_at LIKE ?
+               ORDER BY created_at DESC LIMIT 200""",
+            (type, f"{date}%"),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def delete_old_reports(keep_days: int = 90) -> int:
+    """删除超过 keep_days 天的旧报告"""
+    conn = get_conn()
+    try:
+        cutoff = (datetime.now() - timedelta(days=keep_days)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        conn.execute("DELETE FROM reports WHERE created_at < ?", (cutoff,))
+        conn.commit()
+        return conn.total_changes
+    finally:
+        conn.close()
+
 
 def migrate_from_jsonl() -> int:
     """将 logs/closed_trades.jsonl 中未导入的交易写入 trades 表"""

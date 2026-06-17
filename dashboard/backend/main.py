@@ -7,6 +7,7 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,8 @@ from dashboard.backend.log_service import LogCaptureHandler
 config_service = RuntimeConfig()
 ws_manager = WebSocketManager()
 log_handler = LogCaptureHandler()
+
+logger = logging.getLogger("dashboard")
 
 # 提前初始化 NewsFilter 单例，引擎启动前加载 DB 缓存
 from services.news_filter import NewsFilter
@@ -62,6 +65,9 @@ from dashboard.backend.routes import backtest as route_backtest
 from dashboard.backend.routes import trades as route_trades
 from dashboard.backend.routes import data as route_data
 from dashboard.backend.routes import signals as route_signals
+from dashboard.backend.routes import reports as route_reports
+from dashboard.backend.routes import news_bias as route_news_bias
+from dashboard.backend.routes import version as route_version
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -135,6 +141,79 @@ async def broadcast_engine_status():
         await asyncio.sleep(15)
 
 
+async def report_daily_loop():
+    """每 10 分钟生成一条日报记录"""
+    from dashboard.backend.routes.reports import _gather_daily_report
+    # 启动后先等 30 秒再生成第一条，确保引擎完全就绪
+    await asyncio.sleep(30)
+    while PollerState.running:
+        try:
+            _gather_daily_report()
+            logger.info("[报告] 日报已生成")
+        except Exception as e:
+            logger.warning(f"[报告] 日报生成失败: {e}")
+        await asyncio.sleep(600)
+
+
+async def report_weekly_loop():
+    """每天 00:00 生成前一天的周报"""
+    from dashboard.backend.routes.reports import _gather_weekly_report
+    while PollerState.running:
+        now = datetime.now()
+        # 计算到下一个 00:00 的秒数
+        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        wait_sec = (next_midnight - now).total_seconds()
+        await asyncio.sleep(wait_sec)
+        if not PollerState.running:
+            break
+        try:
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            _gather_weekly_report(target_date=yesterday)
+            logger.info(f"[报告] 周报已生成 ({yesterday})")
+        except Exception as e:
+            logger.warning(f"[报告] 周报生成失败: {e}")
+
+
+async def news_bias_loop():
+    """交易日 8:00 和 20:00 北京时间生成新闻预判报告 + 弹窗推送"""
+    from services.news_bias import NewsBiasEvaluator
+    await asyncio.sleep(60)
+    last_run_key = ""
+    while PollerState.running:
+        try:
+            now = datetime.now()
+            # 非交易日跳过
+            if now.weekday() >= 5:
+                await asyncio.sleep(3600)
+                continue
+
+            hour = now.hour
+            minute = now.minute
+
+            # 8:00-8:04 或 20:00-20:04 生成（每天两次）
+            if hour in (8, 20) and minute < 5:
+                today = now.strftime("%Y-%m-%d")
+                run_key = f"{today}-{hour}"
+                if run_key != last_run_key:
+                    last_run_key = run_key
+                    current_price = 0
+                    cached = getattr(engine_runner, "_cached_price", None)
+                    if cached:
+                        current_price = cached.get("bid", 0)
+
+                    evaluator = NewsBiasEvaluator()
+                    evaluator.verify_old_predictions(current_price=current_price)
+                    report = evaluator.generate_prediction_report(current_price=current_price)
+                    if report:
+                        await ws_manager.broadcast("news_bias_popup", report)
+                        logger.info(f"[NewsBias] 已生成并推送报告 #{report.get('id')}")
+
+            await asyncio.sleep(300)  # 每 5 分钟检查一次
+        except Exception as e:
+            logger.warning(f"[NewsBias] 循环异常: {e}")
+            await asyncio.sleep(300)
+
+
 # === FastAPI 生命周期 ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -148,6 +227,9 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(broadcast_account()),
         asyncio.create_task(broadcast_logs()),
         asyncio.create_task(broadcast_engine_status()),
+        asyncio.create_task(report_daily_loop()),
+        asyncio.create_task(report_weekly_loop()),
+        asyncio.create_task(news_bias_loop()),
     ]
     yield
     poller_state.running = False
@@ -186,6 +268,9 @@ app.include_router(route_backtest.router)
 app.include_router(route_trades.router)
 app.include_router(route_data.router)
 app.include_router(route_signals.router)
+app.include_router(route_reports.router)
+app.include_router(route_news_bias.router)
+app.include_router(route_version.router)
 
 
 # === WebSocket 端点 ===
@@ -235,6 +320,8 @@ if __name__ == "__main__":
     route_logs.log_handler = log_handler
     route_trades.engine_runner = engine_runner
     route_data.engine_runner = engine_runner
+    route_reports.engine_runner = engine_runner
+    route_news_bias.engine_runner = engine_runner
     try:
         from engine_standalone.main import STRATEGY_MAP
         route_engine.available_strategies = {k: True for k in STRATEGY_MAP}
