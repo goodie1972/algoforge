@@ -23,12 +23,14 @@ if _project_root not in sys.path:
 from config import settings
 from core.bridge import create_bridge, OrderType
 from services.news_filter import NewsFilter
+from services.mtf_coordinator import MTFResonanceCoordinator
 from data.downloader import download_timeframe
 from data import database as db
 from strategies.m30_rsi import M30RSIStrategy
 from strategies.v6_hybrid import V6HybridStrategy
 from strategies.sanqing_h1 import SanQingH1Strategy
 from strategies.gold_autoresearch_h1 import GoldAutoResearchStrategy
+from strategies.mtf_resonance_h1 import MTFResonanceStrategy
 from strategies.bakome_backup import BAKOMEBackupStrategy
 from strategies.xaubot_backup import XAUBotBackupStrategy
 
@@ -37,6 +39,7 @@ STRATEGY_MAP = {
     "H1_v6_hybrid": V6HybridStrategy,
     "sanqing_h1": SanQingH1Strategy,
     "gold_auto_research": GoldAutoResearchStrategy,
+    "mtf_resonance_h1": MTFResonanceStrategy,
     "bakome_backup": BAKOMEBackupStrategy,
     "xaubot_backup": XAUBotBackupStrategy,
 }
@@ -107,6 +110,7 @@ class TradingEngine:
         self.strategies = create_strategies(self.bridge, pool)
         self._strategies_lock = threading.Lock()
         self.news_filter = NewsFilter()
+        self._mtf_coordinator = None  # lazy init
         self.running = False
         self._last_balance_check = 0
         self._daily_start_balance = 0.0
@@ -453,7 +457,7 @@ class TradingEngine:
             if close_positions:
                 positions = self.bridge.get_positions(settings.SYMBOL)
                 for pos in positions:
-                    if pos.magic == strategy.magic:
+                    if pos.magic in self._strategy_magics(strategy):
                         self.bridge.close_order(pos.ticket)
                         self._entry_times.pop(pos.ticket, None)
             self.strategies = [s for s in self.strategies if s.name != name]
@@ -461,20 +465,35 @@ class TradingEngine:
             logger.info(f"[策略动态移除] {name} Magic={strategy.magic}")
             return True
 
+    @staticmethod
+    def _strategy_magics(strategy) -> set[int]:
+        """返回策略识别持仓的所有 magic 号（主 + legacy）"""
+        return {strategy.magic} | set(getattr(strategy, 'legacy_magics', []))
+
     def _init_risk_state(self, name: str, magic: int):
         """初始化单策略风控状态"""
         if magic not in self._risk_states:
             self._risk_states[magic] = StrategyRiskState(name=name, magic=magic)
 
     def _update_floating_pnl(self):
-        """更新所有策略的浮动盈亏"""
+        """更新所有策略的浮动盈亏（含 legacy magic 持仓）"""
         all_positions = self.bridge.get_positions(settings.SYMBOL)
         for state in self._risk_states.values():
-            my_pos = [p for p in all_positions if p.magic == state.magic]
+            magics = {state.magic}
+            for s in self.strategies:
+                if s.magic == state.magic:
+                    magics.update(self._strategy_magics(s))
+                    break
+            my_pos = [p for p in all_positions if p.magic in magics]
             state.floating_pnl = sum(p.profit for p in my_pos)
 
     def _record_close(self, ticket: int, pnl: float, magic: int, direction: str = ""):
-        """记录平仓：更新已实现盈亏 + 快速出场检测"""
+        """记录平仓：更新已实现盈亏 + 快速出场检测（legacy magic 自动映射到主策略）"""
+        # 如果 magic 是某个策略的 legacy，映射到主 magic
+        for s in self.strategies:
+            if magic in getattr(s, 'legacy_magics', []):
+                magic = s.magic
+                break
         state = self._risk_states.get(magic)
         if state is None:
             return
@@ -654,6 +673,15 @@ class TradingEngine:
 
         return None
 
+    def _mtf_resonance_allowed(self, signal_dir: str) -> Optional[str]:
+        """MTF 共振方向门禁: 返回当前允许的方向 (BUY/SELL) 或 None（不限制）"""
+        coord_cfg = self._get_coordinator()
+        if not coord_cfg.get("enabled", False) or not coord_cfg.get("mtf_resonance_enabled", False):
+            return None
+        if self._mtf_coordinator is None:
+            self._mtf_coordinator = MTFResonanceCoordinator(self.bridge)
+        return self._mtf_coordinator.get_allowed_direction()
+
     def start(self):
         logger.info("=" * 60)
         logger.info("XAUUSD 多策略交易系统 启动")
@@ -709,14 +737,15 @@ class TradingEngine:
         except Exception as e:
             logger.warning(f"[风控恢复] 加载失败: {e}")
 
-        # 接管现有持仓 + 填充 _entry_times
+        # 接管现有持仓（含 legacy magic）+ 填充 _entry_times
         for s in self.strategies:
-            existing = self.bridge.takeover_existing_positions(settings.SYMBOL, s.magic)
-            self._known_position_count[s.magic] = len(existing)  # 初始化本地计数
+            existing = []
+            for magic in self._strategy_magics(s):
+                existing.extend(self.bridge.takeover_existing_positions(settings.SYMBOL, magic))
+            self._known_position_count[s.magic] = len(existing)
             for pos in existing:
-                # 以当前时间作为近似入场时间（无法获取真实开仓时间）
                 self._entry_times[pos.ticket] = time.time()
-                logger.info(f"[接管] {s.name} Ticket={pos.ticket} 已记录入场时间")
+                logger.info(f"[接管] {s.name} Ticket={pos.ticket}(Magic={pos.magic}) 已记录入场时间")
 
         self._daily_start_balance = self._get_balance()
         self.running = True
@@ -1110,7 +1139,7 @@ class TradingEngine:
         """止损平仓 — 不受风控/新闻禁售限制，但记录试算日志"""
         strategy.refresh_data()
         positions = self.bridge.get_positions(settings.SYMBOL)
-        my_positions = [p for p in positions if p.magic == strategy.magic]
+        my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
         # 检测 MT4 硬止损平仓（桥接消失但引擎没记录）
         prev_count = self._known_position_count.get(strategy.magic, 0)
         now_count = len(my_positions)
@@ -1267,9 +1296,9 @@ class TradingEngine:
         # 刷新数据
         strategy.refresh_data()
 
-        # 获取该策略的持仓（桥接查询 + 本地跟踪双重校验防漏）
+        # 获取该策略的持仓（含 legacy magic，桥接查询 + 本地跟踪双重校验防漏）
         positions = self.bridge.get_positions(settings.SYMBOL)
-        my_positions = [p for p in positions if p.magic == strategy.magic]
+        my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
         n_bridge = len(my_positions)
         n_local = self._known_position_count.get(strategy.magic, 0)
         n_total = max(n_bridge, n_local)  # 取较大值防止桥接漏查
@@ -1306,6 +1335,12 @@ class TradingEngine:
                 cool.pop(signal_dir, None)
 
         logger.info(f"[{strategy.name}] 收到信号: {signal}")
+
+        # ---- MTF 共振方向门禁检查 ----
+        allowed = self._mtf_resonance_allowed(signal_dir)
+        if allowed is not None and allowed not in ("BOTH", signal_dir):
+            logger.info(f"[MTF协调器] 方向限制: 当前仅允许{allowed}，跳过 {signal_dir}")
+            return
 
         # 先写入信号记录（status=pending），再执行开仓
         signal_id = 0
@@ -1457,9 +1492,9 @@ class TradingEngine:
                 strategy.tight_exit_mode = False
 
     def _close_strategy_positions(self, strategy, reason: str):
-        """平掉某个策略的所有持仓，记录指定出场原因"""
+        """平掉某个策略的所有持仓（含 legacy magic），记录指定出场原因"""
         positions = self.bridge.get_positions(settings.SYMBOL)
-        my_positions = [p for p in positions if p.magic == strategy.magic]
+        my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
         if not my_positions:
             return
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
@@ -1613,7 +1648,9 @@ class TradingEngine:
 
         with self._strategies_lock:
             strategies_snapshot = list(self.strategies)
-            strategy_magics = [s.magic for s in strategies_snapshot]
+            strategy_magics = set()
+            for s in strategies_snapshot:
+                strategy_magics.update(self._strategy_magics(s))
 
         report = (
             f"\n{'='*50}\n"
@@ -1626,7 +1663,7 @@ class TradingEngine:
 
         total_pnl = 0.0
         for s in strategies_snapshot:
-            my_pos = [p for p in all_positions if p.magic == s.magic]
+            my_pos = [p for p in all_positions if p.magic in self._strategy_magics(s)]
             pnl = sum(p.profit for p in my_pos)
             total_pnl += pnl
 

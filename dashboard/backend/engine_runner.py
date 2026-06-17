@@ -38,6 +38,7 @@ class EngineRunner:
         self._cached_bid: float = 0.0
         # 独立价格轮询线程（不受 _tick 阻塞影响）
         self._price_thread: Optional[threading.Thread] = None
+        self._bias_thread: Optional[threading.Thread] = None
 
     @property
     def is_running(self) -> bool:
@@ -108,6 +109,7 @@ class EngineRunner:
                 ("strategies.v6_hybrid", "H1_v6_hybrid"),
                 ("strategies.sanqing_h1", "sanqing_h1"),
                 ("strategies.gold_autoresearch_h1", "gold_auto_research"),
+                ("strategies.mtf_resonance_h1", "mtf_resonance_h1"),
             ]
             total = 0
             for mod_name, strat_name in strategy_modules:
@@ -325,6 +327,42 @@ class EngineRunner:
         self._price_thread = threading.Thread(target=_poll, daemon=True, name="price_poller")
         self._price_thread.start()
 
+    # ======================== News-Bias 缓存刷新线程 ========================
+
+    def _start_bias_refresher(self):
+        """定期从 DB 拉取最新 news_bias 报告方向，写入 core.bias_state 缓存。
+        策略层在 generate_signal() 时同步读取，避免每 tick 查 DB。"""
+        if self._bias_thread and self._bias_thread.is_alive():
+            return
+
+        def _refresh():
+            # 启动后立即拉一次，避免前 60s 没数据
+            try:
+                from core import bias_state
+                bias_state.refresh_from_db()
+            except Exception as e:
+                self.logger.warning(f"[bias_refresher] 首次刷新失败: {e}")
+
+            while not self._stop_requested:
+                try:
+                    from config import settings as _cfg
+                    interval = getattr(_cfg, "NEWS_BIAS_BLOCK_REFRESH_SECONDS", 60)
+                except Exception:
+                    interval = 60
+                # 分段 sleep，便于快速响应 stop
+                for _ in range(interval):
+                    if self._stop_requested:
+                        return
+                    time.sleep(1)
+                try:
+                    from core import bias_state
+                    bias_state.refresh_from_db()
+                except Exception as e:
+                    self.logger.debug(f"[bias_refresher] 刷新失败: {e}")
+
+        self._bias_thread = threading.Thread(target=_refresh, daemon=True, name="bias_refresher")
+        self._bias_thread.start()
+
     # ======================== 引擎主循环 ========================
 
     def _run(self):
@@ -391,6 +429,9 @@ class EngineRunner:
 
         # 启动独立价格轮询（0.1s 间隔，不受 _tick 阻塞）
         self._start_price_poller(engine)
+
+        # 启动 News-Bias 缓存刷新（用于阻塞开关）
+        self._start_bias_refresher()
 
         # 校准 MT4 服务器时间 vs 本机 UTC
         engine._calibrate_mt4_time()

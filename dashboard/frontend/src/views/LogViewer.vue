@@ -62,7 +62,7 @@ function logStyle(level: string) {
              style="padding: 1px 12px; display: flex; gap: 8px; white-space: nowrap;"
              @mouseenter="($event.target as HTMLElement).style.background = '#2c3038'"
              @mouseleave="($event.target as HTMLElement).style.background = 'transparent'">
-          <span style="color: #8b8f97; flex-shrink: 0;">{{ entry.time.slice(11, 23) }}</span>
+          <span style="color: #8b8f97; flex-shrink: 0;">{{ entry.timestamp.slice(11, 23) }}</span>
           <span :style="{ ...logStyle(entry.level), flexShrink: 0, width: 60, fontWeight: 600 }">{{ entry.level }}</span>
           <span style="color: #8b8f97; flex-shrink: 0; max-width: 140px; overflow: hidden; text-overflow: ellipsis;">{{ entry.name }}</span>
           <span style="color: #d4d7dd; overflow: hidden; text-overflow: ellipsis;">{{ entry.message }}</span>

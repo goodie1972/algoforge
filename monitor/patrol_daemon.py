@@ -24,7 +24,7 @@ os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
 # ============================================================
 # 配置
 # ============================================================
-API_BASE = "http://localhost:8000/api"
+API_BASE = "http://localhost:1783/api"
 POLL_INTERVAL = 30  # 秒
 REFERENCE_PRICE = 4507.0
 PRICE_DEVIATION = 20.0

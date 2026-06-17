@@ -27,6 +27,9 @@ _ENGINE_KEYS = {
     "profit_exit_cooldown_hours",
     "news_filter_enabled", "news_before_minutes", "news_after_minutes",
     "news_impact_filter", "news_currency_filter",
+    "news_bias_enabled", "news_bias_report_hours",
+    "block_long_when_bias_bearish", "block_short_when_bias_bullish",
+    "news_bias_block_refresh_seconds",
 }
 
 # 策略参数（V6 Hybrid 通用指标参数）
@@ -100,6 +103,11 @@ class RuntimeConfig:
             "news_after_minutes": "NEWS_AFTER_MINUTES",
             "news_impact_filter": "NEWS_IMPACT_FILTER",
             "news_currency_filter": "NEWS_CURRENCY_FILTER",
+            "news_bias_enabled": "NEWS_BIAS_ENABLED",
+            "news_bias_report_hours": "NEWS_BIAS_REPORT_HOURS",
+            "block_long_when_bias_bearish": "BLOCK_LONG_WHEN_BIAS_BEARISH",
+            "block_short_when_bias_bullish": "BLOCK_SHORT_WHEN_BIAS_BULLISH",
+            "news_bias_block_refresh_seconds": "NEWS_BIAS_BLOCK_REFRESH_SECONDS",
             # 风控扩展
             "floating_loss_warn_pct": "FLOATING_LOSS_WARN_PCT",
             "floating_loss_block_pct": "FLOATING_LOSS_BLOCK_PCT",

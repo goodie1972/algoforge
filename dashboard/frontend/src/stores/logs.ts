@@ -25,9 +25,9 @@ export const useLogStore = defineStore('logs', () => {
   async function fetchHistory(level?: string, limit = 100) {
     try {
       const logs = await getLogs(level, limit)
-      const existing = new Set(entries.value.map(e => e.time + e.message))
+      const existing = new Set(entries.value.map(e => e.timestamp + e.message))
       for (const log of logs) {
-        if (!existing.has(log.time + log.message)) {
+        if (!existing.has(log.timestamp + log.message)) {
           entries.value.push(log)
         }
       }

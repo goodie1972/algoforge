@@ -131,8 +131,61 @@ export async function getTradeAnalysis(ticket: number): Promise<any> {
   return data
 }
 
+export async function getTradeReport(): Promise<any> {
+  const { data } = await http.get('/trades/report')
+  return data
+}
+
 export async function getSignals(params?: { strategy?: string; status?: string; limit?: number }): Promise<any[]> {
   const { data } = await http.get('/signals', { params })
+  return data
+}
+
+// === 报告 ===
+export async function getReports(params?: {
+  type?: string
+  date_from?: string
+  date_to?: string
+  page?: number
+  page_size?: number
+}): Promise<any> {
+  const { data } = await http.get('/reports', { params })
+  return data
+}
+
+export async function getReportById(id: number): Promise<any> {
+  const { data } = await http.get(`/reports/${id}`)
+  return data
+}
+
+export async function getReportTimeline(date: string, type = 'daily'): Promise<any> {
+  const { data } = await http.get(`/reports/timeline/${date}`, { params: { type } })
+  return data
+}
+
+export async function generateReport(type = 'daily', date?: string): Promise<any> {
+  const { data } = await http.post('/reports/generate', null, { params: { type, date } })
+  return data
+}
+
+// === 新闻预判报告 ===
+export async function getNewsBiasReports(params?: { date?: string; page?: number; page_size?: number }): Promise<any> {
+  const { data } = await http.get('/news-bias/reports', { params })
+  return data
+}
+
+export async function getNewsBiasReport(id: number): Promise<any> {
+  const { data } = await http.get(`/news-bias/reports/${id}`)
+  return data
+}
+
+export async function getLatestNewsBias(): Promise<any> {
+  const { data } = await http.get('/news-bias/latest')
+  return data
+}
+
+export async function generateNewsBiasReport(): Promise<any> {
+  const { data } = await http.post('/news-bias/generate')
   return data
 }
 
@@ -154,5 +207,47 @@ export async function getBacktestResults(jobId: string): Promise<BacktestJob & {
 
 export async function getBacktestHistory(limit = 20): Promise<BacktestHistoryItem[]> {
   const { data } = await http.get('/backtest/history', { params: { limit } })
+  return data
+}
+
+export interface VersionInfo {
+  version: string
+  commit: string
+  branch: string
+  dirty: boolean
+  display: string
+}
+
+export async function getVersionInfo(): Promise<VersionInfo> {
+  const { data } = await http.get('/version')
+  return data
+}
+
+export interface ChangelogCommit {
+  hash: string
+  date: string
+  subject: string
+}
+
+export async function getChangelog(limit = 20): Promise<{ commits: ChangelogCommit[]; error?: string }> {
+  const { data } = await http.get('/version/changelog', { params: { limit } })
+  return data
+}
+
+export interface BiasState {
+  direction: 'bullish' | 'bearish' | 'neutral' | null
+  score: number
+  updated_at: number
+  source: string
+  age_seconds: number | null
+}
+
+export async function getBiasState(): Promise<BiasState> {
+  const { data } = await http.get('/version/bias-state')
+  return data
+}
+
+export async function forceRefreshBias(): Promise<{ direction: string | null; full: BiasState }> {
+  const { data } = await http.post('/version/bias-state/refresh')
   return data
 }

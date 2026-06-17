@@ -43,7 +43,7 @@ export interface TickPrice {
 }
 
 export interface LogEntry {
-  time: string
+  timestamp: string
   level: string
   name: string
   message: string
@@ -196,4 +196,45 @@ export interface TradeStats {
   summary: StrategyStats
   by_magic: Record<string, StrategyStats & { magic: number; strategy: string }>
   by_strategy: Record<string, StrategyFamilyStats>
+}
+
+// 新闻预判报告
+export interface NewsBiasReport {
+  id: number
+  title: string
+  summary: string
+  news_items: Array<{
+    title: string
+    source: string
+    variable: string
+    direction: string
+    weight: string
+    chain: string
+  }>
+  variable_scores: Record<string, {
+    weight: number
+    count: number
+    bullish: number
+    bearish: number
+    score: number
+  }>
+  market_context: {
+    current_price: number
+    rsi: number
+    trend: string
+    bb_position: number
+  }
+  prediction: {
+    direction: string
+    score: number
+    tech_adjustment: number
+    confidence: number
+    reason: string
+    id?: number
+  }
+  entry_price: number
+  verify_price: number
+  verify_result: string
+  verify_at: string
+  created_at: string
 }

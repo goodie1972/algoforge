@@ -24,6 +24,15 @@ PORT = 1783
 _proc: subprocess.Popen | None = None
 
 
+def _get_version_banner() -> str:
+    try:
+        from core.version import get_version_info
+        info = get_version_info()
+        return f"  {info['display']}  branch={info['branch']}  build={time.strftime('%Y-%m-%d %H:%M:%S')}"
+    except Exception as e:
+        return f"  version unknown: {e}"
+
+
 def _cleanup():
     global _proc
     if _proc and _proc.poll() is None:
@@ -103,6 +112,7 @@ def main():
 
     print("=" * 55)
     print("  XAUUSD 量化交易系统 — 一键启动")
+    print(_get_version_banner())
     print("=" * 55)
     print()
 
@@ -162,11 +172,14 @@ def main():
                 if line:
                     text = line.decode("utf-8", errors="replace").rstrip()
                     if text:
+                        # 用 sys.stdout.buffer 直接以 utf-8 写出，绕过 gbk codec
                         try:
-                            print(f"  [{time.strftime('%H:%M:%S')}] {text}")
-                        except UnicodeEncodeError:
-                            safe = text.encode("utf-8", errors="replace").decode("gbk", errors="replace")
-                            print(f"  [{time.strftime('%H:%M:%S')}] {safe}")
+                            import sys as _sys
+                            msg = f"  [{time.strftime('%H:%M:%S')}] {text}\n"
+                            _sys.stdout.buffer.write(msg.encode("utf-8", errors="replace"))
+                            _sys.stdout.buffer.flush()
+                        except Exception:
+                            pass
             else:
                 time.sleep(1)
     except KeyboardInterrupt:
