@@ -68,6 +68,7 @@ from dashboard.backend.routes import signals as route_signals
 from dashboard.backend.routes import reports as route_reports
 from dashboard.backend.routes import news_bias as route_news_bias
 from dashboard.backend.routes import version as route_version
+from dashboard.backend.routes import strategies as route_strategies
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -271,6 +272,7 @@ app.include_router(route_signals.router)
 app.include_router(route_reports.router)
 app.include_router(route_news_bias.router)
 app.include_router(route_version.router)
+app.include_router(route_strategies.router)
 
 
 # === WebSocket 端点 ===
