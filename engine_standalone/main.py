@@ -33,6 +33,9 @@ from strategies.gold_autoresearch_h1 import GoldAutoResearchStrategy
 from strategies.mtf_resonance_h1 import MTFResonanceStrategy
 from strategies.bakome_backup import BAKOMEBackupStrategy
 from strategies.xaubot_backup import XAUBotBackupStrategy
+from strategies.stoch_m30 import MeanReversionM30Strategy
+from strategies.stoch_trend_m30 import StochTrendM30Strategy
+from strategies.rsi_grading_m30 import RSIGradingM30Strategy
 
 STRATEGY_MAP = {
     "M30_rsi_bb": M30RSIStrategy,
@@ -42,6 +45,9 @@ STRATEGY_MAP = {
     "mtf_resonance_h1": MTFResonanceStrategy,
     "bakome_backup": BAKOMEBackupStrategy,
     "xaubot_backup": XAUBotBackupStrategy,
+    "stoch_m30": MeanReversionM30Strategy,
+    "stoch_trend_m30": StochTrendM30Strategy,
+    "rsi_grading_m30": RSIGradingM30Strategy,
 }
 
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
@@ -81,7 +87,7 @@ class StrategyRiskState:
 
 
 def create_strategies(bridge, pool=None):
-    """从 STRATEGY_POOL 创建策略实例列表"""
+    """从 STRATEGY_POOL 创建策略实例列表（enabled=false 或 max_positions=0 跳过）"""
     if pool is None:
         pool = settings.STRATEGY_POOL
     strategies = []
@@ -90,8 +96,13 @@ def create_strategies(bridge, pool=None):
         if cls is None:
             logger.warning(f"未知策略: {name}，跳过")
             continue
+        if not cfg.get("enabled", True):
+            logger.info(f"[策略加载] {name} 已禁用，跳过")
+            continue
+        if cfg.get("max_positions", 1) == 0:
+            logger.info(f"[策略加载] {name} 最大持仓为 0，跳过")
+            continue
         strategy = cls(bridge, magic=cfg["magic"], timeframe=cfg["timeframe"])
-        # 附加策略专属配置
         strategy.magic = cfg["magic"]
         strategy.double_first = cfg.get("double_first", False)
         strategy.max_positions = cfg.get("max_positions", 1)

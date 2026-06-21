@@ -57,7 +57,7 @@ MAX_CONSECUTIVE_LOSSES = 3                  # 连续亏损 N 次后触发冷却
 CONSECUTIVE_LOSS_COOLDOWN_HOURS = 4         # 连续亏损冷却时长
 
 # === 安全锁 ===
-SAFETY_LOCK_TIMEOUT_MINUTES = 240       # 自动过期时间（分钟，今晚22:00前不建仓）
+SAFETY_LOCK_TIMEOUT_MINUTES = 525600    # 1 年 (2026-06-19: 在没找到稳健策略前永久锁仓, 必须手动删 config/safety_lock.txt 才能解锁)
 
 STOP_LOSS_PIPS = 50         # 默认止损点数
 TAKE_PROFIT_PIPS = 100      # 默认止盈点数
@@ -73,12 +73,17 @@ STRATEGY_POOL = {
         "double_first": False,
         "max_positions": 1,
     },
-    "H1_v6_hybrid": {
-        "magic": 660607,
-        "timeframe": "H1",
-        "double_first": False,
-        "max_positions": 1,
-    },
+    # === v6_hybrid 已下架 (2026-06-18) ===
+    # 回测发现: 602 笔交易总盈亏 -$166, 胜率 31.1%, 盈亏比 0.75
+    # 4 个超卖因子 (BB-BOT, KDJ-OS, RSI-OS, KC-BOT) 全部亏钱
+    # DIVERG 底背离是唯一赚钱因子但被噪音淹没
+    # 详见 backtest/factor_attribution.py + memory/project_v6_hybrid_deprecated.md
+    # "H1_v6_hybrid": {
+    #     "magic": 660607,
+    #     "timeframe": "H1",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
     # === 新增实盘策略 (来自 GitHub 开源回测) ===
     "sanqing_h1": {
         "magic": 880107,
@@ -109,6 +114,25 @@ STRATEGY_POOL = {
     # "xaubot_backup": {
     #     "magic": 777005,
     #     "timeframe": "H1",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # === M30 均值回归新策略 (v13 回测验证) ===
+    # "stoch_m30": {
+    #     "magic": 660901,
+    #     "timeframe": "M30",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "stoch_trend_m30": {
+    #     "magic": 660903,
+    #     "timeframe": "M30",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "rsi_grading_m30": {
+    #     "magic": 660902,
+    #     "timeframe": "M30",
     #     "double_first": False,
     #     "max_positions": 1,
     # },
@@ -158,7 +182,7 @@ COORDINATOR_CONFIG = {
     "enabled": False,                              # 总开关
     # 功能①：跨策略联动出场（信号策略盈利时平目标策略同向单）
     "cross_exit_enabled": False,
-    "signal_strategy": "H1_v6_hybrid",             # 信号源策略名
+    "signal_strategy": None,                         # v6_hybrid 已下架，禁用跨策略联动信号源
     "signal_direction": "BUY",                     # 信号方向 (BUY/SELL)
     "target_strategies": [
         "M30_rsi_bb", "sanqing_h1", "gold_auto_research",

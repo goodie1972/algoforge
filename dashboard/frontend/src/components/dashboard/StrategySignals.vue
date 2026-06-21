@@ -175,6 +175,10 @@ const strategyColors: Record<string, string> = {
   'gold_auto_research': '#20c080',
   'bakome_backup': '#808080',
   'xaubot_backup': '#808080',
+  'stoch_m30': '#20c080',
+  'stoch_trend_m30': '#2080f0',
+  'rsi_grading_m30': '#e040a0',
+  'mtf_resonance_h1': '#2080f0',
 }
 
 interface StratSide {
@@ -303,6 +307,84 @@ const strategyLogics: Record<string, StratLogic> = {
         '盈利: ATR移动止盈(trail)',
         '亏损: ATR硬止损(hard)',
         '趋势感知: 顺势(1.5/3.0)逆势(1.0/2.0)'],
+    },
+  },
+  stoch_m30: {
+    desc: 'M30 Stoch 均值回归 (ADX<30才入场)',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['ADX<30 + BB宽度≤1.0', 'K<20 + K金叉D + close<EMA21', '全震荡市入场，不追趋势'],
+      exit: ['Stoch反向交叉+close≥EMA21出场', 'misalign检测: BB中轨方向≠K方向提前出', 'ATR硬止损 1.0×ATR'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['ADX<30 + BB宽度≤1.0', 'K>80 + K死叉D + close>EMA21'],
+      exit: ['Stoch反向交叉+close≤EMA21出场', 'misalign检测提前出', 'ATR硬止损 1.0×ATR'],
+    },
+  },
+  stoch_trend_m30: {
+    desc: 'M30 Stoch 震荡+趋势双模 (ADX<30震荡/≥30趋势)',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['震荡(ADX<30+BB≤1.0): K<20+金叉+close<EMA21', '趋势(ADX≥30): DI+>DI-+10 + close>EMA21 + 金叉', '趋势顺势单，震荡逆势接飞刀'],
+      exit: ['震荡: Stoch反向交叉出场', '趋势: 从峰值回撤2.0ATR止盈/TP4.0ATR', '趋势: ADX<20衰减出/DI反转出', '硬止损: 震荡1.0ATR/趋势2.0ATR'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['震荡(ADX<30+BB≤1.0): K>80+死叉+close>EMA21', '趋势(ADX≥30): DI->DI+ +10 + close<EMA21 + 死叉'],
+      exit: ['震荡: Stoch反向交叉出场', '趋势: 从最低点回撤2.0ATR止盈/TP4.0ATR', '趋势: ADX<20衰减出/DI反转出'],
+    },
+  },
+  rsi_grading_m30: {
+    desc: 'M30 RSI分级评分+MA14+BB (阈值2宽止损)',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['RSI分级: <20→+2 / 20~30→+1', 'MA14上升→+1 | 触碰BB下轨→+1', '阈值≥2入场, 无RSI方向因子'],
+      exit: ['从最高点回撤2.0×ATR止盈(trail)', '亏损3.0×ATR硬止损(hard)'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['RSI分级: >70→+2 / 65~70→+1', 'MA14下降→+1 | 触碰BB上轨→+1', 'RSI<20禁空, 20~30扣1分'],
+      exit: ['从最低点反弹2.0×ATR止盈(trail)', '亏损3.0×ATR硬止损(hard)'],
+    },
+  },
+  mtf_resonance_h1: {
+    desc: 'H1+M15 TA-Lib 形态共振',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['H1+M15 双周期形态共振开仓', '双周期同时出现反转形态', '共振方向一致时才入场'],
+      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['H1+M15 双周期形态共振开仓', '双周期同时出现反转形态', '共振方向一致时才入场'],
+      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+    },
+  },
+  bakome_backup: {
+    desc: 'H1 备用策略 — Bakome',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['备用策略，保留原版逻辑', '详见 backup 文件'],
+      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['备用策略，保留原版逻辑', '详见 backup 文件'],
+      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+    },
+  },
+  xaubot_backup: {
+    desc: 'H1 备用策略 — XAUBot',
+    long: {
+      title: '做多', color: '#0ecb81',
+      entry: ['备用策略，保留原版逻辑', '详见 backup 文件'],
+      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+    },
+    short: {
+      title: '做空', color: '#f6465d',
+      entry: ['备用策略，保留原版逻辑', '详见 backup 文件'],
+      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
     },
   },
 }
