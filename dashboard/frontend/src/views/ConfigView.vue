@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
-import StrategyConfig from '@/components/config/StrategyConfig.vue'
 import RiskConfig from '@/components/config/RiskConfig.vue'
 import ConnectionConfig from '@/components/config/ConnectionConfig.vue'
 import NewsFilterConfig from '@/components/config/NewsFilterConfig.vue'
@@ -10,7 +9,7 @@ import CoordinatorConfig from '@/components/config/CoordinatorConfig.vue'
 
 const store = useConfigStore()
 const message = useMessage()
-const activeTab = ref('strategy')
+const activeTab = ref('risk')
 
 onMounted(() => store.fetch())
 
@@ -28,10 +27,7 @@ async function resetAll() {
     <n-spin v-if="store.loading" style="padding: 40px;" />
     <n-alert v-else-if="store.error" type="error" :title="store.error" closable />
     <template v-else>
-      <n-tabs v-model:value="activeTab" type="line" animated>
-        <n-tab-pane name="strategy" tab="策略参数">
-          <StrategyConfig />
-        </n-tab-pane>
+      <n-tabs v-model:value="activeTab" type="line">
         <n-tab-pane name="risk" tab="风控参数">
           <RiskConfig />
         </n-tab-pane>

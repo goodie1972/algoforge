@@ -12,7 +12,7 @@
 - `start.py` 启动横幅显示 `v0.5.0 (commit) branch=main build=...`
 
 ### 改进
-- sanqing_h1 v7：逆势 RSI-OB/OS + PRICE-HIGH/LOW 评分
+- sanqing_h1 v6r：回退v6纯顺趋势逻辑，去掉逆势因子；顺趋势出场加宽至trail=2.5 hard=4.0
 - 修复 K线主图与指标窗格同步跳变
 - M5 reverse TP 配置移除（保留 M15 + 灵敏度）
 - 实时盈亏改用价格轮询器重算（不再依赖 MT4 滞后值）

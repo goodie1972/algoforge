@@ -32,116 +32,298 @@ const loading = ref(true)
 
 const timeframes = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1']
 
+interface EntryFactor {
+  name: string
+  score: string
+  detail: string
+}
+
+interface ExitRow {
+  method: string
+  normal: string
+  widen?: string
+}
+
 // 策略进出场逻辑 (与交易终端一致)
 interface StratLogic {
   desc: string
-  long: { title: string; color: string; entry: string[]; exit: string[] }
-  short: { title: string; color: string; entry: string[]; exit: string[] }
+  exitWiden?: boolean
+  exitNote?: string
+  long: { entry: EntryFactor[]; exit: ExitRow[] }
+  short: { entry: EntryFactor[]; exit: ExitRow[] }
 }
 
 const strategyLogics: Record<string, StratLogic> = {
   m30_rsi_v7: {
-    desc: 'M30 RSI+布林带均值回归 (7因子评分≥3)',
+    desc: 'M30 RSI+布林带均值回归 (4因子评分≥3, 位置门禁+急跌惩罚)',
+    exitWiden: true,
+    exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['MA14上升→+1 | 触碰BB下轨→+1', 'RSI<30→+1 | RSI上升→+1', '阈值≥3入场', '位置门禁: 顶部10%禁多', '急跌>1.5%惩罚'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈(trail)', 'ATR硬止损(hard)', '趋势感知: 顺势1.5/3.0逆势1.0/2.0'],
+      entry: [
+        { name: 'MA14趋势', score: '+1', detail: 'MA14上升' },
+        { name: 'BB触轨', score: '+1', detail: '触碰BB下轨' },
+        { name: 'RSI超卖', score: '+1', detail: 'RSI < 30' },
+        { name: 'RSI方向', score: '+1', detail: 'RSI上升' },
+        { name: '总分门槛', score: '', detail: '阈值≥3入场' },
+        { name: '位置门禁', score: '', detail: '60根K线区间顶部10%禁多' },
+        { name: '急跌惩罚', score: '', detail: '急跌>1.5%暂停做多' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['MA14下降→+1 | 触碰BB上轨→+1', 'RSI>65→+1 | RSI下降→+1', 'RSI<20禁空, 20~30扣1分', '位置门禁: 底部10%禁空', '急涨>1.5%惩罚'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈(trail)', 'ATR硬止损(hard)', '趋势感知: 顺势1.5/3.0逆势1.0/2.0'],
+      entry: [
+        { name: 'MA14趋势', score: '+1', detail: 'MA14下降' },
+        { name: 'BB触轨', score: '+1', detail: '触碰BB上轨' },
+        { name: 'RSI超买', score: '+1', detail: 'RSI > 65' },
+        { name: 'RSI方向', score: '+1', detail: 'RSI下降' },
+        { name: 'RSI门禁', score: '', detail: 'RSI<20禁空, 20~30扣1分' },
+        { name: '位置门禁', score: '', detail: '60根K线区间底部10%禁空' },
+        { name: '急涨惩罚', score: '', detail: '急涨>1.5%暂停做空' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
+      ],
     },
   },
   m30_stoch_T6V1: {
-    desc: 'M30 Stoch 均值回归 (ADX<30才入场)',
+    desc: 'M30 Stoch 均值回归 (ADX<30+BB宽≤1.0纯震荡, v11 A5)',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['ADX<30 + BB宽度≤1.0', 'K<20 + K金叉D + close<EMA21', '全震荡市入场，不追趋势'],
-      exit: ['Stoch反向交叉+close≥EMA21出场', 'misalign检测: BB中轨方向≠K方向提前出', 'ATR硬止损 1.0×ATR'],
+      entry: [
+        { name: '震荡条件', score: '+1', detail: 'ADX<30 且 BB宽度≤1.0' },
+        { name: 'K值位置', score: '+1', detail: 'K < 20 (超卖区)' },
+        { name: '金叉确认', score: '+1', detail: 'K线上穿D线' },
+        { name: '价格位置', score: '+1', detail: 'close < EMA21' },
+        { name: '总分门槛', score: '', detail: '4条件全满足+无冲突入场' },
+      ],
+      exit: [
+        { method: 'Stoch反向交叉', normal: 'close≥EMA21出场' },
+        { method: 'misalign检测', normal: 'BB中轨方向≠K方向时提前出' },
+        { method: 'ATR硬止损', normal: '1.0×ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['ADX<30 + BB宽度≤1.0', 'K>80 + K死叉D + close>EMA21'],
-      exit: ['Stoch反向交叉+close≤EMA21出场', 'misalign检测提前出', 'ATR硬止损 1.0×ATR'],
+      entry: [
+        { name: '震荡条件', score: '+1', detail: 'ADX<30 且 BB宽度≤1.0' },
+        { name: 'K值位置', score: '+1', detail: 'K > 80 (超买区)' },
+        { name: '死叉确认', score: '+1', detail: 'K线下穿D线' },
+        { name: '价格位置', score: '+1', detail: 'close > EMA21' },
+        { name: '总分门槛', score: '', detail: '4条件全满足+无冲突入场' },
+      ],
+      exit: [
+        { method: 'Stoch反向交叉', normal: 'close≤EMA21出场' },
+        { method: 'misalign检测', normal: '提前出场' },
+        { method: 'ATR硬止损', normal: '1.0×ATR' },
+      ],
     },
   },
   m30_stoch_T6V8: {
-    desc: 'M30 Stoch 震荡+趋势双模 (ADX<30震荡/≥30趋势)',
+    desc: 'M30 Stoch 震荡+趋势双模 (ADX<30震荡逆势/≥30趋势顺势)',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['震荡(ADX<30+BB≤1.0): K<20+金叉+close<EMA21', '趋势(ADX≥30): DI+>DI-+10 + close>EMA21 + 金叉', '趋势顺势单，震荡逆势接飞刀'],
-      exit: ['震荡: Stoch反向交叉出场', '趋势: 从峰值回撤2.0ATR止盈/TP4.0ATR', '趋势: ADX<20衰减出/DI反转出', '硬止损: 震荡1.0ATR/趋势2.0ATR'],
+      entry: [
+        { name: '震荡模式', score: '', detail: 'ADX<30+BB≤1.0: K<20+金叉+close<EMA21' },
+        { name: '趋势模式', score: '', detail: 'ADX≥30: DI+>DI-+10+close>EMA21+金叉' },
+        { name: 'ADX判定', score: '', detail: 'ADX分界: <30→震荡逆势接飞刀, ≥30→趋势顺势单' },
+        { name: 'DI确认', score: '', detail: '趋势模式下DI+领先DI-至少10' },
+      ],
+      exit: [
+        { method: '震荡出场', normal: 'Stoch反向交叉出场' },
+        { method: '趋势出场', normal: '峰谷回撤2.0ATR止盈 / TP 4.0ATR' },
+        { method: '趋势衰减', normal: 'ADX<20衰减出场 / DI+<DI-反转出' },
+        { method: '硬止损', normal: '震荡1.0ATR / 趋势2.0ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['震荡(ADX<30+BB≤1.0): K>80+死叉+close>EMA21', '趋势(ADX≥30): DI->DI+ +10 + close<EMA21 + 死叉'],
-      exit: ['震荡: Stoch反向交叉出场', '趋势: 从最低点回撤2.0ATR止盈/TP4.0ATR', '趋势: ADX<20衰减出/DI反转出'],
+      entry: [
+        { name: '震荡模式', score: '', detail: 'ADX<30+BB≤1.0: K>80+死叉+close>EMA21' },
+        { name: '趋势模式', score: '', detail: 'ADX≥30: DI->DI++10+close<EMA21+死叉' },
+        { name: 'ADX判定', score: '', detail: 'ADX分界: <30→震荡逆势接飞刀, ≥30→趋势顺势单' },
+        { name: 'DI确认', score: '', detail: '趋势模式下DI-领先DI+至少10' },
+      ],
+      exit: [
+        { method: '震荡出场', normal: 'Stoch反向交叉出场' },
+        { method: '趋势出场', normal: '峰谷回撤2.0ATR止盈 / TP 4.0ATR' },
+        { method: '趋势衰减', normal: 'ADX<20衰减出场 / DI->DI+反转出' },
+        { method: '硬止损', normal: '震荡1.0ATR / 趋势2.0ATR' },
+      ],
     },
   },
   rsi_grading_m30: {
-    desc: 'M30 RSI分级评分+MA14+BB (阈值2宽止损)',
+    desc: 'M30 RSI分级评分+MA14+BB (阈值≥2, 宽止损trail=2.0 hard=3.0)',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['RSI分级: <20→+2 / 20~30→+1', 'MA14上升→+1 | 触碰BB下轨→+1', '阈值≥2入场, 无RSI方向因子', '回测: 27笔$44 PF=1.67'],
-      exit: ['从最高点回撤2.0×ATR止盈(trail)', '亏损3.0×ATR硬止损(hard)'],
+      entry: [
+        { name: 'RSI深度超卖', score: '+2', detail: 'RSI < 20' },
+        { name: 'RSI轻度超卖', score: '+1', detail: 'RSI 20~30' },
+        { name: 'MA14趋势', score: '+1', detail: 'MA14上升' },
+        { name: 'BB触轨', score: '+1', detail: '触碰BB下轨' },
+        { name: '总分门槛', score: '', detail: '阈值≥2入场' },
+        { name: '回测验证', score: '', detail: '27笔 $44 PF=1.67' },
+      ],
+      exit: [
+        { method: 'ATR移动止盈(trail)', normal: '峰谷回撤2.0×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '亏损3.0×ATR(宽止损保留空间)' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['RSI分级: >70→+2 / 65~70→+1', 'MA14下降→+1 | 触碰BB上轨→+1', 'RSI<20禁空, 20~30扣1分'],
-      exit: ['从最低点反弹2.0×ATR止盈(trail)', '亏损3.0×ATR硬止损(hard)'],
+      entry: [
+        { name: 'RSI深度超买', score: '+2', detail: 'RSI > 70' },
+        { name: 'RSI轻度超买', score: '+1', detail: 'RSI 65~70' },
+        { name: 'MA14趋势', score: '+1', detail: 'MA14下降' },
+        { name: 'BB触轨', score: '+1', detail: '触碰BB上轨' },
+        { name: 'RSI门禁', score: '', detail: 'RSI<20禁空, 20~30扣1分' },
+        { name: '总分门槛', score: '', detail: '阈值≥2入场' },
+      ],
+      exit: [
+        { method: 'ATR移动止盈(trail)', normal: '峰谷回撤2.0×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '亏损3.0×ATR(宽止损保留空间)' },
+      ],
     },
   },
   h1_v6_hybrid_v6: {
-    desc: 'H1 多因子评分 V6 混合 (已下架)',
+    desc: 'H1 8因子评分 V6 混合 (阈值≥3, 逆势≥5, 已下架)',
+    exitWiden: true,
+    exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['8因子 ≥4入场(逆势≥5)', 'SMA200上+KDJ超卖+BB下轨+KC下轨', 'MACD底背离+RSI<30+低波动'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损 | 趋势感知乘数'],
+      entry: [
+        { name: 'SMA200趋势', score: '+1', detail: 'close > SMA200 (趋势评分+)' },
+        { name: 'KDJ超卖', score: '+1', detail: 'Stoch K < 30' },
+        { name: 'BB位置', score: '+1', detail: '触碰BB下轨' },
+        { name: 'KC位置', score: '+1', detail: '触碰Keltner下轨' },
+        { name: 'M30方向', score: '+1', detail: 'M30 K线上升 (小周期共振)' },
+        { name: 'MACD底背离', score: '+1', detail: '价格新低+MACD柱升高' },
+        { name: 'RSI偏低', score: '+1', detail: 'RSI < 30' },
+        { name: '低波动', score: '+1', detail: 'ATR < 均值 (波动收缩)' },
+        { name: '总分门槛', score: '', detail: '8因子≥3入场, 逆势≥5' },
+        { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
+        { name: '急跌惩罚', score: '', detail: '急跌>1.5%暂停做多' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['5因子 ≥3入场(逆势≥4)', '仅close≤SMA200评分 | KDJ超买+KC上轨', 'MACD顶背离+RSI>70'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: 'SMA200趋势', score: '+1', detail: 'close < SMA200 (趋势评分-)' },
+        { name: 'KDJ超买', score: '+1', detail: 'Stoch K > 65' },
+        { name: 'BB位置', score: '+1', detail: '触碰BB上轨' },
+        { name: 'KC位置', score: '+1', detail: '触碰Keltner上轨' },
+        { name: 'M30方向', score: '+1', detail: 'M30 K线下降' },
+        { name: 'MACD顶背离', score: '+1', detail: '价格新高+MACD柱降低' },
+        { name: 'RSI偏高', score: '+1', detail: 'RSI > 65' },
+        { name: 'M30趋势门禁', score: '', detail: 'M30上升+close>SMA200时空单阈值3→4' },
+        { name: '总分门槛', score: '', detail: '8因子≥3入场, 逆势≥4' },
+        { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
+        { name: '急涨惩罚', score: '', detail: '急涨>1.5%暂停做空' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
+      ],
     },
   },
   sanqing_h1_v6: {
-    desc: 'H1 EMA9/21 趋势评分系统',
+    desc: 'H1 EMA9/21 + ATR14 6因子评分 (≥5入场, 顺趋势trail=2.5 hard=4.0; 位置门禁)',
+    exitWiden: true,
+    exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['6因子 ≥5入场', 'EMA上升趋势+2(金叉+1)', '触碰EMA9反弹+2 | 实体>ATR+1', '高成交量+1 | 吞没形态+2'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: 'EMA趋势', score: '+2', detail: 'EMA9 > EMA21 (上升趋势)' },
+        { name: 'EMA金叉', score: '+1', detail: 'EMA9上穿EMA21' },
+        { name: '触碰EMA9反弹', score: '+2', detail: 'low≤EMA9×1.002 且 close>EMA9' },
+        { name: '实体幅度', score: '+1', detail: '实体/ATR > 1.0' },
+        { name: '高成交量', score: '+1', detail: 'volume > 均量×1.3' },
+        { name: '吞没形态', score: '+2', detail: 'body中值≥1.5 且 body/prev_max≥1.5' },
+        { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '2.5×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '4.0×ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['6因子 ≥5入场', 'EMA下降趋势+2(死叉+1)', '触碰EMA9回落+2 | 实体>ATR+1', '吞没形态+2'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: 'EMA趋势', score: '+2', detail: 'EMA9 < EMA21 (下降趋势)' },
+        { name: 'EMA死叉', score: '+1', detail: 'EMA9下穿EMA21' },
+        { name: '触碰EMA9回落', score: '+2', detail: 'high≥EMA9×0.998 且 close<EMA9' },
+        { name: '实体幅度', score: '+1', detail: '实体/ATR > 1.0' },
+        { name: '高成交量', score: '+1', detail: 'volume > 均量×1.3' },
+        { name: '吞没形态', score: '+2', detail: 'body中值≥1.5 且 body/prev_max≥1.5' },
+        { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '2.5×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '4.0×ATR' },
+      ],
     },
   },
   gold_autoresearch_h1_v5: {
-    desc: 'H1 4因子共识投票',
+    desc: 'H1 4因子共识投票 (全真入场, 位置门禁+RSI安全过滤)',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['4因子全真入场', '趋势: EMA10>EMA20', '动量: MACD>信号线或Stoch金叉', '波动: ADX>20或ATR上升', '安全: 非(BB上轨+RSI≥70)'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: '趋势', score: '+1', detail: 'EMA10 > EMA20 (上升趋势)' },
+        { name: '动量', score: '+1', detail: 'MACD>信号线 或 Stoch金叉' },
+        { name: '波动', score: '+1', detail: 'ADX>20 或 ATR上升 (有活性)' },
+        { name: '安全过滤', score: '', detail: '非(BB上轨+RSI≥70), 防止追高' },
+        { name: '入场规则', score: '', detail: '4因子全真才入场 (共识投票)' },
+        { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['4因子全真入场', '趋势: EMA10<EMA20', '动量: MACD<信号线或Stoch死叉', '波动: ADX>20或ATR上升', '安全: RSI>35'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: '趋势', score: '+1', detail: 'EMA10 < EMA20 (下降趋势)' },
+        { name: '动量', score: '+1', detail: 'MACD<信号线 或 Stoch死叉' },
+        { name: '波动', score: '+1', detail: 'ADX>20 或 ATR上升 (有活性)' },
+        { name: '安全过滤', score: '', detail: 'RSI > 35 (RSI≤35封空)' },
+        { name: '入场规则', score: '', detail: '4因子全真才入场 (共识投票)' },
+        { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
+      ],
+      exit: [
+        { method: '利润回撤止盈', normal: 'peak回撤25%' },
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR' },
+      ],
     },
   },
   mtf_resonance_h1: {
-    desc: 'H1+M15 TA-Lib 形态共振',
+    desc: 'H1+M15 TA-Lib 形态共振 (双周期同向反转确认+质量过滤)',
     long: {
-      title: '做多', color: '#0ecb81',
-      entry: ['H1+15 双周期形态共振开仓', '双周期同时出现反转形态', '共振方向一致时才入场'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: 'H1反转形态', score: '', detail: 'TA-Lib检测到反转形态 (CDLHAMMER, CDLMORNINGSTAR等)' },
+        { name: 'M15共振', score: '', detail: '同窗口M15出现同向反转信号' },
+        { name: '质量过滤', score: '', detail: 'H1 RSI中位超卖 + H1趋势向下 (BULL_FILTERS)' },
+        { name: '共振原则', score: '', detail: '双周期形态一致才开仓, 否则等待' },
+      ],
+      exit: [
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR' },
+      ],
     },
     short: {
-      title: '做空', color: '#f6465d',
-      entry: ['H1+M15 双周期形态共振开仓', '双周期同时出现反转形态', '共振方向一致时才入场'],
-      exit: ['利润回撤25%止盈 | ATR移动止盈', 'ATR硬止损'],
+      entry: [
+        { name: 'H1反转形态', score: '', detail: 'TA-Lib检测到反转形态 (CDLSHOOTINGSTAR, CDLEVENINGSTAR等)' },
+        { name: 'M15共振', score: '', detail: '同窗口M15出现同向反转信号' },
+        { name: '质量过滤', score: '', detail: 'H1 RSI中位超买 + H1趋势向上 (BEAR_FILTERS)' },
+        { name: '共振原则', score: '', detail: '双周期形态一致才开仓, 否则等待' },
+      ],
+      exit: [
+        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR' },
+        { method: 'ATR硬止损(hard)', normal: '2.0×ATR' },
+      ],
     },
   },
 }
@@ -217,6 +399,13 @@ function getColor(name: string): string {
   return strategyColors[name] || '#808080'
 }
 
+function updateMagic(id: string, val: string) {
+  const n = parseInt(val, 10)
+  if (!isNaN(n) && pool.value[id]) {
+    pool.value[id].magic = Math.min(999999, Math.max(100000, n))
+  }
+}
+
 async function save() {
   saving.value = true
   try {
@@ -274,9 +463,9 @@ async function save() {
           <div style="display: flex; align-items: center; gap: 12px;">
             <n-space size="small" align="center">
               <n-text depth="3" style="font-size: 11px;">Magic</n-text>
-              <n-input-number v-model:value="pool[meta.id].magic" size="tiny"
-                :min="100000" :max="999999"
-                @click.stop style="width: 90px;" />
+              <n-input :value="String(pool[meta.id]?.magic || '')" size="tiny"
+                style="width: 76px;" @click.stop
+                @update:value="updateMagic(meta.id, $event)" />
             </n-space>
             <n-select v-model:value="pool[meta.id].timeframe"
               :options="timeframes.map(t => ({ label: t, value: t }))"
@@ -302,35 +491,107 @@ async function save() {
             </n-space>
           </div>
 
-          <!-- 进出场逻辑 -->
+          <!-- 进出场逻辑 (双栏: 左做多右做空, 上入场下出场) -->
           <template v-if="getLogic(meta.name)">
-            <n-text depth="2" style="font-size: 12px; display: block; margin-bottom: 6px;">
+            <n-text depth="2" style="font-size: 12px; display: block; margin-bottom: 8px;">
               {{ getLogic(meta.name)!.desc }}
             </n-text>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-              <!-- 做空 -->
-              <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #f6465d;">
-                <div style="font-weight:700; color:#f6465d; font-size:12px; margin-bottom:4px;">▼ 做空</div>
-                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
-                <div v-for="(l, li) in getLogic(meta.name)!.short.entry" :key="'se'+li"
-                  style="font-size:10px; color:#ccc; padding:1px 0;">· {{ l }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
-                <div v-for="(l, li) in getLogic(meta.name)!.short.exit" :key="'sx'+li"
-                  style="font-size:10px; color:#999; padding:1px 0;">· {{ l }}</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <!-- 做多 (左) -->
+              <div style="border-left: 3px solid #0ecb81; padding-left: 8px;">
+                <div style="font-weight: 600; color: #0ecb81; font-size: 12px; margin-bottom: 3px;">▲ 做多</div>
+                <n-table size="small" bordered single-line :style="{ fontSize: '11px' }">
+                  <thead>
+                    <tr>
+                      <th style="width: 20px; text-align: center;">#</th>
+                      <th>因子</th>
+                      <th style="width: 34px; text-align: center;">得分</th>
+                      <th>条件</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(f, i) in getLogic(meta.name)!.long.entry" :key="'le'+i">
+                      <td style="text-align: center; color: #8b8f97;">{{ i+1 }}</td>
+                      <td>{{ f.name }}</td>
+                      <td style="text-align: center;">
+                        <span v-if="f.score" style="display:inline-block; padding:0 3px; background:#f0a020; color:#fff; font-weight:700; font-size:10px; border-radius:2px;">{{ f.score }}</span>
+                      </td>
+                      <td>{{ f.detail }}</td>
+                    </tr>
+                  </tbody>
+                </n-table>
+                <n-table size="small" bordered single-line :style="{ fontSize: '10px' }" style="margin-top: 3px;">
+                  <thead>
+                    <tr>
+                      <th style="width:16px;text-align:center;">#</th>
+                      <th>出场方式</th>
+                      <th>正常模式</th>
+                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">加宽</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(ex, i) in getLogic(meta.name)!.long.exit" :key="'lx'+i">
+                      <td style="text-align:center;color:#8b8f97;">{{ i+1 }}</td>
+                      <td>{{ ex.method }}</td>
+                      <td>{{ ex.normal }}</td>
+                      <td v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ ex.widen || '—' }}</td>
+                    </tr>
+                  </tbody>
+                </n-table>
+                <div v-if="getLogic(meta.name)!.exitNote" style="font-size:10px;color:#8b8f97;margin-top:2px;">
+                  {{ getLogic(meta.name)!.exitNote }}
+                </div>
               </div>
-              <!-- 做多 -->
-              <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #0ecb81;">
-                <div style="font-weight:700; color:#0ecb81; font-size:12px; margin-bottom:4px;">▲ 做多</div>
-                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
-                <div v-for="(l, li) in getLogic(meta.name)!.long.entry" :key="'le'+li"
-                  style="font-size:10px; color:#ccc; padding:1px 0;">· {{ l }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
-                <div v-for="(l, li) in getLogic(meta.name)!.long.exit" :key="'lx'+li"
-                  style="font-size:10px; color:#999; padding:1px 0;">· {{ l }}</div>
+
+              <!-- 做空 (右) -->
+              <div style="border-left: 3px solid #f6465d; padding-left: 8px;">
+                <div style="font-weight: 600; color: #f6465d; font-size: 12px; margin-bottom: 3px;">▼ 做空</div>
+                <n-table size="small" bordered single-line :style="{ fontSize: '11px' }">
+                  <thead>
+                    <tr>
+                      <th style="width: 20px; text-align: center;">#</th>
+                      <th>因子</th>
+                      <th style="width: 34px; text-align: center;">得分</th>
+                      <th>条件</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(f, i) in getLogic(meta.name)!.short.entry" :key="'se'+i">
+                      <td style="text-align: center; color: #8b8f97;">{{ i+1 }}</td>
+                      <td>{{ f.name }}</td>
+                      <td style="text-align: center;">
+                        <span v-if="f.score" style="display:inline-block; padding:0 3px; background:#f0a020; color:#fff; font-weight:700; font-size:10px; border-radius:2px;">{{ f.score }}</span>
+                      </td>
+                      <td>{{ f.detail }}</td>
+                    </tr>
+                  </tbody>
+                </n-table>
+                <n-table size="small" bordered single-line :style="{ fontSize: '10px' }" style="margin-top: 3px;">
+                  <thead>
+                    <tr>
+                      <th style="width:16px;text-align:center;">#</th>
+                      <th>出场方式</th>
+                      <th>正常模式</th>
+                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">加宽</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(ex, i) in getLogic(meta.name)!.short.exit" :key="'sx'+i">
+                      <td style="text-align:center;color:#8b8f97;">{{ i+1 }}</td>
+                      <td>{{ ex.method }}</td>
+                      <td>{{ ex.normal }}</td>
+                      <td v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ ex.widen || '—' }}</td>
+                    </tr>
+                  </tbody>
+                </n-table>
+                <div v-if="getLogic(meta.name)!.exitNote" style="font-size:10px;color:#8b8f97;margin-top:2px;">
+                  {{ getLogic(meta.name)!.exitNote }}
+                </div>
               </div>
             </div>
           </template>
-          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">暂无详细策略说明</div>
+          <div v-else style="font-size:12px; color:#8b8f97; padding:4px 0;">暂无详细策略说明</div>
         </div>
       </n-card>
 
