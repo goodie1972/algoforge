@@ -3,7 +3,7 @@ MTF 共振策略 — H1+M15 TA-Lib 形态共振开仓
 ========================================
 - 入场：H1 K 线收盘后检测 TA-Lib 形态 + 质量过滤器，同窗口 M15 有同向信号则开仓
 - 止损：2× H1 ATR
-- 止盈：ATR 移动跟踪止损（trail=1.0 hard=2.0）
+- 止盈：ATR 移动跟踪止损（trail=2.0 hard=1.0）
 """
 
 import logging
@@ -22,6 +22,7 @@ STRATEGY_VERSION = "v1"
 STRATEGY_MAGIC = 660801
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660801, "date": "2026-06-15", "desc": "初始上线：H1+M15 TA-Lib 形态共振开仓，SL=2×ATR，TP=ATR跟踪"},
+    {"version": "v2", "magic": 660801, "date": "2026-06-22", "desc": "移除tight_exit_mode, trail/hard互换为2.0/1.0(止盈>止损)"},
 ]
 
 LOOKAHEAD = 3
@@ -42,12 +43,9 @@ class MTFResonanceStrategy(BaseStrategy):
         self._cached_atr_values: Optional[list[float]] = None
         self._cached_atr_key: int = 0
 
-        # Exit params
-        self.p_trailing_atr = 1.0   # 盈利后回调超过 1 ATR 止盈
-        self.p_hard_atr = 2.0       # 亏损超过 2 ATR 硬止损
-
-        # 新闻风控（引擎直接设置此属性）
-        self.tight_exit_mode: bool = False
+        # Exit params — trail>hard (止盈>止损)
+        self.p_trailing_atr = 2.0   # 盈利后回调超过 2 ATR 止盈
+        self.p_hard_atr = 1.0       # 亏损超过 1 ATR 硬止损
 
     def refresh_data(self, count: int = 200):
         self._cached_atr_key = 0

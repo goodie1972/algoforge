@@ -27,6 +27,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v5", "magic": 660605, "date": "2026-06-11", "desc": "趋势门禁：M30=DOWN+价<SMA200时做多阈值4→5，M30=UP+价>SMA200时做空阈值3→4"},
     {"version": "v6", "magic": 660606, "date": "2026-06-12", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
     {"version": "v7", "magic": 660607, "date": "2026-06-15", "desc": "SMA200改为双向因子(TREND+/TREND-)，取消空单SMA200硬门槛；阈值统一为3，逆势提至5；TOP/BOTTOM-GATE+RALLY/DROP防追高杀低"},
+    {"version": "v8", "magic": 660607, "date": "2026-06-22", "desc": "移除tight_exit_mode新闻风控"},
 ]
 
 
@@ -51,9 +52,6 @@ class V6HybridStrategy(BaseStrategy):
         self.p_trailing_atr = 1.0  # 回调超过 1 ATR 即止盈（原为 4.0）
         self.p_hard_atr = 2.0
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
-
-        # 新闻事件风控
-        self.tight_exit_mode: bool = False
 
         # Indicator calculation params
         self.bb_period = 20
@@ -676,10 +674,6 @@ class V6HybridStrategy(BaseStrategy):
 
         trail_mult, hard_mult = self._get_exit_multipliers(is_buy)
         pdd = self.profit_drawdown_pct
-        if self.tight_exit_mode:
-            trail_mult = 0.5
-            hard_mult = 1.0
-            pdd = 0.15
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
