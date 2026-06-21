@@ -66,7 +66,7 @@ XAUUSD 量化交易系统是一个专为黄金（XAUUSD）设计的自动化交�
 │                                                           │
 │  ┌────────────┐ ┌────────────┐ ┌──────────┐ ┌──────────┐ │
 │  │ M30_rsi_bb │ │ sanqing_h1 │ │v6_hybrid │ │gold_auto │ │
-│  │  (660705)  │ │  (880105)  │ │ (660606) │ │ (880306)  │ │
+│  │  (660706)  │ │  (880106)  │ │ (660607) │ │ (880306)  │ │
 │  └────────────┘ └────────────┘ └──────────┘ └──────────┘ │
 │                                                           │
 │  独立价格轮询线程 (0.1s)     K 线缓存 (每 tick 1周期)      │
@@ -110,7 +110,7 @@ xauusd/
 │   ├── base.py                  # BaseStrategy 抽象基类
 │   ├── m30_rsi.py               # M30 RSI+布林带均值回归 (v5, 660705)
 │   ├── v6_hybrid.py             # H1 多因子 V6 混合策略 (v6, 660606)
-│   ├── sanqing_h1.py            # H1 EMA9/21 趋势策略 (v4, 880105)
+│   ├── sanqing_h1.py            # H1 EMA9/21 趋势策略 (v6r, 880106)
 │   ├── gold_autoresearch_h1.py  # H1 共识投票策略 (v6, 880306)
 │   ├── backup/                  # 版本备份文件
 │   └── STRATEGY_VERSIONING.md   # 版本管理规范文档
@@ -286,7 +286,7 @@ STRATEGY_POOL = {
         "max_positions": 1,
     },
     "sanqing_h1": {
-        "magic": 880105,       # PP=88(借鉴) NN=01 VV=05
+        "magic": 880106,       # PP=88(借鉴) NN=01 VV=06r
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
@@ -590,7 +590,7 @@ STRATEGY_CHANGELOG = [           # 版本历史列表
 |------|------|-------|------|---------|---------|
 | M30_rsi_bb | M30 | 660705 | v5 | 5因子评分≥3 + H1趋势门控 | RSI, BB, ATR, SMA200 |
 | H1_v6_hybrid | H1 | 660606 | v6 | 8因子评分≥3 + 持仓位门控 | KDJ, BB, KC, MACD, RSI |
-| sanqing_h1 | H1 | 880105 | v4 | 6因子评分≥5 + 持仓位门控 | EMA9/21, ATR, Volume |
+| sanqing_h1 | H1 | 880106 | v6r | 6因子评分≥5 + 位置门禁 | EMA9/21, ATR, Volume |
 | gold_auto_research | H1 | 880306 | v6 | 4因子共识（全票通过）+ 持仓位门控 | EMA, MACD, ADX, RSI, BB |
 
 各策略完整文档见 `docs/strategies/`，版本历史见 `strategies/STRATEGY_VERSIONING.md`。
