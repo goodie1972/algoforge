@@ -83,7 +83,7 @@ async function savePool() {
         enabled: cfg.enabled,
         magic: cfg.magic,
         timeframe: cfg.timeframe,
-        max_positions: cfg.enabled ? cfg.max_positions : 0,
+        max_positions: cfg.enabled ? (cfg.max_positions || 1) : 0,
         double_first: cfg.double_first,
       }
     }
