@@ -1,15 +1,13 @@
 """
-M30 RSI分级评分 + MA14 + BB 均值回归策略
-========================================
+M30 RSI分级评分 + MA14 + BB + ADX>28 趋势门禁
+===========================================
 基于回测最优配置 (m30_final_bt.py section 4):
   - RSI 分级评分: <20→+2, 20-30→+1, >70→+2, 65-70→+1
   - MA14 方向 (±1)
   - BB 触轨 (±1)
-  - 无 RSI 方向因子
-  - 阈值 2, trail=2.0×ATR, hard=3.0×ATR
-  - 短侧 RSI 过滤: RSI<20 禁空, RSI 20-30 扣一分
-
-回测结果: 27 笔 $44.32 PF=1.67 WR=37% (M30 双品种盈利)
+  - ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
+  - 无 RSI 方向因子，无短侧过滤
+  - 阈值 2, EMA趋势感知出场: 顺2.0/逆1.0
 """
 
 import logging
@@ -21,11 +19,15 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v1"
+STRATEGY_VERSION = "v5"
 STRATEGY_MAGIC = 660902
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660902, "date": "2026-06-21", "desc": "初始上线: RSI分级评分+MA14+BB, thr=2, trail=2.0 hard=3.0"},
+    {"version": "v2", "magic": 660902, "date": "2026-06-22", "desc": "新增ADX>28趋势增强: +DI/-DI方向评分+2"},
+    {"version": "v3", "magic": 660902, "date": "2026-06-22", "desc": "移除tight_exit_mode和RSI短侧过滤, exit改trail=1.5 hard=1.5"},
+    {"version": "v4", "magic": 660902, "date": "2026-06-22", "desc": "趋势增强改EMA9/21定方向+DI差值定强度"},
+    {"version": "v5", "magic": 660902, "date": "2026-06-22", "desc": "重构: ADX>28趋势门禁(禁反向), EMA9/21趋势感知出场(顺2.0逆1.0)"},
 ]
 
 
@@ -47,12 +49,16 @@ class RSIGradingM30Strategy(BaseStrategy):
         self.rsi_deep_os = 20
         self.rsi_deep_ob = 70
 
-        # Exit params — 宽止损保留盈利空间
-        self.trail_mult = 2.0    # 从峰值回撤 2×ATR 止盈
-        self.hard_mult = 3.0     # 亏损 3×ATR 硬止损
+        # Exit params (EMA趋势感知, 顺宽逆窄)
+        self.trend_trail = 2.0   # 顺趋势: 峰谷回撤 2×ATR
+        self.trend_hard = 2.0    # 顺趋势: 亏损 2×ATR 硬止损
+        self.counter_trail = 1.0 # 逆趋势: 峰谷回撤 1×ATR
+        self.counter_hard = 1.0  # 逆趋势: 亏损 1×ATR 硬止损
 
-        # 新闻风控
-        self.tight_exit_mode: bool = False
+        # ADX>28 趋势门禁
+        self.adx_threshold = 28
+        self.ema_fast = 9
+        self.ema_slow = 21
 
         # 指标参数
         self.bb_period = 20
@@ -132,6 +138,53 @@ class RSIGradingM30Strategy(BaseStrategy):
         ma14 = sum(closes[-self.ma14_period:]) / self.ma14_period
         return 'UP' if closes[-1] > ma14 else 'DOWN'
 
+    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
+        if len(closes) < period: return None
+        k = 2.0 / (period + 1)
+        ema = closes[0]
+        for p in closes[1:]:
+            ema = (p - ema) * k + ema
+        return ema
+
+    def _calc_adx(self, period: int = 14) -> Optional[dict]:
+        candles = self.candles
+        if len(candles) < period + 2: return None
+        highs = [c.high for c in candles]
+        lows = [c.low for c in candles]
+        closes = self.get_close_prices()
+        n = len(highs)
+        tr_list, plus_dm, minus_dm = [], [], []
+        for i in range(1, n):
+            h, l_, pc = highs[i], lows[i], closes[i - 1]
+            ph, pl = highs[i - 1], lows[i - 1]
+            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
+            up = h - ph
+            down = pl - l_
+            plus_dm.append(up if (up > down and up > 0) else 0)
+            minus_dm.append(down if (down > up and down > 0) else 0)
+            tr_list.append(tr)
+        if len(tr_list) < period: return None
+        atr_v = sum(tr_list[:period]) / period
+        pdi_v = sum(plus_dm[:period]) / period
+        ndi_v = sum(minus_dm[:period]) / period
+        if atr_v <= 0: return None
+        pdi_v = pdi_v / atr_v * 100
+        ndi_v = ndi_v / atr_v * 100
+        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
+        for i in range(period, len(tr_list)):
+            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
+            if atr_s[-1] > 0:
+                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i] / atr_s[-1] * 100) / period)
+                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i] / atr_s[-1] * 100) / period)
+            else:
+                pdi_s.append(pdi_s[-1])
+                ndi_s.append(ndi_s[-1])
+        dx = [abs(pdi_s[i] - ndi_s[i]) / max(pdi_s[i] + ndi_s[i], 0.001) * 100 for i in range(len(atr_s))]
+        adx = [sum(dx[:period]) / period]
+        for i in range(period, len(dx)):
+            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
+        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+
     # ─────────────── Signal generation ───────────────
 
     def generate_signal(self) -> Optional[tuple]:
@@ -150,6 +203,8 @@ class RSIGradingM30Strategy(BaseStrategy):
 
         atr_val = self._calc_atr()
         if atr_val is None or atr_val <= 0: return None
+
+        adx_data = self._calc_adx()
 
         ma14_trend = self._get_ma14_trend()
 
@@ -179,27 +234,31 @@ class RSIGradingM30Strategy(BaseStrategy):
         elif rsi_val > self.rsi_ob:
             short_score += 1; short_factors.append(f"RSI-{rsi_val:.0f}")
 
-        # ── Decision ──
+        # ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
+        gate_side = None  # None=无门禁, 'long'=禁多, 'short'=禁空
+        if adx_data and adx_data["adx"] > self.adx_threshold:
+            ema9 = self._calc_ema(closes, self.ema_fast)
+            ema21 = self._calc_ema(closes, self.ema_slow)
+            if ema9 is not None and ema21 is not None:
+                if ema9 > ema21:
+                    gate_side = 'short'
+                elif ema9 < ema21:
+                    gate_side = 'long'
+
+        # ── Decision (ADX>28 门禁禁反向) ──
         signal = None
         signal_str = "无信号"
 
-        if long_score >= self.score_threshold:
-            signal = OrderType.BUY
-            signal_str = "LONG"
-        elif short_score >= self.score_threshold:
-            # RSI 深超卖禁空
-            if rsi_val < self.rsi_deep_os:
-                signal_str = f"RSI深超卖({rsi_val:.0f})禁空"
-            elif rsi_val < self.rsi_os:
-                short_score -= 1
-                if short_score >= self.score_threshold:
-                    signal = OrderType.SELL
-                    signal_str = "SELL(罚)"
-                else:
-                    signal_str = f"RSI扣分({short_score}分)"
-            else:
-                signal = OrderType.SELL
-                signal_str = "SELL"
+        can_long = gate_side != 'long'
+        can_short = gate_side != 'short'
+
+        if can_long and long_score >= self.score_threshold:
+            signal = OrderType.BUY; signal_str = "LONG"
+        elif can_short and short_score >= self.score_threshold:
+            signal = OrderType.SELL; signal_str = "SELL"
+
+        if gate_side and not signal:
+            signal_str += f" ({'上升趋势禁空' if gate_side == 'short' else '下降趋势禁多'})"
 
         # Log
         detail_parts = []
@@ -209,9 +268,18 @@ class RSIGradingM30Strategy(BaseStrategy):
             f"[{self.name}] 评分: {long_score}/{short_score} {signal_str}  "
             f"{' | '.join(detail_parts) if detail_parts else '无'}"
         )
+        adx_log = f" ADX={adx_data['adx']:.1f}" if adx_data else ""
+        gate_log = ""
+        if gate_side:
+            gate_log = " [门禁]" + ("禁空" if gate_side == 'short' else "禁多")
+        ema9_v = ema9 if 'ema9' in dir() else self._calc_ema(closes, self.ema_fast)
+        ema21_v = ema21 if 'ema21' in dir() else self._calc_ema(closes, self.ema_slow)
+        ema_log = ""
+        if ema9_v is not None and ema21_v is not None:
+            ema_log = f" EMA9={ema9_v:.2f} EMA21={ema21_v:.2f}"
         logger.info(
-            f"[{self.name}] Price={close:.2f} RSI={rsi_val:.1f} "
-            f"BB={bb['lower']:.1f}/{bb['upper']:.1f} ATR={atr_val:.2f}"
+            f"[{self.name}] Price={close:.2f} RSI={rsi_val:.1f}"
+            f" BB={bb['lower']:.1f}/{bb['upper']:.1f} ATR={atr_val:.2f}{adx_log}{ema_log}{gate_log}"
         )
 
         iv = {
@@ -219,6 +287,12 @@ class RSIGradingM30Strategy(BaseStrategy):
             "atr": round(atr_val, 2),
             "bb_upper": round(bb["upper"], 2), "bb_lower": round(bb["lower"], 2),
             "bb_mid": round(bb["sma"], 2), "ma14_trend": ma14_trend,
+            "adx": round(adx_data["adx"], 1) if adx_data else 0,
+            "pdi": round(adx_data["pdi"], 1) if adx_data else 0,
+            "ndi": round(adx_data["ndi"], 1) if adx_data else 0,
+            "ema9": round(ema9_v, 2) if ema9_v is not None else 0,
+            "ema21": round(ema21_v, 2) if ema21_v is not None else 0,
+            "gate": gate_side or "",
         }
         return (signal, long_score, short_score, long_factors, short_factors, iv)
 
@@ -229,8 +303,10 @@ class RSIGradingM30Strategy(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
-        dist = atr_val * self.hard_mult
-        if direction == OrderType.BUY:
+        is_buy = direction == OrderType.BUY
+        _, hard = self._get_exit_multipliers(is_buy)
+        dist = atr_val * hard
+        if is_buy:
             sl = round(entry_price - dist, 2)
             tp = round(entry_price + dist * 50, 2)
         else:
@@ -238,8 +314,19 @@ class RSIGradingM30Strategy(BaseStrategy):
             tp = max(round(entry_price - dist * 50, 2), 0)
         return sl, tp
 
+    def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
+        """EMA9/21 趋势感知: 顺趋势宽, 逆趋势窄"""
+        closes = self.get_close_prices()
+        ema9 = self._calc_ema(closes, self.ema_fast)
+        ema21 = self._calc_ema(closes, self.ema_slow)
+        trend_up = ema9 is not None and ema21 is not None and ema9 > ema21
+
+        if (is_buy and trend_up) or (not is_buy and not trend_up):
+            return self.trend_trail, self.trend_hard
+        return self.counter_trail, self.counter_hard
+
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """宽止损出场: 回撤止盈 + 硬止损"""
+        """EMA趋势感知出场: 顺趋势宽/逆趋势窄"""
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
@@ -255,44 +342,37 @@ class RSIGradingM30Strategy(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return False
 
-        trail = self.trail_mult
-        hard = self.hard_mult
-        if self.tight_exit_mode:
-            trail = 0.5
-            hard = 1.0
+        trail, hard = self._get_exit_multipliers(is_buy)
+        reg = "顺" if (trail == self.trend_trail) else "逆"
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
             loss = td["entry"] - bid
 
-            # 回撤止盈 (从最高点回落 trail×ATR)
             drawdown = td["highest"] - bid
             if drawdown > atr_val * trail:
-                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} peak={td['highest']:.2f} drawdown={drawdown:.2f}")
-                self._last_exit_detail = {"exit_type": "trail_stop", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2)}
+                logger.info(f"[{self.name}] BUY {reg}TrailStop ticket={ticket} peak={td['highest']:.2f} drawdown={drawdown:.2f}")
+                self._last_exit_detail = {"exit_type": f"{reg}_trail_stop", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
-            # 硬止损
             if loss > atr_val * hard:
-                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f}")
-                self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
+                logger.info(f"[{self.name}] BUY {reg}HardStop ticket={ticket} loss={loss:.2f}")
+                self._last_exit_detail = {"exit_type": f"{reg}_hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
         else:
             td["lowest"] = min(td["lowest"], ask)
             loss = ask - td["entry"]
 
-            # 回撤止盈
             rally = ask - td["lowest"]
             if rally > atr_val * trail:
-                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} low={td['lowest']:.2f} rally={rally:.2f}")
-                self._last_exit_detail = {"exit_type": "trail_stop", "rally": round(rally, 2), "atr": round(atr_val, 2)}
+                logger.info(f"[{self.name}] SELL {reg}TrailStop ticket={ticket} low={td['lowest']:.2f} rally={rally:.2f}")
+                self._last_exit_detail = {"exit_type": f"{reg}_trail_stop", "rally": round(rally, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
-            # 硬止损
             if loss > atr_val * hard:
-                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f}")
-                self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
+                logger.info(f"[{self.name}] SELL {reg}HardStop ticket={ticket} loss={loss:.2f}")
+                self._last_exit_detail = {"exit_type": f"{reg}_hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
 

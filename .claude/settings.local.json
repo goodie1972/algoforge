@@ -4,7 +4,18 @@
       "Bash(PYTHONPATH=\"D:\\\\backup\\\\BaoBao\\\\PythonProgram\\\\xauusd\" python *)",
       "Bash(python *)",
       "Bash(rm -f /D/backup/BaoBao/PythonProgram/xauusd/.git/index.lock)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(netstat -tlnp)",
+      "Bash(curl -s http://localhost:1783/api/engine/status)",
+      "Bash(curl -s 'http://localhost:1783/api/market/candles?timeframe=M15&count=200')",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(nohup python *)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(PYTHONIOENCODING=utf-8 python backtest/m30_rsi_v8_bt.py)"
     ]
   }
 }

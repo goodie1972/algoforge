@@ -48,9 +48,6 @@ class SanQingH1Strategy(BaseStrategy):
         self.p_hard_atr = 2.0    # 硬止损 ATR×2（原为 2.5）
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
-        # 新闻事件风控
-        self.tight_exit_mode: bool = False
-
     def refresh_data(self, count: int = 200):
         self._cached_atr_key = 0
         self._cached_atr_values = None
@@ -325,10 +322,6 @@ class SanQingH1Strategy(BaseStrategy):
 
         trail_mult, hard_mult = self._get_exit_multipliers(is_buy)
         pdd = self.profit_drawdown_pct
-        if self.tight_exit_mode:
-            trail_mult = 0.5
-            hard_mult = 1.0
-            pdd = 0.15
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)

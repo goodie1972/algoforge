@@ -1482,25 +1482,11 @@ class TradingEngine:
         return info.equity if info else 0.0
 
     def _handle_news_risk(self, snapshot: list):
-        """新闻事件三级风控：收紧 → 强平 → 封仓"""
-        # ① 强平窗口：平所有持仓
+        """新闻事件风控：强平窗口平所有持仓"""
         if self.news_filter.is_in_force_close():
             logger.warning("[新闻风控] 强制平仓窗口 (事件前15min)，平所有持仓")
             for strategy in snapshot:
                 self._close_strategy_positions(strategy, "news_force_close")
-            return
-
-        # ② 收紧窗口：收紧止损
-        if self.news_filter.is_in_pre_tighten():
-            logger.info("[新闻风控] 收紧窗口 (事件前2h~15min)，收紧所有策略止损")
-            for strategy in snapshot:
-                strategy.tight_exit_mode = True
-            return
-
-        # ③ 正常模式：关闭收紧
-        for strategy in snapshot:
-            if getattr(strategy, 'tight_exit_mode', False):
-                strategy.tight_exit_mode = False
 
     def _close_strategy_positions(self, strategy, reason: str):
         """平掉某个策略的所有持仓（含 legacy magic），记录指定出场原因"""

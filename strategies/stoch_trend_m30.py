@@ -20,11 +20,12 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v1"
+STRATEGY_VERSION = "v2"
 STRATEGY_MAGIC = 660903
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660903, "date": "2026-06-21", "desc": "初始上线: Stoch+T6v8 震荡+趋势双模, SL2.0 TP4.0"},
+    {"version": "v2", "magic": 660903, "date": "2026-06-22", "desc": "ADX阈值 30→28, 更早切换趋势模式, 减少逆势开仓"},
 ]
 
 
@@ -39,7 +40,7 @@ class StochTrendM30Strategy(BaseStrategy):
 
         # v11 A5 参数
         self.ma_period = 21
-        self.adx_range_threshold = 30
+        self.adx_range_threshold = 28
         self.bb_slope_threshold = 0.01
 
         # T6v8 趋势参数
