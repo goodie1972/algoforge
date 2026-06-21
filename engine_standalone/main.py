@@ -1499,7 +1499,7 @@ class TradingEngine:
 
         # ③ 正常模式：关闭收紧
         for strategy in snapshot:
-            if strategy.tight_exit_mode:
+            if getattr(strategy, 'tight_exit_mode', False):
                 strategy.tight_exit_mode = False
 
     def _close_strategy_positions(self, strategy, reason: str):
