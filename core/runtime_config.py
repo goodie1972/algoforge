@@ -135,6 +135,9 @@ class RuntimeConfig:
         all_keys = _ENGINE_KEYS | _STRATEGY_KEYS | {"slippage", "timeframe", "magic_number"}
         for key in all_keys:
             result[key] = self.get(key)
+        result["strategy_pool"] = self.get_strategy_pool()
+        result["coordinator"] = self.get_coordinator_config()
+        result["symbol"] = getattr(settings, 'SYMBOL', 'XAUUSD')
         return result
 
     def get_strategy_pool(self) -> dict[str, Any]:
