@@ -41,6 +41,7 @@ function defaults() {
     rally_drop_threshold: store.items?.coordinator?.rally_drop_threshold ?? 1.5,
     profit_drawdown_enabled: store.items?.coordinator?.profit_drawdown_enabled ?? true,
     profit_drawdown_pct: store.items?.coordinator?.profit_drawdown_pct ?? 0.25,
+    profit_drawdown_min_peak_atr: store.items?.coordinator?.profit_drawdown_min_peak_atr ?? 0.5,
   }
 }
 
