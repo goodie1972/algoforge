@@ -340,6 +340,7 @@ class RSIGradingM30Strategy(BaseStrategy):
                 "highest": position.open_price if is_buy else 0,
                 "lowest": position.open_price if not is_buy else float("inf"),
                 "entry": position.open_price,
+                "peak_profit": 0.0,
             }
 
         td = self._trail_data[ticket]
@@ -349,10 +350,23 @@ class RSIGradingM30Strategy(BaseStrategy):
 
         trail, hard = self._get_exit_multipliers(is_buy)
         reg = "顺" if (trail == self.trend_trail) else "逆"
+        pdd = self.profit_drawdown_pct
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
+            current_profit = bid - td["entry"]
             loss = td["entry"] - bid
+            if abs(current_profit) < atr_val * 10:
+                td["peak_profit"] = max(td["peak_profit"], current_profit)
+
+            if current_profit > 0:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
+                    profit_ratio = current_profit / td["peak_profit"]
+                    if profit_ratio < (1 - pdd):
+                        logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
+                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2), "reg": reg}
+                        del self._trail_data[ticket]
+                        return True
 
             drawdown = td["highest"] - bid
             if drawdown > atr_val * trail:
@@ -360,14 +374,26 @@ class RSIGradingM30Strategy(BaseStrategy):
                 self._last_exit_detail = {"exit_type": f"{reg}_trail_stop", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
-            if loss > atr_val * hard:
+            if current_profit <= 0 and loss > atr_val * hard:
                 logger.info(f"[{self.name}] BUY {reg}HardStop ticket={ticket} loss={loss:.2f}")
                 self._last_exit_detail = {"exit_type": f"{reg}_hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
         else:
             td["lowest"] = min(td["lowest"], ask)
+            current_profit = td["entry"] - ask
             loss = ask - td["entry"]
+            if abs(current_profit) < atr_val * 10:
+                td["peak_profit"] = max(td["peak_profit"], current_profit)
+
+            if current_profit > 0:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
+                    profit_ratio = current_profit / td["peak_profit"]
+                    if profit_ratio < (1 - pdd):
+                        logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
+                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2), "reg": reg}
+                        del self._trail_data[ticket]
+                        return True
 
             rally = ask - td["lowest"]
             if rally > atr_val * trail:
@@ -375,7 +401,7 @@ class RSIGradingM30Strategy(BaseStrategy):
                 self._last_exit_detail = {"exit_type": f"{reg}_trail_stop", "rally": round(rally, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]
                 return True
-            if loss > atr_val * hard:
+            if current_profit <= 0 and loss > atr_val * hard:
                 logger.info(f"[{self.name}] SELL {reg}HardStop ticket={ticket} loss={loss:.2f}")
                 self._last_exit_detail = {"exit_type": f"{reg}_hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
                 del self._trail_data[ticket]

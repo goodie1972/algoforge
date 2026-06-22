@@ -345,6 +345,7 @@ class StochTrendM30Strategy(BaseStrategy):
             self._pos_data[ticket] = {
                 "entry_price": position.open_price,
                 "regime": reg, "peak": position.open_price,
+                "peak_profit": 0.0,
             }
 
         td = self._pos_data[ticket]
@@ -367,9 +368,23 @@ class StochTrendM30Strategy(BaseStrategy):
             self._last_exit_detail = {"exit_type": "hard_stop", "regime": regime}
             del self._pos_data[ticket]; return True
 
-        # 更新峰值
-        if is_buy: td["peak"] = max(td["peak"], bid)
-        else: td["peak"] = min(td["peak"], ask)
+        # 更新峰值 + 利润峰值跟踪
+        if is_buy:
+            td["peak"] = max(td["peak"], bid)
+            _cp = bid - entry_price
+        else:
+            td["peak"] = min(td["peak"], ask)
+            _cp = entry_price - ask
+        if abs(_cp) < atr_val * 10:
+            td["peak_profit"] = max(td["peak_profit"], _cp)
+
+        # 利润回撤止盈（通用，不限 regime）
+        if _cp > 0 and self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
+            profit_ratio = _cp / td["peak_profit"]
+            if profit_ratio < (1 - self.profit_drawdown_pct):
+                logger.info(f"[{self.name}] ProfitStop ticket={ticket} profit=${_cp:.2f} peak=${td['peak_profit']:.2f}")
+                self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(_cp, 2), "atr": round(atr_val, 2)}
+                del self._pos_data[ticket]; return True
 
         # ── 震荡出场 (v11 A5，宽幅同规则) ──
         if regime in ("range", "range_wide") and stoch and ma_val:

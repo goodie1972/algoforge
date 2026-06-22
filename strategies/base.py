@@ -44,6 +44,7 @@ class BaseStrategy(abc.ABC):
         self.rally_drop_threshold: float = _coord.get('rally_drop_threshold', 1.5)
         self.profit_drawdown_enabled: bool = _coord.get('profit_drawdown_enabled', True)
         self.profit_drawdown_pct: float = _coord.get('profit_drawdown_pct', 0.25)
+        self.profit_drawdown_min_peak_atr: float = _coord.get('profit_drawdown_min_peak_atr', 0.5)
 
         # News-Bias 阻塞开关（每次信号动态读取 config_service，覆盖优先）
         self.block_long_when_bias_bearish: bool = _settings.BLOCK_LONG_WHEN_BIAS_BEARISH
@@ -232,6 +233,7 @@ class BaseStrategy(abc.ABC):
         self.rally_drop_threshold = _coord.get('rally_drop_threshold', 1.5)
         self.profit_drawdown_enabled = _coord.get('profit_drawdown_enabled', True)
         self.profit_drawdown_pct = _coord.get('profit_drawdown_pct', 0.25)
+        self.profit_drawdown_min_peak_atr = _coord.get('profit_drawdown_min_peak_atr', 0.5)
 
     def filter_positions(self, positions: list[Position]) -> dict:
         """统计当前品种的多空持仓"""

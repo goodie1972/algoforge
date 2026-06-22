@@ -423,7 +423,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 利润回撤止盈
-                if self.profit_drawdown_enabled and td["peak_profit"] > 0:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
@@ -454,7 +454,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 利润回撤止盈
-                if self.profit_drawdown_enabled and td["peak_profit"] > 0:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")

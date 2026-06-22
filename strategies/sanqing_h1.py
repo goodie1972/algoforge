@@ -384,7 +384,7 @@ class SanQingH1Strategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if self.profit_drawdown_enabled and td["peak_profit"] > 0:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
                     # 自适应回撤: 微利单给更多浮动空间
                     if td["peak_profit"] < atr_val * 1.0:
                         pdd_used = 0.5
@@ -425,7 +425,7 @@ class SanQingH1Strategy(BaseStrategy):
 
             if current_profit > 0:
                 # 盈利 → 止盈逻辑
-                if self.profit_drawdown_enabled and td["peak_profit"] > 0:
+                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
                     # 自适应回撤: 微利单给更多浮动空间
                     if td["peak_profit"] < atr_val * 1.0:
                         pdd_used = 0.5
