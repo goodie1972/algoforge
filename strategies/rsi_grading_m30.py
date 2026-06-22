@@ -245,20 +245,25 @@ class RSIGradingM30Strategy(BaseStrategy):
                 elif ema9 < ema21:
                     gate_side = 'long'
 
-        # ── Decision (ADX>28 门禁禁反向) ──
+        # ── Decision (ADX>28 门禁禁反向; ADX≤28 提高阈值到 3) ──
         signal = None
         signal_str = "无信号"
 
         can_long = gate_side != 'long'
         can_short = gate_side != 'short'
 
-        if can_long and long_score >= self.score_threshold:
+        # ADX≤28 无门禁: 需要更高阈值过滤震荡市假信号
+        effective_threshold = 3 if (adx_data is None or adx_data["adx"] <= self.adx_threshold) else self.score_threshold
+
+        if can_long and long_score >= effective_threshold:
             signal = OrderType.BUY; signal_str = "LONG"
-        elif can_short and short_score >= self.score_threshold:
+        elif can_short and short_score >= effective_threshold:
             signal = OrderType.SELL; signal_str = "SELL"
 
         if gate_side and not signal:
             signal_str += f" ({'上升趋势禁空' if gate_side == 'short' else '下降趋势禁多'})"
+        elif effective_threshold != self.score_threshold and not signal:
+            signal_str += f" (ADX≤{self.adx_threshold} 阈值提升至 {effective_threshold})"
 
         # Log
         detail_parts = []

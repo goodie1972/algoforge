@@ -115,7 +115,7 @@ class BaseStrategy(abc.ABC):
                         factors_long.append(f"RALLY-{rally_pct:.1f}%")
                         logger.info(f"[{self.name}] 急涨惩罚: 低点上涨 {rally_pct:.1f}%，禁BUY")
 
-        # ── ③ News-Bias 阻塞（与位置门禁 + 急涨急跌正交） ──
+        # ── ③ News-Bias 阻塞（ADX 门禁在 bias_state 层面处理） ──
         # 每次信号动态读取 config_service（覆盖优先），所以 UI 切换开关立即生效
         try:
             from dashboard.backend.config_service import RuntimeConfig
@@ -142,7 +142,6 @@ class BaseStrategy(abc.ABC):
                 score_short = 0
                 factors_short.append("BIAS-BULL-BLOCK")
                 logger.info(f"[{self.name}] News-Bias 阻塞: bias=bullish，禁SELL")
-
         return (signal, score_long, score_short, factors_long, factors_short, iv) + extra
 
     def _load_m30_data(self):

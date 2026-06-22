@@ -20,12 +20,13 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v2"
+STRATEGY_VERSION = "v3"
 STRATEGY_MAGIC = 660903
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660903, "date": "2026-06-21", "desc": "初始上线: Stoch+T6v8 震荡+趋势双模, SL2.0 TP4.0"},
     {"version": "v2", "magic": 660903, "date": "2026-06-22", "desc": "ADX阈值 30→28, 更早切换趋势模式, 减少逆势开仓"},
+    {"version": "v3", "magic": 660903, "date": "2026-06-22", "desc": "新增宽幅震荡子模式: BB width>2%时, 触轨+K极端(85/15)+DI交叉进场, 窄幅原版不变"},
 ]
 
 
@@ -145,7 +146,12 @@ class StochTrendM30Strategy(BaseStrategy):
             ndi_a = talib.MINUS_DI(h, l_, c, timeperiod=14)
             if any(np.isnan(x[-1]) for x in (adx_a, pdi_a, ndi_a)):
                 return None
-            return {"adx": float(adx_a[-1]), "pdi": float(pdi_a[-1]), "ndi": float(ndi_a[-1])}
+            prev_pdi = float(pdi_a[-2]) if len(pdi_a) >= 2 and not np.isnan(pdi_a[-2]) else None
+            prev_ndi = float(ndi_a[-2]) if len(ndi_a) >= 2 and not np.isnan(ndi_a[-2]) else None
+            return {
+                "adx": float(adx_a[-1]), "pdi": float(pdi_a[-1]), "ndi": float(ndi_a[-1]),
+                "prev_pdi": prev_pdi, "prev_ndi": prev_ndi,
+            }
         except ImportError:
             return self._calc_adx_wilder(highs, lows, closes)
         except Exception:
@@ -184,7 +190,10 @@ class StochTrendM30Strategy(BaseStrategy):
         adx = [sum(dx[:period]) / period]
         for i in range(period, len(dx)):
             adx.append((adx[-1] * (period - 1) + dx[i]) / period)
-        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+        prev_pdi = pdi_s[-2] if len(pdi_s) >= 2 else None
+        prev_ndi = ndi_s[-2] if len(ndi_s) >= 2 else None
+        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1],
+                "prev_pdi": prev_pdi, "prev_ndi": prev_ndi}
 
     def _bb_rising_ok(self, k_curr: float, k_prev: float) -> bool:
         closes = self.get_close_prices()
@@ -241,18 +250,45 @@ class StochTrendM30Strategy(BaseStrategy):
         long_score, short_score = 0, 0
         long_factors, short_factors = [], []
 
-        # ── 震荡模式 (v11 A5) ──
-        if is_ranging and bb["width"] <= 1.0:
-            if (k_curr < 20) and cross_up_now and (close < ma_val):
-                signal = OrderType.BUY
-                long_score = 3
-                long_factors = [f"K={k_curr:.0f}", "CROSS-UP", "RNG"]
-                self._pending_entry_info = {"regime": "range", "adx": adx, "atr": atr_val}
-            elif (k_curr > 80) and cross_down_now and (close > ma_val):
-                signal = OrderType.SELL
-                short_score = 3
-                short_factors = [f"K={k_curr:.0f}", "CROSS-DN", "RNG"]
-                self._pending_entry_info = {"regime": "range", "adx": adx, "atr": atr_val}
+        bb_width_threshold = 0.02  # 宽窄幅分界（黄金分割61.8%分位≈2%）
+
+        # ── 震荡模式 ──
+        if is_ranging:
+            if bb["width"] <= bb_width_threshold:
+                # 窄幅震荡 (原版 v11 A5)
+                if (k_curr < 20) and cross_up_now and (close < ma_val):
+                    signal = OrderType.BUY
+                    long_score = 3
+                    long_factors = [f"K={k_curr:.0f}", "CROSS-UP", "RNG"]
+                    self._pending_entry_info = {"regime": "range", "adx": adx, "atr": atr_val}
+                elif (k_curr > 80) and cross_down_now and (close > ma_val):
+                    signal = OrderType.SELL
+                    short_score = 3
+                    short_factors = [f"K={k_curr:.0f}", "CROSS-DN", "RNG"]
+                    self._pending_entry_info = {"regime": "range", "adx": adx, "atr": atr_val}
+            else:
+                # 宽幅震荡：触轨 + K极端 + DI交叉
+                touch_upper = candles[-1].high >= bb["upper"]
+                touch_lower = candles[-1].low <= bb["lower"]
+                if len(candles) >= 2:
+                    touch_upper = touch_upper or candles[-2].high >= bb["upper"]
+                    touch_lower = touch_lower or candles[-2].low <= bb["lower"]
+
+                prev_pdi = adx_data.get("prev_pdi")
+                prev_ndi = adx_data.get("prev_ndi")
+                di_death = prev_pdi is not None and prev_ndi is not None and prev_pdi >= prev_ndi and pdi < ndi
+                di_golden = prev_pdi is not None and prev_ndi is not None and prev_pdi <= prev_ndi and pdi > ndi
+
+                if touch_lower and k_curr < 15 and di_golden:
+                    signal = OrderType.BUY
+                    long_score = 3
+                    long_factors = [f"K={k_curr:.0f}", "TOUCH-LOW", "DI-GOLD"]
+                    self._pending_entry_info = {"regime": "range_wide", "adx": adx, "atr": atr_val}
+                elif touch_upper and k_curr > 85 and di_death:
+                    signal = OrderType.SELL
+                    short_score = 3
+                    short_factors = [f"K={k_curr:.0f}", "TOUCH-UP", "DI-DEATH"]
+                    self._pending_entry_info = {"regime": "range_wide", "adx": adx, "atr": atr_val}
 
         # ── 趋势模式 (T6v8) ──
         if signal is None and (not is_ranging) and adx >= self.adx_range_threshold:
@@ -267,6 +303,7 @@ class StochTrendM30Strategy(BaseStrategy):
                 short_factors = [f"ADX={adx:.0f}", f"DI-={ndi-pdi:.0f}", "TREND"]
                 self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val}
 
+        regime_label = "RNG" if is_ranging and bb["width"] <= bb_width_threshold else "RNG-W" if is_ranging else "TRD"
         iv = {
             "close": round(close, 2), "atr": round(atr_val, 2),
             "adx": round(adx, 1), "pdi": round(pdi, 1), "ndi": round(ndi, 1),
@@ -278,7 +315,7 @@ class StochTrendM30Strategy(BaseStrategy):
         logger.info(
             f"[{self.name}] K={k_curr:.1f} D={d_curr:.1f} "
             f"{'CROSS-UP' if cross_up_now else 'CROSS-DN' if cross_down_now else '--'} "
-            f"ADX={adx:.1f} {'RNG' if is_ranging else 'TRD'} "
+            f"ADX={adx:.1f} {regime_label} "
             f"信号={'BUY' if signal == OrderType.BUY else 'SELL' if signal == OrderType.SELL else '无'}"
         )
 
@@ -292,7 +329,7 @@ class StochTrendM30Strategy(BaseStrategy):
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
         regime = self._pending_entry_info.get("regime", "range")
-        mult = self.trend_sl_atr if regime == "trend" else 1.0
+        mult = self.trend_sl_atr if regime == "trend" else 1.0  # range/range_wide both use 1.0 ATR
         dist = atr_val * mult
         if direction == OrderType.BUY:
             return round(entry_price - dist, 2), round(entry_price + dist * 50, 2)
@@ -334,8 +371,8 @@ class StochTrendM30Strategy(BaseStrategy):
         if is_buy: td["peak"] = max(td["peak"], bid)
         else: td["peak"] = min(td["peak"], ask)
 
-        # ── 震荡出场 (v11 A5) ──
-        if regime == "range" and stoch and ma_val:
+        # ── 震荡出场 (v11 A5，宽幅同规则) ──
+        if regime in ("range", "range_wide") and stoch and ma_val:
             k_curr, k_prev = stoch["curr_k"], stoch["prev_k"]
             d_curr, d_prev = stoch["curr_d"], stoch["prev_d"]
             close = closes[-1] if closes else (bid if is_buy else ask)

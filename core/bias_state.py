@@ -71,8 +71,60 @@ def is_stale(max_age_seconds: float) -> bool:
         return (time.time() - _updated_at) > max_age_seconds
 
 
+def _get_h1_adx(period: int = 14) -> Optional[float]:
+    """H1 ADX 计算，用于 news-bias 门禁"""
+    try:
+        from data.database import get_conn
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+            "WHERE timeframe='H1' ORDER BY timestamp"
+        ).fetchall()
+        conn.close()
+        if len(rows) < period + 2:
+            return None
+        highs = [r[2] for r in rows]
+        lows = [r[3] for r in rows]
+        closes = [r[4] for r in rows]
+        n = len(highs)
+        tr_list, plus_dm, minus_dm = [], [], []
+        for i in range(1, n):
+            h, l_, pc = highs[i], lows[i], closes[i - 1]
+            ph, pl = highs[i - 1], lows[i - 1]
+            tr_list.append(max(h - l_, abs(h - pc), abs(l_ - pc)))
+            up = h - ph
+            down = pl - l_
+            plus_dm.append(up if up > down and up > 0 else 0)
+            minus_dm.append(down if down > up and down > 0 else 0)
+        if len(tr_list) < period:
+            return None
+        atr_v = sum(tr_list[:period]) / period
+        pdi_v = sum(plus_dm[:period]) / period
+        ndi_v = sum(minus_dm[:period]) / period
+        if atr_v <= 0:
+            return None
+        pdi_v = pdi_v / atr_v * 100
+        ndi_v = ndi_v / atr_v * 100
+        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
+        for i in range(period, len(tr_list)):
+            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
+            if atr_s[-1] > 0:
+                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i] / atr_s[-1] * 100) / period)
+                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i] / atr_s[-1] * 100) / period)
+            else:
+                pdi_s.append(pdi_s[-1])
+                ndi_s.append(ndi_s[-1])
+        dx = [abs(pdi_s[i] - ndi_s[i]) / max(pdi_s[i] + ndi_s[i], 0.001) * 100 for i in range(len(atr_s))]
+        adx = [sum(dx[:period]) / period]
+        for i in range(period, len(dx)):
+            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
+        return round(adx[-1], 1)
+    except Exception as e:
+        return None
+
+
 def refresh_from_db() -> Optional[str]:
-    """从 DB 读最新报告并更新缓存，返回新方向"""
+    """从 DB 读最新报告并更新缓存，返回新方向（H1 ADX ≤ 阈值时强制 neutral）"""
     try:
         from data.database import get_latest_news_bias_report
         report = get_latest_news_bias_report()
@@ -86,6 +138,19 @@ def refresh_from_db() -> Optional[str]:
                     prediction = {}
             raw_dir = prediction.get("direction") if isinstance(prediction, dict) else None
             score = prediction.get("score", 0) if isinstance(prediction, dict) else 0
+
+            # ADX 门禁：H1 ADX ≤ 阈值视为震荡市，绕过 news-bias
+            try:
+                from config import settings as _bias_settings
+                _adx_gate = getattr(_bias_settings, 'NEWS_BIAS_ADX_GATE', 0)
+                if _adx_gate > 0:
+                    _h1_adx = _get_h1_adx()
+                    if _h1_adx is not None and _h1_adx <= _adx_gate:
+                        set("neutral", score, source=f"adx_gate(adx={_h1_adx})")
+                        return "neutral"
+            except Exception:
+                pass
+
             set(raw_dir, score, source="db_refresh")
             return get()
         else:

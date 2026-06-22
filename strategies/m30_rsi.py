@@ -1,11 +1,8 @@
 """
 M30 RSI + 布林带均值回归 — ADX>28趋势门禁
 ========================================
-- 入场: 4因子评分系统 ≥3 分触发
-  ① MA14趋势
-  ② BB触轨
-  ③ RSI超卖/超买
-  ④ M30 RSI方向(3根连续确认)
+- 入场: 5因子评分系统 ≥3 分触发
+- 5因子: MA14趋势, BB触轨, RSI超卖/超买, RSI方向(3根), DI强度(>10)
 - ADX>28 + EMA9/21 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
 - 出场: ATR 动态追踪止损 (Trailing Stop + Hard Stop)
 - 双向交易 (Long / Short)
@@ -21,7 +18,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v10"
+STRATEGY_VERSION = "v11"
 STRATEGY_MAGIC = 660707
 STRATEGY_LEGACY_MAGICS = [660705, 660706]  # 旧版 magic，引擎启动时自动接管
 STRATEGY_CHANGELOG = [
@@ -35,6 +32,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v8", "magic": 660707, "date": "2026-06-22", "desc": "移除tight_exit_mode和RSI短侧过滤"},
     {"version": "v9", "magic": 660707, "date": "2026-06-22", "desc": "新增ADX>28趋势门禁(EMA9/21), RSI方向改3根连续确认"},
     {"version": "v10", "magic": 660707, "date": "2026-06-22", "desc": "新增DI止盈判定: 移动止盈触发时+DI- -DI>10(BUY)/-DI-+DI>10(SELL)则忽略止盈"},
+    {"version": "v11", "magic": 660707, "date": "2026-06-22", "desc": "新增DI强度因子⑤: |DI差|>10 给±1分, 5因子评分阈值保持3"},
 ]
 
 
@@ -265,6 +263,14 @@ class M30RSIStrategy(BaseStrategy):
             long_score += 1; long_detail.append("RSI-UP")
         elif m30_rsi_dir == 'down':
             short_score += 1; short_detail.append("RSI-DN")
+
+        # ⑤ DI强度: |DI差|>10 确认单边势
+        if adx_data:
+            di_diff = adx_data["pdi"] - adx_data["ndi"]
+            if di_diff > 10:
+                long_score += 1; long_detail.append(f"DI+{di_diff:.0f}")
+            elif di_diff < -10:
+                short_score += 1; short_detail.append(f"DI{di_diff:.0f}")
 
         # ── ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多 ──
         gate_side = None

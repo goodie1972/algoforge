@@ -15,7 +15,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v6r"
+STRATEGY_VERSION = "v7"
 STRATEGY_MAGIC = 880106
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 880101, "date": "2026-06-08", "desc": "初始上线：6因子评分≥5，ATR跟踪止损 trail=4.0 hard=2.5"},
@@ -25,6 +25,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v5", "magic": 880105, "date": "2026-06-11", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
     {"version": "v6", "magic": 880106, "date": "2026-06-12", "desc": "自适应回撤止盈：微利单profit_drawdown按peak_profit占比ATR动态放松至50%/40%"},
     {"version": "v6r", "magic": 880106, "date": "2026-06-21", "desc": "回退v6纯顺趋势逻辑，去掉逆势因子；顺趋势出场加宽至trail=2.5 hard=4.0"},
+    {"version": "v7", "magic": 880106, "date": "2026-06-22", "desc": "ADX>25 趋势中阈值从5降到4；ADX≤25保持阈值5"},
 ]
 
 
@@ -41,7 +42,10 @@ class SanQingH1Strategy(BaseStrategy):
         self._cached_atr_key: int = 0
 
         # Entry params
-        self.score_threshold = 5
+        self.score_threshold = 3
+
+        # ADX>20 趋势中阈值降到 3；ADX≤20 保持阈值 3
+        self.adx_threshold = 20
 
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 4.0）
@@ -93,6 +97,45 @@ class SanQingH1Strategy(BaseStrategy):
     def _calc_atr(self, period: int = 14) -> Optional[float]:
         vals = self._calc_atr_values(period)
         return vals[-1] if vals else None
+
+    def _calc_adx(self, period: int = 14) -> Optional[dict]:
+        """计算 ADX / +DI / -DI"""
+        candles = self.candles
+        if len(candles) < period + 2: return None
+        highs = [c.high for c in candles]
+        lows = [c.low for c in candles]
+        closes = self.get_close_prices()
+        n = len(highs)
+        tr_list, plus_dm, minus_dm = [], [], []
+        for i in range(1, n):
+            h, l_, pc = highs[i], lows[i], closes[i - 1]
+            ph, pl = highs[i - 1], lows[i - 1]
+            tr_list.append(max(h - l_, abs(h - pc), abs(l_ - pc)))
+            up = h - ph
+            down = pl - l_
+            plus_dm.append(up if up > down and up > 0 else 0)
+            minus_dm.append(down if down > up and down > 0 else 0)
+        if len(tr_list) < period: return None
+        atr_v = sum(tr_list[:period]) / period
+        pdi_v = sum(plus_dm[:period]) / period
+        ndi_v = sum(minus_dm[:period]) / period
+        if atr_v <= 0: return None
+        pdi_v = pdi_v / atr_v * 100
+        ndi_v = ndi_v / atr_v * 100
+        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
+        for i in range(period, len(tr_list)):
+            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
+            if atr_s[-1] > 0:
+                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i] / atr_s[-1] * 100) / period)
+                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i] / atr_s[-1] * 100) / period)
+            else:
+                pdi_s.append(pdi_s[-1])
+                ndi_s.append(ndi_s[-1])
+        dx = [abs(pdi_s[i] - ndi_s[i]) / max(pdi_s[i] + ndi_s[i], 0.001) * 100 for i in range(len(atr_s))]
+        adx = [sum(dx[:period]) / period]
+        for i in range(period, len(dx)):
+            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
+        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
 
     def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
         if len(closes) < period + 1:
@@ -162,6 +205,10 @@ class SanQingH1Strategy(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return None
 
+        # ADX — 趋势中阈值动态放宽
+        adx_data = self._calc_adx(14)
+        effective_threshold = 4 if (adx_data and adx_data["adx"] > self.adx_threshold) else self.score_threshold
+
         # Body analysis
         body = abs(close - opens_[-1])
         candle_range = high - low
@@ -210,9 +257,11 @@ class SanQingH1Strategy(BaseStrategy):
                 and candle_range > 0 and body / candle_range >= 0.5):
             sell_score += 2
 
+        adx_str = f" ADX={adx_data['adx']:.1f}" if adx_data else ""
         logger.info(
             f"[{self.name}] 评分: BUY={buy_score} SELL={sell_score} "
-            f"Price={close:.2f} EMA9={ema9:.2f} EMA21={ema21:.2f} ATR={atr_val:.2f}"
+            f"Price={close:.2f} EMA9={ema9:.2f} EMA21={ema21:.2f} ATR={atr_val:.2f}{adx_str}"
+            f" 阈值={effective_threshold}"
         )
 
         # 构建因子明细
@@ -241,11 +290,11 @@ class SanQingH1Strategy(BaseStrategy):
         recent_low = min(c.low for c in candles[-lookback:])
         price_position = (close - recent_low) / (recent_high - recent_low) if recent_high > recent_low else 0.5
 
-        if price_position < 0.10 and sell_score >= self.score_threshold:
+        if price_position < 0.10 and sell_score >= effective_threshold:
             short_factors.append("BOTTOM-GATE")
             logger.info(f"[{self.name}] 位置门禁: 价格在区间底部 {price_position:.1%}，禁止SELL (原分={sell_score})")
             sell_score = 0
-        elif price_position > 0.90 and buy_score >= self.score_threshold:
+        elif price_position > 0.90 and buy_score >= effective_threshold:
             long_factors.append("TOP-GATE")
             logger.info(f"[{self.name}] 位置门禁: 价格在区间顶部 {price_position:.1%}，禁止BUY (原分={buy_score})")
             buy_score = 0
@@ -257,12 +306,15 @@ class SanQingH1Strategy(BaseStrategy):
             "body_median_ratio": round(body_median_ratio, 2),
             "price_position": round(price_position, 3),
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
+            "adx": round(adx_data["adx"], 1) if adx_data else None,
+            "pdi": round(adx_data["pdi"], 1) if adx_data else None,
+            "ndi": round(adx_data["ndi"], 1) if adx_data else None,
         }
 
         signal = None
-        if buy_score >= self.score_threshold:
+        if buy_score >= effective_threshold:
             signal = OrderType.BUY
-        elif sell_score >= self.score_threshold:
+        elif sell_score >= effective_threshold:
             signal = OrderType.SELL
         return (signal, buy_score, sell_score, long_factors, short_factors, indicator_values)
 
