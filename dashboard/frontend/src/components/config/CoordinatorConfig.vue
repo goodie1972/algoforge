@@ -277,6 +277,11 @@ const directionOptions = [
                     @update:value="(v: number) => local.profit_drawdown_pct = v"
                     :min="0.05" :max="1.0" :step="0.05" style="width: 110px;" />
                 </n-form-item>
+                <n-form-item label="峰值门槛(ATR)" label-placement="left" :label-width="110">
+                  <n-input-number :value="local.profit_drawdown_min_peak_atr"
+                    @update:value="(v: number) => local.profit_drawdown_min_peak_atr = v"
+                    :min="0.0" :max="5.0" :step="0.1" style="width: 110px;" />
+                </n-form-item>
               </template>
             </n-card>
           </template>
