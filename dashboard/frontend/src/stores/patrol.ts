@@ -11,9 +11,10 @@ import { usePriceStore } from './prices'
 import { usePositionStore } from './positions'
 import type { PatrolAlert } from '@/types'
 
-const REFERENCE_PRICE = 4507.0
-const PRICE_DEVIATION = 20.0
 const ALERT_SL = 4480.03
+const SHARP_MOVE_THRESHOLD = 50    // 短期剧烈波动阈值（点）
+const MOVE_WINDOW_SECONDS = 60     // 检测窗口（秒）
+const PRICE_SAMPLE_INTERVAL = 10   // 采样间隔（秒）
 const DISMISSED_STORAGE_KEY = 'patrol_dismissed_keys'
 
 function loadDismissed(): Set<string> {
@@ -36,15 +37,19 @@ export const usePatrolStore = defineStore('patrol', () => {
   const dismissedKeys = ref<Set<string>>(loadDismissed())
   let alertId = 0
   let timer: ReturnType<typeof setInterval> | null = null
+  let lastSampleTime = 0
+  let priceHistory: { price: number; time: number }[] = []
 
   // 状态跟踪（变化检测用）
   const prevState = ref({
     engineRunning: false as boolean | null,
     bridgeConnected: false as boolean | null,
     positionTickets: new Set<number>(),
-    reportedDeviation: 0,
     reportedSl4480: false,
   })
+
+  // 已报告过的错误日志时间戳（避免重复报告历史错误）
+  let lastSeenErrorTime = ''
 
   // === 计算属性 ===
   const health = computed<'normal' | 'warning' | 'critical'>(() => {
@@ -111,18 +116,31 @@ export const usePatrolStore = defineStore('patrol', () => {
       addAlert('critical', '无法连接引擎 API！后端可能未启动', 'api_unreachable')
     }
 
-    // ---- 2. 价格异动 ----
+    // ---- 2. 短期剧烈波动检测 ----
     const bid = priceStore.bid
     if (bid > 0) {
-      const deviation = Math.abs(bid - REFERENCE_PRICE)
-      if (deviation > PRICE_DEVIATION) {
-        const prevDev = prevState.value.reportedDeviation
-        if (prevDev === 0 || Math.abs(deviation - prevDev) >= PRICE_DEVIATION) {
-          const direction = bid < REFERENCE_PRICE ? '下跌' : '上涨'
+      const now = Date.now()
+      // 按采样间隔记录价格
+      if (now - lastSampleTime >= PRICE_SAMPLE_INTERVAL * 1000) {
+        priceHistory.push({ price: bid, time: now })
+        lastSampleTime = now
+        // 清理超出窗口的历史样本
+        const cutoff = now - MOVE_WINDOW_SECONDS * 1000
+        priceHistory = priceHistory.filter(s => s.time >= cutoff)
+        // 最多保留 30 个样本防内存泄漏
+        if (priceHistory.length > 30) priceHistory = priceHistory.slice(-30)
+      }
+      // 在窗口内查找最大波动
+      if (priceHistory.length >= 2) {
+        const oldest = priceHistory[0]
+        const maxMove = Math.abs(bid - oldest.price)
+        if (maxMove >= SHARP_MOVE_THRESHOLD) {
+          const direction = bid > oldest.price ? '急涨' : '急跌'
           addAlert('warning',
-            `价格异动：${direction} ${deviation.toFixed(1)} 点（参考 ${REFERENCE_PRICE}，当前 ${bid}）`,
-            'price_deviation')
-          prevState.value.reportedDeviation = deviation
+            `价格剧烈波动：${direction} ${maxMove.toFixed(1)} 点（${oldest.price} → ${bid}，${MOVE_WINDOW_SECONDS}s 内）`,
+            'sharp_move')
+          // 触发后清空历史，避免短时间内重复报警
+          priceHistory = []
         }
       }
     }
@@ -166,16 +184,28 @@ export const usePatrolStore = defineStore('patrol', () => {
 
     prevState.value.positionTickets = currentTickets
 
-    // ---- 4. 错误日志 ----
+    // ---- 4. 错误日志（仅新出现的错误，跳过历史 ----
     try {
       const { getLogs } = await import('@/api/client')
       const logs = await getLogs('ERROR', 20)
       if (logs && logs.length > 0) {
+        // 找出最新的错误日志时间戳
+        let latestTime = ''
         for (const l of logs) {
-          const logKey = `log_${(l as any).id || l.time}`
-          addAlert('warning',
-            `日志错误: ${l.message.substring(0, 120)}`,
-            logKey)
+          const ts = (l as any).time || ''
+          if (ts > latestTime) latestTime = ts
+        }
+        // 只有出现了比上次更新的错误才报警
+        if (latestTime > lastSeenErrorTime) {
+          for (const l of logs) {
+            const ts = (l as any).time || ''
+            if (ts <= lastSeenErrorTime) continue // 跳过已见过的
+            const logKey = `log_${(l as any).id || ts}`
+            addAlert('warning',
+              `日志错误: ${l.message.substring(0, 120)}`,
+              logKey)
+          }
+          lastSeenErrorTime = latestTime
         }
       }
     } catch {
@@ -206,7 +236,7 @@ export const usePatrolStore = defineStore('patrol', () => {
     saveDismissed(dismissedKeys.value)
     alerts.value = []
     prevState.value.reportedSl4480 = false
-    prevState.value.reportedDeviation = 0
+    priceHistory = []
   }
 
   return {

@@ -124,18 +124,18 @@ STRATEGY_POOL = {
     #     "double_first": False,
     #     "max_positions": 1,
     # },
-    # "stoch_trend_m30": {
-    #     "magic": 660903,
-    #     "timeframe": "M30",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
-    # "rsi_grading_m30": {
-    #     "magic": 660902,
-    #     "timeframe": "M30",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
+    "stoch_trend_m30": {
+        "magic": 660903,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "rsi_grading_m30": {
+        "magic": 660902,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
 }
 
 # 全局最大持仓 = 策略数量 × 1.5 四舍五入
@@ -171,9 +171,16 @@ NEWS_BIAS_ENABLED = True          # 是否执行评估
 NEWS_BIAS_REPORT_HOURS = "8,20"   # 生成报告的小时(北京时间)，逗号分隔，默认8点和20点
 
 # News-Bias 阻塞控制（影响开仓）
-BLOCK_LONG_WHEN_BIAS_BEARISH = False    # 新闻预判为看跌时，阻止所有策略开多
-BLOCK_SHORT_WHEN_BIAS_BULLISH = False   # 新闻预判为看涨时，阻止所有策略开空
+BLOCK_LONG_WHEN_BIAS_BEARISH = True    # 新闻预判为看跌时，阻止所有策略开多
+BLOCK_SHORT_WHEN_BIAS_BULLISH = True   # 新闻预判为看涨时，阻止所有策略开空
 NEWS_BIAS_BLOCK_REFRESH_SECONDS = 60    # 引擎刷新最新 bias 方向的间隔
+
+# News-Bias ADX 门禁：H1 ADX ≤ 此值时视为震荡市，绕过 news-bias 阻塞
+NEWS_BIAS_ADX_GATE = 25
+
+# 全局方向过滤器 — 硬编码限制开仓方向（优先级最高，不受新闻bias影响）
+# 可选值: "BOTH" (双向), "SELL_ONLY" (只开空), "BUY_ONLY" (只开多)
+GLOBAL_DIRECTION_FILTER = "SELL_ONLY"
 
 # ============================================================
 # 多策略协调器配置 — 策略间信号联动出场

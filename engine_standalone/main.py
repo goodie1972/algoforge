@@ -891,13 +891,20 @@ class TradingEngine:
         if not global_blocked:
             news_blocked = self._check_news_blackout()
 
+        # ---- News-Bias 方向阻塞检查 ----
+        bias_blocked = False
+        if not global_blocked and not news_blocked:
+            bias_blocked = self._check_news_bias_block()
+            if bias_blocked:
+                logger.warning("[News-Bias] 方向阻塞触发，跳过开仓")
+
         safety_blocked = False
         if not global_blocked and not news_blocked:
             if self._is_safety_locked():
                 safety_blocked = True
                 logger.warning("[安全锁] 检测到锁文件，暂停开新仓")
 
-        if global_blocked or news_blocked or safety_blocked:
+        if global_blocked or news_blocked or safety_blocked or bias_blocked:
             # 有全局阻断时，跳过本轮开仓，但每策略仍检查浮动亏损
             self._check_floating_loss_blocks()
             for _ in range(3):
@@ -1347,6 +1354,15 @@ class TradingEngine:
 
         logger.info(f"[{strategy.name}] 收到信号: {signal}")
 
+        # ---- 全局方向过滤器（优先级最高） ----
+        dir_filter = getattr(settings, 'GLOBAL_DIRECTION_FILTER', 'BOTH')
+        if dir_filter == 'SELL_ONLY' and signal_dir == 'BUY':
+            logger.info(f"[方向过滤器] {dir_filter} 模式，跳过 {signal_dir} 信号 ({strategy.name})")
+            return
+        if dir_filter == 'BUY_ONLY' and signal_dir == 'SELL':
+            logger.info(f"[方向过滤器] {dir_filter} 模式，跳过 {signal_dir} 信号 ({strategy.name})")
+            return
+
         # ---- MTF 共振方向门禁检查 ----
         allowed = self._mtf_resonance_allowed(signal_dir)
         if allowed is not None and allowed not in ("BOTH", signal_dir):
@@ -1582,6 +1598,37 @@ class TradingEngine:
                 self.bridge.send_heartbeat()
             return True
         return False
+
+    def _check_news_bias_block(self) -> bool:
+        """检查 News-Bias 方向阻塞"""
+        try:
+            import importlib
+            importlib.reload(settings)
+            
+            if not getattr(settings, 'NEWS_BIAS_ENABLED', True):
+                return False
+            
+            if not hasattr(self.news_filter, 'get_current_bias'):
+                return False
+            bias = self.news_filter.get_current_bias()
+            if not bias:
+                return False
+            
+            bearish = getattr(settings, 'BLOCK_LONG_WHEN_BIAS_BEARISH', False)
+            bullish = getattr(settings, 'BLOCK_SHORT_WHEN_BIAS_BULLISH', False)
+            
+            if bearish and bias.get('overall') == 'BEARISH':
+                logger.info("[News-Bias] 看跌 → 阻止开多")
+                return True
+            
+            if bullish and bias.get('overall') == 'BULLISH':
+                logger.info("[News-Bias] 看涨 → 阻止开空")
+                return True
+            
+            return False
+        except Exception as e:
+            logger.error(f"[News-Bias] 方向阻塞检查异常: {e}")
+            return False
 
     def _sync_market_data(self):
         """周期性同步 K 线数据到 SQLite（含协调器短周期）"""

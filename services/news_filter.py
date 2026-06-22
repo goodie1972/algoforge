@@ -335,6 +335,70 @@ class NewsFilter:
                 return True
         return False
 
+    # ── News-Bias 实时方向阻塞 ──────────────────────────────
+
+    def get_current_bias(self) -> Optional[dict]:
+        """获取当前新闻事件的预期方向（用于阻塞控制）。
+        返回 {'overall': 'BULLISH'|'BEARISH'|'NEUTRAL', 'details': [...]} 或 None
+        """
+        try:
+            from services.news_bias import classify_event
+            from config import settings
+            
+            if not getattr(settings, 'NEWS_BIAS_ENABLED', True):
+                return None
+            
+            events = self.get_upcoming_events(limit=50)
+            if not events:
+                return None
+            
+            bullish_score = 0
+            bearish_score = 0
+            details = []
+            
+            now = datetime.now()
+            # 只看未来 4 小时内的新闻
+            cutoff = now + timedelta(hours=4)
+            
+            for evt in events:
+                evt_dt = datetime.strptime(evt["datetime"], "%Y-%m-%d %H:%M")
+                if evt_dt > cutoff:
+                    continue
+                
+                bias, reason, conf = classify_event(evt["title"])
+                weight = {"high": 3, "medium": 2, "low": 1}.get(conf, 1)
+                
+                if bias == "bullish":
+                    bullish_score += weight
+                elif bias == "bearish":
+                    bearish_score += weight
+                
+                details.append({
+                    "event": evt["title"],
+                    "time": evt["datetime"],
+                    "bias": bias,
+                    "confidence": conf,
+                })
+            
+            if not details:
+                return None
+            
+            overall = "NEUTRAL"
+            if bullish_score > bearish_score * 1.5:
+                overall = "BULLISH"
+            elif bearish_score > bullish_score * 1.5:
+                overall = "BEARISH"
+            
+            return {
+                "overall": overall,
+                "bullish_score": bullish_score,
+                "bearish_score": bearish_score,
+                "details": details,
+            }
+        except Exception as e:
+            logger.error(f"[News-Bias] 获取方向异常: {e}")
+            return None
+
     # ── 前端展示 ──────────────────────────────────────────
 
     @staticmethod

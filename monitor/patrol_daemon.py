@@ -26,8 +26,8 @@ os.environ.setdefault("no_proxy", "localhost,127.0.0.1")
 # ============================================================
 API_BASE = "http://localhost:1783/api"
 POLL_INTERVAL = 30  # 秒
-REFERENCE_PRICE = 4507.0
-PRICE_DEVIATION = 20.0
+SHARP_MOVE_THRESHOLD = 50   # 短期剧烈波动阈值（点）
+MOVE_WINDOW_SECONDS = 60    # 检测窗口（秒）
 ALERT_SL = 4480.03  # 需监视的止损位
 STATE_FILE = Path(__file__).parent / ".patrol_state.json"
 PID_FILE = Path(__file__).parent / ".patrol.pid"
@@ -101,7 +101,8 @@ def load_state() -> dict:
         "bridge_connected": False,
         "last_price": 0,
         "reported_sl_4480": False,
-        "reported_deviation": 0,
+        "price_samples": [],
+        "last_seen_error_time": "",
         "last_pos_tickets": [],
         "last_closed_tickets": set(),
         "last_closed_analysis": {},
@@ -151,7 +152,7 @@ def patrol():
         state["engine_running"] = running
         state["bridge_connected"] = bridge
 
-    # ---- 2. 价格 ----
+    # ---- 2. 短期剧烈波动检测 ----
     price_data = api_get("/market/price")
     if price_data:
         bid = price_data.get("bid", 0)
@@ -159,19 +160,37 @@ def patrol():
         spread = price_data.get("spread", 0)
         logger.info(f"价格: bid={bid} ask={ask} spread={spread}")
 
-        # 相对参考价波动（带去重 — 每次突破阈值 ±20 点才再报）
+        # 在窗口内查找最大波动（通过与上次巡检价格对比）
         if bid > 0:
-            deviation = abs(bid - REFERENCE_PRICE)
-            prev_dev = state.get("reported_deviation", 0)
-            if deviation > PRICE_DEVIATION and abs(deviation - prev_dev) >= PRICE_DEVIATION:
-                direction = "下跌" if bid < REFERENCE_PRICE else "上涨"
-                notify_info(
-                    "价格异动",
-                    f"价格 {direction} {deviation:.1f} 点（参考 {REFERENCE_PRICE}，当前 {bid}）",
-                )
-                state["reported_deviation"] = deviation
+            prev_price = state.get("last_price", 0)
+            if prev_price > 0:
+                move = abs(bid - prev_price)
+                # 检查短期累计波动：价格变化超过阈值
+                price_samples = state.get("price_samples", [])
+                now = time.time()
+                price_samples.append({"price": bid, "time": now})
+                # 清理超出窗口的样本
+                cutoff = now - MOVE_WINDOW_SECONDS
+                price_samples = [s for s in price_samples if s["time"] >= cutoff]
+                # 最多保留 30 个样本
+                if len(price_samples) > 30:
+                    price_samples = price_samples[-30:]
 
-        state["last_price"] = bid
+                if len(price_samples) >= 2:
+                    oldest = price_samples[0]
+                    window_move = abs(bid - oldest["price"])
+                    if window_move >= SHARP_MOVE_THRESHOLD:
+                        direction = "急涨" if bid > oldest["price"] else "急跌"
+                        notify_info(
+                            "价格剧烈波动",
+                            f"{direction} {window_move:.1f} 点（{oldest['price']} → {bid}，{MOVE_WINDOW_SECONDS}s 内）",
+                        )
+                        # 触发后清空历史，避免重复报警
+                        price_samples = []
+
+                state["price_samples"] = price_samples
+
+            state["last_price"] = bid
     else:
         state["last_price"] = 0
 
@@ -275,27 +294,39 @@ def patrol():
 
         state["last_closed_tickets"] = current_closed_tickets
 
-    # ---- 4. 错误日志 ----
+    # ---- 4. 错误日志（仅新出现的错误） ----
     logs = api_get("/logs")
     if logs:
-        db_kw = ["database", "sqlite", "ohlcv", "no such table", "market_data.db"]
-        errors = [
-            l.get("message", "")
-            for l in logs.get("logs", [])
-            if "ERROR" in l.get("message", "")
-            or "exception" in l.get("message", "").lower()
-            or ("WARNING" in l.get("message", "")
-                and any(kw in l.get("message", "").lower() for kw in db_kw))
-        ]
-        if errors:
-            err_count = sum(1 for e in errors if "ERROR" in e.upper() or "exception" in e.lower())
-            warn_count = len(errors) - err_count
-            label = f"{err_count} 条错误"
-            if warn_count:
-                label += f", {warn_count} 条数据库告警"
-            logger.warning(f"检测到 {label}:")
-            for e in errors[-5:]:  # 最多显示 5 条
+        log_entries = logs.get("logs", [])
+        last_seen = state.get("last_seen_error_time", "")
+        latest_time = last_seen
+        new_errors = []
+
+        for l in log_entries:
+            msg = l.get("message", "")
+            ts = l.get("time", "") or ""
+            if not ts:
+                continue
+            is_error = "ERROR" in msg or "exception" in msg.lower()
+            is_db_warn = "WARNING" in msg and any(kw in msg.lower() for kw in
+                         ["database", "sqlite", "ohlcv", "no such table", "market_data.db"])
+            if not (is_error or is_db_warn):
+                continue
+            if ts > latest_time:
+                latest_time = ts
+            if ts > last_seen:
+                new_errors.append(msg)
+
+        if new_errors:
+            logger.warning(f"检测到 {len(new_errors)} 条新错误/告警:")
+            for e in new_errors[-5:]:
                 logger.warning(f"  {e}")
+        elif latest_time > last_seen:
+            # 没有新错误，但时间戳变了（旧的日志），更新 last_seen 避免重复报告
+            pass
+
+        if latest_time > last_seen:
+            state["last_seen_error_time"] = latest_time
 
     # ---- 保存状态 ----
     save_state(state)
@@ -309,8 +340,7 @@ def patrol_loop():
     logger.info("XAUUSD 监控守护进程启动")
     logger.info(f"API 地址: {API_BASE}")
     logger.info(f"巡检间隔: {POLL_INTERVAL}s")
-    logger.info(f"参考价格: {REFERENCE_PRICE}")
-    logger.info(f"波动阈值: {PRICE_DEVIATION}")
+    logger.info(f"剧烈波动阈值: {SHARP_MOVE_THRESHOLD} 点 / {MOVE_WINDOW_SECONDS}s")
     logger.info("=" * 50)
 
     # 写 PID
