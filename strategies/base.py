@@ -8,6 +8,7 @@ from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, Position, OrderType
 import config.settings as _settings
+from core.runtime_config import RuntimeConfig as _RuntimeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class BaseStrategy(abc.ABC):
         self._last_signal: Optional[dict] = None
         self._m30_candles: list[Candle] = []
 
-        # K-line filter parameters (from COORDINATOR_CONFIG, hot-reloadable)
-        _coord = getattr(_settings, 'COORDINATOR_CONFIG', {})
+        # K-line filter parameters (from RuntimeConfig → runtime_config.json, hot-reloadable)
+        _coord = _RuntimeConfig().get_coordinator_config()
         self.position_gate_enabled: bool = _coord.get('position_gate_enabled', True)
         self.position_gate_lookback: int = _coord.get('position_gate_lookback', 60)
         self.position_gate_bottom: float = _coord.get('position_gate_bottom', 0.10)
@@ -116,10 +117,9 @@ class BaseStrategy(abc.ABC):
                         logger.info(f"[{self.name}] 急涨惩罚: 低点上涨 {rally_pct:.1f}%，禁BUY")
 
         # ── ③ News-Bias 阻塞（ADX 门禁在 bias_state 层面处理） ──
-        # 每次信号动态读取 config_service（覆盖优先），所以 UI 切换开关立即生效
+        # 每次信号动态读取 RuntimeConfig（覆盖优先），所以 UI 切换开关立即生效
         try:
-            from dashboard.backend.config_service import RuntimeConfig
-            _cfg = RuntimeConfig()
+            _cfg = _RuntimeConfig()
             _block_long = _cfg.get("block_long_when_bias_bearish")
             _block_short = _cfg.get("block_short_when_bias_bullish")
         except Exception:
@@ -221,8 +221,8 @@ class BaseStrategy(abc.ABC):
         """热重载配置参数，子类覆盖（不覆盖 magic/timeframe，它们由 STRATEGY_POOL 管理）"""
         self.symbol = _settings.SYMBOL
 
-        # 热重载 K 线过滤器参数（从 COORDINATOR_CONFIG 读取）
-        _coord = getattr(_settings, 'COORDINATOR_CONFIG', {})
+        # 热重载 K 线过滤器参数（从 RuntimeConfig 读取，dashboard 保存优先）
+        _coord = _RuntimeConfig().get_coordinator_config()
         self.position_gate_enabled = _coord.get('position_gate_enabled', True)
         self.position_gate_lookback = _coord.get('position_gate_lookback', 60)
         self.position_gate_bottom = _coord.get('position_gate_bottom', 0.10)

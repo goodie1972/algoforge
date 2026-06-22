@@ -422,27 +422,29 @@ class GoldAutoResearchStrategy(BaseStrategy):
                 td["peak_profit"] = max(td["peak_profit"], current_profit)
 
             if current_profit > 0:
-                # 盈利 → 止盈逻辑
-                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
+                # 盈利 → 利润回撤止盈
+                if self.profit_drawdown_enabled and td["peak_profit"] > 0:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
                         self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
-                drawdown = td["highest"] - bid
-                if drawdown > atr_val * trail_mult:
-                    logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
-                    del self._trail_data[ticket]
-                    return True
-            else:
-                # 亏损 → 只走硬止损
-                if loss > atr_val * hard_mult:
-                    logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
-                    del self._trail_data[ticket]
-                    return True
+
+            # 移动止盈：从最高点回落（不论盈亏）
+            drawdown = td["highest"] - bid
+            if drawdown > atr_val * trail_mult:
+                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
+                self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
+                del self._trail_data[ticket]
+                return True
+
+            # 硬止损（仅亏损时兜底）
+            if current_profit <= 0 and loss > atr_val * hard_mult:
+                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
+                self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
+                del self._trail_data[ticket]
+                return True
         else:
             td["lowest"] = min(td["lowest"], ask)
             current_profit = td["entry"] - ask
@@ -451,27 +453,29 @@ class GoldAutoResearchStrategy(BaseStrategy):
                 td["peak_profit"] = max(td["peak_profit"], current_profit)
 
             if current_profit > 0:
-                # 盈利 → 止盈逻辑
-                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * 0.5:
+                # 盈利 → 利润回撤止盈
+                if self.profit_drawdown_enabled and td["peak_profit"] > 0:
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd):
                         logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
                         self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
                         del self._trail_data[ticket]
                         return True
-                rally = ask - td["lowest"]
-                if rally > atr_val * trail_mult:
-                    logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
-                    self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
-                    del self._trail_data[ticket]
-                    return True
-            else:
-                # 亏损 → 只走硬止损
-                if loss > atr_val * hard_mult:
-                    logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                    self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
-                    del self._trail_data[ticket]
-                    return True
+
+            # 移动止盈：从最低点反弹（不论盈亏）
+            rally = ask - td["lowest"]
+            if rally > atr_val * trail_mult:
+                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
+                self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
+                del self._trail_data[ticket]
+                return True
+
+            # 硬止损（仅亏损时兜底）
+            if current_profit <= 0 and loss > atr_val * hard_mult:
+                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
+                self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
+                del self._trail_data[ticket]
+                return True
 
         self._last_exit_detail = None
         return False
