@@ -12,7 +12,7 @@ STRATEGY_REGISTRY = {
     "M30_rsi_bb": {
         "backup_name": "m30_rsi_v7",
         "file": "m30_rsi.py",
-        "display": "M30 RSI+BB v7",
+        "display": "M30 RSI+BB v10",
         "backup_file": "20260620_m30_rsi_v7.py",
         "default_magic": 660706,
         "default_timeframe": "M30",
@@ -20,7 +20,7 @@ STRATEGY_REGISTRY = {
     "H1_v6_hybrid": {
         "backup_name": "h1_v6_hybrid_v6",
         "file": "v6_hybrid.py",
-        "display": "H1 V6 混合 v6",
+        "display": "H1 V6 混合 v6 [已下架]",
         "backup_file": "20260615_h1_v6_hybrid_v6.py",
         "default_magic": 660607,
         "default_timeframe": "H1",
@@ -28,7 +28,7 @@ STRATEGY_REGISTRY = {
     "sanqing_h1": {
         "backup_name": "sanqing_h1_v6",
         "file": "sanqing_h1.py",
-        "display": "H1 三清 v6",
+        "display": "H1 三清 v6r",
         "backup_file": "20260615_sanqing_h1_v6.py",
         "default_magic": 880107,
         "default_timeframe": "H1",
@@ -36,7 +36,7 @@ STRATEGY_REGISTRY = {
     "gold_auto_research": {
         "backup_name": "gold_autoresearch_h1_v5",
         "file": "gold_autoresearch_h1.py",
-        "display": "H1 黄金自动研究 v5",
+        "display": "H1 黄金自动研究 v6",
         "backup_file": "20260611_gold_autoresearch_h1_v5.py",
         "default_magic": 880306,
         "default_timeframe": "H1",
@@ -68,7 +68,7 @@ STRATEGY_REGISTRY = {
     "stoch_m30": {
         "backup_name": "m30_stoch_T6V1",
         "file": "stoch_m30.py",
-        "display": "M30 Stoch T0 (纯震荡)",
+        "display": "M30 Stoch T6V1 (纯震荡)",
         "backup_file": "20260619_m30_stoch_T6V1.py",
         "default_magic": 660901,
         "default_timeframe": "M30",
@@ -76,7 +76,7 @@ STRATEGY_REGISTRY = {
     "stoch_trend_m30": {
         "backup_name": "m30_stoch_T6V8",
         "file": "stoch_trend_m30.py",
-        "display": "M30 Stoch T6V8 (趋势叠加)",
+        "display": "M30 Stoch v3 (趋势叠加)",
         "backup_file": "20260619_m30_stoch_T6V8.py",
         "default_magic": 660903,
         "default_timeframe": "M30",

@@ -55,7 +55,7 @@ interface StratLogic {
 
 const strategyLogics: Record<string, StratLogic> = {
   m30_rsi_v7: {
-    desc: 'M30 RSI+布林带均值回归 (4因子评分≥3, 位置门禁+急跌惩罚)',
+    desc: 'M30 RSI+布林带 v10 (4因子评分≥3, DI止盈判定, 位置门禁+急跌惩罚)',
     exitWiden: true,
     exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
     long: {
@@ -69,7 +69,7 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '急跌惩罚', score: '', detail: '急跌>1.5%暂停做多' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
       ],
@@ -85,7 +85,7 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '急涨惩罚', score: '', detail: '急涨>1.5%暂停做空' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
       ],
@@ -123,7 +123,7 @@ const strategyLogics: Record<string, StratLogic> = {
     },
   },
   m30_stoch_T6V8: {
-    desc: 'M30 Stoch 震荡+趋势双模 (ADX<30震荡逆势/≥30趋势顺势)',
+    desc: 'M30 Stoch v3 震荡+趋势双模 (ADX<30宽幅震荡/≥30趋势顺势; ADX门禁全局化)',
     long: {
       entry: [
         { name: '震荡模式', score: '', detail: 'ADX<30+BB≤1.0: K<20+金叉+close<EMA21' },
@@ -185,7 +185,7 @@ const strategyLogics: Record<string, StratLogic> = {
     },
   },
   h1_v6_hybrid_v6: {
-    desc: 'H1 8因子评分 V6 混合 (阈值≥3, 逆势≥5, 已下架)',
+    desc: '[已下架] H1 8因子评分 V6 混合 (602笔亏$166, 4个超卖因子全亏)',
     exitWiden: true,
     exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
     long: {
@@ -203,7 +203,7 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '急跌惩罚', score: '', detail: '急跌>1.5%暂停做多' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
       ],
@@ -223,14 +223,14 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '急涨惩罚', score: '', detail: '急涨>1.5%暂停做空' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
       ],
     },
   },
   sanqing_h1_v6: {
-    desc: 'H1 EMA9/21 + ATR14 6因子评分 (≥5入场, 顺趋势trail=2.5 hard=4.0; 位置门禁)',
+    desc: 'H1 EMA9/21 + ATR14 6因子评分 v6r (≥5入场, 纯顺趋势, 顺趋势trail=2.5 hard=4.0; 位置门禁)',
     exitWiden: true,
     exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
     long: {
@@ -244,7 +244,7 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '2.5×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '4.0×ATR' },
       ],
@@ -260,14 +260,14 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%', widen: '同左' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '2.5×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '4.0×ATR' },
       ],
     },
   },
   gold_autoresearch_h1_v5: {
-    desc: 'H1 4因子共识投票 (全真入场, 位置门禁+RSI安全过滤)',
+    desc: 'H1 4因子共识投票 v6 (全真入场, 利润回撤止盈, 位置门禁+RSI安全过滤)',
     long: {
       entry: [
         { name: '趋势', score: '+1', detail: 'EMA10 > EMA20 (上升趋势)' },
@@ -278,7 +278,7 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR' },
       ],
@@ -293,7 +293,7 @@ const strategyLogics: Record<string, StratLogic> = {
         { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
       ],
       exit: [
-        { method: '利润回撤止盈', normal: 'peak回撤25%' },
+        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)' },
         { method: 'ATR移动止盈(trail)', normal: '1.0×ATR' },
         { method: 'ATR硬止损(hard)', normal: '2.0×ATR' },
       ],
