@@ -476,6 +476,48 @@ class TradingEngine:
             logger.info(f"[策略动态移除] {name} Magic={strategy.magic}")
             return True
 
+    def _sync_strategy_pool(self):
+        """将 running strategy list 与 strategy_pool 配置同步（自动增删策略，无需重启）"""
+        pool = self._get_strategy_pool()
+        if pool is None:
+            return
+
+        with self._strategies_lock:
+            current = {s.name: s for s in self.strategies}
+
+        # 1. 移除：池中标记为禁用或 max_positions=0 的策略
+        for name in list(current.keys()):
+            cfg = pool.get(name)
+            if cfg is None or not cfg.get("enabled", True) or cfg.get("max_positions", 1) == 0:
+                if name in current:
+                    self.remove_strategy(name, close_positions=True)
+                    logger.info(f"[策略池同步] 已移除 {name}")
+
+        # 重新获取快照（移除后 list 已变）
+        with self._strategies_lock:
+            current = {s.name: s for s in self.strategies}
+
+        # 2. 添加：池中启用但未在运行中的策略
+        for name, cfg in pool.items():
+            if not cfg.get("enabled", True) or cfg.get("max_positions", 1) == 0:
+                continue
+            if name not in current:
+                self.add_strategy(name, cfg)
+                logger.info(f"[策略池同步] 已添加 {name}")
+
+        # 3. 更新：参数变更（max_positions / double_first）
+        with self._strategies_lock:
+            for name, s in current.items():
+                cfg = pool.get(name)
+                if cfg is None:
+                    continue
+                if s.max_positions != cfg.get("max_positions", 1):
+                    s.max_positions = cfg.get("max_positions", 1)
+                    logger.info(f"[策略池同步] {name} max_positions → {s.max_positions}")
+                if s.double_first != cfg.get("double_first", False):
+                    s.double_first = cfg.get("double_first", False)
+                    logger.info(f"[策略池同步] {name} double_first → {s.double_first}")
+
     @staticmethod
     def _strategy_magics(strategy) -> set[int]:
         """返回策略识别持仓的所有 magic 号（主 + legacy）"""
@@ -805,6 +847,9 @@ class TradingEngine:
                 logger.info("[热重载] 配置已更新")
         except OSError:
             pass
+
+        # 策略池热同步：自动增删策略（无需重启引擎）
+        self._sync_strategy_pool()
 
         # 桥接连接保活：心跳失败时尝试重连
         try:

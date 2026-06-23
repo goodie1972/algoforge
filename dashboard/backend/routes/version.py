@@ -49,6 +49,20 @@ async def get_changelog(limit: int = 20):
         return {"commits": [], "error": str(e)}
 
 
+@router.get("/remote-changelog")
+async def get_remote_changelog(limit: int = 20):
+    """获取远程有但本地没有的 commit 列表"""
+    from core.version import get_remote_changelog as _remote_log
+    return {"commits": _remote_log(limit)}
+
+
+@router.post("/update")
+async def update_version():
+    """执行 git pull 更新代码（仅工作区干净时允许）"""
+    from core.version import do_update
+    return do_update()
+
+
 @router.get("/bias-state")
 async def get_bias_state():
     """返回当前引擎缓存的最新 news-bias 方向（用于 Dashboard 显示 + 调试）"""

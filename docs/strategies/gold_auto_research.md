@@ -4,7 +4,7 @@
 
 - **策略名称：** `gold_auto_research`
 - **类名：** `GoldAutoResearchStrategy`
-- **Magic Number：** `777003`
+- **Magic Number：** `880306`
 - **运行周期：** H1（1 小时）
 - **策略类型：** 共识投票策略
 - **设计目标：** 四个独立维度各自判断市场方向，全部一致时才触发信号
