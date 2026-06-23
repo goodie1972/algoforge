@@ -16,3 +16,18 @@ import AppShell from './AppShell.vue'
     </n-message-provider>
   </n-config-provider>
 </template>
+
+<style>
+/* 全局替换 InputNumber +/- 图标为上下箭头 */
+.n-input-number .n-button--primary-type .n-icon svg {
+  display: none !important;
+}
+.n-input-number .n-button--primary-type:first-child .n-button__content::after {
+  content: '▲' !important;
+  font-size: 10px !important;
+}
+.n-input-number .n-button--primary-type:last-child .n-button__content::after {
+  content: '▼' !important;
+  font-size: 10px !important;
+}
+</style>

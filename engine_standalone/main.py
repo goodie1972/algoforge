@@ -1263,8 +1263,8 @@ class TradingEngine:
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
 
             if broker_close > 0 and broker_open > 0:
-                open_dt = datetime.fromtimestamp(broker_open)
-                close_dt = datetime.fromtimestamp(broker_close)
+                open_dt = self._mt4_to_local(broker_open)
+                close_dt = self._mt4_to_local(broker_close)
                 open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
                 close_time_str = close_dt.strftime('%Y-%m-%d %H:%M:%S')
                 actual_hold = int(broker_close - broker_open)
@@ -1359,6 +1359,25 @@ class TradingEngine:
         # 刷新数据
         strategy.refresh_data()
 
+        # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
+        try:
+            adx_data = strategy.get_adx_data()
+        except Exception:
+            adx_data = None
+        price = strategy.candles[-1].close if strategy.candles else 0
+        gate_sell = strategy.calc_gate_state("SELL", price, adx_data)
+        gate_buy = strategy.calc_gate_state("BUY", price, adx_data)
+        if gate_sell.get("details") or gate_buy.get("details"):
+            di = adx_data if adx_data else {}
+            log_parts = []
+            if di:
+                log_parts.append(f"+DI={di.get('pdi',0):.1f} -DI={di.get('ndi',0):.1f} ADX={di.get('adx',0):.1f}")
+            gs = gate_sell.get("details", {})
+            gb = gate_buy.get("details", {})
+            log_parts.append(f"SELL:{gs.get('pos_gate','?')} {gs.get('rally_drop','?')}")
+            log_parts.append(f"BUY:{gb.get('pos_gate','?')} {gb.get('rally_drop','?')}")
+            logger.info(f"[{strategy.name}] 门禁 | {' '.join(log_parts)}")
+
         # 获取该策略的持仓（含 legacy magic，桥接查询 + 本地跟踪双重校验防漏）
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
@@ -1384,8 +1403,15 @@ class TradingEngine:
         if not signal:
             return
 
-        # 止盈冷却检查：盈利平仓后 N 小时内不再开同向单
         signal_dir = "BUY" if "BUY" in signal else "SELL"
+
+        # ── 门禁拦截（使用顶部已计算的门禁数据） ──
+        gate = gate_sell if signal_dir == "SELL" else gate_buy
+        if gate["blocked"]:
+            logger.info(f"[{strategy.name}] 门禁拦截 {signal_dir}: {gate['reason']}")
+            return
+
+        # 止盈冷却检查：盈利平仓后 N 小时内不再开同向单
         cool = self._profit_exit_cooldown.get(strategy.magic, {})
         if signal_dir in cool:
             elapsed = time.time() - cool[signal_dir]
@@ -1587,8 +1613,8 @@ class TradingEngine:
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
 
             if broker_close > 0 and broker_open > 0:
-                open_dt = datetime.fromtimestamp(broker_open)
-                close_dt = datetime.fromtimestamp(broker_close)
+                open_dt = self._mt4_to_local(broker_open)
+                close_dt = self._mt4_to_local(broker_close)
                 open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
                 close_time_str = close_dt.strftime('%Y-%m-%d %H:%M:%S')
                 hold_sec = int(broker_close - broker_open)

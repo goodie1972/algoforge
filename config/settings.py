@@ -216,6 +216,10 @@ COORDINATOR_CONFIG = {
     # ③ 利润回撤止盈：浮动盈利从峰值回撤 N% 即止盈（引擎出场逻辑）
     "profit_drawdown_enabled": True,
     "profit_drawdown_pct": 0.25,
+    # ADX 跳过（位置门禁：|+DI - -DI| > 阈值时跳过）
+    "di_gate_skip_threshold": 20,
+    # ADX 跳过（急跌急涨：M30 ADX > 阈值时跳过）
+    "rally_drop_adx_skip": 25,
 }
 
 # === 止盈冷却时间（策略盈利平仓后，N 小时内不再开同向单） ===
