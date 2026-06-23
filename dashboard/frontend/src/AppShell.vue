@@ -13,7 +13,7 @@ import { usePriceStore } from '@/stores/prices'
 import { useLogStore } from '@/stores/logs'
 import { usePatrolStore } from '@/stores/patrol'
 import { wsClient } from '@/api/websocket'
-import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog } from '@/api/client'
+import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog, getRemoteChangelog, updateVersion } from '@/api/client'
 import { useMessage, useDialog } from 'naive-ui'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
 import NewsBiasPopup from '@/components/NewsBiasPopup.vue'
@@ -43,21 +43,66 @@ const wsPulse = ref(false)
 let pulseTimer: ReturnType<typeof setTimeout> | null = null
 
 // 版本信息
-const versionInfo = ref<{version: string; commit: string; branch: string; dirty: boolean; display: string}>({
-  version: '0.0.0', commit: '?', branch: '?', dirty: false, display: 'v0.0.0',
+const versionInfo = ref<{version: string; commit: string; branch: string; dirty: boolean; display: string; has_update: boolean; behind_count: number}>({
+  version: '0.0.0', commit: '?', branch: '?', dirty: false, display: 'v0.0.0', has_update: false, behind_count: 0,
 })
 const showChangelog = ref(false)
 const changelog = ref<Array<{hash: string; date: string; subject: string}>>([])
+const updating = ref(false)
+const updateResult = ref<string>('')
 async function loadChangelog() {
   try {
     const r = await getChangelog(20)
     changelog.value = r.commits || []
   } catch { /* ignore */ }
 }
+const remoteChangelog = ref<Array<{hash: string; date: string; subject: string}>>([])
+const loadingRemote = ref(false)
+async function loadRemoteChangelog() {
+  loadingRemote.value = true
+  try {
+    const r = await getRemoteChangelog(20)
+    remoteChangelog.value = r.commits || []
+  } catch { /* ignore */ }
+  loadingRemote.value = false
+}
 async function openChangelog() {
   showChangelog.value = true
-  loadChangelog()
+  updateResult.value = ''
+  checkUpdate()
 }
+async function checkUpdate() {
+  updateResult.value = ''
+  try {
+    const v = await getVersionInfo()
+    versionInfo.value = v as any
+    if (v.has_update) {
+      loadRemoteChangelog()
+      updateResult.value = `发现 ${v.behind_count} 个新 commit`
+    } else {
+      loadChangelog()
+      updateResult.value = '已是最新'
+    }
+  } catch { /* ignore */ }
+}
+async function doUpdate() {
+  updating.value = true
+  updateResult.value = ''
+  try {
+    const r = await updateVersion()
+    if (r.success && r.version) {
+      versionInfo.value = r.version as any
+      updateResult.value = '✅ 更新成功！'
+      remoteChangelog.value = []
+    } else {
+      updateResult.value = `❌ ${r.message}`
+    }
+  } catch (e: any) {
+    updateResult.value = `❌ ${e?.message || '更新失败'}`
+  }
+  updating.value = false
+}
+let updateCheckTimer: ReturnType<typeof setInterval> | null = null
 function triggerPulse() {
   wsPulse.value = true
   if (pulseTimer) clearTimeout(pulseTimer)
@@ -133,6 +178,10 @@ onMounted(() => {
   accountStore.fetch()
   logStore.fetchHistory()
   getVersionInfo().then((v) => { versionInfo.value = v as any }).catch(() => { /* keep default */ })
+  // 每 5 分钟检查远程更新
+  updateCheckTimer = setInterval(() => {
+    getVersionInfo().then((v) => { versionInfo.value = v as any }).catch(() => {})
+  }, 300000)
 
   wsClient.connect()
   wsClient.on('prices', (msg) => { priceStore.updateTick(msg.data.bid, msg.data.ask); triggerPulse() })
@@ -152,6 +201,7 @@ onMounted(() => {
 onUnmounted(() => {
   wsClient.disconnect()
   patrolStore.stop()
+  if (updateCheckTimer) clearInterval(updateCheckTimer)
 })
 </script>
 
@@ -199,15 +249,19 @@ onUnmounted(() => {
                 border: 1px solid rgba(240, 185, 11, 0.3);
               ">
                 <span style="font-size: 9px;">●</span>
-                <span>{{ versionInfo.display }}</span>
-                <span v-if="versionInfo.dirty" style="color: #f6465d;">●</span>
+                <span>v{{ versionInfo.version }}</span>
+                <span v-if="versionInfo.has_update" style="color: #f6465d; font-size: 9px;">●</span>
+                <span v-if="versionInfo.behind_count > 0" style="color: #f0b90b; opacity: 0.7;">({{ versionInfo.behind_count }})</span>
+                <span v-else style="color: #22c55e; font-size: 10px;">✓</span>
               </div>
             </template>
             <div style="font-size: 12px; line-height: 1.5;">
               <div><b>分支:</b> {{ versionInfo.branch }}</div>
               <div><b>提交:</b> {{ versionInfo.commit }}</div>
-              <div v-if="versionInfo.dirty" style="color: #f6465d;">⚠ 有未提交修改</div>
-              <div style="color: #888; margin-top: 4px;">点击查看最近变更</div>
+              <div v-if="versionInfo.has_update" style="color: #f6465d;">⬆ 有 {{ versionInfo.behind_count }} 个新 commit 可更新</div>
+              <div v-else style="color: #22c55e;">✓ 已是最新版本</div>
+              <div v-if="versionInfo.dirty" style="color: #888; margin-top: 2px;">* 本地有未提交修改</div>
+              <div style="color: #888; margin-top: 4px;">点击查看详情</div>
             </div>
           </n-tooltip>
           <PatrolIndicator />
@@ -242,32 +296,69 @@ onUnmounted(() => {
 
     <!-- 版本变更日志弹窗 -->
     <n-modal v-model:show="showChangelog" preset="card" style="width: 640px; max-width: 90vw;"
-             :title="`最近变更 — ${versionInfo.display}`">
+             :title="versionInfo.has_update ? `版本更新 — v${versionInfo.version} → 落后 ${versionInfo.behind_count} 个 commit` : `版本信息 — v${versionInfo.version} 已是最新`">
       <template #header-extra>
-        <n-tag size="small" :bordered="false" type="warning" v-if="versionInfo.dirty">有未提交修改</n-tag>
-        <n-tag size="small" :bordered="false" type="info" v-else>工作区干净</n-tag>
+        <n-tag size="small" :bordered="false" type="success" v-if="!versionInfo.has_update">已是最新</n-tag>
+        <n-tag size="small" :bordered="false" type="warning" v-else>有更新</n-tag>
       </template>
-      <div v-if="!changelog.length" style="text-align: center; color: #888; padding: 20px;">
-        加载中...
+
+      <!-- 有更新时：远程 changelog + 更新按钮 -->
+      <div v-if="versionInfo.has_update">
+        <div v-if="loadingRemote" style="text-align: center; color: #888; padding: 20px;">加载中...</div>
+        <div v-else style="max-height: 50vh; overflow-y: auto;">
+          <div v-for="(c, i) in remoteChangelog" :key="i"
+               style="display: flex; gap: 12px; padding: 8px 4px; border-bottom: 1px solid #1f1f1f;">
+            <div style="font-family: ui-monospace, monospace; color: #f0b90b; font-size: 11px; min-width: 64px;">
+              {{ c.hash }}
+            </div>
+            <div style="color: #666; font-size: 11px; min-width: 130px; font-family: ui-monospace, monospace;">
+              {{ c.date?.slice(0, 16) }}
+            </div>
+            <div style="flex: 1; font-size: 13px; color: #ddd; line-height: 1.5;">
+              {{ c.subject }}
+            </div>
+          </div>
+        </div>
+        <div v-if="updateResult" style="margin-top: 12px; font-size: 12px;" :style="{color: updateResult.includes('成功') || updateResult.includes('最新') ? '#22c55e' : '#f6465d'}">{{ updateResult }}</div>
       </div>
-      <div v-else style="max-height: 60vh; overflow-y: auto;">
-        <div v-for="(c, i) in changelog" :key="i"
-             style="display: flex; gap: 12px; padding: 8px 4px; border-bottom: 1px solid #1f1f1f;">
-          <div style="font-family: ui-monospace, monospace; color: #f0b90b; font-size: 11px; min-width: 64px;">
-            {{ c.hash }}
-          </div>
-          <div style="color: #666; font-size: 11px; min-width: 130px; font-family: ui-monospace, monospace;">
-            {{ c.date?.slice(0, 16) }}
-          </div>
-          <div style="flex: 1; font-size: 13px; color: #ddd; line-height: 1.5;">
-            {{ c.subject }}
+
+      <!-- 无更新时：本地 changelog -->
+      <div v-else>
+        <div style="margin-bottom: 12px; display: flex; gap: 16px; font-size: 12px; color: #888;">
+          <span>当前版本: <b style="color: #ddd;">v{{ versionInfo.version }}</b></span>
+          <span>提交: <b style="color: #ddd;">{{ versionInfo.commit }}</b></span>
+          <span>分支: <b style="color: #ddd;">{{ versionInfo.branch }}</b></span>
+        </div>
+        <div v-if="!changelog.length" style="text-align: center; color: #888; padding: 20px;">
+          加载中...
+        </div>
+        <div v-else style="max-height: 40vh; overflow-y: auto;">
+          <div v-for="(c, i) in changelog" :key="i"
+               style="display: flex; gap: 12px; padding: 8px 4px; border-bottom: 1px solid #1f1f1f;">
+            <div style="font-family: ui-monospace, monospace; color: #f0b90b; font-size: 11px; min-width: 64px;">
+              {{ c.hash }}
+            </div>
+            <div style="color: #666; font-size: 11px; min-width: 130px; font-family: ui-monospace, monospace;">
+              {{ c.date?.slice(0, 16) }}
+            </div>
+            <div style="flex: 1; font-size: 13px; color: #ddd; line-height: 1.5;">
+              {{ c.subject }}
+            </div>
           </div>
         </div>
       </div>
+
       <template #footer>
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #888;">
-          <span>最近 {{ changelog.length }} 条 commit</span>
-          <n-button size="small" quaternary @click="loadChangelog">↻ 刷新</n-button>
+          <span v-if="versionInfo.has_update">待更新 {{ versionInfo.behind_count }} 个 commit</span>
+          <span v-else>最近 {{ changelog.length }} 条 commit</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span v-if="versionInfo.dirty && versionInfo.has_update" style="color: #f0b90b;">⚠ 本地有未提交修改</span>
+            <n-button size="small" quaternary :loading="loadingRemote" @click="checkUpdate">↻ 检查更新</n-button>
+            <n-button size="small" type="warning" secondary :disabled="!versionInfo.has_update || versionInfo.dirty" :loading="updating" @click="doUpdate">
+              ⬇ 版本更新
+            </n-button>
+          </div>
         </div>
       </template>
     </n-modal>

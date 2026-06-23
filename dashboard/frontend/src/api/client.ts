@@ -216,6 +216,8 @@ export interface VersionInfo {
   branch: string
   dirty: boolean
   display: string
+  has_update: boolean
+  behind_count: number
 }
 
 export async function getVersionInfo(): Promise<VersionInfo> {
@@ -231,6 +233,16 @@ export interface ChangelogCommit {
 
 export async function getChangelog(limit = 20): Promise<{ commits: ChangelogCommit[]; error?: string }> {
   const { data } = await http.get('/version/changelog', { params: { limit } })
+  return data
+}
+
+export async function getRemoteChangelog(limit = 20): Promise<{ commits: ChangelogCommit[] }> {
+  const { data } = await http.get('/version/remote-changelog', { params: { limit } })
+  return data
+}
+
+export async function updateVersion(): Promise<{ success: boolean; message: string; version?: VersionInfo }> {
+  const { data } = await http.post('/version/update')
   return data
 }
 
