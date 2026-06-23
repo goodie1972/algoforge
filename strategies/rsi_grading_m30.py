@@ -75,6 +75,9 @@ class RSIGradingM30Strategy(BaseStrategy):
         self._cached_atr_values: Optional[list[float]] = None
         self._cached_atr_key: int = 0
 
+    def get_adx_data(self) -> Optional[dict]:
+        return self._calc_adx(14)
+
     def refresh_data(self, count: int = 350):
         self._cached_atr_key = 0
         self._cached_atr_values = None

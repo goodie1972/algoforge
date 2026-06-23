@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS trades (
     hold_seconds INTEGER DEFAULT 0,
     exit_reason TEXT DEFAULT '',
     indicator_snapshot TEXT DEFAULT '',
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_trades_close_time ON trades(close_time);
 CREATE INDEX IF NOT EXISTS idx_trades_strategy ON trades(strategy);
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS signals (
     confidence REAL,
     price_entry REAL,
     ticket INTEGER,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_signals_strategy_ts ON signals(strategy, timestamp);
 CREATE INDEX IF NOT EXISTS idx_signals_ticket ON signals(ticket);
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS account_snapshots (
     leverage INTEGER DEFAULT 0,
     floating_pnl REAL DEFAULT 0,
     daily_pnl REAL DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_account_ts ON account_snapshots(timestamp);
 
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS risk_states (
     realized_loss_amount_blocked INTEGER DEFAULT 0,
     consecutive_loss_blocked INTEGER DEFAULT 0,
     blocked_at TEXT DEFAULT '',
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS logs (
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS logs (
     level TEXT NOT NULL,
     name TEXT NOT NULL,
     message TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_logs_ts ON logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS news_evaluations (
     actual_move_15m REAL DEFAULT 0,
     actual_move_1h REAL DEFAULT 0,
     direction_match TEXT,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_news_eval_time ON news_evaluations(event_time);
 
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS news_bias_reports (
     verify_at TEXT DEFAULT '',
     popped_up INTEGER DEFAULT 0,
     summary TEXT DEFAULT '',
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_nbr_created ON news_bias_reports(created_at);
 
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS strategy_versions (
     version TEXT NOT NULL,
     date TEXT NOT NULL,
     description TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sv_magic ON strategy_versions(magic);
 
@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS reports (
     daily_pnl REAL DEFAULT 0,
     position_count INTEGER DEFAULT 0,
     snapshot_id INTEGER,
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_reports_type_date ON reports(type, created_at);
 """
@@ -220,6 +220,7 @@ def init_db():
         logger.info(f"数据库初始化完成: {DB_PATH} ({len(names)} 张表: {', '.join(names)})")
         migrate_signals_lifecycle()
         migrate_risk_states_exit_timestamps()
+        migrate_timezone_fix()
     finally:
         conn.close()
 
@@ -258,6 +259,49 @@ def migrate_risk_states_exit_timestamps():
             conn.execute("ALTER TABLE risk_states ADD COLUMN exit_timestamps TEXT DEFAULT '[]'")
             conn.commit()
             logger.info("迁移: risk_states 表添加 exit_timestamps 列成功")
+    finally:
+        conn.close()
+
+
+def migrate_timezone_fix():
+    """将表中已存在的 UTC created_at/updated_at 转为本地时 (UTC+8)。
+    SQLite 的 datetime('now') 返回 UTC，此前所有表的默认值都用它。
+    新数据已改为 datetime('now', 'localtime')，老数据用此迁移加 8 小时。"""
+    conn = get_conn()
+    try:
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+        fixed = 0
+        for (tbl,) in tables:
+            cols = {row[1] for row in conn.execute(f"PRAGMA table_info('{tbl}')").fetchall()}
+            for time_col in ('created_at', 'updated_at'):
+                if time_col not in cols:
+                    continue
+                rows = conn.execute(
+                    f"SELECT rowid, {time_col} FROM {tbl} "
+                    f"WHERE {time_col} IS NOT NULL AND {time_col} != ''"
+                ).fetchall()
+                for rowid, val in rows:
+                    try:
+                        dt = datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
+                    except (ValueError, TypeError):
+                        continue
+                    # 加 8 小时（UTC → UTC+8）
+                    local_dt = dt + timedelta(hours=8)
+                    local_str = local_dt.strftime("%Y-%m-%d %H:%M:%S")
+                    conn.execute(
+                        f"UPDATE {tbl} SET {time_col}=? WHERE rowid=?",
+                        (local_str, rowid)
+                    )
+                    fixed += 1
+        if fixed:
+            conn.commit()
+            logger.info(f"时区迁移: 已修正 {fixed} 条记录的 created_at/updated_at (UTC → UTC+8)")
+        else:
+            logger.info("时区迁移: 无需修正")
+    except Exception as e:
+        logger.warning(f"时区迁移异常: {e}")
     finally:
         conn.close()
 

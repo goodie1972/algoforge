@@ -42,6 +42,8 @@ class BaseStrategy(abc.ABC):
         self.rally_drop_enabled: bool = _coord.get('rally_drop_enabled', True)
         self.rally_drop_lookback: int = _coord.get('rally_drop_lookback', 30)
         self.rally_drop_threshold: float = _coord.get('rally_drop_threshold', 1.5)
+        self.di_gate_skip_threshold: float = _coord.get('di_gate_skip_threshold', 20)
+        self.rally_drop_adx_skip: float = _coord.get('rally_drop_adx_skip', 25)
         self.profit_drawdown_enabled: bool = _coord.get('profit_drawdown_enabled', True)
         self.profit_drawdown_pct: float = _coord.get('profit_drawdown_pct', 0.25)
         self.profit_drawdown_min_peak_atr: float = _coord.get('profit_drawdown_min_peak_atr', 0.5)
@@ -65,85 +67,97 @@ class BaseStrategy(abc.ABC):
         return [c.close for c in self.candles]
 
     def _apply_kline_filters(self, result: tuple):
-        """统一 K 线过滤器：位置门禁 + 急跌急涨惩罚。
-        在 generate_signal() 之后调用，直接 nullify 信号（不操作评分过程）。"""
-        signal, score_long, score_short, factors_long, factors_short, iv = result[:6]
-        extra = result[6:] if len(result) > 6 else ()
-        candles = self.candles
-        if not candles:
-            return result
+        """统一 K 线过滤器（保留供外部调用，引擎层使用 calc_gate_state）"""
+        return result
 
-        close = candles[-1].close
+    def calc_gate_state(self, direction: Optional[str], price: float,
+                        adx_data: Optional[dict] = None) -> dict:
+        """计算门禁状态：位置门禁 + 急跌惩罚 + News-Bias。
+        无论是否有信号都计算，用于引擎层统一拦截。
+        返回: {"blocked": bool, "reason": str, "details": dict}"""
+        state = {"blocked": False, "reason": "", "details": {}}
 
-        # ── ① 位置门禁 ──
-        if self.position_gate_enabled:
-            lookback = min(self.position_gate_lookback, len(candles))
-            if lookback >= 2:
-                hi = max(c.high for c in candles[-lookback:])
-                lo = min(c.low for c in candles[-lookback:])
-                pos = (close - lo) / (hi - lo) if hi > lo else 0.5
+        # ── ① 位置门禁 + DI 跳过 ──
+        if self.position_gate_enabled and direction:
+            di_diff = 0
+            if adx_data:
+                di_diff = abs(adx_data.get("pdi", 0) - adx_data.get("ndi", 0))
+            state["details"]["di_diff"] = round(di_diff, 1)
 
-                if signal == OrderType.SELL and pos < self.position_gate_bottom:
-                    signal = None
-                    score_short = 0
-                    factors_short.append(f"BOTTOM-GATE({pos:.1%})")
-                    logger.info(f"[{self.name}] 位置门禁: 区间底部 {pos:.1%}，禁SELL")
-                elif signal == OrderType.BUY and pos > self.position_gate_top:
-                    signal = None
-                    score_long = 0
-                    factors_long.append(f"TOP-GATE({pos:.1%})")
-                    logger.info(f"[{self.name}] 位置门禁: 区间顶部 {pos:.1%}，禁BUY")
+            if di_diff > self.di_gate_skip_threshold:
+                state["details"]["pos_gate"] = f"DI跳过(diff={di_diff:.0f})"
+            else:
+                lookback = min(self.position_gate_lookback, len(self.candles))
+                if lookback >= 2:
+                    hi = max(c.high for c in self.candles[-lookback:])
+                    lo = min(c.low for c in self.candles[-lookback:])
+                    pos = (price - lo) / (hi - lo) if hi > lo else 0.5
+                    state["details"]["pos"] = round(pos, 3)
+                    if direction == "SELL" and pos < self.position_gate_bottom:
+                        state["blocked"] = True
+                        state["reason"] = f"位置门禁: 底部 {pos:.1%}"
+                        state["details"]["pos_gate"] = f"禁SELL({pos:.1%})"
+                    elif direction == "BUY" and pos > self.position_gate_top:
+                        state["blocked"] = True
+                        state["reason"] = f"位置门禁: 顶部 {pos:.1%}"
+                        state["details"]["pos_gate"] = f"禁BUY({pos:.1%})"
+                    else:
+                        state["details"]["pos_gate"] = f"正常({pos:.1%})"
 
-        # ── ② 急跌急涨惩罚（使用 M30 K 线） ──
-        if self.rally_drop_enabled:
+        # ── ② 急跌急涨惩罚 ──
+        if self.rally_drop_enabled and direction and not state["blocked"]:
             self._load_m30_data()
             if self._m30_candles:
                 rd_lookback = min(self.rally_drop_lookback, len(self._m30_candles))
                 if rd_lookback >= 2:
-                    m30_close = self._m30_candles[-1].close
-                    rd_hi = max(c.high for c in self._m30_candles[-rd_lookback:])
-                    rd_lo = min(c.low for c in self._m30_candles[-rd_lookback:])
-                    drop_pct = (rd_hi - m30_close) / rd_hi * 100
-                    rally_pct = (m30_close - rd_lo) / rd_lo * 100
+                    m30_adx = self._calc_m30_adx(14)
+                    state["details"]["m30_adx"] = round(m30_adx, 1) if m30_adx else 0
+                    if m30_adx and m30_adx > self.rally_drop_adx_skip:
+                        state["details"]["rally_drop"] = f"ADX跳过({m30_adx:.0f})"
+                    else:
+                        m30_close = self._m30_candles[-1].close
+                        rd_hi = max(c.high for c in self._m30_candles[-rd_lookback:])
+                        rd_lo = min(c.low for c in self._m30_candles[-rd_lookback:])
+                        drop_pct = (rd_hi - m30_close) / rd_hi * 100
+                        rally_pct = (m30_close - rd_lo) / rd_lo * 100
+                        if direction == "SELL" and drop_pct > self.rally_drop_threshold:
+                            state["blocked"] = True
+                            state["reason"] = f"急跌惩罚: 回落 {drop_pct:.1f}%"
+                            state["details"]["rally_drop"] = f"禁SELL({drop_pct:.1f}%)"
+                        elif direction == "BUY" and rally_pct > self.rally_drop_threshold:
+                            state["blocked"] = True
+                            state["reason"] = f"急涨惩罚: 上涨 {rally_pct:.1f}%"
+                            state["details"]["rally_drop"] = f"禁BUY({rally_pct:.1f}%)"
+                        else:
+                            state["details"]["rally_drop"] = "正常"
 
-                    if drop_pct > self.rally_drop_threshold and signal == OrderType.SELL:
-                        signal = None
-                        score_short = 0
-                        factors_short.append(f"DROP-{drop_pct:.1f}%")
-                        logger.info(f"[{self.name}] 急跌惩罚: 高点回落 {drop_pct:.1f}%，禁SELL")
-                    elif rally_pct > self.rally_drop_threshold and signal == OrderType.BUY:
-                        signal = None
-                        score_long = 0
-                        factors_long.append(f"RALLY-{rally_pct:.1f}%")
-                        logger.info(f"[{self.name}] 急涨惩罚: 低点上涨 {rally_pct:.1f}%，禁BUY")
-
-        # ── ③ News-Bias 阻塞（ADX 门禁在 bias_state 层面处理） ──
-        # 每次信号动态读取 RuntimeConfig（覆盖优先），所以 UI 切换开关立即生效
-        try:
-            _cfg = _RuntimeConfig()
-            _block_long = _cfg.get("block_long_when_bias_bearish")
-            _block_short = _cfg.get("block_short_when_bias_bullish")
-        except Exception:
-            _block_long = self.block_long_when_bias_bearish
-            _block_short = self.block_short_when_bias_bullish
-
-        if signal is not None and (_block_long or _block_short):
+        # ── ③ News-Bias 阻塞 ──
+        if not state["blocked"] and direction:
             try:
-                from core import bias_state
-                bias_dir = bias_state.get()
+                _cfg = _RuntimeConfig()
+                _block_long = _cfg.get("block_long_when_bias_bearish")
+                _block_short = _cfg.get("block_short_when_bias_bullish")
             except Exception:
-                bias_dir = None
-            if bias_dir == "bearish" and _block_long and signal == OrderType.BUY:
-                signal = None
-                score_long = 0
-                factors_long.append("BIAS-BEAR-BLOCK")
-                logger.info(f"[{self.name}] News-Bias 阻塞: bias=bearish，禁BUY")
-            elif bias_dir == "bullish" and _block_short and signal == OrderType.SELL:
-                signal = None
-                score_short = 0
-                factors_short.append("BIAS-BULL-BLOCK")
-                logger.info(f"[{self.name}] News-Bias 阻塞: bias=bullish，禁SELL")
-        return (signal, score_long, score_short, factors_long, factors_short, iv) + extra
+                _block_long = self.block_long_when_bias_bearish
+                _block_short = self.block_short_when_bias_bullish
+            if _block_long or _block_short:
+                try:
+                    from core import bias_state
+                    bias_dir = bias_state.get()
+                except Exception:
+                    bias_dir = None
+                if bias_dir == "bearish" and _block_long and direction == "BUY":
+                    state["blocked"] = True
+                    state["reason"] = "News-Bias 偏空，禁BUY"
+                    state["details"]["bias"] = "bearish-block-BUY"
+                elif bias_dir == "bullish" and _block_short and direction == "SELL":
+                    state["blocked"] = True
+                    state["reason"] = "News-Bias 偏多，禁SELL"
+                    state["details"]["bias"] = "bullish-block-SELL"
+                else:
+                    state["details"]["bias"] = bias_dir or "neutral"
+
+        return state
 
     def _load_m30_data(self):
         """加载 M30 K 线数据从本地 SQLite（供 H1 策略做急跌急涨检测）"""
@@ -161,6 +175,34 @@ class BaseStrategy(abc.ABC):
         except Exception as e:
             logger.warning(f"[{self.name}] M30 data load failed: {e}")
             self._m30_candles = []
+
+    def _calc_m30_adx(self, period: int = 14) -> Optional[float]:
+        """用 M30 K 线计算 ADX（供急跌急涨惩罚的 ADX 门禁使用）"""
+        c = self._m30_candles
+        if not c or len(c) < period + 1:
+            return None
+        tr = [max(c[i].high - c[i].low,
+                   abs(c[i].high - c[i-1].close),
+                   abs(c[i].low - c[i-1].close)) for i in range(1, len(c))]
+        up = [c[i].high - c[i-1].high for i in range(1, len(c))]
+        dn = [c[i-1].low - c[i].low for i in range(1, len(c))]
+        plus_dm = [u if u > d and u > 0 else 0 for u, d in zip(up, dn)]
+        minus_dm = [d if d > u and d > 0 else 0 for u, d in zip(up, dn)]
+
+        def rma(values: list, n: int) -> list:
+            alpha = 1.0 / n
+            result = [sum(values[:n]) / n]
+            for v in values[n:]:
+                result.append(result[-1] + alpha * (v - result[-1]))
+            return result
+
+        atr = rma(tr, period)
+        pdi = rma(plus_dm, period)
+        ndi = rma(minus_dm, period)
+        dx = [abs(p - n) / (p + n) * 100 if (p + n) > 0 else 0
+              for p, n in zip(pdi, ndi)]
+        adx = rma(dx, period)
+        return adx[-1] if adx else None
 
     @abc.abstractmethod
     def generate_signal(self):
@@ -218,6 +260,10 @@ class BaseStrategy(abc.ABC):
             return f"信号: {signal.value}"
         return None
 
+    def get_adx_data(self) -> Optional[dict]:
+        """获取本策略的 ADX 数据（含 +DI/-DI），供引擎门禁使用"""
+        return None  # 子类覆盖
+
     def reload_config(self):
         """热重载配置参数，子类覆盖（不覆盖 magic/timeframe，它们由 STRATEGY_POOL 管理）"""
         self.symbol = _settings.SYMBOL
@@ -231,6 +277,8 @@ class BaseStrategy(abc.ABC):
         self.rally_drop_enabled = _coord.get('rally_drop_enabled', True)
         self.rally_drop_lookback = _coord.get('rally_drop_lookback', 30)
         self.rally_drop_threshold = _coord.get('rally_drop_threshold', 1.5)
+        self.di_gate_skip_threshold = _coord.get('di_gate_skip_threshold', 20)
+        self.rally_drop_adx_skip = _coord.get('rally_drop_adx_skip', 25)
         self.profit_drawdown_enabled = _coord.get('profit_drawdown_enabled', True)
         self.profit_drawdown_pct = _coord.get('profit_drawdown_pct', 0.25)
         self.profit_drawdown_min_peak_atr = _coord.get('profit_drawdown_min_peak_atr', 0.5)

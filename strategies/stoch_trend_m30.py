@@ -62,6 +62,9 @@ class StochTrendM30Strategy(BaseStrategy):
         self._cached_atr_values = None
         super().refresh_data(count)
 
+    def get_adx_data(self) -> Optional[dict]:
+        return self._calc_adx()
+
     # ─────────────── Indicator helpers ───────────────
 
     def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:

@@ -50,6 +50,16 @@ class GoldAutoResearchStrategy(BaseStrategy):
         self.p_hard_atr = 2.0
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
+    def get_adx_data(self) -> Optional[dict]:
+        result = self._calc_adx(14)
+        if result is None:
+            return None
+        return {
+            "adx": result["adx_list"][-1] if result.get("adx_list") else 0,
+            "pdi": result["pdi_list"][-1] if result.get("pdi_list") else 0,
+            "ndi": result["ndi_list"][-1] if result.get("ndi_list") else 0,
+        }
+
     def refresh_data(self, count: int = 300):
         self._cached_atr_key = 0
         self._cached_atr_values = None

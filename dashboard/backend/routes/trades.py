@@ -375,8 +375,8 @@ async def recover_trades():
     for order in missing:
         magic = order["magic"]
         strategy = _resolve_strategy_name(magic)
-        open_dt = datetime.fromtimestamp(order["open_time"])
-        close_dt = datetime.fromtimestamp(order["close_time"])
+        open_dt = engine._mt4_to_local(order["open_time"])
+        close_dt = engine._mt4_to_local(order["close_time"])
         hold_sec = int(order["close_time"] - order["open_time"])
 
         record = {

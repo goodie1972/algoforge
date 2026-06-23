@@ -77,6 +77,10 @@ class M30RSIStrategy(BaseStrategy):
         self._cached_atr_values: Optional[list[float]] = None
         self._cached_atr_key: int = 0
 
+    def get_adx_data(self) -> Optional[dict]:
+        """返回 ADX 数据（含 +DI/-DI），供引擎门禁使用"""
+        return self._calc_adx(14)
+
     def refresh_data(self, count: int = 350):
         self._cached_atr_key = 0
         self._cached_atr_values = None
