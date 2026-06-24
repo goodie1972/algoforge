@@ -187,7 +187,7 @@ class EngineRunner:
         except Exception as e:
             self.logger.warning(f"[数据同步] 跳过（模块未就绪: {e}）")
 
-    # ======================== 缓存更新（引擎线程调用，避免与广播任务抢 bridge socket） ========================
+    # ======================== 缓存更新（仅从价格轮询线程调用，消除主线程 bridge 竞争） ========================
 
     def _fresh_positions(self):
         """用最新 cached_price 刷新持仓盈亏（每 0.1s 价格采样实时重算）"""
@@ -211,19 +211,11 @@ class EngineRunner:
             fresh.append(p)
         return fresh
 
-    def _update_caches(self, engine):
-        """从引擎线程更新 dashboard 缓存，消除并发 bridge 访问"""
+    def _update_positions_cache(self):
+        """从 bridge 更新持仓缓存（仅从价格轮询线程调用，无 lock 竞争）"""
         from config import settings as _cfg
-        # 价格
         try:
-            bid, ask = engine.bridge.get_tick_price(_cfg.SYMBOL)
-            if bid > 0:
-                self._cached_price = {"bid": bid, "ask": ask}
-        except Exception:
-            pass
-        # 持仓
-        try:
-            positions = engine.bridge.get_positions(_cfg.SYMBOL)
+            positions = self.bridge.get_positions(_cfg.SYMBOL)
             _bid = self._cached_price.get("bid", 0) if self._cached_price else 0
             _ask = self._cached_price.get("ask", 0) if self._cached_price else 0
             self._cached_positions = [
@@ -245,9 +237,11 @@ class EngineRunner:
             ]
         except Exception:
             pass
-        # 账户
+
+    def _update_account_cache(self):
+        """从 bridge 更新账户缓存（仅从价格轮询线程调用）"""
         try:
-            info = engine.bridge.get_account_info()
+            info = self.bridge.get_account_info()
             if info:
                 self._cached_account = {
                     "login": info.login,
@@ -293,7 +287,7 @@ class EngineRunner:
             last_ts = self._cached_candles_ts.get(tf, 0)
             if now - last_ts >= 120 or tf not in self._cached_candles:
                 try:
-                    raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 500)
+                    raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 200)
                     raw_rev = list(reversed(raw))
                     offset = int(self.mt4_offset)
                     self._cached_candles[tf] = [
@@ -310,11 +304,13 @@ class EngineRunner:
     # ======================== 独立价格轮询线程 ========================
 
     def _start_price_poller(self, engine):
-        """启动独立价格轮询线程（0.1s 间隔，不受 _tick 阻塞影响）"""
+        """启动独立价格轮询线程（1s 间隔，匹配 EA OnTimer 处理能力）
+        也在此线程中定期更新持仓/账户缓存，避免主线程与 poller 争 bridge 锁。"""
         if self._price_thread and self._price_thread.is_alive():
             return
         from config import settings as _cfg
         def _poll():
+            tick_count = 0
             while not self._stop_requested:
                 try:
                     _b, _a = engine.bridge.get_tick_price(_cfg.SYMBOL)
@@ -323,7 +319,13 @@ class EngineRunner:
                         self._cached_bid = _b
                 except Exception:
                     pass
-                time.sleep(0.1)
+                # 每 5 tick (~5s) 更新持仓和账户缓存，与价格更新复用同个线程，
+                # 避免主循环 _tick() 中的 heartbeat 与 poller 争 bridge 锁
+                tick_count += 1
+                if tick_count % 5 == 0:
+                    self._update_positions_cache()
+                    self._update_account_cache()
+                time.sleep(1.0)
         self._price_thread = threading.Thread(target=_poll, daemon=True, name="price_poller")
         self._price_thread.start()
 
@@ -465,28 +467,15 @@ class EngineRunner:
         self._sync_strategy_versions()
 
         # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
-        # 价格采样由独立线程 _price_poller 负责（0.1s 间隔）
+        # 价格/持仓/账户采样由独立线程 _price_poller 负责（1s 间隔）
         while engine.running and not self._stop_requested:
             try:
-                # 桥接保活检测
-                try:
-                    engine.bridge.send_heartbeat()
-                except Exception:
-                    self.logger.warning("[桥接] 心跳失败，尝试重连...")
-                    try:
-                        engine.bridge.disconnect()
-                        time.sleep(2)
-                        engine.bridge.connect()
-                    except Exception as e2:
-                        self.logger.error(f"[桥接] 重连失败: {e2}")
-
-                engine._tick()
-                self._update_caches(engine)
+                engine._tick()  # 内含心跳、策略处理、执行
             except Exception as e:
                 self.logger.exception(f"主循环异常: {e}")
                 time.sleep(60)
 
-            # K 线缓存后台刷新
+            # K 线缓存后台刷新（低频率，与 _tick 串行避免桥接冲突）
             try:
                 self._refresh_candle_cache(engine)
             except Exception:

@@ -307,28 +307,27 @@ if os.path.isdir(FRONTEND_DIST):
             return JSONResponse({"detail": "Not Found"}, status_code=404)
         return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
-# === 路由依赖注入（必须放在 __name__ 守卫内） ===
-# 由于 backend/ 在 sys.path，__import__('main') 会导入自身，
-# 导致模块级代码递归执行产生两个 engine_runner 实例互相覆盖。
-# 通过 __name__ 守卫确保只注入一次。
-if __name__ == "__main__":
-    app.state.engine_runner = engine_runner
-    app.state.ws_manager = ws_manager
-    route_engine.engine_runner = engine_runner
-    route_account.engine_runner = engine_runner
-    route_positions.engine_runner = engine_runner
-    route_config.config_service = config_service
-    route_market.engine_runner = engine_runner
-    route_logs.log_handler = log_handler
-    route_trades.engine_runner = engine_runner
-    route_data.engine_runner = engine_runner
-    route_reports.engine_runner = engine_runner
-    route_news_bias.engine_runner = engine_runner
-    try:
-        from engine_standalone.main import STRATEGY_MAP
-        route_engine.available_strategies = {k: True for k in STRATEGY_MAP}
-    except Exception:
-        route_engine.available_strategies = {}
+# === 路由依赖注入 ===
+# 当通过 uvicorn main:app 启动时，__name__ 不是 "__main__"，
+# 所以注入代码必须放在 __name__ 守卫之外。
+# 即使在 python main.py 模式下递归导入，重复注入也仅覆盖指针，不影响功能。
+app.state.engine_runner = engine_runner
+app.state.ws_manager = ws_manager
+route_engine.engine_runner = engine_runner
+route_account.engine_runner = engine_runner
+route_positions.engine_runner = engine_runner
+route_config.config_service = config_service
+route_market.engine_runner = engine_runner
+route_logs.log_handler = log_handler
+route_trades.engine_runner = engine_runner
+route_data.engine_runner = engine_runner
+route_reports.engine_runner = engine_runner
+route_news_bias.engine_runner = engine_runner
+try:
+    from engine_standalone.main import STRATEGY_MAP
+    route_engine.available_strategies = {k: True for k in STRATEGY_MAP}
+except Exception:
+    route_engine.available_strategies = {}
 
 
 # === 入口 ===

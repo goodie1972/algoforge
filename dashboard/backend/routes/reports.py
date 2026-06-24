@@ -65,11 +65,15 @@ def _build_daily_report() -> dict:
             positions_by_strategy[strat] = []
         positions_by_strategy[strat].append(p)
 
-    # 信号数据 — 从数据库读取最新信号（含阈值、因子、时间戳）
+    # 信号数据 — 从策略注册表动态获取在线策略（跳过已下架）
     signals_data = []
-    strategy_names = ["M30_rsi_bb", "H1_v6_hybrid", "sanqing_h1", "gold_auto_research", "mtf_resonance_h1"]
     try:
-        for s_name in strategy_names:
+        from dashboard.backend.strategy_registry import STRATEGY_REGISTRY
+        active_strategies = {
+            k: v for k, v in STRATEGY_REGISTRY.items()
+            if "已下架" not in v.get("display", "")
+        }
+        for s_name in active_strategies:
             sig = db.get_latest_signal(s_name)
             if sig:
                 # 解析 JSON 字段
@@ -333,6 +337,7 @@ def _gather_daily_report() -> dict:
         "floating_pnl": content.get("floating_pnl", 0),
         "daily_pnl": content.get("daily_pnl", 0),
         "position_count": content.get("position_count", 0),
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     report_id = db.insert_report(record)
     return report_id
