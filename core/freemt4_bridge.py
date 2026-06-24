@@ -37,8 +37,8 @@ class FreeMT4Bridge(MT4BridgeBase):
         self._last_reconnect = 0.0
 
     def connect(self) -> bool:
+        """创建持久 Socket 连接到 EA"""
         self.disconnect()
-
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._sock.settimeout(5)
@@ -97,7 +97,9 @@ class FreeMT4Bridge(MT4BridgeBase):
                 return text[:-1]
 
     def _send_cmd(self, cmd: str) -> Optional[list]:
-        """非递归发送命令，断连时最多重连一次重试"""
+        """共享持久连接发送命令，断连时最多重连一次重试"""
+        fcode = cmd.split("#")[0] if "#" in cmd else cmd
+
         for attempt in range(2):
             if not self._connected or not self._sock:
                 if attempt == 0:
@@ -107,28 +109,23 @@ class FreeMT4Bridge(MT4BridgeBase):
 
             try:
                 with self._lock:
-                    full_cmd = cmd + "!"
-                    self._sock.sendall(full_cmd.encode("utf-8"))
+                    self._sock.sendall((cmd + "!").encode("utf-8"))
                     response = self._recv_raw()
+
                 parts = response.split("#")
 
-                if len(parts) < 2:
+                if len(parts) < 2 or parts[0] != fcode:
                     return None
-
-                if parts[0] != cmd.split("#")[0]:
-                    return None
-
                 if parts[1] != "OK":
-                    cmd_type = cmd.split("#")[0] if "#" in cmd else cmd
                     error_detail = "#".join(parts[1:])[:200]
-                    logger.error(f"[FreeMT4] EA 错误: {cmd_type} 返回 {error_detail}")
+                    logger.error(f"[FreeMT4] EA 错误: {fcode} 返回 {error_detail}")
                     return None
 
                 return parts[2:]
 
             except Exception:
                 self.disconnect()
-                # 继续下一轮循环尝试重连
+                # 下一轮尝试重连
 
         return None
 

@@ -12,7 +12,7 @@ STRATEGY_REGISTRY = {
     "M30_rsi_bb": {
         "backup_name": "m30_rsi_v7",
         "file": "m30_rsi.py",
-        "display": "M30 RSI+BB v10",
+        "display": "M30 RSI+BB v11",
         "backup_file": "20260620_m30_rsi_v7.py",
         "default_magic": 660706,
         "default_timeframe": "M30",

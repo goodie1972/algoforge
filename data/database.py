@@ -1051,8 +1051,8 @@ def insert_report(record: dict) -> int:
         cur = conn.execute(
             """INSERT INTO reports
                (type, title, summary, content, account_balance, account_equity,
-                floating_pnl, daily_pnl, position_count, snapshot_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                floating_pnl, daily_pnl, position_count, snapshot_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 record.get("type", "daily"),
                 record.get("title", ""),
@@ -1064,6 +1064,7 @@ def insert_report(record: dict) -> int:
                 record.get("daily_pnl", 0),
                 record.get("position_count", 0),
                 record.get("snapshot_id"),
+                record.get("created_at"),
             ),
         )
         conn.commit()
