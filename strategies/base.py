@@ -80,8 +80,15 @@ class BaseStrategy(abc.ABC):
         # ── ① 位置门禁 + DI 跳过 ──
         if self.position_gate_enabled and direction:
             di_diff = 0
-            if adx_data:
-                di_diff = abs(adx_data.get("pdi", 0) - adx_data.get("ndi", 0))
+            if adx_data and adx_data.get("pdi") is not None:
+                di_diff = abs(adx_data["pdi"] - adx_data["ndi"])
+            else:
+                # 数据库回退：加载 M30 计算 DI diff
+                self._load_m30_data()
+                if self._m30_candles:
+                    m30_db = self._calc_m30_adx(14)
+                    if m30_db:
+                        di_diff = abs(m30_db["pdi"] - m30_db["ndi"])
             state["details"]["di_diff"] = round(di_diff, 1)
 
             if di_diff > self.di_gate_skip_threshold:
@@ -110,7 +117,12 @@ class BaseStrategy(abc.ABC):
             if self._m30_candles:
                 rd_lookback = min(self.rally_drop_lookback, len(self._m30_candles))
                 if rd_lookback >= 2:
-                    m30_adx = self._calc_m30_adx(14)
+                    # 优先用传入的 adx_data（实时桥接数据），回退到 SQLite
+                    if adx_data and adx_data.get("adx"):
+                        m30_adx = adx_data["adx"]
+                    else:
+                        m30_db = self._calc_m30_adx(14)
+                        m30_adx = m30_db["adx"] if m30_db else None
                     state["details"]["m30_adx"] = round(m30_adx, 1) if m30_adx else 0
                     if m30_adx and m30_adx > self.rally_drop_adx_skip:
                         state["details"]["rally_drop"] = f"ADX跳过({m30_adx:.0f})"
@@ -176,8 +188,8 @@ class BaseStrategy(abc.ABC):
             logger.warning(f"[{self.name}] M30 data load failed: {e}")
             self._m30_candles = []
 
-    def _calc_m30_adx(self, period: int = 14) -> Optional[float]:
-        """用 M30 K 线计算 ADX（供急跌急涨惩罚的 ADX 门禁使用）"""
+    def _calc_m30_adx(self, period: int = 14) -> Optional[dict]:
+        """用 M30 K 线计算 ADX/DI（供门禁数据库回退使用），返回 {adx, pdi, ndi}"""
         c = self._m30_candles
         if not c or len(c) < period + 1:
             return None
@@ -202,7 +214,9 @@ class BaseStrategy(abc.ABC):
         dx = [abs(p - n) / (p + n) * 100 if (p + n) > 0 else 0
               for p, n in zip(pdi, ndi)]
         adx = rma(dx, period)
-        return adx[-1] if adx else None
+        if not adx:
+            return None
+        return {"adx": adx[-1], "pdi": pdi[-1], "ndi": ndi[-1]}
 
     @abc.abstractmethod
     def generate_signal(self):

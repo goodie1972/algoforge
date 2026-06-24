@@ -18,11 +18,12 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v1"
+STRATEGY_VERSION = "v3"
 STRATEGY_MAGIC = 660801
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660801, "date": "2026-06-15", "desc": "初始上线：H1+M15 TA-Lib 形态共振开仓，SL=2×ATR，TP=ATR跟踪"},
     {"version": "v2", "magic": 660801, "date": "2026-06-22", "desc": "移除tight_exit_mode, trail/hard互换为2.0/1.0(止盈>止损)"},
+    {"version": "v3", "magic": 660801, "date": "2026-06-24", "desc": "修复M15共振检测: 传完整M15数据给TA-Lib而非仅窗口4根, RSI/EMA/形态检测正常"},
 ]
 
 LOOKAHEAD = 3
@@ -136,14 +137,16 @@ class MTFResonanceStrategy(BaseStrategy):
         return None
 
     def _check_m15_confluence(self, m15_candles, h1_ts, h1_dir):
-        window = [c for c in m15_candles if h1_ts <= int(c.time) < h1_ts + 3600]
-        if len(window) < 3:
+        window_len = sum(1 for c in m15_candles if h1_ts <= int(c.time) < h1_ts + 3600)
+        if window_len < 3:
             return False
 
-        o = np.array([c.open for c in window], dtype=float)
-        h = np.array([c.high for c in window], dtype=float)
-        l = np.array([c.low for c in window], dtype=float)
-        c_arr = np.array([c.close for c in window], dtype=float)
+        # 用完整 M15 数据计算指标和形态（TA-Lib 需要足够的前导数据）
+        o = np.array([c.open for c in m15_candles], dtype=float)
+        h = np.array([c.high for c in m15_candles], dtype=float)
+        l = np.array([c.low for c in m15_candles], dtype=float)
+        c_arr = np.array([c.close for c in m15_candles], dtype=float)
+        ts_arr = np.array([int(c.time) for c in m15_candles], dtype=int)
 
         ind = self._compute_indicators(o, h, l, c_arr)
         patterns = self._detect_patterns(o, h, l, c_arr)
@@ -152,6 +155,9 @@ class MTFResonanceStrategy(BaseStrategy):
             for i in range(LOOKAHEAD + 2, len(sig_arr) - LOOKAHEAD - 2):
                 raw = sig_arr[i]
                 if raw == 0:
+                    continue
+                # 只检查落在 H1 窗口内的 M15 K 线
+                if not (h1_ts <= ts_arr[i] < h1_ts + 3600):
                     continue
                 sig_dir = "bull" if raw > 0 else "bear"
                 if sig_dir != h1_dir:
