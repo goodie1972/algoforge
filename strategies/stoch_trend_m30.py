@@ -360,6 +360,9 @@ class StochTrendM30Strategy(BaseStrategy):
         ma_val = self._calc_ema(closes, self.ma_period)
         stoch = self._calc_stoch()
         adx_data = self._calc_adx()
+        _pdd_trend = self.profit_drawdown_pct
+        if adx_data and adx_data.get("adx", 0) > 25:
+            _pdd_trend = max(_pdd_trend, 0.5)
         regime = td["regime"]
         entry_price = td["entry_price"]
         pnl_pts = (bid - entry_price) if is_buy else (entry_price - ask)
@@ -384,7 +387,7 @@ class StochTrendM30Strategy(BaseStrategy):
         # 利润回撤止盈（通用，不限 regime）
         if _cp > 0 and self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
             profit_ratio = _cp / td["peak_profit"]
-            if profit_ratio < (1 - self.profit_drawdown_pct):
+            if profit_ratio < (1 - _pdd_trend):
                 logger.info(f"[{self.name}] ProfitStop ticket={ticket} profit=${_cp:.2f} peak=${td['peak_profit']:.2f}")
                 self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(_cp, 2), "atr": round(atr_val, 2)}
                 del self._pos_data[ticket]; return True

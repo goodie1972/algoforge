@@ -395,6 +395,11 @@ class SanQingH1Strategy(BaseStrategy):
                         pdd_used = 0.4
                     else:
                         pdd_used = pdd
+                        # ADX>25 趋势强 → 放宽回撤
+                        if pdd_used < 0.5:
+                            _ax = self._calc_adx(14)
+                            if _ax and _ax.get("adx", 0) > 25:
+                                pdd_used = 0.5
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd_used):
                         logger.info(
@@ -436,6 +441,11 @@ class SanQingH1Strategy(BaseStrategy):
                         pdd_used = 0.4
                     else:
                         pdd_used = pdd
+                        # ADX>25 趋势强 → 放宽回撤
+                        if pdd_used < 0.5:
+                            _ax = self._calc_adx(14)
+                            if _ax and _ax.get("adx", 0) > 25:
+                                pdd_used = 0.5
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd_used):
                         logger.info(

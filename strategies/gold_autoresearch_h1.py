@@ -423,6 +423,10 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
         trail_mult, hard_mult = self._get_exit_multipliers(is_buy)
         pdd = self.profit_drawdown_pct
+        # ADX>25 趋势强 → 放宽回撤
+        _ax = self.get_adx_data()
+        if _ax and _ax.get("adx", 0) > 25:
+            pdd = max(pdd, 0.5)
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
