@@ -162,9 +162,11 @@ class RuntimeConfig:
         return dict(getattr(settings, 'COORDINATOR_CONFIG', {"enabled": False}))
 
     def set_coordinator_config(self, cfg: dict) -> dict:
-        """设置协调器配置"""
+        """设置协调器配置（合并方式，仅更新传入的字段）"""
         with self._data_lock:
-            self._overrides["coordinator"] = dict(cfg)
+            existing = self._overrides.get("coordinator", {})
+            existing.update(cfg)
+            self._overrides["coordinator"] = existing
             self._save()
         return self.get_coordinator_config()
 

@@ -1687,14 +1687,38 @@ class TradingEngine:
             
             bearish = getattr(settings, 'BLOCK_LONG_WHEN_BIAS_BEARISH', False)
             bullish = getattr(settings, 'BLOCK_SHORT_WHEN_BIAS_BULLISH', False)
-            
+
+            # 从 RuntimeConfig 读取 DI 差值门限（0=关闭绕过）
+            _di_gap_threshold = 0
+            try:
+                _rc = self.config_service.get_coordinator_config()
+                _di_gap_threshold = _rc.get('news_bias_di_gap', 0) or 0
+            except Exception:
+                pass
+
+            # M30 DI 差值判断：M30 |+DI - -DI| < 阈值时绕过新闻阻塞
+            _m30_gap = None
+            if _di_gap_threshold > 0:
+                for _s in getattr(self, 'strategies', []) or []:
+                    if getattr(_s, 'timeframe', '') == 'M30':
+                        _ax = _s.get_adx_data()
+                        if _ax and 'pdi' in _ax and 'ndi' in _ax:
+                            _m30_gap = abs(_ax['pdi'] - _ax['ndi'])
+                            break
+
             if bearish and bias.get('overall') == 'BEARISH':
-                logger.info("[News-Bias] 看跌 → 阻止开多")
-                return True
-            
+                if _m30_gap is not None and _m30_gap < _di_gap_threshold:
+                    logger.info(f"[News-Bias] M30 DI差={_m30_gap:.1f} < {_di_gap_threshold}，市场均衡，跳过看跌阻塞")
+                else:
+                    logger.info("[News-Bias] 看跌 → 阻止开多")
+                    return True
+
             if bullish and bias.get('overall') == 'BULLISH':
-                logger.info("[News-Bias] 看涨 → 阻止开空")
-                return True
+                if _m30_gap is not None and _m30_gap < _di_gap_threshold:
+                    logger.info(f"[News-Bias] M30 DI差={_m30_gap:.1f} < {_di_gap_threshold}，市场均衡，跳过看涨阻塞")
+                else:
+                    logger.info("[News-Bias] 看涨 → 阻止开空")
+                    return True
             
             return False
         except Exception as e:

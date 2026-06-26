@@ -22,6 +22,7 @@ const generating = ref(false)
 // News-bias 独立数据
 const newsBiasTimeline = ref<any[]>([])
 const newsBiasReport = ref<any>(null)
+const cachedNewsSection = ref<any>(null)  // 从日报缓存的新闻评估段
 const livePrice = ref<{ bid: number; ask: number; spread: number } | null>(null)
 let priceTimer: ReturnType<typeof setInterval> | null = null
 
@@ -76,6 +77,14 @@ async function loadReport(id: number) {
   error.value = ''
   try {
     currentReport.value = await getReportById(id)
+    // 缓存日报中的新闻评估段
+    let content = currentReport.value.content
+    if (typeof content === 'string') {
+      try { content = JSON.parse(content) } catch { content = null }
+    }
+    if (content?.sections) {
+      cachedNewsSection.value = content.sections.find((s: any) => s.type === 'news_bias') || null
+    }
   } catch (e: any) {
     error.value = e?.message || '加载失败'
     currentReport.value = null
@@ -179,6 +188,11 @@ function fmtPnl(v: number): string {
 function fmtPnlColor(v: number): string {
   return v >= 0 ? '#0ecb81' : '#f6465d'
 }
+
+// 从当前日报中提取新闻评估段（作为 newsBiasReport 的兜底）
+const embeddedNewsSection = computed(() => {
+  return cachedNewsSection.value
+})
 
 // ── News-bias 辅助函数 ────────────────────────────────
 function nbTagType(dir: string): 'success' | 'error' | 'warning' | 'default' {
@@ -295,7 +309,7 @@ function nbBuildSummary(r: any): string {
         <!-- 新闻评估时间轴 -->
         <template v-if="activeTab === 'news_bias'">
           <div v-if="newsBiasTimeline.length === 0 && !loading" style="padding: 16px;">
-            <n-empty description="当日无新闻预判">
+            <n-empty :description="embeddedNewsSection ? '数据来自日报嵌入' : '当日无新闻预判'">
               <template #extra>
                 <n-button size="small" secondary :loading="generating" @click="handleGenerate">
                   手动生成
@@ -416,14 +430,66 @@ function nbBuildSummary(r: any): string {
         <!-- 错误态 -->
         <n-alert v-else-if="error" type="error" :title="error" closable style="margin-bottom: 16px;" />
 
-        <!-- 空态 -->
-        <n-empty v-else-if="!newsBiasReport" description="选择左侧报告查看详情">
-          <template #extra>
-            <n-button size="small" secondary :loading="generating" @click="handleGenerate">
-              生成报告
-            </n-button>
+        <!-- 空态 / 兜底显示日报嵌入的新闻评估 -->
+        <template v-else-if="!newsBiasReport">
+          <template v-if="embeddedNewsSection">
+            <!-- 复用日报嵌入的新闻评估 -->
+            <div style="margin-bottom: 16px;">
+              <div style="font-size: 13px; color: #888; margin-bottom: 8px;">
+                <n-tag size="tiny" type="info" :bordered="false">来自日报数据</n-tag>
+                以下新闻评估数据来自最近一期日报
+              </div>
+              <n-card :title="embeddedNewsSection.title" size="small" bordered>
+                <div style="display: flex; gap: 24px; margin-bottom: 12px;">
+                  <div>
+                    <span style="color: #888; font-size: 12px;">总计 </span>
+                    <span style="font-weight: 700;">{{ embeddedNewsSection.data.total ?? 0 }} 条</span>
+                  </div>
+                  <div>
+                    <span style="color: #888; font-size: 12px;">方向性 </span>
+                    <span style="font-weight: 700;">{{ embeddedNewsSection.data.directional ?? 0 }} 笔</span>
+                  </div>
+                  <div>
+                    <span style="color: #888; font-size: 12px;">准确率 </span>
+                    <span :style="{ color: (embeddedNewsSection.data.accuracy ?? 0) >= 60 ? '#0ecb81' : '#f6465d', fontWeight: 700 }">
+                      {{ embeddedNewsSection.data.accuracy ?? 0 }}%
+                    </span>
+                  </div>
+                  <div>
+                    <span style="color: #888; font-size: 12px;">正确/错误 </span>
+                    <span style="font-weight: 700;">
+                      <span style="color: #0ecb81;">{{ embeddedNewsSection.data.correct ?? 0 }}</span>
+                      /
+                      <span style="color: #f6465d;">{{ embeddedNewsSection.data.wrong ?? 0 }}</span>
+                    </span>
+                  </div>
+                </div>
+                <div v-if="embeddedNewsSection.data.evaluations?.length">
+                  <n-data-table :columns="[
+                    { title: '事件', key: 'event_title', width: 200,
+                      render: (r: any) => r.event_title?.length > 30 ? r.event_title.slice(0, 30) + '…' : r.event_title },
+                    { title: '方向', key: 'expected_bias', width: 70,
+                      render: (r: any) => h(NTag, { size:'small', type: r.expected_bias === 'bullish' ? 'success' : r.expected_bias === 'bearish' ? 'error' : 'default', bordered:false }, () => r.expected_bias === 'bullish' ? '利多' : r.expected_bias === 'bearish' ? '利空' : '中性') },
+                    { title: '置信度', key: 'confidence', width: 70 },
+                    { title: '实动15m', key: 'actual_move_15m', width: 90,
+                      render: (r: any) => h('span', { style: { color: (r.actual_move_15m ?? 0) >= 0 ? '#0ecb81' : '#f6465d' } }, fmtPnl(r.actual_move_15m ?? 0)) },
+                    { title: '实动1h', key: 'actual_move_1h', width: 90,
+                      render: (r: any) => h('span', { style: { color: (r.actual_move_1h ?? 0) >= 0 ? '#0ecb81' : '#f6465d' } }, fmtPnl(r.actual_move_1h ?? 0)) },
+                    { title: '判定', key: 'direction_match', width: 70,
+                      render: (r: any) => r.direction_match ? h(NTag, { size:'small', type: r.direction_match === 'correct' ? 'success' : 'error', bordered:false }, () => r.direction_match === 'correct' ? '✓' : '✗') : h(NTag, { size:'small', type:'default', bordered:false }, () => '-') },
+                  ]" :data="embeddedNewsSection.data.evaluations" size="small" :bordered="true" :max-height="400" striped />
+                </div>
+              </n-card>
+            </div>
           </template>
-        </n-empty>
+          <n-empty v-else description="选择左侧报告查看详情">
+            <template #extra>
+              <n-button size="small" secondary :loading="generating" @click="handleGenerate">
+                生成报告
+              </n-button>
+            </template>
+          </n-empty>
+        </template>
 
         <!-- 数据态 -->
         <template v-else>
@@ -912,6 +978,21 @@ function nbBuildSummary(r: any): string {
                     <span v-if="s.indicator_values?.ema9">EMA9={{ s.indicator_values.ema9.toFixed(1) }}</span>
                     <span v-if="s.indicator_values?.ema21">EMA21={{ s.indicator_values.ema21.toFixed(1) }}</span>
                     <span v-if="s.indicator_values?.price_position">位置={{ (s.indicator_values.price_position * 100).toFixed(0) }}%</span>
+                  </div>
+                  <!-- 门禁状态 -->
+                  <div v-if="s.gate_buy || s.gate_sell" style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 6px; padding-top: 6px; border-top: 1px solid #333; font-size: 12px;">
+                    <div v-if="s.gate_buy">
+                      <span :style="{ color: s.gate_buy_blocked ? '#f6465d' : '#0ecb81', fontWeight: 600 }">▲ BUY</span>
+                      <span v-if="s.gate_buy.pos_gate" style="margin-left: 4px; color: #aaa;">[{{ s.gate_buy.pos_gate }}]</span>
+                      <span v-if="s.gate_buy.rally_drop" style="margin-left: 4px; color: #888;">[{{ s.gate_buy.rally_drop }}]</span>
+                      <span v-if="s.gate_buy.bias" style="margin-left: 4px; color: #666;">[{{ s.gate_buy.bias }}]</span>
+                    </div>
+                    <div v-if="s.gate_sell">
+                      <span :style="{ color: s.gate_sell_blocked ? '#f6465d' : '#0ecb81', fontWeight: 600 }">▼ SELL</span>
+                      <span v-if="s.gate_sell.pos_gate" style="margin-left: 4px; color: #aaa;">[{{ s.gate_sell.pos_gate }}]</span>
+                      <span v-if="s.gate_sell.rally_drop" style="margin-left: 4px; color: #888;">[{{ s.gate_sell.rally_drop }}]</span>
+                      <span v-if="s.gate_sell.bias" style="margin-left: 4px; color: #666;">[{{ s.gate_sell.bias }}]</span>
+                    </div>
                   </div>
                 </div>
               </n-card>

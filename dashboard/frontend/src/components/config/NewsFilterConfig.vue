@@ -18,6 +18,7 @@ const local = reactive({
   news_bias_report_hours: store.items.news_bias_report_hours ?? '0,12',
   block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
   block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
+  news_bias_di_gap: store.items?.coordinator?.news_bias_di_gap ?? 8,
 })
 
 const original = computed(() => ({
@@ -30,6 +31,7 @@ const original = computed(() => ({
   news_bias_report_hours: store.items.news_bias_report_hours ?? '0,12',
   block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
   block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
+  news_bias_di_gap: store.items?.coordinator?.news_bias_di_gap ?? 8,
 }))
 
 const changed = computed(() => JSON.stringify(local) !== JSON.stringify(original.value))
@@ -46,11 +48,14 @@ watch(() => store.items, () => {
     news_bias_report_hours: store.items.news_bias_report_hours ?? '0,12',
     block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
     block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
+    news_bias_di_gap: store.items?.coordinator?.news_bias_di_gap ?? 8,
   })
 }, { deep: true })
 
 async function save() {
-  await store.update({ ...local })
+  const { news_bias_di_gap, ...general } = local
+  await store.update(general)
+  await store.updateCoordinator({ news_bias_di_gap })
   message.success('新闻配置已保存')
 }
 
@@ -133,6 +138,13 @@ const impactOptions = [
 
         <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" label="当前 Bias">
           <BiasStateIndicator />
+        </n-form-item>
+
+        <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" label="DI差值门限">
+          <n-input-number :value="local.news_bias_di_gap"
+            @update:value="(v: number) => local.news_bias_di_gap = v"
+            :min="0" :max="30" :step="1" style="width: 110px;" />
+          <template #feedback>M30 |+DI - -DI| &lt; 此值时绕过方向阻塞（0=关闭绕过，默认8）</template>
         </n-form-item>
 
         <n-button type="primary" :disabled="!changed" @click="save" block>

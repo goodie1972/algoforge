@@ -75,7 +75,7 @@ async def update_config(req: ConfigUpdate):
     if not config_service:
         raise HTTPException(500, "配置服务未初始化")
     try:
-        updated = config_service.set_many(req.updates)
+        updated = config_service.update(req.updates)
         return {"message": "配置已更新", "updated": updated}
     except Exception as e:
         raise HTTPException(422, f"配置更新失败: {e}")

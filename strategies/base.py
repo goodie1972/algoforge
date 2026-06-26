@@ -37,6 +37,7 @@ class BaseStrategy(abc.ABC):
         _coord = _RuntimeConfig().get_coordinator_config()
         self.position_gate_enabled: bool = _coord.get('position_gate_enabled', True)
         self.position_gate_lookback: int = _coord.get('position_gate_lookback', 60)
+        self.position_gate_m30_lookback: int = _coord.get('position_gate_m30_lookback', 40)
         self.position_gate_bottom: float = _coord.get('position_gate_bottom', 0.10)
         self.position_gate_top: float = _coord.get('position_gate_top', 0.90)
         self.rally_drop_enabled: bool = _coord.get('rally_drop_enabled', True)
@@ -77,14 +78,16 @@ class BaseStrategy(abc.ABC):
         返回: {"blocked": bool, "reason": str, "details": dict}"""
         state = {"blocked": False, "reason": "", "details": {}}
 
+        # 统一加载 M30 数据（位置门禁 + 急跌急涨共用，避免重复查库）
+        self._load_m30_data()
+
         # ── ① 位置门禁 + DI 跳过 ──
         if self.position_gate_enabled and direction:
             di_diff = 0
             if adx_data and adx_data.get("pdi") is not None:
                 di_diff = abs(adx_data["pdi"] - adx_data["ndi"])
             else:
-                # 数据库回退：加载 M30 计算 DI diff
-                self._load_m30_data()
+                # 数据库回退：用已加载的 M30 计算 DI diff
                 if self._m30_candles:
                     m30_db = self._calc_m30_adx(14)
                     if m30_db:
@@ -94,10 +97,12 @@ class BaseStrategy(abc.ABC):
             if di_diff > self.di_gate_skip_threshold:
                 state["details"]["pos_gate"] = f"DI跳过(diff={di_diff:.0f})"
             else:
-                lookback = min(self.position_gate_lookback, len(self.candles))
-                if lookback >= 2:
-                    hi = max(c.high for c in self.candles[-lookback:])
-                    lo = min(c.low for c in self.candles[-lookback:])
+                # 用 M30 40 根算位置（抗 spike 区间膨胀）
+                m30_use = self._m30_candles
+                if m30_use and len(m30_use) >= 2:
+                    m30_lookback = min(self.position_gate_m30_lookback, len(m30_use))
+                    hi = max(c.high for c in m30_use[-m30_lookback:])
+                    lo = min(c.low for c in m30_use[-m30_lookback:])
                     pos = (price - lo) / (hi - lo) if hi > lo else 0.5
                     state["details"]["pos"] = round(pos, 3)
                     if direction == "SELL" and pos < self.position_gate_bottom:
@@ -113,7 +118,6 @@ class BaseStrategy(abc.ABC):
 
         # ── ② 急跌急涨惩罚 ──
         if self.rally_drop_enabled and direction and not state["blocked"]:
-            self._load_m30_data()
             if self._m30_candles:
                 rd_lookback = min(self.rally_drop_lookback, len(self._m30_candles))
                 if rd_lookback >= 2:
@@ -286,6 +290,7 @@ class BaseStrategy(abc.ABC):
         _coord = _RuntimeConfig().get_coordinator_config()
         self.position_gate_enabled = _coord.get('position_gate_enabled', True)
         self.position_gate_lookback = _coord.get('position_gate_lookback', 60)
+        self.position_gate_m30_lookback = _coord.get('position_gate_m30_lookback', 40)
         self.position_gate_bottom = _coord.get('position_gate_bottom', 0.10)
         self.position_gate_top = _coord.get('position_gate_top', 0.90)
         self.rally_drop_enabled = _coord.get('rally_drop_enabled', True)
