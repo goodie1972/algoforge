@@ -28,6 +28,7 @@ function defaults() {
     mtf_resonance_enabled: store.items?.coordinator?.mtf_resonance_enabled ?? false,
     position_gate_enabled: store.items?.coordinator?.position_gate_enabled ?? true,
     position_gate_lookback: store.items?.coordinator?.position_gate_lookback ?? 60,
+    position_gate_m30_lookback: store.items?.coordinator?.position_gate_m30_lookback ?? 40,
     position_gate_bottom: store.items?.coordinator?.position_gate_bottom ?? 0.10,
     position_gate_top: store.items?.coordinator?.position_gate_top ?? 0.90,
     rally_drop_enabled: store.items?.coordinator?.rally_drop_enabled ?? true,
@@ -70,7 +71,7 @@ async function save() {
             <n-divider title-position="left">规则说明</n-divider>
             <n-alert type="info" :bordered="false" style="font-size: 13px;">
               <div v-if="local.position_gate_enabled">
-                <n-text code>① 位置门禁</n-text>：价格在 {{ local.position_gate_lookback }} 根 K 线区间的底部 {{ (local.position_gate_bottom * 100).toFixed(0) }}% / 顶部 {{ (local.position_gate_top * 100).toFixed(0) }}% 时，禁止对应方向开仓。DI 差值 > {{ local.di_gate_skip_threshold }} 时跳过。<br>
+                <n-text code>① 位置门禁</n-text>：价格在 M30 {{ local.position_gate_m30_lookback }} 根区间的底部 {{ (local.position_gate_bottom * 100).toFixed(0) }}% / 顶部 {{ (local.position_gate_top * 100).toFixed(0) }}% 时，禁止对应方向开仓。DI 差值 > {{ local.di_gate_skip_threshold }} 时跳过。<br>
               </div>
               <div v-if="local.rally_drop_enabled">
                 <n-text code>② 急跌急涨</n-text>：M30 周期内从高点回落超过 {{ local.rally_drop_threshold }}% 禁追空、从低点上涨超过 {{ local.rally_drop_threshold }}% 禁追多。ADX > {{ local.rally_drop_adx_skip }} 时跳过。<br>
@@ -118,9 +119,9 @@ async function save() {
                 </n-space>
               </template>
               <template v-if="local.position_gate_enabled">
-                <n-form-item label="区间周期（K线）" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.position_gate_lookback"
-                    @update:value="(v: number) => local.position_gate_lookback = v"
+                <n-form-item label="M30 区间周期" label-placement="left" :label-width="110">
+                  <n-input-number :value="local.position_gate_m30_lookback"
+                    @update:value="(v: number) => local.position_gate_m30_lookback = v"
                     :min="10" :max="200" style="width: 110px;" />
                 </n-form-item>
                 <n-grid :cols="2" :x-gap="8">
@@ -199,6 +200,7 @@ async function save() {
                 </n-form-item>
               </template>
             </n-card>
+
           </template>
         </n-space>
       </n-grid-item>

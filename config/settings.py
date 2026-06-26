@@ -204,9 +204,10 @@ COORDINATOR_CONFIG = {
     # 功能③：MTF 共振方向门禁（H1+M15 TA-Lib 形态共振时限制开仓方向）
     "mtf_resonance_enabled": True,  # H1+M15 共振方向门禁
     # 功能④：K线过滤器 — 每个过滤器独立开关，统一由 BaseStrategy 施加
-    # ① 位置门禁：N根K线区间底部 threshold 禁空、顶部 threshold 禁多
+    # ① 位置门禁：M30 N根K线区间底部 threshold 禁空、顶部 threshold 禁多
     "position_gate_enabled": True,
     "position_gate_lookback": 60,
+    "position_gate_m30_lookback": 40,
     "position_gate_bottom": 0.10,
     "position_gate_top": 0.90,
     # ② 急跌急涨惩罚：M30周期内从高/低点起算超过 threshold % 禁追
@@ -220,6 +221,8 @@ COORDINATOR_CONFIG = {
     "di_gate_skip_threshold": 20,
     # ADX 跳过（急跌急涨：M30 ADX > 阈值时跳过）
     "rally_drop_adx_skip": 25,
+    # ④ News-Bias DI 差值门禁：M30 |+DI - -DI| < 此值时绕过新闻阻塞（0=关闭）
+    "news_bias_di_gap": 8,
 }
 
 # === 止盈冷却时间（策略盈利平仓后，N 小时内不再开同向单） ===
