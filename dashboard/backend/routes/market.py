@@ -41,22 +41,47 @@ async def get_candles(
     if cached is not None:
         return cached
     # 缓存未就绪 → 回退到桥接直接获取
-    if not engine_runner.bridge:
-        return []
+    if engine_runner.bridge is not None:
+        try:
+            candles = await run_bridge(engine_runner.bridge.get_candles, settings.SYMBOL, timeframe, count)
+            candles = list(reversed(candles))
+            offset = int(engine_runner.mt4_offset)
+            return [
+                {
+                    "time": int(c.time) - offset,
+                    "open": c.open,
+                    "high": c.high,
+                    "low": c.low,
+                    "close": c.close,
+                    "volume": c.volume,
+                }
+                for c in candles
+            ]
+        except Exception as e:
+            raise HTTPException(502, f"获取 K 线失败: {e}")
+    # 桥接不可用 → 回退到 SQLite 数据库
     try:
-        candles = await run_bridge(engine_runner.bridge.get_candles, settings.SYMBOL, timeframe, count)
-        candles = list(reversed(candles))
-        offset = int(engine_runner.mt4_offset)
+        from data.database import get_conn
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+            "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
+            (timeframe, count),
+        ).fetchall()
+        conn.close()
+        if not rows:
+            return []
+        rows.reverse()
         return [
             {
-                "time": int(c.time) - offset,
-                "open": c.open,
-                "high": c.high,
-                "low": c.low,
-                "close": c.close,
-                "volume": c.volume,
+                "time": r[0],
+                "open": r[1],
+                "high": r[2],
+                "low": r[3],
+                "close": r[4],
+                "volume": r[5],
             }
-            for c in candles
+            for r in rows
         ]
     except Exception as e:
-        raise HTTPException(502, f"获取 K 线失败: {e}")
+        return []
