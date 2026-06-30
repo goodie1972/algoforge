@@ -430,6 +430,14 @@ class BBDeepReturnStrategy(BaseStrategy):
             current_profit = bid - td["entry"]
             loss = td["entry"] - bid
             td["peak_profit"] = max(td["peak_profit"], current_profit)
+
+            # 保本出场：走过≥0.3ATR盈利后回到成本附近
+            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
+                logger.info(f"[{self.name}] BUY Breakeven ticket={ticket} profit=${current_profit:.2f}")
+                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
+                del self._trail_data[ticket]
+                return True
+
             # 追踪 MFI 峰值（用于反向检测）
             mfi_now = self._calc_mfi()
             if mfi_now is not None:
@@ -439,6 +447,14 @@ class BBDeepReturnStrategy(BaseStrategy):
             current_profit = td["entry"] - ask
             loss = ask - td["entry"]
             td["peak_profit"] = max(td["peak_profit"], current_profit)
+
+            # 保本出场：走过≥0.3ATR盈利后回到成本附近
+            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
+                logger.info(f"[{self.name}] SELL Breakeven ticket={ticket} profit=${current_profit:.2f}")
+                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
+                del self._trail_data[ticket]
+                return True
+
             mfi_now = self._calc_mfi()
             if mfi_now is not None:
                 td["valley_mfi"] = min(td.get("valley_mfi", mfi_now), mfi_now)

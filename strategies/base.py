@@ -356,6 +356,19 @@ class BaseStrategy(abc.ABC):
         self.profit_drawdown_pct = _coord.get('profit_drawdown_pct', 0.25)
         self.profit_drawdown_min_peak_atr = _coord.get('profit_drawdown_min_peak_atr', 0.5)
 
+    def _check_breakeven_exit(self, td: dict, current_profit: float, atr_val: float,
+                               entry: float, is_buy: bool) -> bool:
+        """保本出场：价格走过 ≥0.3×ATR 盈利后回到成本附近时平仓，防盈利变亏损。
+        子类在 check_ema20_exit 中 peak_profit 更新后调用。"""
+        if atr_val <= 0 or entry <= 0:
+            return False
+        # 最大有利偏移（MFE）
+        mfe = (td.get("highest", entry) - entry) if is_buy else (entry - td.get("lowest", entry))
+        if mfe < atr_val * 0.3:
+            return False  # 没走过足够盈利，不激活保本
+        # 回到成本 ±0.05×ATR 以内
+        return current_profit <= atr_val * 0.05
+
     def filter_positions(self, positions: list[Position]) -> dict:
         """统计当前品种的多空持仓"""
         longs = [p for p in positions if p.order_type in ("OP_BUY", "BUY")]

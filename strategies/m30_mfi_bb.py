@@ -442,6 +442,14 @@ class M30MFIBBStrategy(BaseStrategy):
             loss = td["entry"] - bid
             td["peak_profit"] = max(td["peak_profit"], current_profit)
 
+            # 保本出场：走过≥0.3ATR盈利后回到成本附近
+            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
+                logger.info(f"[{self.name}] BUY Breakeven ticket={ticket} profit=${current_profit:.2f}")
+                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
+                self._last_profit_exit_time["BUY"] = time.time()
+                del self._trail_data[ticket]
+                return True
+
             if current_profit > 0:
                 if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
                     profit_ratio = current_profit / td["peak_profit"]
@@ -474,6 +482,14 @@ class M30MFIBBStrategy(BaseStrategy):
             current_profit = td["entry"] - ask
             loss = ask - td["entry"]
             td["peak_profit"] = max(td["peak_profit"], current_profit)
+
+            # 保本出场：走过≥0.3ATR盈利后回到成本附近
+            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
+                logger.info(f"[{self.name}] SELL Breakeven ticket={ticket} profit=${current_profit:.2f}")
+                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
+                self._last_profit_exit_time["SELL"] = time.time()
+                del self._trail_data[ticket]
+                return True
 
             if current_profit > 0:
                 if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:

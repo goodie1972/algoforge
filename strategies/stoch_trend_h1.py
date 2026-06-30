@@ -354,6 +354,14 @@ class StochTrendH1Strategy(BaseStrategy):
         if abs(_cp) < atr_val * 10:
             td["peak_profit"] = max(td["peak_profit"], _cp)
 
+        # 保本出场：走过≥0.3ATR盈利后回到成本附近
+        mfe = (td["peak"] - entry_price) if is_buy else (entry_price - td["peak"])
+        if mfe >= atr_val * 0.3 and _cp <= atr_val * 0.05:
+            logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} Breakeven ticket={ticket}")
+            self._last_exit_detail = {"exit_type": "breakeven", "profit": round(_cp, 2)}
+            del self._pos_data[ticket]
+            return True
+
         # 利润回撤止盈
         if _cp > 0 and self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
             profit_ratio = _cp / td["peak_profit"]
