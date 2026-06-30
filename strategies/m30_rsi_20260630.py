@@ -51,7 +51,7 @@ class M30RSIStrategy(BaseStrategy):
         self.rsi_oversold = 30
         self.rsi_overbought = 65
         self.bb_std = 2.0
-        self.score_threshold = 3
+        self.score_threshold = 4
 
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 4.0）
@@ -252,11 +252,14 @@ class M30RSIStrategy(BaseStrategy):
         elif m30_trend == 'DOWN':
             short_score += 1; short_detail.append("M30-DN")
 
-        # ② BB touch
-        if close <= bb['lower']:
-            long_score += 1; long_detail.append("BB-BOT")
-        if close >= bb['upper']:
-            short_score += 1; short_detail.append("BB-TOP")
+        # ② BB 位置：价格进入上下轨 10% 区间即触发（原需精确触轨）
+        bb_range = bb['upper'] - bb['lower']
+        bb_bot_zone = bb['lower'] + bb_range * 0.1   # 底部 10% 边界
+        bb_top_zone = bb['lower'] + bb_range * 0.9   # 顶部 10% 边界
+        if close <= bb_bot_zone:
+            long_score += 1; long_detail.append(f"BB-BOT({(close-bb['lower'])/bb_range*100:.0f}%)")
+        if close >= bb_top_zone:
+            short_score += 1; short_detail.append(f"BB-TOP({(close-bb['lower'])/bb_range*100:.0f}%)")
 
         # ③ RSI extreme
         if rsi_val < self.rsi_oversold:

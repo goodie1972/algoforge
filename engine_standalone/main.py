@@ -26,15 +26,15 @@ from services.news_filter import NewsFilter
 from services.mtf_coordinator import MTFResonanceCoordinator
 from data.downloader import download_timeframe
 from data import database as db
-from strategies.m30_rsi import M30RSIStrategy
-from strategies.sanqing_h1 import SanQingH1Strategy
-from strategies.gold_autoresearch_h1 import GoldAutoResearchStrategy
+from strategies.m30_rsi_20260630 import M30RSIStrategy
+from strategies.sanqing_h1_20260630 import SanQingH1Strategy
+from strategies.gold_autoresearch_h1_20260630 import GoldAutoResearchStrategy
 from strategies.bakome_backup import BAKOMEBackupStrategy
 from strategies.xaubot_backup import XAUBotBackupStrategy
-from strategies.stoch_trend_h1 import StochTrendH1Strategy
-from strategies.rsi_grading_m30 import RSIGradingM30Strategy
-from strategies.m30_mfi_bb import M30MFIBBStrategy
-from strategies.m30_bb_deepreturn import BBDeepReturnStrategy
+from strategies.stoch_trend_h1_20260630 import StochTrendH1Strategy
+from strategies.rsi_grading_m30_20260630 import RSIGradingM30Strategy
+from strategies.m30_mfi_bb_20260630 import M30MFIBBStrategy
+from strategies.m30_bb_deepreturn_20260630 import BBDeepReturnStrategy
 
 STRATEGY_MAP = {
     "M30_rsi_bb": M30RSIStrategy,
