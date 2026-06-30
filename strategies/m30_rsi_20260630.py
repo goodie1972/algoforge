@@ -1,8 +1,8 @@
 """
 M30 RSI + 布林带均值回归
 =========================
-- 入场: 7因子评分系统 ≥4 分触发
-- 7因子: M30趋势, BB位置(90%), RSI超卖/超买, RSI方向(3根), DI强度, 成交量, K线形态
+- 入场: 7因子评分系统 ≥4直接开, =3需diff≥2
+- 7因子: M30趋势, BB位置(90%), RSI分层(25/35/65/75), RSI方向(3根), DI强度, 成交量, K线形态
 - ADX>28趋势门禁已移除（2026-06-30）
 - 出场: 保本出场 + 利润回撤止盈 + ATR追踪 + DI跳过(盈利时) + 硬止损
 - 双向交易 (Long / Short)
@@ -48,10 +48,12 @@ class M30RSIStrategy(BaseStrategy):
         self._last_exit_detail: Optional[dict] = None
 
         # Entry params (from optimization)
-        self.rsi_oversold = 30
+        self.rsi_deep_oversold = 25
+        self.rsi_oversold = 35
+        self.rsi_deep_overbought = 75
         self.rsi_overbought = 65
         self.bb_std = 2.0
-        self.score_threshold = 4
+        self.score_threshold = 3
 
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 4.0）
@@ -258,10 +260,14 @@ class M30RSIStrategy(BaseStrategy):
         if close >= bb_top_zone:
             short_score += 1; short_detail.append(f"BB-TOP({(close-bb['lower'])/bb_range*100:.0f}%)")
 
-        # ③ RSI extreme
-        if rsi_val < self.rsi_oversold:
+        # ③ RSI extreme（分层：浅/深两档）
+        if rsi_val < self.rsi_deep_oversold:
+            long_score += 2; long_detail.append(f"RSI-{rsi_val:.0f}(deep)")
+        elif rsi_val < self.rsi_oversold:
             long_score += 1; long_detail.append(f"RSI-{rsi_val:.0f}")
-        if rsi_val > self.rsi_overbought:
+        if rsi_val > self.rsi_deep_overbought:
+            short_score += 2; short_detail.append(f"RSI-{rsi_val:.0f}(deep)")
+        elif rsi_val > self.rsi_overbought:
             short_score += 1; short_detail.append(f"RSI-{rsi_val:.0f}")
 
         # ④ M30 RSI direction
@@ -311,15 +317,22 @@ class M30RSIStrategy(BaseStrategy):
                 logger.info(f"[{self.name}] SELL冷却中: 盈利平仓后还剩{int(remaining)}秒")
                 short_score = 0
 
-        # ── Decision（ADX>28 门禁已移除 2026-06-30）──
+        # ── Decision（双层判决：≥4直接开，=3需diff≥2）──
+        diff = long_score - short_score
         signal = None
         signal_str = "无信号"
-        if long_score >= self.score_threshold:
+        if long_score >= self.score_threshold + 1:
             signal = OrderType.BUY
             signal_str = "LONG"
-        elif short_score >= self.score_threshold:
+        elif short_score >= self.score_threshold + 1:
             signal = OrderType.SELL
             signal_str = "SELL"
+        elif long_score >= self.score_threshold and diff >= 2:
+            signal = OrderType.BUY
+            signal_str = f"LONG(diff={diff})"
+        elif short_score >= self.score_threshold and -diff >= 2:
+            signal = OrderType.SELL
+            signal_str = f"SELL(diff={-diff})"
 
         # ── Logging ──
         detail_parts = []
