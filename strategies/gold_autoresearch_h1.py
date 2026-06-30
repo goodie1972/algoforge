@@ -275,16 +275,24 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
         mom_up = False
         mom_dn = False
-        if macd_val is not None:
-            if macd_val > macd_sig:
-                mom_up = True
-            elif macd_val < macd_sig:
-                mom_dn = True
-        if stoch_k is not None:
-            if stoch_k > stoch_d:
-                mom_up = True
-            elif stoch_k < stoch_d:
-                mom_dn = True
+        macd_up = macd_val is not None and macd_val > macd_sig
+        macd_dn = macd_val is not None and macd_val < macd_sig
+        stoch_up = stoch_k is not None and stoch_k > stoch_d
+        stoch_dn = stoch_k is not None and stoch_k < stoch_d
+        # MACD 和 Stoch 一致才给方向，打架时都不加分
+        if macd_up and stoch_up:
+            mom_up = True
+        elif macd_dn and stoch_dn:
+            mom_dn = True
+        # 某个指标不可实时用另一个
+        elif macd_up and not (stoch_up or stoch_dn):
+            mom_up = True
+        elif macd_dn and not (stoch_up or stoch_dn):
+            mom_dn = True
+        elif stoch_up and not (macd_up or macd_dn):
+            mom_up = True
+        elif stoch_dn and not (macd_up or macd_dn):
+            mom_dn = True
 
         # ── ③ Volatility: ADX > 20 or ATR rising ──
         adx_val, pdi, ndi = self._get_adx_at(n - 1)
