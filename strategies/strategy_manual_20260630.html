@@ -204,8 +204,8 @@ pre { background: var(--card); padding: 1rem; overflow-x: auto; border-radius: 6
 <table>
   <tr><th>#</th><th>因子</th><th>计算方式</th><th>加分方向</th></tr>
   <tr><td>①</td><td>M30 趋势</td><td>close > MA14 → UP；close < MA14 → DOWN</td><td>同侧 +1</td></tr>
-  <tr><td>②</td><td>BB 位置</td><td>价格进入布林带上/下轨 10% 区间（原需精确触轨，2026-06-30 放宽）</td><td>同侧 +1</td></tr>
-  <tr><td>③</td><td>RSI 极值</td><td>RSI < 30 超卖 / RSI > 65 超买</td><td>同侧 +1</td></tr>
+  <tr><td>②</td><td>BB 位置</td><td>价格进入布林带上/下轨 10% 区间</td><td>同侧 +1</td></tr>
+  <tr><td>③</td><td>RSI 分层</td><td><strong>+2</strong>(&lt;25) / +1(&lt;35) 多；<strong>+2</strong>(&gt;75) / +1(&gt;65) 空（不叠加）</td><td>同侧 +1~+2</td></tr>
   <tr><td>④</td><td>RSI 方向</td><td>连续 3 根 RSI 递升→up；递降→down（3 根确认）</td><td>同侧 +1</td></tr>
   <tr><td>⑤</td><td>DI 强度</td><td>|+DI − -DI| > 10 确认单边势</td><td>同侧 +1</td></tr>
   <tr><td>⑥</td><td>成交量</td><td>当根 volume > SMA20×1.3 且 K 线方向一致</td><td>同侧 +1</td></tr>
@@ -214,7 +214,8 @@ pre { background: var(--card); padding: 1rem; overflow-x: auto; border-radius: 6
 
 <h4>决策流程</h4>
 <pre>7 因子评分 → 冷却检查（盈利出场同方向 30 分钟扣分）
-→ score >= 4 → BUY / SELL
+→ ≥4 直接开仓（不检查 diff）
+→ =3 需 |long_score - short_score| ≥ 2 才开
 （ADX>28 趋势门禁已于 2026-06-30 移除）</pre>
 
 <h3>3.2 出场逻辑</h3>
