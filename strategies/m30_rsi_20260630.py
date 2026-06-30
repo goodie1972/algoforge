@@ -188,7 +188,7 @@ class M30RSIStrategy(BaseStrategy):
         return sum(vols) / period
 
     def _detect_candle_pattern(self) -> tuple:
-        """TA-Lib 蜡烛图形态检测，覆盖常见见底/见顶反转形态。"""
+        """TA-Lib 强反转形态检测（仅高置信度信号）。"""
         c = self.candles
         if len(c) < 10:
             return ('none', None)
@@ -200,36 +200,28 @@ class M30RSIStrategy(BaseStrategy):
             l = np.array([x.low for x in c], dtype=float)
             cl = np.array([x.close for x in c], dtype=float)
 
-            # 早晨之星/黄昏之星（需 penetration 参数）
+            # 早晨之星/黄昏之星（三根K线确认，最强反转）
             if talib.CDLMORNINGSTAR(o, h, l, cl, penetration=0.3)[-1] == 100:
                 return ('long', 'MORNING')
             if talib.CDLEVENINGSTAR(o, h, l, cl, penetration=0.3)[-1] == -100:
                 return ('short', 'EVENING')
 
-            # 标准 4 参数形态 o,h,l,c（见底）
+            # 强见底反转
             for func, name in [
                     (talib.CDLHAMMER, "HAMMER"),
-                    (talib.CDLINVERTEDHAMMER, "INVHAM"),
                     (talib.CDLPIERCING, "PIERCE"),
-                    (talib.CDLHARAMI, "HARAMI"),
-                    (talib.CDLDOJI, "DOJI"),
-                    (talib.CDLDRAGONFLYDOJI, "DRAGON"),
-                    (talib.CDLHOMINGPIGEON, "PIGEON"),
             ]:
-                if func(o, h, l, cl)[-1] >= 80:
+                if func(o, h, l, cl)[-1] == 100:
                     return ('long', name)
 
-            # 标准 4 参数形态 o,h,l,c（见顶）
+            # 强见顶反转
             for func, name in [
                     (talib.CDLSHOOTINGSTAR, "SHOOT"),
                     (talib.CDLDARKCLOUDCOVER, "CLOUD"),
-                    (talib.CDLHARAMI, "HARAMI"),
-                    (talib.CDLDOJI, "DOJI"),
-                    (talib.CDLGRAVESTONEDOJI, "GRAVE"),
                     (talib.CDLBEARISHENGULFING, "ENGULF"),
                     (talib.CDLHANGINGMAN, "HANG"),
             ]:
-                if func(o, h, l, cl)[-1] <= -80:
+                if func(o, h, l, cl)[-1] == -100:
                     return ('short', name)
         except Exception:
             pass
