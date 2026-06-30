@@ -105,11 +105,10 @@ class EngineRunner:
             from data.database import upsert_strategy_version
             import importlib
             strategy_modules = [
-                ("strategies.m30_rsi", "M30_rsi_bb"),
-                ("strategies.v6_hybrid", "H1_v6_hybrid"),
-                ("strategies.sanqing_h1", "sanqing_h1"),
-                ("strategies.gold_autoresearch_h1", "gold_auto_research"),
-                ("strategies.mtf_resonance_h1", "mtf_resonance_h1"),
+                ("strategies.m30_rsi_20260630", "M30_rsi_bb"),
+                ("strategies.sanqing_h1_20260630", "sanqing_h1"),
+                ("strategies.gold_autoresearch_h1_20260630", "gold_auto_research"),
+                ("strategies.m30_mfi_bb_20260630", "mfi_bb_m30"),
             ]
             total = 0
             for mod_name, strat_name in strategy_modules:
