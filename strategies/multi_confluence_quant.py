@@ -95,44 +95,12 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
         return {"k": k}
 
     def _calc_atr(self, period: int = 14) -> Optional[float]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        tr_sum = 0
-        for i in range(1, period + 2):
-            h, l_, pc = candles[-i].high, candles[-i].low, candles[-i-1].close
-            tr_sum += max(h - l_, abs(h - pc), abs(l_ - pc))
-        return tr_sum / (period + 1)
+        """标准 Wilder ATR，委托基类统一实现"""
+        return self.calc_atr_wilder(self.candles, period)
 
     def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        n = len(candles)
-        tr_list, plus_dm, minus_dm = [], [], []
-        for i in range(1, n):
-            h, l_, pc = candles[i].high, candles[i].low, candles[i-1].close
-            ph, pl = candles[i-1].high, candles[i-1].low
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            up = h - ph; down = pl - l_
-            plus_dm.append(up if (up > down and up > 0) else 0)
-            minus_dm.append(down if (down > up and down > 0) else 0)
-            tr_list.append(tr)
-        if len(tr_list) < period: return None
-        atr_v = sum(tr_list[:period]) / period
-        pdi_v = sum(plus_dm[:period]) / period
-        ndi_v = sum(minus_dm[:period]) / period
-        if atr_v <= 0: return None
-        pdi_v, ndi_v = pdi_v / atr_v * 100, ndi_v / atr_v * 100
-        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
-        for i in range(period, len(tr_list)):
-            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
-            if atr_s[-1] > 0:
-                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i]/atr_s[-1]*100) / period)
-                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i]/atr_s[-1]*100) / period)
-        dx = [abs(pdi_s[i]-ndi_s[i])/max(pdi_s[i]+ndi_s[i], 0.001)*100 for i in range(len(atr_s))]
-        adx = [sum(dx[:period]) / period]
-        for i in range(period, len(dx)):
-            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
-        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
+        return self.calc_adx_wilder(self.candles, period)
 
     def _calc_linear_reg_slope(self, closes: list[float], period: int = 20) -> Optional[float]:
         if len(closes) < period: return None

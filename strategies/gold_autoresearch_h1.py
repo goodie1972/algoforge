@@ -136,14 +136,16 @@ class GoldAutoResearchStrategy(BaseStrategy):
         return vals[-1] if vals else None
 
     def _calc_adx(self, period: int = 14):
-        """Compute ADX from candle data. Returns dict with adx_list, pdi_list, ndi_list."""
+        """标准 Wilder ADX/+DI/-DI 列表版（0-100 量纲）。
+        返回 {adx_list, pdi_list, ndi_list, warmup}，三者等长且对齐同一 K 线。
+        adx_list[k] 对应 K 线索引 (2*period-1)+k，故 warmup=2*period-1。"""
         cache_key = len(self.candles)
         if self._cached_adx_key == cache_key and self._cached_adx is not None:
             return self._cached_adx
 
         candles = self.candles
         n = len(candles)
-        if n < period + 2:
+        if n < 2 * period + 1:
             return None
 
         tr, plus_dm, minus_dm = [], [], []
@@ -157,35 +159,31 @@ class GoldAutoResearchStrategy(BaseStrategy):
             plus_dm.append(up if up > down and up > 0 else 0)
             minus_dm.append(down if down > up and down > 0 else 0)
 
-        if len(tr) < period:
+        if len(tr) < 2 * period:
             return None
 
-        atr_val = sum(tr[:period]) / period
-        pdi_val = sum(plus_dm[:period]) / period / atr_val * 100 if atr_val > 0 else 0
-        ndi_val = sum(minus_dm[:period]) / period / atr_val * 100 if atr_val > 0 else 0
+        def rma(values, p):
+            alpha = 1.0 / p
+            res = [sum(values[:p]) / p]
+            for v in values[p:]:
+                res.append(res[-1] + alpha * (v - res[-1]))
+            return res
 
-        atr_smooth = [atr_val]
-        pdi_smooth = [pdi_val]
-        ndi_smooth = [ndi_val]
-
-        for i in range(period, len(tr)):
-            atr_smooth.append((atr_smooth[-1] * (period - 1) + tr[i]) / period)
-            pd_ = (pdi_smooth[-1] * (period - 1) + plus_dm[i] / atr_smooth[-1] * 100) / period if atr_smooth[-1] > 0 else 0
-            nd_ = (ndi_smooth[-1] * (period - 1) + minus_dm[i] / atr_smooth[-1] * 100) / period if atr_smooth[-1] > 0 else 0
-            pdi_smooth.append(pd_)
-            ndi_smooth.append(nd_)
-
+        atr_s = rma(tr, period)
+        sdp = rma(plus_dm, period)
+        sdm = rma(minus_dm, period)
+        pdi_smooth = [100 * sdp[i] / atr_s[i] if atr_s[i] > 0 else 0.0 for i in range(len(atr_s))]
+        ndi_smooth = [100 * sdm[i] / atr_s[i] if atr_s[i] > 0 else 0.0 for i in range(len(atr_s))]
         dx = [abs(pdi_smooth[i] - ndi_smooth[i]) / max(pdi_smooth[i] + ndi_smooth[i], 0.001) * 100
-              for i in range(len(atr_smooth))]
-        adx_list = [sum(dx[:period]) / period]
-        for i in range(period, len(dx)):
-            adx_list.append((adx_list[-1] * (period - 1) + dx[i]) / period)
+              for i in range(len(atr_s))]
+        adx_list = rma(dx, period)
 
+        # 对齐到 adx_list 的 K 线（adx_list[k] ↔ K线 (2*period-1)+k）
         result = {
             'adx_list': adx_list,
-            'pdi_list': pdi_smooth,
-            'ndi_list': ndi_smooth,
-            'warmup': period + 1,
+            'pdi_list': pdi_smooth[period - 1:],
+            'ndi_list': ndi_smooth[period - 1:],
+            'warmup': 2 * period - 1,
         }
         self._cached_adx = result
         self._cached_adx_key = cache_key
@@ -232,20 +230,20 @@ class GoldAutoResearchStrategy(BaseStrategy):
         if idx < 20:
             return None, None
         lookback = 14
-        # %K
-        w = self.candles[idx - lookback: idx + 1]
+        # %K (14 根含当前，标准 Stoch(14))
+        w = self.candles[idx - lookback + 1: idx + 1]
         hi_w = max(c.high for c in w)
         lo_w = min(c.low for c in w)
         k = 50.0 if hi_w == lo_w else (self.candles[idx].close - lo_w) / (hi_w - lo_w) * 100
 
         # %D (3-bar SMA of %K)
         k_values = []
-        for j in range(idx - lookback, idx + 1):
+        for j in range(idx - 2, idx + 1):
             w2 = self.candles[j - lookback + 1: j + 1]
             h2 = max(c.high for c in w2)
             l2 = min(c.low for c in w2)
             k_values.append(50.0 if h2 == l2 else (self.candles[j].close - l2) / (h2 - l2) * 100)
-        d = sum(k_values[-3:]) / 3 if len(k_values) >= 3 else k
+        d = sum(k_values) / 3 if len(k_values) >= 3 else k
         return k, d
 
     # ─────────────── Signal generation ───────────────

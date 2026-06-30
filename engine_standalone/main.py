@@ -27,27 +27,25 @@ from services.mtf_coordinator import MTFResonanceCoordinator
 from data.downloader import download_timeframe
 from data import database as db
 from strategies.m30_rsi import M30RSIStrategy
-from strategies.v6_hybrid import V6HybridStrategy
 from strategies.sanqing_h1 import SanQingH1Strategy
 from strategies.gold_autoresearch_h1 import GoldAutoResearchStrategy
-from strategies.mtf_resonance_h1 import MTFResonanceStrategy
 from strategies.bakome_backup import BAKOMEBackupStrategy
 from strategies.xaubot_backup import XAUBotBackupStrategy
-from strategies.stoch_m30 import MeanReversionM30Strategy
-from strategies.stoch_trend_m30 import StochTrendM30Strategy
+from strategies.stoch_trend_h1 import StochTrendH1Strategy
 from strategies.rsi_grading_m30 import RSIGradingM30Strategy
+from strategies.m30_mfi_bb import M30MFIBBStrategy
+from strategies.m30_bb_deepreturn import BBDeepReturnStrategy
 
 STRATEGY_MAP = {
     "M30_rsi_bb": M30RSIStrategy,
-    "H1_v6_hybrid": V6HybridStrategy,
     "sanqing_h1": SanQingH1Strategy,
     "gold_auto_research": GoldAutoResearchStrategy,
-    "mtf_resonance_h1": MTFResonanceStrategy,
     "bakome_backup": BAKOMEBackupStrategy,
     "xaubot_backup": XAUBotBackupStrategy,
-    "stoch_m30": MeanReversionM30Strategy,
-    "stoch_trend_m30": StochTrendM30Strategy,
+    "stoch_trend_h1": StochTrendH1Strategy,
     "rsi_grading_m30": RSIGradingM30Strategy,
+    "mfi_bb_m30": M30MFIBBStrategy,
+    "m30_bb_deepreturn": BBDeepReturnStrategy,
 }
 
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
@@ -209,10 +207,11 @@ class TradingEngine:
             logger.warning(f"[时间校准] 失败: {e}")
 
     def _mt4_to_local(self, mt4_ts: int):
-        """将 MT4 时间戳转为本地 datetime（校准后）"""
+        """将 MT4 时间戳转为本地 datetime（UTC+5）"""
         from datetime import datetime
+        from config.settings import LOCAL_TZ
         corrected = mt4_ts - self._mt4_offset
-        return datetime.fromtimestamp(corrected)
+        return datetime.fromtimestamp(corrected, tz=LOCAL_TZ)
 
     @property
     def closed_trades(self) -> list[dict]:
@@ -223,10 +222,12 @@ class TradingEngine:
     @staticmethod
     def _pos_open_time(pos) -> tuple:
         """将 Position 的 open_time 转为 (格式化时间字符串, UNIX时间戳)"""
+        from datetime import datetime
+        from config.settings import LOCAL_TZ
         raw = str(pos.open_time)
         try:
             ts = int(raw)
-            dt = datetime.fromtimestamp(ts)
+            dt = datetime.fromtimestamp(ts, tz=LOCAL_TZ)
             return (dt.strftime("%Y-%m-%d %H:%M:%S"), ts)
         except (ValueError, OSError):
             # 可能是已格式化的时间字符串
@@ -255,9 +256,10 @@ class TradingEngine:
 
     def _db_to_candles(self, db_candles: list[dict]) -> list[Candle]:
         """将数据库 K 线 dict 转为 Candle 对象"""
+        from config.settings import LOCAL_TZ
         result = []
         for c in db_candles:
-            time_str = datetime.fromtimestamp(c["time"]).strftime("%Y-%m-%d %H:%M:%S")
+            time_str = datetime.fromtimestamp(c["time"], tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")
             result.append(Candle(
                 time=time_str,
                 open=c["open"],
@@ -1273,7 +1275,8 @@ class TradingEngine:
                 close_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 entry_ts = self._entry_times.get(pos.ticket, 0)
                 if entry_ts > 0:
-                    open_time_str = datetime.fromtimestamp(entry_ts).strftime('%Y-%m-%d %H:%M:%S')
+                    from config.settings import LOCAL_TZ
+                    open_time_str = datetime.fromtimestamp(entry_ts, tz=LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S')
                     actual_hold = int(time.time() - entry_ts)
                 else:
                     open_time_str, open_ts = self._pos_open_time(pos)
@@ -1622,7 +1625,8 @@ class TradingEngine:
                 close_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 entry_ts = self._entry_times.get(pos.ticket, 0)
                 if entry_ts > 0:
-                    open_time_str = datetime.fromtimestamp(entry_ts).strftime('%Y-%m-%d %H:%M:%S')
+                    from config.settings import LOCAL_TZ
+                    open_time_str = datetime.fromtimestamp(entry_ts, tz=LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S')
                     hold_sec = int(time.time() - entry_ts)
                 else:
                     open_time_str, open_ts = self._pos_open_time(pos)

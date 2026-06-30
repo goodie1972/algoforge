@@ -205,18 +205,53 @@ class BaseStrategy(abc.ABC):
 
         self._m30_candles = []
 
-    def _calc_m30_adx(self, period: int = 14) -> Optional[dict]:
-        """用 M30 K 线计算 ADX/DI（供门禁数据库回退使用），返回 {adx, pdi, ndi}"""
-        c = self._m30_candles
-        if not c or len(c) < period + 1:
+    @staticmethod
+    def calc_atr_wilder(candles: list, period: int = 14) -> Optional[float]:
+        """标准 Wilder ATR。首根 SMA(TR,period)，后续 RMA 递推。
+        candles 按时间旧→新排列。"""
+        if not candles or len(candles) < period + 2:
             return None
-        tr = [max(c[i].high - c[i].low,
-                   abs(c[i].high - c[i-1].close),
-                   abs(c[i].low - c[i-1].close)) for i in range(1, len(c))]
-        up = [c[i].high - c[i-1].high for i in range(1, len(c))]
-        dn = [c[i-1].low - c[i].low for i in range(1, len(c))]
-        plus_dm = [u if u > d and u > 0 else 0 for u, d in zip(up, dn)]
-        minus_dm = [d if d > u and d > 0 else 0 for u, d in zip(up, dn)]
+        tr_values = []
+        for i in range(1, len(candles)):
+            h = candles[i].high
+            l_ = candles[i].low
+            pc = candles[i - 1].close
+            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
+            tr_values.append(tr)
+        if len(tr_values) < period:
+            return None
+        atr_v = sum(tr_values[:period]) / period
+        alpha = 1.0 / period
+        for v in tr_values[period:]:
+            atr_v = atr_v + alpha * (v - atr_v)
+        return atr_v
+
+    @staticmethod
+    def calc_adx_wilder(candles: list, period: int = 14) -> Optional[dict]:
+        """标准 Wilder ADX/+DI/-DI（0-100 量纲）。
+
+        标准 DMI：先对 +DM/-DM/TR 分别做 Wilder RMA 平滑，
+        再 +DI = 100*RMA(+DM)/RMA(TR)，-DI 同理，DX = |+DI-−DI|/(+DI+−DI)*100，ADX = RMA(DX)。
+        candles 按时间旧→新排列。返回 {adx, pdi, ndi} 或 None。
+        """
+        if not candles or len(candles) < period + 2:
+            return None
+        highs = [c.high for c in candles]
+        lows = [c.low for c in candles]
+        closes = [c.close for c in candles]
+        n = len(highs)
+        tr_list, plus_dm, minus_dm = [], [], []
+        for i in range(1, n):
+            h, l_, pc = highs[i], lows[i], closes[i - 1]
+            ph, pl = highs[i - 1], lows[i - 1]
+            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
+            up = h - ph
+            down = pl - l_
+            plus_dm.append(up if (up > down and up > 0) else 0)
+            minus_dm.append(down if (down > up and down > 0) else 0)
+            tr_list.append(tr)
+        if len(tr_list) < period:
+            return None
 
         def rma(values: list, n: int) -> list:
             alpha = 1.0 / n
@@ -225,15 +260,21 @@ class BaseStrategy(abc.ABC):
                 result.append(result[-1] + alpha * (v - result[-1]))
             return result
 
-        atr = rma(tr, period)
-        pdi = rma(plus_dm, period)
-        ndi = rma(minus_dm, period)
-        dx = [abs(p - n) / (p + n) * 100 if (p + n) > 0 else 0
-              for p, n in zip(pdi, ndi)]
-        adx = rma(dx, period)
-        if not adx:
+        atr_s = rma(tr_list, period)
+        sdp = rma(plus_dm, period)   # 平滑 +DM
+        sdm = rma(minus_dm, period)  # 平滑 -DM
+        pdi_s = [100 * sdp[i] / atr_s[i] if atr_s[i] > 0 else 0.0 for i in range(len(atr_s))]
+        ndi_s = [100 * sdm[i] / atr_s[i] if atr_s[i] > 0 else 0.0 for i in range(len(atr_s))]
+        dx = [abs(pdi_s[i] - ndi_s[i]) / max(pdi_s[i] + ndi_s[i], 0.001) * 100
+              for i in range(len(atr_s))]
+        if len(dx) < period:
             return None
-        return {"adx": adx[-1], "pdi": pdi[-1], "ndi": ndi[-1]}
+        adx = rma(dx, period)
+        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+
+    def _calc_m30_adx(self, period: int = 14) -> Optional[dict]:
+        """用 M30 K 线计算 ADX/DI（供门禁数据库回退使用），返回 {adx, pdi, ndi}（0-100 量纲）"""
+        return self.calc_adx_wilder(self._m30_candles, period)
 
     @abc.abstractmethod
     def generate_signal(self):

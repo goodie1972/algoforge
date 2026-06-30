@@ -154,43 +154,8 @@ class M30MFIBBStrategy(BaseStrategy):
         return 'UP' if closes[-1] > ma20 else 'DOWN'
 
     def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        highs = [c.high for c in candles]
-        lows = [c.low for c in candles]
-        closes = self.get_close_prices()
-        n = len(highs)
-        tr_list, plus_dm, minus_dm = [], [], []
-        for i in range(1, n):
-            h, l_, pc = highs[i], lows[i], closes[i - 1]
-            ph, pl = highs[i - 1], lows[i - 1]
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            up = h - ph
-            down = pl - l_
-            plus_dm.append(up if (up > down and up > 0) else 0)
-            minus_dm.append(down if (down > up and down > 0) else 0)
-            tr_list.append(tr)
-        if len(tr_list) < period: return None
-        atr_v = sum(tr_list[:period]) / period
-        pdi_v = sum(plus_dm[:period]) / period
-        ndi_v = sum(minus_dm[:period]) / period
-        if atr_v <= 0: return None
-        pdi_v = pdi_v / atr_v * 100
-        ndi_v = ndi_v / atr_v * 100
-        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
-        for i in range(period, len(tr_list)):
-            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
-            if atr_s[-1] > 0:
-                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i] / atr_s[-1] * 100) / period)
-                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i] / atr_s[-1] * 100) / period)
-            else:
-                pdi_s.append(pdi_s[-1])
-                ndi_s.append(ndi_s[-1])
-        dx = [abs(pdi_s[i] - ndi_s[i]) / max(pdi_s[i] + ndi_s[i], 0.001) * 100 for i in range(len(atr_s))]
-        adx = [sum(dx[:period]) / period]
-        for i in range(period, len(dx)):
-            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
-        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
+        return self.calc_adx_wilder(self.candles, period)
 
     # ─────────────── Score helpers ───────────────
 
@@ -475,8 +440,7 @@ class M30MFIBBStrategy(BaseStrategy):
             td["highest"] = max(td["highest"], bid)
             current_profit = bid - td["entry"]
             loss = td["entry"] - bid
-            if abs(current_profit) < atr_val * 10:
-                td["peak_profit"] = max(td["peak_profit"], current_profit)
+            td["peak_profit"] = max(td["peak_profit"], current_profit)
 
             if current_profit > 0:
                 if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
@@ -491,7 +455,7 @@ class M30MFIBBStrategy(BaseStrategy):
             drawdown = td["highest"] - bid
             if drawdown > atr_val * trail_mult:
                 adx_data = self._calc_adx()
-                if adx_data and (adx_data["pdi"] - adx_data["ndi"]) > 10:
+                if adx_data and current_profit > 0 and (adx_data["pdi"] - adx_data["ndi"]) > 10:
                     logger.info(f"[{self.name}] BUY DI跳过止盈 ticket={ticket} DIs={adx_data['pdi']-adx_data['ndi']:.1f}")
                 else:
                     logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
@@ -509,8 +473,7 @@ class M30MFIBBStrategy(BaseStrategy):
             td["lowest"] = min(td["lowest"], ask)
             current_profit = td["entry"] - ask
             loss = ask - td["entry"]
-            if abs(current_profit) < atr_val * 10:
-                td["peak_profit"] = max(td["peak_profit"], current_profit)
+            td["peak_profit"] = max(td["peak_profit"], current_profit)
 
             if current_profit > 0:
                 if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
@@ -525,7 +488,7 @@ class M30MFIBBStrategy(BaseStrategy):
             rally = ask - td["lowest"]
             if rally > atr_val * trail_mult:
                 adx_data = self._calc_adx()
-                if adx_data and (adx_data["ndi"] - adx_data["pdi"]) > 10:
+                if adx_data and current_profit > 0 and (adx_data["ndi"] - adx_data["pdi"]) > 10:
                     logger.info(f"[{self.name}] SELL DI跳过止盈 ticket={ticket} DIs={adx_data['ndi']-adx_data['pdi']:.1f}")
                 else:
                     logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")

@@ -83,44 +83,12 @@ class ViprasolSniperStrategy(BaseStrategy):
         return {"macd": macd_line}
 
     def _calc_atr(self, period: int = 14) -> Optional[float]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        tr_sum = 0
-        for i in range(1, period + 2):
-            h, l_, pc = candles[-i].high, candles[-i].low, candles[-i-1].close
-            tr_sum += max(h - l_, abs(h - pc), abs(l_ - pc))
-        return tr_sum / (period + 1)
+        """标准 Wilder ATR，委托基类统一实现"""
+        return self.calc_atr_wilder(self.candles, period)
 
     def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        n = len(candles)
-        tr_list, plus_dm, minus_dm = [], [], []
-        for i in range(1, n):
-            h, l_, pc = candles[i].high, candles[i].low, candles[i-1].close
-            ph, pl = candles[i-1].high, candles[i-1].low
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            up = h - ph; down = pl - l_
-            plus_dm.append(up if (up > down and up > 0) else 0)
-            minus_dm.append(down if (down > up and down > 0) else 0)
-            tr_list.append(tr)
-        if len(tr_list) < period: return None
-        atr_v = sum(tr_list[:period]) / period
-        pdi_v = sum(plus_dm[:period]) / period
-        ndi_v = sum(minus_dm[:period]) / period
-        if atr_v <= 0: return None
-        pdi_v, ndi_v = pdi_v / atr_v * 100, ndi_v / atr_v * 100
-        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
-        for i in range(period, len(tr_list)):
-            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
-            if atr_s[-1] > 0:
-                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i]/atr_s[-1]*100) / period)
-                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i]/atr_s[-1]*100) / period)
-        dx = [abs(pdi_s[i]-ndi_s[i])/max(pdi_s[i]+ndi_s[i], 0.001)*100 for i in range(len(atr_s))]
-        adx = [sum(dx[:period]) / period]
-        for i in range(period, len(dx)):
-            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
-        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
+        return self.calc_adx_wilder(self.candles, period)
 
     def _calc_bb_levels(self) -> Optional[dict]:
         closes = self.get_close_prices()
@@ -256,12 +224,15 @@ class ViprasolSniperStrategy(BaseStrategy):
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
         if ticket not in self._trail_data:
+            _atr0 = self._calc_atr()
             self._trail_data[ticket] = {
                 "highest": position.open_price if is_buy else 0,
                 "lowest": position.open_price if not is_buy else float("inf"),
                 "entry": position.open_price,
                 "peak_profit": 0.0,
                 "breakeven": False,
+                # 锁定入场时 1R 风险距离，RR 出场价位不随后续 ATR 漂移
+                "risk_r": (_atr0 * self.sl_atr) if (_atr0 and _atr0 > 0) else None,
             }
 
         td = self._trail_data[ticket]
@@ -270,7 +241,11 @@ class ViprasolSniperStrategy(BaseStrategy):
             return False
 
         entry = td["entry"]
-        risk_r = atr_val * self.sl_atr  # 1R
+        # RR 出场用入场时锁定的 1R；若入场时 ATR 缺失则用当前 ATR 补锁
+        risk_r = td.get("risk_r")
+        if not risk_r:
+            risk_r = atr_val * self.sl_atr
+            td["risk_r"] = risk_r
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)

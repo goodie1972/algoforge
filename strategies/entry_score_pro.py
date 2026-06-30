@@ -82,45 +82,14 @@ class EntryScoreProStrategy(BaseStrategy):
         if avg_loss == 0: return 100.0
         return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
 
-    def _calc_atr(self, period: int = 14) -> Optional[float]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        tr_sum = 0
-        for i in range(1, period + 2):
-            h, l_, pc = candles[-i].high, candles[-i].low, candles[-i-1].close
-            tr_sum += max(h - l_, abs(h - pc), abs(l_ - pc))
-        return tr_sum / (period + 1)
+    def _calc_atr(self, period: int = 14, offset: int = 0) -> Optional[float]:
+        """标准 Wilder ATR（带 offset 偏移，供波动因子计算历史 ATR 使用）"""
+        sub = self.candles[:-offset] if offset > 0 else self.candles
+        return self.calc_atr_wilder(sub, period)
 
     def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        n = len(candles)
-        tr_list, plus_dm, minus_dm = [], [], []
-        for i in range(1, n):
-            h, l_, pc = candles[i].high, candles[i].low, candles[i-1].close
-            ph, pl = candles[i-1].high, candles[i-1].low
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            up = h - ph; down = pl - l_
-            plus_dm.append(up if (up > down and up > 0) else 0)
-            minus_dm.append(down if (down > up and down > 0) else 0)
-            tr_list.append(tr)
-        if len(tr_list) < period: return None
-        atr_v = sum(tr_list[:period]) / period
-        pdi_v = sum(plus_dm[:period]) / period
-        ndi_v = sum(minus_dm[:period]) / period
-        if atr_v <= 0: return None
-        pdi_v, ndi_v = pdi_v / atr_v * 100, ndi_v / atr_v * 100
-        atr_s, pdi_s, ndi_s = [atr_v], [pdi_v], [ndi_v]
-        for i in range(period, len(tr_list)):
-            atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
-            if atr_s[-1] > 0:
-                pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i]/atr_s[-1]*100) / period)
-                ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i]/atr_s[-1]*100) / period)
-        dx = [abs(pdi_s[i]-ndi_s[i])/max(pdi_s[i]+ndi_s[i], 0.001)*100 for i in range(len(atr_s))]
-        adx = [sum(dx[:period]) / period]
-        for i in range(period, len(dx)):
-            adx.append((adx[-1] * (period - 1) + dx[i]) / period)
-        return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
+        return self.calc_adx_wilder(self.candles, period)
 
     def _find_swing(self, lookback: int = 10) -> Optional[dict]:
         """找最近摆动高点和低点"""
@@ -200,13 +169,16 @@ class EntryScoreProStrategy(BaseStrategy):
         body_ratio = body / candle_range if candle_range > 0 else 0.5
         mom_long = 50 + body_ratio * 50 if candles[-1].close > candles[-1].open else 50 - body_ratio * 50
 
-        # ④ 波动(10%): ATR vs 50bar均线
-        if len(closes) >= 50:
-            old_atr = self._calc_atr(period=14)  # 这里简化用当前ATR
-            atr_ratio = 1.0
-            prox_long = int(prox_long)
-        else:
-            atr_ratio = 1.0
+        # ④ 波动(10%): 当前ATR vs 30根前ATR，适中波动利于入场（方向无关质量分）
+        atr_now = self._calc_atr(period=14)
+        atr_old = self._calc_atr(period=14, offset=30) if len(closes) >= 50 else None
+        vol_score = 50  # 数据不足时中性
+        if atr_now and atr_old and atr_old > 0:
+            ratio = atr_now / atr_old
+            if 0.8 <= ratio <= 1.3:      # 健康波动
+                vol_score = 70
+            elif ratio > 1.6 or ratio < 0.5:  # 混乱或死寂
+                vol_score = 30
 
         # ⑤ 趋势(20%): MA14 + RSI
         ma14 = sum(closes[-14:]) / 14 if len(closes) >= 14 else close
@@ -229,14 +201,14 @@ class EntryScoreProStrategy(BaseStrategy):
             struct_long * self.w_structure +
             prox_long * self.w_proximity +
             mom_long * self.w_momentum +
-            50 * self.w_volatility +
+            vol_score * self.w_volatility +
             trend_long * self.w_trend
         ) / total_w)
         score_short = int((
             struct_short * self.w_structure +
             prox_short * self.w_proximity +
             (100 - mom_long) * self.w_momentum +
-            50 * self.w_volatility +
+            vol_score * self.w_volatility +
             trend_short * self.w_trend
         ) / total_w)
 
@@ -320,7 +292,7 @@ class EntryScoreProStrategy(BaseStrategy):
                 del self._trail_data[ticket]
                 return True
             loss = td["entry"] - bid
-            if loss > atr_val * self.sl_atr * 2:
+            if loss > atr_val * self.sl_atr:
                 self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss, 2)}
                 del self._trail_data[ticket]
                 return True
@@ -332,7 +304,7 @@ class EntryScoreProStrategy(BaseStrategy):
                 del self._trail_data[ticket]
                 return True
             loss = ask - td["entry"]
-            if loss > atr_val * self.sl_atr * 2:
+            if loss > atr_val * self.sl_atr:
                 self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss, 2)}
                 del self._trail_data[ticket]
                 return True
