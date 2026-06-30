@@ -212,13 +212,10 @@ pre { background: var(--card); padding: 1rem; overflow-x: auto; border-radius: 6
   <tr><td>⑦</td><td>K 线形态</td><td>吞没/锤子/射击之星</td><td>同侧 +1</td></tr>
 </table>
 
-<h4>ADX>28 趋势门禁</h4>
-<p>ADX > 28 时启用 EMA9/21 方向判断：EMA9 > EMA21 → 禁空（只做多）；EMA9 < EMA21 → 禁多（只做空）</p>
-
 <h4>决策流程</h4>
-<pre>7 因子评分 → 冷却检查（盈利出场同方向 30 分钟扣分）→ ADX>28 门禁禁反向
-→ can_long and score >= 4 → BUY
-→ can_short and score >= 4 → SELL</pre>
+<pre>7 因子评分 → 冷却检查（盈利出场同方向 30 分钟扣分）
+→ score >= 4 → BUY / SELL
+（ADX>28 趋势门禁已于 2026-06-30 移除）</pre>
 
 <h3>3.2 出场逻辑</h3>
 <table>

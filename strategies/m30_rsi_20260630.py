@@ -1,10 +1,10 @@
 """
-M30 RSI + 布林带均值回归 — ADX>28趋势门禁
-========================================
-- 入场: 5因子评分系统 ≥3 分触发
-- 5因子: MA14趋势, BB触轨, RSI超卖/超买, RSI方向(3根), DI强度(>10)
-- ADX>28 + EMA9/21 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
-- 出场: ATR 动态追踪止损 (Trailing Stop + Hard Stop)
+M30 RSI + 布林带均值回归
+=========================
+- 入场: 7因子评分系统 ≥4 分触发
+- 7因子: M30趋势, BB位置(90%), RSI超卖/超买, RSI方向(3根), DI强度, 成交量, K线形态
+- ADX>28趋势门禁已移除（2026-06-30）
+- 出场: 保本出场 + 利润回撤止盈 + ATR追踪 + DI跳过(盈利时) + 硬止损
 - 双向交易 (Long / Short)
 """
 
@@ -58,10 +58,7 @@ class M30RSIStrategy(BaseStrategy):
         self.p_hard_atr = 2.0       # 硬止损 ATR×2（原为 3.0）
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
-        # ADX>28 趋势门禁
-        self.adx_threshold = 28
-        self.ema_fast = 9
-        self.ema_slow = 21
+        # (ADX>28 趋势门禁已移除 — 2026-06-30)
 
         # Indicator params
         self.bb_period = 20
@@ -298,17 +295,6 @@ class M30RSIStrategy(BaseStrategy):
         elif pat_dir == 'short':
             short_score += 1; short_detail.append(pat_name)
 
-        # ── ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多 ──
-        gate_side = None
-        if adx_data and adx_data["adx"] > self.adx_threshold:
-            ema9 = self._calc_ema(closes, self.ema_fast)
-            ema21 = self._calc_ema(closes, self.ema_slow)
-            if ema9 is not None and ema21 is not None:
-                if ema9 > ema21:
-                    gate_side = 'short'
-                elif ema9 < ema21:
-                    gate_side = 'long'
-
         now = time.time()
 
         # ── 盈利平仓冷却：同方向30分钟内不开仓 ──
@@ -325,21 +311,15 @@ class M30RSIStrategy(BaseStrategy):
                 logger.info(f"[{self.name}] SELL冷却中: 盈利平仓后还剩{int(remaining)}秒")
                 short_score = 0
 
-        # ── Decision（ADX>28 门禁禁反向）──
-        can_long = gate_side != 'long'
-        can_short = gate_side != 'short'
-
+        # ── Decision（ADX>28 门禁已移除 2026-06-30）──
         signal = None
         signal_str = "无信号"
-        if can_long and long_score >= self.score_threshold:
+        if long_score >= self.score_threshold:
             signal = OrderType.BUY
             signal_str = "LONG"
-        elif can_short and short_score >= self.score_threshold:
+        elif short_score >= self.score_threshold:
             signal = OrderType.SELL
             signal_str = "SELL"
-
-        if gate_side and not signal:
-            signal_str += f" ({'上升趋势禁空' if gate_side == 'short' else '下降趋势禁多'})"
 
         # ── Logging ──
         detail_parts = []
@@ -350,12 +330,9 @@ class M30RSIStrategy(BaseStrategy):
             f"明细: {' | '.join(detail_parts) if detail_parts else '无'}"
         )
         adx_log = f" ADX={adx_data['adx']:.1f}" if adx_data else ""
-        gate_log = ""
-        if gate_side:
-            gate_log = " [门禁]" + ("禁空" if gate_side == 'short' else "禁多")
         logger.info(
             f"[{self.name}] Price={close:.2f} BB={bb['lower']:.2f}/{bb['upper']:.2f} "
-            f"RSI={rsi_val:.1f} ATR={atr_val:.2f} M30={m30_trend}{adx_log}{gate_log}"
+            f"RSI={rsi_val:.1f} ATR={atr_val:.2f} M30={m30_trend}{adx_log}"
         )
 
         # Price position within BB bands
@@ -366,8 +343,6 @@ class M30RSIStrategy(BaseStrategy):
         recent_high = max(closes[-lookback:])
         recent_low = min(closes[-lookback:])
 
-        ema9_v = self._calc_ema(closes, self.ema_fast) if adx_data else None
-        ema21_v = self._calc_ema(closes, self.ema_slow) if adx_data else None
         indicator_values = {
             "close": round(close, 2), "rsi": round(rsi_val, 2),
             "atr": round(atr_val, 2), "bb_upper": round(bb["upper"], 2),
@@ -376,9 +351,7 @@ class M30RSIStrategy(BaseStrategy):
             "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
             "m30_trend": m30_trend, "m30_rsi_dir": m30_rsi_dir,
             "adx": round(adx_data["adx"], 1) if adx_data else 0,
-            "ema9": round(ema9_v, 2) if ema9_v is not None else 0,
-            "ema21": round(ema21_v, 2) if ema21_v is not None else 0,
-            "gate": gate_side or "",
+            "ema9": 0, "ema21": 0,
         }
         return (signal, long_score, short_score, long_detail, short_detail, indicator_values)
 
