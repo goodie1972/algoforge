@@ -188,31 +188,51 @@ class M30RSIStrategy(BaseStrategy):
         return sum(vols) / period
 
     def _detect_candle_pattern(self) -> tuple:
-        """Detect engulfing / hammer / shooting star"""
+        """TA-Lib 蜡烛图形态检测，覆盖常见见底/见顶反转形态。"""
         c = self.candles
-        if len(c) < 3:
+        if len(c) < 10:
             return ('none', None)
-        c1, c2 = c[-2], c[-1]
-        o1, h1, l1, cc1 = c1.open, c1.high, c1.low, c1.close
-        o2, h2, l2, cc2 = c2.open, c2.high, c2.low, c2.close
-        body1 = abs(cc1 - o1); body2 = abs(cc2 - o2)
-        range1 = h1 - l1; range2 = h2 - l2
-        if range1 <= 0 or range2 <= 0:
-            return ('none', None)
-        bull1, bull2 = cc1 > o1, cc2 > o2
-        # Bullish engulfing
-        if bull2 and not bull1 and body2 >= body1 * 0.8 and o2 <= cc1 and cc2 >= o1:
-            return ('long', 'ENGULF')
-        # Bearish engulfing
-        if not bull2 and bull1 and body2 >= body1 * 0.8 and cc2 <= o1 and o2 >= cc1:
-            return ('short', 'ENGULF')
-        # Hammer
-        upper2 = h2 - max(o2, cc2); lower2 = min(o2, cc2) - l2
-        if lower2 >= body2 * 2 and upper2 <= body2 * 0.5 and body2 / range2 <= 0.4:
-            return ('long', 'HAMMER')
-        # Shooting star
-        if upper2 >= body2 * 2 and lower2 <= body2 * 0.5 and body2 / range2 <= 0.4:
-            return ('short', 'SHOOT')
+        try:
+            import numpy as np
+            import talib
+            o = np.array([x.open for x in c], dtype=float)
+            h = np.array([x.high for x in c], dtype=float)
+            l = np.array([x.low for x in c], dtype=float)
+            cl = np.array([x.close for x in c], dtype=float)
+
+            # 早晨之星/黄昏之星（需 penetration 参数）
+            if talib.CDLMORNINGSTAR(o, h, l, cl, penetration=0.3)[-1] == 100:
+                return ('long', 'MORNING')
+            if talib.CDLEVENINGSTAR(o, h, l, cl, penetration=0.3)[-1] == -100:
+                return ('short', 'EVENING')
+
+            # 标准 4 参数形态 o,h,l,c（见底）
+            for func, name in [
+                    (talib.CDLHAMMER, "HAMMER"),
+                    (talib.CDLINVERTEDHAMMER, "INVHAM"),
+                    (talib.CDLPIERCING, "PIERCE"),
+                    (talib.CDLHARAMI, "HARAMI"),
+                    (talib.CDLDOJI, "DOJI"),
+                    (talib.CDLDRAGONFLYDOJI, "DRAGON"),
+                    (talib.CDLHOMINGPIGEON, "PIGEON"),
+            ]:
+                if func(o, h, l, cl)[-1] >= 80:
+                    return ('long', name)
+
+            # 标准 4 参数形态 o,h,l,c（见顶）
+            for func, name in [
+                    (talib.CDLSHOOTINGSTAR, "SHOOT"),
+                    (talib.CDLDARKCLOUDCOVER, "CLOUD"),
+                    (talib.CDLHARAMI, "HARAMI"),
+                    (talib.CDLDOJI, "DOJI"),
+                    (talib.CDLGRAVESTONEDOJI, "GRAVE"),
+                    (talib.CDLBEARISHENGULFING, "ENGULF"),
+                    (talib.CDLHANGINGMAN, "HANG"),
+            ]:
+                if func(o, h, l, cl)[-1] <= -80:
+                    return ('short', name)
+        except Exception:
+            pass
         return ('none', None)
 
 
