@@ -297,7 +297,7 @@ class StochTrendH1Strategy(BaseStrategy):
 
         logger.info(
             f"[{self.name}] K={k_curr:.1f} D={d_curr:.1f} ADX={adx:.1f} "
-            f"H4={h4_trend or 'N/A'} M15K={m15_k:.0f if m15_k is not None else 'N/A'} "
+            f"H4={h4_trend or 'N/A'} M15K={f'{m15_k:.0f}' if m15_k is not None else 'N/A'} "
             f"{'BUY' if signal == OrderType.BUY else 'SELL' if signal == OrderType.SELL else '无'}"
         )
 

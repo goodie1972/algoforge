@@ -18,7 +18,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v12"
+STRATEGY_VERSION = "v13"
 STRATEGY_MAGIC = 660707
 STRATEGY_LEGACY_MAGICS = [660705, 660706]  # 旧版 magic，引擎启动时自动接管
 STRATEGY_CHANGELOG = [
@@ -34,6 +34,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v10", "magic": 660707, "date": "2026-06-22", "desc": "新增DI止盈判定: 移动止盈触发时+DI- -DI>10(BUY)/-DI-+DI>10(SELL)则忽略止盈"},
     {"version": "v11", "magic": 660707, "date": "2026-06-22", "desc": "新增DI强度因子⑤: |DI差|>10 给±1分, 5因子评分阈值保持3"},
     {"version": "v12", "magic": 660707, "date": "2026-07-01", "desc": "H1 MA20趋势门禁替代ADX门禁：H1下行禁BUY、H1上行禁SELL"},
+    {"version": "v13", "magic": 660707, "date": "2026-07-01", "desc": "H1门禁放过极值区：BB上轨10%外或RSI深超买时允许SELL，下轨10%外或深超卖时允许BUY"},
 ]
 
 
@@ -298,18 +299,27 @@ class M30RSIStrategy(BaseStrategy):
                 short_score += 1; short_detail.append(f"DI{di_diff:.0f}")
 
         # ⑥ H1 趋势门禁：H1下行禁BUY，H1上行禁SELL
+        # 例外：价格在BB极值区（上下轨10%外）或RSI深区时放过，均值回归信号优先
         self._load_h1_data()
         h1_trend = self._get_h1_trend(20)
         if h1_trend == 'DOWN':
-            if long_score > 0:
-                logger.info(f"[{self.name}] H1={h1_trend} 禁BUY (原LONG={long_score}分)")
-            long_score = 0
-            long_detail = [d for d in long_detail if d.startswith("COOLDOWN")]
+            if close <= bb_bot_zone or rsi_val <= self.rsi_deep_oversold:
+                if long_score > 0:
+                    logger.info(f"[{self.name}] H1={h1_trend} 但价格极值，放过BUY")
+            else:
+                if long_score > 0:
+                    logger.info(f"[{self.name}] H1={h1_trend} 禁BUY (原LONG={long_score}分)")
+                long_score = 0
+                long_detail = [d for d in long_detail if d.startswith("COOLDOWN")]
         elif h1_trend == 'UP':
-            if short_score > 0:
-                logger.info(f"[{self.name}] H1={h1_trend} 禁SELL (原SHORT={short_score}分)")
-            short_score = 0
-            short_detail = [d for d in short_detail if d.startswith("COOLDOWN")]
+            if close >= bb_top_zone or rsi_val >= self.rsi_deep_overbought:
+                if short_score > 0:
+                    logger.info(f"[{self.name}] H1={h1_trend} 但价格极值，放过SELL")
+            else:
+                if short_score > 0:
+                    logger.info(f"[{self.name}] H1={h1_trend} 禁SELL (原SHORT={short_score}分)")
+                short_score = 0
+                short_detail = [d for d in short_detail if d.startswith("COOLDOWN")]
 
         # --- Volume confirmation: vol > SMA20*1.3 ---
         vol_sma = self._calc_volume_sma()
