@@ -443,8 +443,8 @@ class BaseStrategy(abc.ABC):
         mfe = (td.get("highest", entry) - entry) if is_buy else (entry - td.get("lowest", entry))
         if mfe < atr_val * 0.3:
             return False  # 没走过足够盈利，不激活保本
-        # 回到成本 ±0.05×ATR 以内
-        return current_profit <= atr_val * 0.05
+        # 回到成本 ±0.05×ATR 以内（仅在盈利时触发，亏损时让硬止损兜底）
+        return 0 <= current_profit <= atr_val * 0.05
 
     def filter_positions(self, positions: list[Position]) -> dict:
         """统计当前品种的多空持仓"""
