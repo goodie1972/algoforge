@@ -18,7 +18,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v11"
+STRATEGY_VERSION = "v12"
 STRATEGY_MAGIC = 660707
 STRATEGY_LEGACY_MAGICS = [660705, 660706]  # 旧版 magic，引擎启动时自动接管
 STRATEGY_CHANGELOG = [
@@ -33,6 +33,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v9", "magic": 660707, "date": "2026-06-22", "desc": "新增ADX>28趋势门禁(EMA9/21), RSI方向改3根连续确认"},
     {"version": "v10", "magic": 660707, "date": "2026-06-22", "desc": "新增DI止盈判定: 移动止盈触发时+DI- -DI>10(BUY)/-DI-+DI>10(SELL)则忽略止盈"},
     {"version": "v11", "magic": 660707, "date": "2026-06-22", "desc": "新增DI强度因子⑤: |DI差|>10 给±1分, 5因子评分阈值保持3"},
+    {"version": "v12", "magic": 660707, "date": "2026-07-01", "desc": "H1 MA20趋势门禁替代ADX门禁：H1下行禁BUY、H1上行禁SELL"},
 ]
 
 
@@ -296,6 +297,20 @@ class M30RSIStrategy(BaseStrategy):
             elif di_diff < -10:
                 short_score += 1; short_detail.append(f"DI{di_diff:.0f}")
 
+        # ⑥ H1 趋势门禁：H1下行禁BUY，H1上行禁SELL
+        self._load_h1_data()
+        h1_trend = self._get_h1_trend(20)
+        if h1_trend == 'DOWN':
+            if long_score > 0:
+                logger.info(f"[{self.name}] H1={h1_trend} 禁BUY (原LONG={long_score}分)")
+            long_score = 0
+            long_detail = [d for d in long_detail if d.startswith("COOLDOWN")]
+        elif h1_trend == 'UP':
+            if short_score > 0:
+                logger.info(f"[{self.name}] H1={h1_trend} 禁SELL (原SHORT={short_score}分)")
+            short_score = 0
+            short_detail = [d for d in short_detail if d.startswith("COOLDOWN")]
+
         # --- Volume confirmation: vol > SMA20*1.3 ---
         vol_sma = self._calc_volume_sma()
         if vol_sma and vol_sma > 0:
@@ -357,7 +372,7 @@ class M30RSIStrategy(BaseStrategy):
         adx_log = f" ADX={adx_data['adx']:.1f}" if adx_data else ""
         logger.info(
             f"[{self.name}] Price={close:.2f} BB={bb['lower']:.2f}/{bb['upper']:.2f} "
-            f"RSI={rsi_val:.1f} ATR={atr_val:.2f} M30={m30_trend}{adx_log}"
+            f"RSI={rsi_val:.1f} ATR={atr_val:.2f} M30={m30_trend} H1={h1_trend}{adx_log}"
         )
 
         # Price position within BB bands
@@ -375,6 +390,7 @@ class M30RSIStrategy(BaseStrategy):
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
             "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
             "m30_trend": m30_trend, "m30_rsi_dir": m30_rsi_dir,
+            "h1_trend": h1_trend,
             "adx": round(adx_data["adx"], 1) if adx_data else 0,
             "ema9": 0, "ema21": 0,
         }

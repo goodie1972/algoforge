@@ -32,6 +32,7 @@ class BaseStrategy(abc.ABC):
         # 最近一次信号详情（供引擎写入 DB）
         self._last_signal: Optional[dict] = None
         self._m30_candles: list[Candle] = []
+        self._h1_candles: list[Candle] = []
 
         # K-line filter parameters (from RuntimeConfig → runtime_config.json, hot-reloadable)
         _coord = _RuntimeConfig().get_coordinator_config()
@@ -204,6 +205,44 @@ class BaseStrategy(abc.ABC):
             logger.warning(f"[{self.name}] M30 bridge load failed: {e}")
 
         self._m30_candles = []
+
+    def _load_h1_data(self):
+        """加载 H1 K 线数据 — 优先 SQLite，回退到桥接直接获取"""
+        try:
+            from data.database import get_conn
+            conn = get_conn()
+            rows = conn.execute(
+                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='H1' ORDER BY timestamp"
+            ).fetchall()
+            conn.close()
+            if rows:
+                self._h1_candles = [
+                    Candle(time=str(r[0]), open=r[1], high=r[2], low=r[3], close=r[4], volume=r[5])
+                    for r in rows
+                ]
+                return
+        except Exception as e:
+            logger.warning(f"[{self.name}] H1 DB load failed: {e}")
+
+        # DB 无数据 → 直接从桥接获取
+        try:
+            raw = self.bridge.get_candles(self.symbol, "H1", 60)
+            if raw:
+                self._h1_candles = list(reversed(raw))
+                logger.info(f"[{self.name}] H1 loaded from bridge: {len(self._h1_candles)} candles")
+                return
+        except Exception as e:
+            logger.warning(f"[{self.name}] H1 bridge load failed: {e}")
+
+        self._h1_candles = []
+
+    def _get_h1_trend(self, period: int = 20) -> str:
+        """H1 MA2period趋势判断，返回 'UP' / 'DOWN' / 'NEUTRAL'"""
+        if len(self._h1_candles) < period:
+            return 'NEUTRAL'
+        closes = [c.close for c in self._h1_candles]
+        ma = sum(closes[-period:]) / period
+        return 'UP' if closes[-1] > ma else 'DOWN'
 
     @staticmethod
     def calc_atr_wilder(candles: list, period: int = 14) -> Optional[float]:

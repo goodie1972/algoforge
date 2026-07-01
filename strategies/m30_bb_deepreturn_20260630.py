@@ -18,11 +18,12 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v1"
+STRATEGY_VERSION = "v2"
 STRATEGY_MAGIC = 661101
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 661101, "date": "2026-06-29", "desc": "初始上线：BB极值+MFI极值超跌反弹，分支出场"},
+    {"version": "v2", "magic": 661101, "date": "2026-07-01", "desc": "MFI超买 80→70 不对称化，适应黄金慢涨急跌"},
 ]
 
 
@@ -40,8 +41,8 @@ class BBDeepReturnStrategy(BaseStrategy):
 
         # Entry params
         self.mfi_period = 14
-        self.mfi_oversold = 20
-        self.mfi_overbought = 80
+        self.mfi_oversold = 30
+        self.mfi_overbought = 70
         self.bb_std = 2.0
         self.bb_period = 20
         self.score_threshold = 3

@@ -12,6 +12,7 @@ Gold-AutoResearch — H1 实盘策略
 
 import logging
 import math
+import time
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, OrderType
