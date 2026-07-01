@@ -18,12 +18,13 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v2"
+STRATEGY_VERSION = "v3"
 STRATEGY_MAGIC = 661001
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 661001, "date": "2026-06-26", "desc": "初始上线：MFI+BB 双模策略，ADX=25 分界"},
     {"version": "v2", "magic": 661001, "date": "2026-07-01", "desc": "MFI超买 80→70 不对称化，适应黄金慢涨急跌"},
+    {"version": "v3", "magic": 661001, "date": "2026-07-01", "desc": "M30趋势同向时profit_drawdown放宽至40%（原25%），让趋势单多跑"},
 ]
 
 
@@ -436,6 +437,11 @@ class M30MFIBBStrategy(BaseStrategy):
         _ax = self._calc_adx(14)
         if _ax and _ax.get("adx", 0) > 25:
             pdd = max(pdd, 0.5)
+
+        # M30趋势同向时放宽利润回撤至40%（让趋势单多跑）
+        m30_trend = self._get_m30_trend()
+        if (is_buy and m30_trend == 'UP') or (not is_buy and m30_trend == 'DOWN'):
+            pdd = max(pdd, 0.4)
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
