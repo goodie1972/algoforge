@@ -20,7 +20,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v6"
+STRATEGY_VERSION = "v7"
 STRATEGY_MAGIC = 880306
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 880301, "date": "2026-06-08", "desc": "初始上线：4因子共识投票，ATR跟踪止损 trail=3.5 hard=2.0"},
@@ -29,6 +29,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v4", "magic": 880304, "date": "2026-06-11", "desc": "新增 tight_exit_mode 新闻风控"},
     {"version": "v5", "magic": 880305, "date": "2026-06-11", "desc": "SAFE-DN改为RSI≤35独立封空，防止接近超卖区开空"},
     {"version": "v6", "magic": 880306, "date": "2026-06-11", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
+    {"version": "v7", "magic": 880306, "date": "2026-07-01", "desc": "H4 SMA50趋势门禁：H4下行禁BUY、H4上行禁SELL"},
 ]
 
 
@@ -328,6 +329,8 @@ class GoldAutoResearchStrategy(BaseStrategy):
                 if rsi_val <= 35:
                     safe_dn = False
 
+        self._load_h4_data()
+        h4_trend = self._get_h4_trend(50)
         # ── Consensus ──
         logger.info(
             f"[{self.name}] Trend={'UP' if trend_up else 'DOWN'} "
@@ -335,8 +338,17 @@ class GoldAutoResearchStrategy(BaseStrategy):
             f"Vol={'ACTIVE' if vol_active else 'QUIET'} "
             f"RSI={rsi_val:.1f} ADX={adx_val} "
             f"Price={close:.2f} "
-            f"EMA10={ema10:.2f} EMA20={ema20:.2f}"
+            f"EMA10={ema10:.2f} EMA20={ema20:.2f} "
+            f"H4={h4_trend}"
         )
+
+        # H4 趋势门禁：H4下行禁BUY，H4上行禁SELL
+        h4_block_long = h4_trend == 'DOWN'
+        h4_block_short = h4_trend == 'UP'
+        if h4_block_long:
+            logger.info(f"[{self.name}] H4={h4_trend} 禁BUY")
+        if h4_block_short:
+            logger.info(f"[{self.name}] H4={h4_trend} 禁SELL")
 
         indicator_values = {
             "close": round(close, 2), "ema10": round(ema10, 2), "ema20": round(ema20, 2),
@@ -349,6 +361,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
             "rsi": round(rsi_val, 2) if rsi_val else 0,
             "bb_mid": round(bb_mid, 2) if bb_mid else 0,
             "bb_std": round(bb_std, 2) if bb_std else 0,
+            "h4_trend": h4_trend,
         }
 
         long_factors = []
@@ -364,9 +377,9 @@ class GoldAutoResearchStrategy(BaseStrategy):
         if safe_dn: short_factors.append("SAFE-DN")
 
         signal = None
-        if trend_up and mom_up and vol_active and safe_up:
+        if trend_up and mom_up and vol_active and safe_up and not h4_block_long:
             signal = OrderType.BUY
-        elif trend_dn and mom_dn and vol_active and safe_dn:
+        elif trend_dn and mom_dn and vol_active and safe_dn and not h4_block_short:
             signal = OrderType.SELL
 
         return (signal, len(long_factors), len(short_factors), long_factors, short_factors, indicator_values)

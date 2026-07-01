@@ -37,7 +37,17 @@
 | RSI 周期 | 10 | 安全性判断 |
 | 布林带 | 20/2 | 安全性判断 |
 
-## 入场逻辑 — 4 因子共识
+## 入场逻辑 — 4 因子共识 + H4 趋势门禁
+
+### H4 趋势门禁（顶层硬规则）
+
+在 4 因子共识之前，先加载 H4 K 线（从 SQLite）计算 SMA50 趋势：
+
+- **H4 = DOWN**：H1 趋势即使翻多也**禁 BUY**（防下跌中的反弹诱多）
+- **H4 = UP**：H1 趋势即使翻空也**禁 SELL**（防上涨中的回调诱空）
+
+> 这修正了 EMA10/20 在 H1 周期上容易被反弹扭曲的问题。
+> 昨天的 -$64 大亏单（BUY 4046→3981）就是 H4=DOWN 时 H1 反弹翻多导致的。
 
 ### 因子 1：趋势 (EMA10/20)
 
@@ -98,11 +108,11 @@ ADX 值缓存在 `_cached_adx` 中，按已计算的 K 线数量键控。
 ### 信号决策
 
 ```
-BUY  = trend_up AND mom_up AND vol_active AND safe_up
-SELL = trend_dn AND mom_dn AND vol_active AND safe_dn
+BUY  = trend_up AND mom_up AND vol_active AND safe_up AND H4 ≠ DOWN
+SELL = trend_dn AND mom_dn AND vol_active AND safe_dn AND H4 ≠ UP
 ```
 
-**四个条件必须全部满足，没有评分、没有加权、没有折中。**
+**四个条件必须全部满足 + H4 趋势不矛盾。没有评分、没有加权、没有折中。**
 
 ## 出场逻辑
 
@@ -138,7 +148,7 @@ SELL = trend_dn AND mom_dn AND vol_active AND safe_dn
 - 四个维度互不重叠，覆盖方向→力度→环境→风险的全链条
 - ADX/ATR 活性过滤防止横盘行情中的无效交易
 - RSI+BB 安全机制防止追高/杀跌
-- 不需要外部数据源（无需 SQLite）
+- 不需要外部数据源（无需 SQLite）**仅 H4 趋势门禁需要 SQLite**
 
 **局限：**
 - 较保守，交易频率最低（四个条件同时满足的概率较低）
