@@ -141,6 +141,12 @@ SELL = trend_dn AND mom_dn AND vol_active AND safe_dn AND H4 ≠ UP
 | 双倍首单 | 否 |
 | 新闻收紧 | 支持 |
 
+## 保本出场局限
+
+与所有策略共享基类 `_check_breakeven_exit()`，MFE≥0.3ATR 后回成本±0.05ATR 平仓。
+
+在 RSI 接近安全阈值边缘（RSI≤35 或 RSI≥70 附近）时开仓，价格处于布林带附近，反弹动力强，易在开仓后 10-20 分钟内被保本出场。
+
 ## 优劣势
 
 **优势：**
