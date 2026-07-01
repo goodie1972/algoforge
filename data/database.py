@@ -1079,7 +1079,7 @@ def insert_report(record: dict) -> int:
 def get_reports(type: str = "daily", date_from: str = "",
                 date_to: str = "", page: int = 1,
                 page_size: int = 50) -> list[dict]:
-    """获取报告列表，按 created_at 倒序"""
+    """获取报告列表，按 id 倒序（created_at 曾被旧 bug 写乱，不可靠）"""
     conn = get_conn()
     try:
         query = "SELECT id, type, title, summary, account_balance, account_equity, floating_pnl, daily_pnl, position_count, created_at FROM reports WHERE type=?"
@@ -1090,7 +1090,7 @@ def get_reports(type: str = "daily", date_from: str = "",
         if date_to:
             query += " AND created_at <= ?"
             params.append(date_to)
-        query += " ORDER BY created_at DESC"
+        query += " ORDER BY id DESC"
         offset = (page - 1) * page_size
         query += " LIMIT ? OFFSET ?"
         params.extend([page_size, offset])
@@ -1118,7 +1118,7 @@ def get_report_timeline(date: str, type: str = "daily") -> list[dict]:
             """SELECT id, type, title, summary, account_balance, account_equity,
                       floating_pnl, daily_pnl, position_count, created_at
                FROM reports WHERE type=? AND created_at LIKE ?
-               ORDER BY created_at DESC LIMIT 200""",
+               ORDER BY id DESC LIMIT 200""",
             (type, f"{date}%"),
         ).fetchall()
         return [dict(r) for r in rows]
