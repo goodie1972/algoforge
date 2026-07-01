@@ -160,10 +160,18 @@ const columns = [
 
 // 策略颜色映射（与持仓保持一致）
 const strategyColors: Record<string, string> = {
-  'H1_v6_hybrid': '#2080f0',
   'M30_rsi_bb': '#f0a020',
-  'sanqing_h1': '#9220f0',
   'gold_auto_research': '#20c080',
+  'mfi_bb_m30': '#00bcd4',
+  'm30_bb_deepreturn': '#ff7043',
+  'entry_score_pro': '#7c4dff',
+  'momentum_pulse_pro': '#ffa726',
+  'stoch_trend_h1': '#26c6da',
+  'sanqing_h1': '#9220f0',
+  'stoch_m30': '#20c080',
+  'stoch_trend_m30': '#2080f0',
+  'rsi_grading_m30': '#e040a0',
+  'mtf_resonance_h1': '#2080f0',
   'bakome_backup': '#808080',
   'xaubot_backup': '#808080',
 }

@@ -344,18 +344,24 @@ const strategyLogics: Record<string, StratLogic> = {
   },
 }
 
-// 策略颜色映射 (按 backup_name)
+// 策略颜色映射 (按 name)
 const strategyColors: Record<string, string> = {
-  m30_rsi_v7: '#f0a020',
-  m30_stoch_T6V1: '#20c080',
-  m30_stoch_T6V8: '#2080f0',
+  M30_rsi_bb: '#f0a020',
+  gold_auto_research: '#20c080',
+  mfi_bb_m30: '#00bcd4',
+  m30_bb_deepreturn: '#ff7043',
+  entry_score_pro: '#7c4dff',
+  momentum_pulse_pro: '#ffa726',
+  stoch_trend_h1: '#26c6da',
+  stoch_m30: '#20c080',
+  stoch_trend_m30: '#2080f0',
   rsi_grading_m30: '#e040a0',
-  h1_v6_hybrid_v6: '#808080',
-  sanqing_h1_v6: '#9220f0',
-  gold_autoresearch_h1_v5: '#20c080',
   mtf_resonance_h1: '#2080f0',
-  H1_bakome_backup: '#808080',
-  H1_xaubot_backup: '#808080',
+  sanqing_h1: '#9220f0',
+  bakome_backup: '#808080',
+  xaubot_backup: '#808080',
+  multi_confluence_quant: '#808080',
+  viprasol_sniper: '#808080',
 }
 
 // 已启用策略
