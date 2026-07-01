@@ -199,8 +199,8 @@ def download_all_paged(symbol: str = "XAUUSD",
                         target_ts: int = TARGET_TS) -> dict:
     """全量分页下载所有周期（覆盖到 target_ts 的完整历史）"""
     if timeframes is None:
-        # 默认只做回测需要的周期
-        timeframes = ["M15", "M30", "H1", "H4", "D1"]
+        # 默认回填所有交易终端需要的周期
+        timeframes = ["M5", "M15", "M30", "H1", "H4", "D1", "W1"]
 
     init_db()
     bridge = create_bridge()

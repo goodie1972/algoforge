@@ -57,6 +57,13 @@ class EngineRunner:
             return (datetime.now() - self._start_time).total_seconds()
         return 0.0
 
+    @property
+    def supervisor(self):
+        """获取引擎的监督者实例"""
+        if self._engine and hasattr(self._engine, 'supervisor'):
+            return self._engine.supervisor
+        return None
+
     def start(self) -> bool:
         """启动引擎后台线程"""
         if self.is_running:

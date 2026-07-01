@@ -28,8 +28,17 @@ export const usePriceStore = defineStore('prices', () => {
   async function fetchCandles(timeframe = 'H1', count = 500) {
     loading.value = true
     try {
-      candles.value = await getCandles(timeframe, count)
-    } catch { /* ignore */ }
+      const data = await getCandles(timeframe, count)
+      if (data && data.length > 0) {
+        candles.value = data
+      } else {
+        // 返回空数据时清空旧图（避免不同周期显示相同 K 线）
+        candles.value = []
+      }
+    } catch { 
+      // 请求失败时清空旧图（避免残留上一周期数据）
+      candles.value = []
+    }
     finally { loading.value = false }
   }
 

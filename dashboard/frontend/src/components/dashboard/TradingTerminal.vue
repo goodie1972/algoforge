@@ -645,13 +645,15 @@ function applyTfPreset() {
   showATR.value = false
 }
 
-function switchTf(tf: string) {
+async function switchTf(tf: string) {
   activeTf.value = tf
+  // 先停自动刷新，防止旧周期回调覆盖新数据
+  stopAutoRefresh()
   // 切换周期时清除旧指标系列（新数据到达后重建）
   clearAllOverlays()
   clearAllPanes()
   applyTfPreset()
-  loadCandles()
+  await loadCandles()
   startAutoRefresh()
 }
 

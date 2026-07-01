@@ -58,8 +58,9 @@ def format_record(order: dict) -> dict:
     magic = order["magic"]
     strategy = MAGIC_TO_STRATEGY.get(magic, f"magic_{magic}")
 
-    open_dt = datetime.fromtimestamp(order["open_time"])
-    close_dt = datetime.fromtimestamp(order["close_time"])
+    from config.settings import LOCAL_TZ
+    open_dt = datetime.fromtimestamp(order["open_time"], tz=LOCAL_TZ)
+    close_dt = datetime.fromtimestamp(order["close_time"], tz=LOCAL_TZ)
     hold_sec = int(order["close_time"] - order["open_time"])
 
     return {

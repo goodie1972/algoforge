@@ -69,6 +69,7 @@ from dashboard.backend.routes import reports as route_reports
 from dashboard.backend.routes import news_bias as route_news_bias
 from dashboard.backend.routes import version as route_version
 from dashboard.backend.routes import strategies as route_strategies
+from dashboard.backend.routes import supervisor as route_supervisor
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -273,6 +274,7 @@ app.include_router(route_reports.router)
 app.include_router(route_news_bias.router)
 app.include_router(route_version.router)
 app.include_router(route_strategies.router)
+app.include_router(route_supervisor.router)
 
 
 # === WebSocket 端点 ===
@@ -323,9 +325,18 @@ route_trades.engine_runner = engine_runner
 route_data.engine_runner = engine_runner
 route_reports.engine_runner = engine_runner
 route_news_bias.engine_runner = engine_runner
+route_supervisor.engine_runner = engine_runner
+# supervisor 路由需要引擎的监督者实例（延迟绑定，引擎启动后才有）
+def _wire_supervisor():
+    sv = getattr(engine_runner, 'supervisor', None)
+    if sv:
+        from dashboard.backend.routes import supervisor as sv_route
+        sv_route.supervisor = sv
+import threading
+threading.Timer(5.0, _wire_supervisor).start()
 try:
-    from engine_standalone.main import STRATEGY_MAP
-    route_engine.available_strategies = {k: True for k in STRATEGY_MAP}
+    from strategies.scanner import scan_strategies
+    route_engine.available_strategies = {k: True for k in scan_strategies()}
 except Exception:
     route_engine.available_strategies = {}
 

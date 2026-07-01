@@ -74,7 +74,7 @@ class NewsFilter:
             elapsed = now - last_fetch
             self._next_fetch = last_fetch + FETCH_INTERVAL
             logger.info(f"[新闻过滤] 日历有效（{elapsed/3600:.1f}h 前拉取），"
-                       f"下次拉取: {datetime.fromtimestamp(self._next_fetch).strftime('%m-%d %H:%M')}")
+                       f"下次拉取: {datetime.fromtimestamp(self._next_fetch, tz=settings.LOCAL_TZ).strftime('%m-%d %H:%M')}")
 
     def _read_config(self):
         """读取最新配置"""
@@ -170,7 +170,7 @@ class NewsFilter:
                 merged = list(self._cache)
                 self._save_to_db(merged)
                 logger.info(f"[新闻过滤] HTTP 拉取成功: {len(data)} 个事件, "
-                           f"下次拉取: {datetime.fromtimestamp(self._next_fetch).strftime('%m-%d %H:%M')}")
+                           f"下次拉取: {datetime.fromtimestamp(self._next_fetch, tz=settings.LOCAL_TZ).strftime('%m-%d %H:%M')}")
             else:
                 logger.warning(f"[新闻过滤] 日历格式异常: {type(data)}")
                 self._next_fetch = now + 3600  # 1h 后重试
