@@ -496,9 +496,9 @@ class M30RSIStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最高点回落（不论盈亏）
+            # 移动止盈：从最高点回落（仅盈利时触发，亏损时让硬止损兜底）
             drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult:
+            if drawdown > atr_val * trail_mult and current_profit > 0:
                 # DI止盈判定: +DI - -DI > 10 趋势仍强, 忽略止盈
                 adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["pdi"] - adx_data["ndi"]) > 10:
@@ -541,9 +541,9 @@ class M30RSIStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最低点反弹（不论盈亏）
+            # 移动止盈：从最低点反弹（仅盈利时触发，亏损时让硬止损兜底）
             rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult:
+            if rally > atr_val * trail_mult and current_profit > 0:
                 # DI止盈判定: -DI - +DI > 10 趋势仍强, 忽略止盈
                 adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["ndi"] - adx_data["pdi"]) > 10:

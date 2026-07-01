@@ -477,9 +477,9 @@ class GoldAutoResearchStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最高点回落（不论盈亏）
+            # 移动止盈：从最高点回落（仅盈利时触发，亏损时让硬止损兜底）
             drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult:
+            if drawdown > atr_val * trail_mult and current_profit > 0:
                 logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
                 self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                 del self._trail_data[ticket]
@@ -516,9 +516,9 @@ class GoldAutoResearchStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最低点反弹（不论盈亏）
+            # 移动止盈：从最低点反弹（仅盈利时触发，亏损时让硬止损兜底）
             rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult:
+            if rally > atr_val * trail_mult and current_profit > 0:
                 logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
                 self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                 del self._trail_data[ticket]

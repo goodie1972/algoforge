@@ -472,7 +472,7 @@ class M30MFIBBStrategy(BaseStrategy):
                         return True
 
             drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult:
+            if drawdown > atr_val * trail_mult and current_profit > 0:
                 adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["pdi"] - adx_data["ndi"]) > 10:
                     logger.info(f"[{self.name}] BUY DI跳过止盈 ticket={ticket} DIs={adx_data['pdi']-adx_data['ndi']:.1f}")
@@ -513,7 +513,7 @@ class M30MFIBBStrategy(BaseStrategy):
                         return True
 
             rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult:
+            if rally > atr_val * trail_mult and current_profit > 0:
                 adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["ndi"] - adx_data["pdi"]) > 10:
                     logger.info(f"[{self.name}] SELL DI跳过止盈 ticket={ticket} DIs={adx_data['ndi']-adx_data['pdi']:.1f}")
