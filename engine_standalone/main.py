@@ -24,29 +24,11 @@ from config import settings
 from core.bridge import create_bridge, OrderType
 from services.news_filter import NewsFilter
 from services.mtf_coordinator import MTFResonanceCoordinator
+from services.supervisor import TradeSupervisor
+from core.runtime_config import RuntimeConfig
 from data.downloader import download_timeframe
 from data import database as db
-from strategies.m30_rsi_20260630 import M30RSIStrategy
-from strategies.sanqing_h1_20260630 import SanQingH1Strategy
-from strategies.gold_autoresearch_h1_20260630 import GoldAutoResearchStrategy
-from strategies.bakome_backup import BAKOMEBackupStrategy
-from strategies.xaubot_backup import XAUBotBackupStrategy
-from strategies.stoch_trend_h1_20260630 import StochTrendH1Strategy
-from strategies.rsi_grading_m30_20260630 import RSIGradingM30Strategy
-from strategies.m30_mfi_bb_20260630 import M30MFIBBStrategy
-from strategies.m30_bb_deepreturn_20260630 import BBDeepReturnStrategy
-
-STRATEGY_MAP = {
-    "M30_rsi_bb": M30RSIStrategy,
-    "sanqing_h1": SanQingH1Strategy,
-    "gold_auto_research": GoldAutoResearchStrategy,
-    "bakome_backup": BAKOMEBackupStrategy,
-    "xaubot_backup": XAUBotBackupStrategy,
-    "stoch_trend_h1": StochTrendH1Strategy,
-    "rsi_grading_m30": RSIGradingM30Strategy,
-    "mfi_bb_m30": M30MFIBBStrategy,
-    "m30_bb_deepreturn": BBDeepReturnStrategy,
-}
+from strategies.scanner import scan_strategies
 
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
 if not logging.getLogger().handlers:
@@ -90,7 +72,7 @@ def create_strategies(bridge, pool=None):
         pool = settings.STRATEGY_POOL
     strategies = []
     for name, cfg in pool.items():
-        cls = STRATEGY_MAP.get(name)
+        cls = scan_strategies().get(name)
         if cls is None:
             logger.warning(f"未知策略: {name}，跳过")
             continue
@@ -129,6 +111,7 @@ class TradingEngine:
         self._last_report_time = 0
         self._report_interval = 4 * 3600
         self._config_mtime = 0.0
+        self._rtconfig_mtime = 0.0
         self._last_news_check = 0.0
         self._last_data_sync = 0.0
         self._data_sync_interval = 300  # 每300秒（5分钟）同步一次数据
@@ -144,6 +127,8 @@ class TradingEngine:
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
         self._load_closed_trades()
+        # 监督者系统
+        self.supervisor = TradeSupervisor()
         db.init_db()  # 确保所有表存在
         db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
 
@@ -187,9 +172,10 @@ class TradingEngine:
 
     def _get_coordinator(self):
         """获取协调器配置，RuntimeConfig 覆盖优先"""
-        if self._config_service is not None:
-            return self._config_service.get_coordinator_config()
-        return dict(settings.COORDINATOR_CONFIG)
+        try:
+            return RuntimeConfig().get_coordinator_config()
+        except Exception:
+            return dict(settings.COORDINATOR_CONFIG)
 
     def _calibrate_mt4_time(self):
         """启动时校准 MT4 服务器时间 vs 本机 UTC 时间"""
@@ -444,7 +430,7 @@ class TradingEngine:
             if any(s.magic == magic for s in self.strategies):
                 logger.warning(f"[策略动态添加] Magic {magic} 已被占用，跳过")
                 return False
-            cls = STRATEGY_MAP.get(name)
+            cls = scan_strategies().get(name)
             if cls is None:
                 logger.warning(f"[策略动态添加] 未知策略: {name}")
                 return False
@@ -844,9 +830,23 @@ class TradingEngine:
             if mtime > self._config_mtime:
                 self._config_mtime = mtime
                 importlib.reload(settings)
+                RuntimeConfig().reload()
                 for s in snapshot:
                     s.reload_config()
                 logger.info("[热重载] 配置已更新")
+        except OSError:
+            pass
+
+        # runtime_config.json 热重载（仪表盘配置变更时）
+        try:
+            from core.runtime_config import CONFIG_FILE
+            rt_mtime = os.path.getmtime(CONFIG_FILE)
+            if rt_mtime > self._rtconfig_mtime:
+                self._rtconfig_mtime = rt_mtime
+                RuntimeConfig().reload()
+                for s in snapshot:
+                    s.reload_config()
+                logger.info("[RuntimeConfig] 热重载完成")
         except OSError:
             pass
 
@@ -1313,6 +1313,10 @@ class TradingEngine:
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
+            # 通知监督者
+            if hasattr(self, 'supervisor'):
+                exit_type = exit_detail.get("exit_type", "strategy_exit")
+                self.supervisor.on_trade_close(record, exit_type)
             try:
                 with open(self._trades_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -1522,6 +1526,20 @@ class TradingEngine:
             }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
+            # 通知监督者
+            if hasattr(self, 'supervisor'):
+                direction = "BUY"
+                ed = self._entry_signal_data.get(ticket, {})
+                self.supervisor.on_trade_open(
+                    ticket=ticket, strategy=strategy.name,
+                    direction=direction, price=ask,
+                    magic=strategy.magic,
+                    entry_data={
+                        "entry_factors": ed.get("entry_factors", {}),
+                        "indicator_values": ed.get("indicator_values", {}),
+                        "scores": ed.get("scores", {}),
+                    },
+                )
         return ticket or 0
 
     def _execute_sell(self, strategy, signal_id=0):
@@ -1561,6 +1579,20 @@ class TradingEngine:
             }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
+            # 通知监督者
+            if hasattr(self, 'supervisor'):
+                direction = "SELL"
+                ed = self._entry_signal_data.get(ticket, {})
+                self.supervisor.on_trade_open(
+                    ticket=ticket, strategy=strategy.name,
+                    direction=direction, price=bid,
+                    magic=strategy.magic,
+                    entry_data={
+                        "entry_factors": ed.get("entry_factors", {}),
+                        "indicator_values": ed.get("indicator_values", {}),
+                        "scores": ed.get("scores", {}),
+                    },
+                )
         return ticket or 0
 
     def _get_balance(self) -> float:
@@ -1653,6 +1685,9 @@ class TradingEngine:
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
+            # 通知监督者
+            if hasattr(self, 'supervisor'):
+                self.supervisor.on_trade_close(record, reason)
             try:
                 with open(self._trades_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -1730,7 +1765,7 @@ class TradingEngine:
             return False
 
     def _sync_market_data(self):
-        """周期性同步 K 线数据到 SQLite（含协调器短周期）"""
+        """周期性同步 K 线数据到 SQLite（含交易终端展示周期）"""
         now = time.time()
         if now - self._last_data_sync < self._data_sync_interval:
             return
@@ -1746,6 +1781,9 @@ class TradingEngine:
             active_tfs.add("M15")
         if coord.get("m5_reverse_tp_enabled", False):
             active_tfs.add("M5")
+        # 交易终端展示需要的周期（确保 DB 中有数据，避免不同周期显示相同的 K 线图）
+        DISPLAY_TFS = {"M5", "M15", "H4", "D1", "W1"}
+        active_tfs.update(DISPLAY_TFS)
         if not active_tfs:
             return
 
