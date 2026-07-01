@@ -24,7 +24,7 @@ STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 661001, "date": "2026-06-26", "desc": "初始上线：MFI+BB 双模策略，ADX=25 分界"},
     {"version": "v2", "magic": 661001, "date": "2026-07-01", "desc": "MFI超买 80→70 不对称化，适应黄金慢涨急跌"},
-    {"version": "v3", "magic": 661001, "date": "2026-07-01", "desc": "ADX<25震荡模式跳过利润回撤止盈，靠ATR追踪+硬止损兜底，防极端位置被小回撤震出"},
+    {"version": "v3", "magic": 661001, "date": "2026-07-01", "desc": "ADX>25趋势模式profit_drawdown放宽至40%（原25%），让趋势单多跑"},
 ]
 
 
@@ -436,11 +436,7 @@ class M30MFIBBStrategy(BaseStrategy):
         pdd = self.profit_drawdown_pct
         _ax = self._calc_adx(14)
         if _ax and _ax.get("adx", 0) > 25:
-            pdd = max(pdd, 0.5)
-
-        # 震荡模式(ADX<25)下跳过利润回撤止盈，靠ATR追踪+硬止损兜底
-        # 均值回归开仓在极端位置，25%小回撤就被震出，参考DeepReturn分支出场设计
-        skip_profit_drawdown = _ax and _ax.get("adx", 0) < 25
+            pdd = max(pdd, 0.4)
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
