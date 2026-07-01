@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 STRATEGY_VERSION = "v13"
 STRATEGY_MAGIC = 660707
-STRATEGY_LEGACY_MAGICS = [660705, 660706]  # 旧版 magic，引擎启动时自动接管
+STRATEGY_LEGACY_MAGICS = [660705, 660706,
+]  # 旧版 magic，引擎启动时自动接管
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 660701, "date": "2026-06-08", "desc": "初始上线：5因子评分≥3，ATR跟踪止损 trail=4.0 hard=3.0"},
     {"version": "v2", "magic": 660702, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
@@ -33,7 +34,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v9", "magic": 660707, "date": "2026-06-22", "desc": "新增ADX>28趋势门禁(EMA9/21), RSI方向改3根连续确认"},
     {"version": "v10", "magic": 660707, "date": "2026-06-22", "desc": "新增DI止盈判定: 移动止盈触发时+DI- -DI>10(BUY)/-DI-+DI>10(SELL)则忽略止盈"},
     {"version": "v11", "magic": 660707, "date": "2026-06-22", "desc": "新增DI强度因子⑤: |DI差|>10 给±1分, 5因子评分阈值保持3"},
-    {"version": "v12", "magic": 660707, "date": "2026-07-01", "desc": "H1 MA20趋势门禁替代ADX门禁：H1下行禁BUY、H1上行禁SELL"},
+    {"version": "v12", "magic": 660707, "date": "2026-07-01", "desc": "H1 MA20趋势门禁替代ADX门禁"},
     {"version": "v13", "magic": 660707, "date": "2026-07-01", "desc": "H1门禁放过极值区：BB上轨10%外或RSI深超买时允许SELL，下轨10%外或深超卖时允许BUY"},
 ]
 
@@ -298,28 +299,14 @@ class M30RSIStrategy(BaseStrategy):
             elif di_diff < -10:
                 short_score += 1; short_detail.append(f"DI{di_diff:.0f}")
 
-        # ⑥ H1 趋势门禁：H1下行禁BUY，H1上行禁SELL
-        # 例外：价格在BB极值区（上下轨10%外）或RSI深区时放过，均值回归信号优先
+        # ⑥ H1 趋势门禁（只拦信号不扣分）
+        # 例外：价格在BB极值 + RSI极端同时满足时，确认真均值回归，放过
+        #   SHORT: H1=UP 但 price>=BB上轨 AND RSI>70 → 放过SELL
+        #   LONG:  H1=DOWN 但 price<=BB下轨 AND RSI<30 → 放过BUY
         self._load_h1_data()
         h1_trend = self._get_h1_trend(20)
-        if h1_trend == 'DOWN':
-            if close <= bb_bot_zone or rsi_val <= self.rsi_deep_oversold:
-                if long_score > 0:
-                    logger.info(f"[{self.name}] H1={h1_trend} 但价格极值，放过BUY")
-            else:
-                if long_score > 0:
-                    logger.info(f"[{self.name}] H1={h1_trend} 禁BUY (原LONG={long_score}分)")
-                long_score = 0
-                long_detail = [d for d in long_detail if d.startswith("COOLDOWN")]
-        elif h1_trend == 'UP':
-            if close >= bb_top_zone or rsi_val >= self.rsi_deep_overbought:
-                if short_score > 0:
-                    logger.info(f"[{self.name}] H1={h1_trend} 但价格极值，放过SELL")
-            else:
-                if short_score > 0:
-                    logger.info(f"[{self.name}] H1={h1_trend} 禁SELL (原SHORT={short_score}分)")
-                short_score = 0
-                short_detail = [d for d in short_detail if d.startswith("COOLDOWN")]
+        h1_block_long = h1_trend == 'DOWN' and not (close <= bb_bot_zone and rsi_val < 30)
+        h1_block_short = h1_trend == 'UP' and not (close >= bb_top_zone and rsi_val > 70)
 
         # --- Volume confirmation: vol > SMA20*1.3 ---
         vol_sma = self._calc_volume_sma()
@@ -354,29 +341,32 @@ class M30RSIStrategy(BaseStrategy):
                 logger.info(f"[{self.name}] SELL冷却中: 盈利平仓后还剩{int(remaining)}秒")
                 short_score = 0
 
-        # ── Decision（双层判决：≥4直接开，=3需diff≥2）──
+        # ── Decision（双层判决：≥4直接开，=3需diff≥2）+ H1门禁拦截 ──
         diff = long_score - short_score
         signal = None
         signal_str = "无信号"
-        if long_score >= self.score_threshold + 1:
+        if long_score >= self.score_threshold + 1 and not h1_block_long:
             signal = OrderType.BUY
             signal_str = "LONG"
-        elif short_score >= self.score_threshold + 1:
+        elif short_score >= self.score_threshold + 1 and not h1_block_short:
             signal = OrderType.SELL
             signal_str = "SELL"
-        elif long_score >= self.score_threshold and diff >= 2:
+        elif long_score >= self.score_threshold and diff >= 2 and not h1_block_long:
             signal = OrderType.BUY
             signal_str = f"LONG(diff={diff})"
-        elif short_score >= self.score_threshold and -diff >= 2:
+        elif short_score >= self.score_threshold and -diff >= 2 and not h1_block_short:
             signal = OrderType.SELL
             signal_str = f"SELL(diff={-diff})"
 
         # ── Logging ──
+        gate_log = ""
+        if h1_block_long: gate_log = " [H1禁BUY]"
+        elif h1_block_short: gate_log = " [H1禁SELL]"
         detail_parts = []
         if long_detail: detail_parts.append("LONG: " + " ".join(long_detail))
         if short_detail: detail_parts.append("SHORT: " + " ".join(short_detail))
         logger.info(
-            f"[{self.name}] 评分: {long_score}/{short_score}  {signal_str}  "
+            f"[{self.name}] 评分: {long_score}/{short_score}{gate_log}  {signal_str}  "
             f"明细: {' | '.join(detail_parts) if detail_parts else '无'}"
         )
         adx_log = f" ADX={adx_data['adx']:.1f}" if adx_data else ""
