@@ -18,13 +18,14 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v3"
+STRATEGY_VERSION = "v4"
 STRATEGY_MAGIC = 661001
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 661001, "date": "2026-06-26", "desc": "初始上线：MFI+BB 双模策略，ADX=25 分界"},
     {"version": "v2", "magic": 661001, "date": "2026-07-01", "desc": "MFI超买 80→70 不对称化，适应黄金慢涨急跌"},
     {"version": "v3", "magic": 661001, "date": "2026-07-01", "desc": "ADX>25趋势模式profit_drawdown放宽至40%（原25%），让趋势单多跑"},
+    {"version": "v4", "magic": 661001, "date": "2026-07-01", "desc": "趋势模式MFI中值回调(40-60)作为核心入场条件，未满足时即使总分达标也不开仓"},
 ]
 
 
@@ -321,8 +322,16 @@ class M30MFIBBStrategy(BaseStrategy):
         if is_trend:
             if pdi > ndi:
                 short_score = 0  # 顺势偏多，不做空
+                # MFI 中值回调是趋势模式核心入场条件，未满足时不开
+                if not (self.mfi_mid_low <= mfi_val <= self.mfi_mid_high):
+                    logger.info(f"[{self.name}] [TREND] MFI={mfi_val:.1f} 不在中值区，放弃BUY")
+                    long_score = 0
             else:
                 long_score = 0   # 顺势偏空，不做多
+                # MFI 中值回调是趋势模式核心入场条件，未满足时不开
+                if not (self.mfi_mid_low <= mfi_val <= self.mfi_mid_high):
+                    logger.info(f"[{self.name}] [TREND] MFI={mfi_val:.1f} 不在中值区，放弃SELL")
+                    short_score = 0
 
         now = time.time()
 
