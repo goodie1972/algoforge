@@ -89,7 +89,7 @@ ADX>28 门禁已移除（2026-06-30）→ **H1 MA20 趋势门禁**（2026-07-01 
 
 **状态**: ✅ 活跃 | v6 | Magic 880306 | 周期 H1
 
-**入场**: 四因子共识（4/4 必须全过）
+**入场**: 四因子共识（4/4 必须全过）+ **H4 SMA50 趋势门禁**（H4=DOWN 禁BUY，H4=UP 禁SELL，防反弹诱多/诱空）
 | 因子 | 条件 | 方向 |
 |---|---|---|
 | ① 趋势 | EMA10 vs EMA20 | UP/DOWN |
@@ -204,6 +204,7 @@ ADX>28 门禁已移除（2026-06-30）→ **H1 MA20 趋势门禁**（2026-07-01 
 | 变更 | 影响 |
 |---|---|
 | H1 MA20 趋势门禁（H1=DOWN禁BUY，H1=UP禁SELL） | m30_rsi |
+| H4 SMA50 趋势门禁（H4=DOWN禁BUY，H4=UP禁SELL） | gold_autoresearch_h1 |
 | MFI 超买 80→70 不对称化 | m30_mfi_bb, m30_bb_deepreturn |
 | 新增策略文档 | m30_mfi_bb.md, m30_bb_deepreturn.md |
 
