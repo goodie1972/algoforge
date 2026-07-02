@@ -114,6 +114,14 @@ SELL = trend_dn AND mom_dn AND vol_active AND safe_dn AND H4 ≠ UP
 
 **四个条件必须全部满足 + H4 趋势不矛盾。没有评分、没有加权、没有折中。**
 
+### 运动员 tick 验证 (_verify_entry)
+
+策略发出候选信号后，运动员每 tick 用实时价格 + 数据工厂最新指标独立重算入场条件：
+
+- TREND（EMA9/21）方向 + SAFE（RSI）不超72/不低于32
+
+10秒过期作废。验证失败保留在队列等下一次 tick。
+
 ## 出场逻辑
 
 三层退出机制，同标准实现。

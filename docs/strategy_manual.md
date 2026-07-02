@@ -29,7 +29,35 @@
 | 急跌急涨 | lookback=30, threshold=1.5%, ADX跳过=25 | 急跌处禁空、急涨处禁多；ADX>25 跳过 |
 | News-Bias | 读取 bias_state | 偏空禁BUY、偏多禁SELL |
 
-### 1.3 出场层级
+### 1.3 数据工厂统一指标 (v2.0.0)
+
+DataFactory 独立线程从 TA-Lib 预计算所有公共指标，写入全局缓存。策略通过 `get_indicator(key)` 读取，无需自行桥接。
+
+| 指标 | 缓存 key | 周期 | TA-Lib 函数 |
+|:----|:----|:---:|:-----|
+| RSI | `rsi` / `rsi_5` / `rsi_10` | M15/M30/H1/H4 | RSI(14/5/10) |
+| MFI | `mfi` | 同上 | MFI(14) |
+| BB | `bb{upper,mid,lower}` | 同上 | BBANDS(20,2,2) |
+| EMA | `ema_9` / `ema_21` | 同上 | EMA(9/21) |
+| SMA | `sma_14` / `sma_20` / `sma_50` | 同上 | SMA(14/20/50) |
+| ATR | `atr` / `atr_20` | 同上 | ATR(14/20) |
+| ADX | `adx` / `pdi` / `ndi` | 同上 | ADX/PLUS_DI/MINUS_DI(14) |
+| MACD | `macd{macd,signal}` | 同上 | MACD(12,26,9) |
+| Stoch | `stoch_14_3_3` / `stoch_21_5_3` | 同上 | STOCH(14,3,3)/(21,5,3) |
+| Trend | `trend` | 同上 | close vs SMA(14) |
+| VolSMA | `volume_sma_20` | 同上 | SMA(vol,20) |
+
+策略独有指标（TA-Lib K线形态、MACD序列等）由各策略自行计算。
+
+### 三轨架构说明
+
+v2.0.0 引入三轨架构：
+
+- **轨1: DataFactory** — 独立线程，双桥接(exec+data)，增量拉取K线，TA-Lib统一计算指标
+- **轨2: 策略员** — 主引擎循环，读缓存指标，评分达标出门票（候选信号）
+- **轨3: 运动员** — tick验证层，实时重算入场条件，10秒过期作废
+
+### 1.4 出场层级
 
 | 层 | 类型 | 说明 |
 |---|---|---|
@@ -40,7 +68,7 @@
 | 5 | DI 跳过 | 盈利+强趋势(DI差>10)跳过追踪 |
 | 6 | 硬止损 | 亏损 > hard_mult×ATR |
 
-### 1.4 指标标准
+### 1.5 指标标准
 
 | 指标 | 标准 |
 |---|---|

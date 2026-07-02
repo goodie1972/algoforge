@@ -288,3 +288,16 @@ class EntryScoreProStrategy(BaseStrategy):
 
         self._last_exit_detail = None
         return False
+
+    @staticmethod
+    def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+        """默认验证：tick 价不跑出 BB 边界"""
+        direction = signal.get("direction", "BUY")
+        bb = latest.get("bb") or signal.get("indicator_values", {}).get("bb") or {}
+        if direction == "BUY":
+            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                return False
+        else:
+            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                return False
+        return True
