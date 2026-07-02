@@ -245,7 +245,7 @@ async def lifespan(app: FastAPI):
 # === FastAPI 应用 ===
 app = FastAPI(
     title="XAUUSD Trading Dashboard",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
