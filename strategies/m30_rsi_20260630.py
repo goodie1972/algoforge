@@ -505,3 +505,34 @@ class M30RSIStrategy(BaseStrategy):
 
         self._last_exit_detail = None
         return False
+
+    @staticmethod
+    def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+            '''用最新 tick 价 + 工厂缓存重算入场条件'''
+            direction = signal.get("direction", "BUY")
+            bb = latest.get("bb") or {}
+            rsi = latest.get("rsi", 50)
+            pdi = latest.get("pdi", 15)
+            ndi = latest.get("ndi", 15)
+            trend = latest.get("trend", "NEUTRAL")
+            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+
+            if direction == "BUY":
+                if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                    return False
+                if any(f.startswith("RSI-") for f in factors) and rsi > 45:
+                    return False
+                if any(f.startswith("DI+") for f in factors) and pdi <= ndi:
+                    return False
+                if any(f in ("M30-UP","MA20-UP") for f in factors) and trend != "UP":
+                    return False
+            else:
+                if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                    return False
+                if any(f.startswith("RSI-") for f in factors) and rsi < 55:
+                    return False
+                if any(f.startswith("DI-") or f.startswith("DI") for f in factors) and ndi <= pdi:
+                    return False
+                if any(f in ("M30-DN","MA20-DN") for f in factors) and trend != "DOWN":
+                    return False
+            return True

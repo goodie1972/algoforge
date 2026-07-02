@@ -259,8 +259,8 @@ class GoldAutoResearchStrategy(BaseStrategy):
         n = len(closes)
 
         # ── ① Trend: EMA10 vs EMA20 ──
-        ema10 = self.get_indicator("ema_10")
-        ema20 = self.get_indicator("ema_20")
+        ema10 = self.get_indicator("ema_9")
+        ema20 = self.get_indicator("ema_21")
         if ema10 is None or ema20 is None:
             return None
         trend_up = ema10 > ema20
@@ -383,8 +383,8 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
     def _get_trend(self) -> str:
         """EMA10/20 trend: 'UP' / 'DOWN' / 'NEUTRAL'"""
-        ema10 = self.get_indicator("ema_10")
-        ema20 = self.get_indicator("ema_20")
+        ema10 = self.get_indicator("ema_9")
+        ema20 = self.get_indicator("ema_21")
         if ema10 is None or ema20 is None:
             return 'NEUTRAL'
         return 'UP' if ema10 > ema20 else 'DOWN'
@@ -527,3 +527,25 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
         self._last_exit_detail = None
         return False
+
+    @staticmethod
+    def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+            direction = signal.get("direction", "BUY")
+            ema10, ema20 = latest.get("ema_9"), latest.get("ema_21")
+            rsi = latest.get("rsi", 50)
+            adx = latest.get("adx", 20)
+            trend_up = ema10 and ema20 and ema10 > ema20
+            trend_dn = ema10 and ema20 and ema10 < ema20
+            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+
+            if direction == "BUY":
+                if any(f == "TREND-UP" for f in factors) and not trend_up:
+                    return False
+                if any(f == "SAFE-UP" for f in factors) and rsi > 72:
+                    return False
+            else:
+                if any(f == "TREND-DN" for f in factors) and not trend_dn:
+                    return False
+                if any(f == "SAFE-DN" for f in factors) and rsi < 32:
+                    return False
+            return True

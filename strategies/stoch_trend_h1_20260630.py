@@ -190,7 +190,7 @@ class StochTrendH1Strategy(BaseStrategy):
         if adx_data is None:
             return None
 
-        ma_val = self.get_indicator("ema_20")
+        ma_val = self.get_indicator("ema_21")
         if ma_val is None:
             return None
 
@@ -371,3 +371,27 @@ class StochTrendH1Strategy(BaseStrategy):
 
         self._last_exit_detail = None
         return False
+
+    @staticmethod
+    def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+            direction = signal.get("direction", "BUY")
+            adx = latest.get("adx", 20)
+            pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
+            stoch = latest.get("stoch_21_5_3") or {}
+            stoch_k = stoch.get("k", 50)
+
+            if direction == "BUY":
+                if adx < 25:
+                    return False
+                if pdi <= ndi:
+                    return False
+                if stoch_k > 40:
+                    return False
+            else:
+                if adx < 25:
+                    return False
+                if ndi <= pdi:
+                    return False
+                if stoch_k < 60:
+                    return False
+            return True

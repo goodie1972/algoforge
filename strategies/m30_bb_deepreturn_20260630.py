@@ -500,3 +500,27 @@ class BBDeepReturnStrategy(BaseStrategy):
         direction = "BUY" if is_buy else "SELL"
         self._last_profit_exit_time[direction] = time.time()
         self._trail_data.pop(ticket, None)
+
+    @staticmethod
+    def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+            direction = signal.get("direction", "BUY")
+            bb = latest.get("bb") or {}
+            mfi = latest.get("mfi", 50)
+            trend = latest.get("trend", "NEUTRAL")
+            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+
+            if direction == "BUY":
+                if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                    return False
+                if any(f.startswith("MFI-") for f in factors) and mfi > 45:
+                    return False
+                if any(f == "MA20-UP" for f in factors) and trend != "UP":
+                    return False
+            else:
+                if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                    return False
+                if any(f.startswith("MFI-") for f in factors) and mfi < 55:
+                    return False
+                if any(f == "MA20-DN" for f in factors) and trend != "DOWN":
+                    return False
+            return True

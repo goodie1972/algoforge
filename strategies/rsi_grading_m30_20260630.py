@@ -163,8 +163,8 @@ class RSIGradingM30Strategy(BaseStrategy):
         # ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
         gate_side = None  # None=无门禁, 'long'=禁多, 'short'=禁空
         if adx is not None and adx > self.adx_threshold:
-            ema9 = self.get_indicator("ema_10")
-            ema21 = self.get_indicator("ema_20")
+            ema9 = self.get_indicator("ema_9")
+            ema21 = self.get_indicator("ema_21")
             if ema9 is not None and ema21 is not None:
                 if ema9 > ema21:
                     gate_side = 'short'
@@ -203,8 +203,8 @@ class RSIGradingM30Strategy(BaseStrategy):
         gate_log = ""
         if gate_side:
             gate_log = " [门禁]" + ("禁空" if gate_side == 'short' else "禁多")
-        ema9_v = ema9 if 'ema9' in dir() else self.get_indicator("ema_10")
-        ema21_v = ema21 if 'ema21' in dir() else self.get_indicator("ema_20")
+        ema9_v = ema9 if 'ema9' in dir() else self.get_indicator("ema_9")
+        ema21_v = ema21 if 'ema21' in dir() else self.get_indicator("ema_21")
         ema_log = ""
         if ema9_v is not None and ema21_v is not None:
             ema_log = f" EMA9={ema9_v:.2f} EMA21={ema21_v:.2f}"
@@ -247,8 +247,8 @@ class RSIGradingM30Strategy(BaseStrategy):
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
         """EMA9/21 趋势感知: 顺趋势宽, 逆趋势窄"""
-        ema9 = self.get_indicator("ema_10")
-        ema21 = self.get_indicator("ema_20")
+        ema9 = self.get_indicator("ema_9")
+        ema21 = self.get_indicator("ema_21")
         trend_up = ema9 is not None and ema21 is not None and ema9 > ema21
 
         if (is_buy and trend_up) or (not is_buy and not trend_up):

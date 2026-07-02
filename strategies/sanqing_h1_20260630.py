@@ -111,8 +111,8 @@ class SanQingH1Strategy(BaseStrategy):
         volume = volumes[-1] if len(volumes) > 0 else 0
 
         # EMA9/21
-        ema9 = self.get_indicator("ema_10")
-        ema21 = self.get_indicator("ema_20")
+        ema9 = self.get_indicator("ema_9")
+        ema21 = self.get_indicator("ema_21")
         if ema9 is None or ema21 is None:
             return None
         ema9_p = self._calc_ema(closes[:-1], 9)
@@ -246,8 +246,8 @@ class SanQingH1Strategy(BaseStrategy):
 
     def _get_trend(self) -> str:
         """EMA9/21 trend: 'UP' / 'DOWN' / 'NEUTRAL'"""
-        ema9 = self.get_indicator("ema_10")
-        ema21 = self.get_indicator("ema_20")
+        ema9 = self.get_indicator("ema_9")
+        ema21 = self.get_indicator("ema_21")
         if ema9 is None or ema21 is None:
             return 'NEUTRAL'
         return 'UP' if ema9 > ema21 else 'DOWN'
