@@ -184,8 +184,8 @@ def _talib_indicators(candles: list, tf: str) -> dict:
 class DataFactory:
     """数据工厂 — 独立线程维护所有周期缓存"""
 
-    def __init__(self, bridges: list):
-        self._bridges = bridges  # [data_bridge_a, data_bridge_b, tick_bridge, _]
+    def __init__(self, bridge):
+        self._bridge = bridge
         self._running = False
         self._thread = None
 
@@ -206,23 +206,14 @@ class DataFactory:
         self._initial_load()
         logger.info("[数据工厂] 首次加载完成，进入增量循环")
         while self._running:
-            threads = [
-                threading.Thread(target=self._sync_tf, args=("M15", self._bridges[0])),
-                threading.Thread(target=self._sync_tf, args=("M30", self._bridges[0])),
-                threading.Thread(target=self._sync_tf, args=("H1",  self._bridges[1])),
-                threading.Thread(target=self._sync_tf, args=("H4",  self._bridges[1])),
-                threading.Thread(target=self._sync_tick, args=(self._bridges[2],)),
-            ]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
+            for tf in ["M15", "M30", "H1", "H4"]:
+                self._sync_tf(tf, self._bridge)
+            self._sync_tick(self._bridge)
             time.sleep(0.3)
 
     def _initial_load(self):
-        for tf, bridge in [("M15", self._bridges[0]), ("M30", self._bridges[0]),
-                           ("H1", self._bridges[1]), ("H4", self._bridges[1])]:
-            self._sync_tf(tf, bridge, full=True)
+        for tf in ["M15", "M30", "H1", "H4"]:
+            self._sync_tf(tf, self._bridge, full=True)
 
     def _sync_tf(self, tf: str, bridge, full: bool = False):
         try:

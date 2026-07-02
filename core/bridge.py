@@ -154,11 +154,9 @@ def create_bridge() -> MT4BridgeBase:
 
 
 def create_bridge_pair():
-    """创建 4 个独立桥接实例（留给 EA V3 多客户端用）"""
+    """创建双桥接：data_bridge(推流) + exec_bridge(下单)"""
     from core.freemt4_bridge import FreeMT4Bridge
-    return [
-        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-data-a"),   # 数据推流 M15/M30
-        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-data-b"),   # 数据推流 H1/H4
-        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-tick"),     # tick 价格
-        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-exec"),     # 命令执行
-    ]
+    return (
+        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="data"),
+        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="exec"),
+    )

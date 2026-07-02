@@ -61,19 +61,26 @@ class BaseStrategy(abc.ABC):
         return {self.magic} | set(self.legacy_magics)
 
     def refresh_data(self, count: int = 200):
-        """从数据工厂缓存读取 K 线数据"""
+        """从数据工厂缓存读取 K 线数据 + 预计算指标"""
         try:
             from services.data_factory import get_cache
             cached = get_cache(self.timeframe)
-            if cached and "candles" in cached:
+            # 检查缓存中既有 candle 又有指标（rsi 做探针）
+            if cached and "candles" in cached and "rsi" in cached:
                 self.candles = cached.get("candles", [])
                 self._cached_indicators = cached
                 return
         except Exception:
             pass
-        # fallback：数据工厂不可用时从桥接获取
+        # fallback：从桥接获取 candle + 本地计算指标
         raw = self.bridge.get_candles(self.symbol, self.timeframe, count)
         self.candles = list(reversed(raw)) if raw else []
+        if self.candles:
+            try:
+                from services.data_factory import _talib_indicators
+                self._cached_indicators = _talib_indicators(self.candles, self.timeframe)
+            except Exception:
+                self._cached_indicators = {}
 
     def get_close_prices(self) -> list[float]:
         """获取收盘价序列"""
