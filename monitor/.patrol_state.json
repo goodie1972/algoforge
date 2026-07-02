@@ -1,0 +1,886 @@
+{
+  "positions": [],
+  "engine_running": true,
+  "bridge_connected": true,
+  "last_price": 0,
+  "reported_sl_4480": false,
+  "reported_deviation": 175.76000000000022,
+  "last_pos_tickets": [],
+  "last_closed_tickets": [],
+  "last_closed_analysis": {
+    "89624960": {
+      "ticket": 89624960,
+      "strategy": "rsi_turn_m30",
+      "magic": 777888,
+      "direction": "BUY",
+      "entry_price": 4457.62,
+      "exit_price": 4441.7,
+      "pnl": -15.92,
+      "hold_seconds": 1787,
+      "sl": 4435.12,
+      "tp": 445741.0,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -15.92,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89555203": {
+      "ticket": 89555203,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4482.1,
+      "exit_price": 4476.8,
+      "pnl": -5.3,
+      "hold_seconds": 4500,
+      "sl": 4474.1,
+      "tp": 99999,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -5.3,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89734148": {
+      "ticket": 89734148,
+      "strategy": "sanqing_h1",
+      "magic": 777002,
+      "direction": "SELL",
+      "entry_price": 4285.24,
+      "exit_price": 4311.43,
+      "pnl": -26.19,
+      "hold_seconds": 88,
+      "sl": 4359.24,
+      "tp": 575.44,
+      "entry_analysis": {
+        "system": "6\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf\uff0c\u8bc4\u5206 \u2265 5 \u89e6\u53d1",
+        "threshold": 5,
+        "factors": [
+          [
+            "EMA9/21 \u8d8b\u52bf",
+            "\u591a\u5934\u6392\u5217 +2 / \u7a7a\u5934\u6392\u5217 +2 / \u91d1\u53c9\u6b7b\u53c9 +1"
+          ],
+          [
+            "EMA9 \u652f\u6491/\u963b\u529b",
+            "\u4ef7\u683c\u56de\u8e29 EMA9 \u4e0d\u7834(\u591a)/\u53cd\u5f39 EMA9 \u4e0d\u8fc7(\u7a7a) +2"
+          ],
+          [
+            "\u5b9e\u4f53/ATR \u6bd4\u503c",
+            "K\u7ebf\u5b9e\u4f53 > 1.0 ATR +1"
+          ],
+          [
+            "\u6210\u4ea4\u91cf\u653e\u5927",
+            "\u6210\u4ea4\u91cf > 21\u65e5\u5747\u91cf\u00d71.3 +1"
+          ],
+          [
+            "K\u7ebf\u5b9e\u4f53\u6269\u5f20",
+            "\u5b9e\u4f53 > 5\u65e5\u5747\u91cf\u4e2d\u4f4d\u6570\u00d71.5 +2"
+          ]
+        ],
+        "likely_conditions": [
+          "EMA9/21 \u7a7a\u5934\u6392\u5217",
+          "\u4ef7\u683c\u6d4b\u8bd5 EMA9 \u963b\u529b"
+        ]
+      },
+      "exit_analysis": {
+        "label": "\u7b56\u7565\u51fa\u573a",
+        "logic": "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\uff1a\u2460\u5229\u6da6\u56de\u64a4\u6b62\u76c8(peak\u219225%\u56de\u64a4) \u2461ATR \u79fb\u52a8\u6b62\u76c8(trail_mult) \u2462\u786c\u6b62\u635f(hard_mult)",
+        "exit_trigger": "\u672a\u77e5",
+        "pnl": -26.19,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\u89e6\u53d1\uff0c\u672a\u5230\u786c\u6b62\u635f\u6c34\u4f4d\u5373\u88ab\u79fb\u52a8\u6b62\u76c8\u51fa\u573a\uff08\u65e7\u7248\u903b\u8f91\uff09",
+            "\u7a7a\u5355\u5728 H1 \u4e0b\u8dcc\u8d8b\u52bf\u4e2d\u53cd\u5f39\u88ab\u626b\uff0cATR trail_mult=1.5 \u504f\u7d27"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\uff1aH1 \u8d8b\u52bf\u5f3a\u52b2\u53cd\u5f39\u65f6\uff0c\u9002\u5f53\u589e\u5927\u9996\u5355 ATR \u786c\u6b62\u635f\u500d\u6570",
+            "\u5f53\u524d H1 DOWN \u8d8b\u52bf\u4e0b SELL \u7684 trail_mult \u4e3a 1.5\uff08\u987a\u52bf\u504f\u677e\uff09\uff0c\n\u4f46\u5b9e\u9645\u6548\u679c\u662f\u4e8f\u635f\u65f6\u4e5f\u89e6\u53d1\uff0c\u5df2\u4fee\u590d\u4e3a\u4ec5\u76c8\u5229\u65f6\u8ffd\u8e2a",
+            "sanqing_h1 \u8bc4\u5206\u9608\u503c\u8f83\u9ad8(5)\uff0c\u5173\u6ce8\u4fe1\u53f7\u7cbe\u786e\u6027",
+            "\u3010\u5df2\u4fee\u590d\u3011\u4e8f\u635f\u72b6\u6001\u4e0b\u4e0d\u518d\u89e6\u53d1\u79fb\u52a8\u6b62\u76c8\uff0c\u4ec5\u8d70\u786c\u6b62\u635f"
+          ]
+        }
+      }
+    },
+    "89567625": {
+      "ticket": 89567625,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4473.78,
+      "exit_price": 4459.68,
+      "pnl": -14.1,
+      "hold_seconds": 1090,
+      "sl": 4460.08,
+      "tp": 5930.36,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -14.1,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89744148": {
+      "ticket": 89744148,
+      "strategy": "M30_rsi_bb",
+      "magic": 777001,
+      "direction": "SELL",
+      "entry_price": 4299.66,
+      "exit_price": 4328.25,
+      "pnl": -28.59,
+      "hold_seconds": 717,
+      "sl": 4347.45,
+      "tp": 1901.65,
+      "entry_analysis": {
+        "system": "5\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf\uff0c\u8bc4\u5206 \u2265 3 \u89e6\u53d1",
+        "threshold": 3,
+        "factors": [
+          {
+            "name": "H1 \u8d8b\u52bf",
+            "desc": "H1 SMA200 \u5224\u65ad\u8d8b\u52bf\u65b9\u5411\uff0c\u987a\u52bf +1 \u5206"
+          },
+          {
+            "name": "BB \u89e6\u8f68",
+            "desc": "\u4ef7\u683c\u89e6\u53ca\u5e03\u6797\u5e26\u4e0a\u8f68(\u7a7a)/\u4e0b\u8f68(\u591a) +1 \u5206"
+          },
+          {
+            "name": "RSI \u6781\u7aef",
+            "desc": "RSI \u8d85\u4e70(>65)/\u8d85\u5356(<30) +1 \u5206"
+          },
+          {
+            "name": "M30 RSI \u65b9\u5411",
+            "desc": "M30 RSI \u4e0a\u5347(\u591a)/\u4e0b\u964d(\u7a7a) +1 \u5206"
+          },
+          {
+            "name": "\u4f4e\u6ce2\u52a8\u7387",
+            "desc": "ATR < \u5747\u4ef7\u00d72.5% \u65f6 +1 \u5206"
+          }
+        ],
+        "likely_conditions": [
+          "H1 \u8d8b\u52bf DOWN",
+          "BB \u4e0a\u8f68\u89e6\u8f68",
+          "RSI \u8d85\u4e70\u533a\u57df"
+        ]
+      },
+      "exit_analysis": {
+        "label": "\u7b56\u7565\u51fa\u573a",
+        "logic": "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\uff1a\u2460\u5229\u6da6\u56de\u64a4\u6b62\u76c8(peak\u219225%\u56de\u64a4) \u2461ATR \u79fb\u52a8\u6b62\u76c8(trail_mult) \u2462\u786c\u6b62\u635f(hard_mult)",
+        "exit_trigger": "\u672a\u77e5",
+        "pnl": -28.59,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\u89e6\u53d1\uff0c\u672a\u5230\u786c\u6b62\u635f\u6c34\u4f4d\u5373\u88ab\u79fb\u52a8\u6b62\u76c8\u51fa\u573a\uff08\u65e7\u7248\u903b\u8f91\uff09",
+            "\u7a7a\u5355\u5728 H1 \u4e0b\u8dcc\u8d8b\u52bf\u4e2d\u53cd\u5f39\u88ab\u626b\uff0cATR trail_mult=1.5 \u504f\u7d27"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\uff1aH1 \u8d8b\u52bf\u5f3a\u52b2\u53cd\u5f39\u65f6\uff0c\u9002\u5f53\u589e\u5927\u9996\u5355 ATR \u786c\u6b62\u635f\u500d\u6570",
+            "M30_rsi_bb \u80dc\u7387\u8f83\u9ad8(70%)\u4f46\u76c8\u4e8f\u6bd4\u504f\u4f4e\uff0c\u5173\u6ce8\u5355\u7b14\u4e8f\u635f\u63a7\u5236",
+            "\u5f53\u524d H1 DOWN \u8d8b\u52bf\u4e0b SELL \u7684 trail_mult \u4e3a 1.5\uff08\u987a\u52bf\u504f\u677e\uff09\uff0c\n\u4f46\u5b9e\u9645\u6548\u679c\u662f\u4e8f\u635f\u65f6\u4e5f\u89e6\u53d1\uff0c\u5df2\u4fee\u590d\u4e3a\u4ec5\u76c8\u5229\u65f6\u8ffd\u8e2a",
+            "\u3010\u5df2\u4fee\u590d\u3011\u4e8f\u635f\u72b6\u6001\u4e0b\u4e0d\u518d\u89e6\u53d1\u79fb\u52a8\u6b62\u76c8\uff0c\u4ec5\u8d70\u786c\u6b62\u635f"
+          ]
+        }
+      }
+    },
+    "89555607": {
+      "ticket": 89555607,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4475.3,
+      "exit_price": 4470.1,
+      "pnl": -5.2,
+      "hold_seconds": 4500,
+      "sl": 4467.3,
+      "tp": 99999,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -5.2,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89725595": {
+      "ticket": 89725595,
+      "strategy": "magic_666666",
+      "magic": 666666,
+      "direction": "BUY",
+      "entry_price": 4340.67,
+      "exit_price": 4338.71,
+      "pnl": -1.96,
+      "hold_seconds": 780,
+      "sl": 4275.36,
+      "tp": 7607.19,
+      "entry_analysis": {
+        "system": "8\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf\uff08\u4ec5\u505a\u591a\uff09\uff0c\u8bc4\u5206 \u2265 3 \u89e6\u53d1",
+        "threshold": 3,
+        "factors": [
+          [
+            "H1 EMA20 \u659c\u7387",
+            "EMA20 \u4e0a\u884c\u8d8b\u52bf +2"
+          ],
+          [
+            "M30 RSI \u65b9\u5411",
+            "RSI \u4ece\u4f4e\u4f4d\u56de\u5347 +1"
+          ],
+          [
+            "K\u7ebf\u5f62\u6001",
+            "\u770b\u6da8\u541e\u6ca1/\u9524\u5b50\u7ebf\u7b49 +1"
+          ],
+          [
+            "\u6210\u4ea4\u91cf\u786e\u8ba4",
+            "\u653e\u91cf\u4e0a\u6da8 +1"
+          ],
+          [
+            "ATR \u6ce2\u52a8\u7387",
+            "\u4f4e\u6ce2\u52a8\u540e\u542f\u52a8 +1"
+          ]
+        ],
+        "likely_conditions": [
+          "H1 \u4e0a\u884c\u8d8b\u52bf",
+          "RSI \u4ece\u4f4e\u4f4d\u56de\u5347",
+          "EMA20 \u659c\u7387\u5411\u4e0a"
+        ]
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -1.96,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89569565": {
+      "ticket": 89569565,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4464.07,
+      "exit_price": 4447.61,
+      "pnl": -16.46,
+      "hold_seconds": 1718,
+      "sl": 4448.09,
+      "tp": 6055.59,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -16.46,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89733928": {
+      "ticket": 89733928,
+      "strategy": "M30_rsi_bb",
+      "magic": 777001,
+      "direction": "SELL",
+      "entry_price": 4287.17,
+      "exit_price": 4314.5,
+      "pnl": -27.33,
+      "hold_seconds": 183,
+      "sl": 4339.31,
+      "tp": 1690.04,
+      "entry_analysis": {
+        "system": "5\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf\uff0c\u8bc4\u5206 \u2265 3 \u89e6\u53d1",
+        "threshold": 3,
+        "factors": [
+          {
+            "name": "H1 \u8d8b\u52bf",
+            "desc": "H1 SMA200 \u5224\u65ad\u8d8b\u52bf\u65b9\u5411\uff0c\u987a\u52bf +1 \u5206"
+          },
+          {
+            "name": "BB \u89e6\u8f68",
+            "desc": "\u4ef7\u683c\u89e6\u53ca\u5e03\u6797\u5e26\u4e0a\u8f68(\u7a7a)/\u4e0b\u8f68(\u591a) +1 \u5206"
+          },
+          {
+            "name": "RSI \u6781\u7aef",
+            "desc": "RSI \u8d85\u4e70(>65)/\u8d85\u5356(<30) +1 \u5206"
+          },
+          {
+            "name": "M30 RSI \u65b9\u5411",
+            "desc": "M30 RSI \u4e0a\u5347(\u591a)/\u4e0b\u964d(\u7a7a) +1 \u5206"
+          },
+          {
+            "name": "\u4f4e\u6ce2\u52a8\u7387",
+            "desc": "ATR < \u5747\u4ef7\u00d72.5% \u65f6 +1 \u5206"
+          }
+        ],
+        "likely_conditions": [
+          "H1 \u8d8b\u52bf DOWN",
+          "BB \u4e0a\u8f68\u89e6\u8f68",
+          "RSI \u8d85\u4e70\u533a\u57df"
+        ]
+      },
+      "exit_analysis": {
+        "label": "\u7b56\u7565\u51fa\u573a",
+        "logic": "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\uff1a\u2460\u5229\u6da6\u56de\u64a4\u6b62\u76c8(peak\u219225%\u56de\u64a4) \u2461ATR \u79fb\u52a8\u6b62\u76c8(trail_mult) \u2462\u786c\u6b62\u635f(hard_mult)",
+        "exit_trigger": "\u672a\u77e5",
+        "pnl": -27.33,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\u89e6\u53d1\uff0c\u672a\u5230\u786c\u6b62\u635f\u6c34\u4f4d\u5373\u88ab\u79fb\u52a8\u6b62\u76c8\u51fa\u573a\uff08\u65e7\u7248\u903b\u8f91\uff09",
+            "\u7a7a\u5355\u5728 H1 \u4e0b\u8dcc\u8d8b\u52bf\u4e2d\u53cd\u5f39\u88ab\u626b\uff0cATR trail_mult=1.5 \u504f\u7d27"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\uff1aH1 \u8d8b\u52bf\u5f3a\u52b2\u53cd\u5f39\u65f6\uff0c\u9002\u5f53\u589e\u5927\u9996\u5355 ATR \u786c\u6b62\u635f\u500d\u6570",
+            "M30_rsi_bb \u80dc\u7387\u8f83\u9ad8(70%)\u4f46\u76c8\u4e8f\u6bd4\u504f\u4f4e\uff0c\u5173\u6ce8\u5355\u7b14\u4e8f\u635f\u63a7\u5236",
+            "\u5f53\u524d H1 DOWN \u8d8b\u52bf\u4e0b SELL \u7684 trail_mult \u4e3a 1.5\uff08\u987a\u52bf\u504f\u677e\uff09\uff0c\n\u4f46\u5b9e\u9645\u6548\u679c\u662f\u4e8f\u635f\u65f6\u4e5f\u89e6\u53d1\uff0c\u5df2\u4fee\u590d\u4e3a\u4ec5\u76c8\u5229\u65f6\u8ffd\u8e2a",
+            "\u3010\u5df2\u4fee\u590d\u3011\u4e8f\u635f\u72b6\u6001\u4e0b\u4e0d\u518d\u89e6\u53d1\u79fb\u52a8\u6b62\u76c8\uff0c\u4ec5\u8d70\u786c\u6b62\u635f"
+          ]
+        }
+      }
+    },
+    "89630763": {
+      "ticket": 89630763,
+      "strategy": "rsi_turn_m30",
+      "magic": 777888,
+      "direction": "BUY",
+      "entry_price": 4467.51,
+      "exit_price": 4452.97,
+      "pnl": -14.54,
+      "hold_seconds": 593,
+      "sl": 4444.77,
+      "tp": 446711.0,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -14.54,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89556011": {
+      "ticket": 89556011,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4470.2,
+      "exit_price": 4465.1,
+      "pnl": -5.1,
+      "hold_seconds": 4200,
+      "sl": 4462.2,
+      "tp": 99999,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -5.1,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89722038": {
+      "ticket": 89722038,
+      "strategy": "sanqing_h1",
+      "magic": 777002,
+      "direction": "SELL",
+      "entry_price": 4310.81,
+      "exit_price": 4317.98,
+      "pnl": -7.17,
+      "hold_seconds": 492,
+      "sl": 4380.07,
+      "tp": 846.22,
+      "entry_analysis": {
+        "system": "6\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf\uff0c\u8bc4\u5206 \u2265 5 \u89e6\u53d1",
+        "threshold": 5,
+        "factors": [
+          [
+            "EMA9/21 \u8d8b\u52bf",
+            "\u591a\u5934\u6392\u5217 +2 / \u7a7a\u5934\u6392\u5217 +2 / \u91d1\u53c9\u6b7b\u53c9 +1"
+          ],
+          [
+            "EMA9 \u652f\u6491/\u963b\u529b",
+            "\u4ef7\u683c\u56de\u8e29 EMA9 \u4e0d\u7834(\u591a)/\u53cd\u5f39 EMA9 \u4e0d\u8fc7(\u7a7a) +2"
+          ],
+          [
+            "\u5b9e\u4f53/ATR \u6bd4\u503c",
+            "K\u7ebf\u5b9e\u4f53 > 1.0 ATR +1"
+          ],
+          [
+            "\u6210\u4ea4\u91cf\u653e\u5927",
+            "\u6210\u4ea4\u91cf > 21\u65e5\u5747\u91cf\u00d71.3 +1"
+          ],
+          [
+            "K\u7ebf\u5b9e\u4f53\u6269\u5f20",
+            "\u5b9e\u4f53 > 5\u65e5\u5747\u91cf\u4e2d\u4f4d\u6570\u00d71.5 +2"
+          ]
+        ],
+        "likely_conditions": [
+          "EMA9/21 \u7a7a\u5934\u6392\u5217",
+          "\u4ef7\u683c\u6d4b\u8bd5 EMA9 \u963b\u529b"
+        ]
+      },
+      "exit_analysis": {
+        "label": "\u7b56\u7565\u51fa\u573a",
+        "logic": "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\uff1a\u2460\u5229\u6da6\u56de\u64a4\u6b62\u76c8(peak\u219225%\u56de\u64a4) \u2461ATR \u79fb\u52a8\u6b62\u76c8(trail_mult) \u2462\u786c\u6b62\u635f(hard_mult)",
+        "exit_trigger": "\u672a\u77e5",
+        "pnl": -7.17,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\u89e6\u53d1\uff0c\u672a\u5230\u786c\u6b62\u635f\u6c34\u4f4d\u5373\u88ab\u79fb\u52a8\u6b62\u76c8\u51fa\u573a\uff08\u65e7\u7248\u903b\u8f91\uff09",
+            "\u7a7a\u5355\u5728 H1 \u4e0b\u8dcc\u8d8b\u52bf\u4e2d\u53cd\u5f39\u88ab\u626b\uff0cATR trail_mult=1.5 \u504f\u7d27"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\uff1aH1 \u8d8b\u52bf\u5f3a\u52b2\u53cd\u5f39\u65f6\uff0c\u9002\u5f53\u589e\u5927\u9996\u5355 ATR \u786c\u6b62\u635f\u500d\u6570",
+            "\u5f53\u524d H1 DOWN \u8d8b\u52bf\u4e0b SELL \u7684 trail_mult \u4e3a 1.5\uff08\u987a\u52bf\u504f\u677e\uff09\uff0c\n\u4f46\u5b9e\u9645\u6548\u679c\u662f\u4e8f\u635f\u65f6\u4e5f\u89e6\u53d1\uff0c\u5df2\u4fee\u590d\u4e3a\u4ec5\u76c8\u5229\u65f6\u8ffd\u8e2a",
+            "sanqing_h1 \u8bc4\u5206\u9608\u503c\u8f83\u9ad8(5)\uff0c\u5173\u6ce8\u4fe1\u53f7\u7cbe\u786e\u6027",
+            "\u3010\u5df2\u4fee\u590d\u3011\u4e8f\u635f\u72b6\u6001\u4e0b\u4e0d\u518d\u89e6\u53d1\u79fb\u52a8\u6b62\u76c8\uff0c\u4ec5\u8d70\u786c\u6b62\u635f"
+          ]
+        }
+      }
+    },
+    "89633591": {
+      "ticket": 89633591,
+      "strategy": "magic_777888",
+      "magic": 777888,
+      "direction": "BUY",
+      "entry_price": 4459.02,
+      "exit_price": 4436.56,
+      "pnl": -22.46,
+      "hold_seconds": 2544,
+      "sl": 4436.68,
+      "tp": 445897.0,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -22.46,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89555001": {
+      "ticket": 89555001,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4485.2,
+      "exit_price": 4479.5,
+      "pnl": -5.7,
+      "hold_seconds": 4020,
+      "sl": 4477.2,
+      "tp": 99999,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -5.7,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89555405": {
+      "ticket": 89555405,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4478.5,
+      "exit_price": 4472.9,
+      "pnl": -5.6,
+      "hold_seconds": 4500,
+      "sl": 4470.5,
+      "tp": 99999,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -5.6,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89559256": {
+      "ticket": 89559256,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4494.39,
+      "exit_price": 4479.76,
+      "pnl": -14.63,
+      "hold_seconds": 19473,
+      "sl": 4480.03,
+      "tp": 5927.37,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -14.63,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89559259": {
+      "ticket": 89559259,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4494.49,
+      "exit_price": 4479.76,
+      "pnl": -14.73,
+      "hold_seconds": 19471,
+      "sl": 4480.03,
+      "tp": 5927.37,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -14.73,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89588444": {
+      "ticket": 89588444,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "SELL",
+      "entry_price": 4524.77,
+      "exit_price": 4536.63,
+      "pnl": -11.86,
+      "hold_seconds": 3675,
+      "sl": 4536.49,
+      "tp": 3314.13,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -11.86,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89721950": {
+      "ticket": 89721950,
+      "strategy": "gold_auto_research",
+      "magic": 777003,
+      "direction": "SELL",
+      "entry_price": 4316.79,
+      "exit_price": 4326.67,
+      "pnl": -9.88,
+      "hold_seconds": 3853,
+      "sl": 4386.44,
+      "tp": 856.19,
+      "entry_analysis": {
+        "system": "\u591a\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf",
+        "factors": [
+          [
+            "\u8d8b\u52bf\u8ddf\u8e2a",
+            "EMA \u5747\u7ebf\u6392\u5217\u5224\u65ad\u65b9\u5411"
+          ],
+          [
+            "\u52a8\u91cf\u786e\u8ba4",
+            "RSI/MACD \u786e\u8ba4\u52a8\u80fd"
+          ],
+          [
+            "\u6ce2\u52a8\u7387\u8fc7\u6ee4",
+            "ATR \u63a7\u5236\u5165\u573a\u65f6\u673a"
+          ]
+        ],
+        "likely_conditions": [
+          "EMA \u7a7a\u5934\u6392\u5217",
+          "RSI \u786e\u8ba4\u52a8\u80fd\u65b9\u5411"
+        ]
+      },
+      "exit_analysis": {
+        "label": "\u7b56\u7565\u51fa\u573a",
+        "logic": "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\uff1a\u2460\u5229\u6da6\u56de\u64a4\u6b62\u76c8(peak\u219225%\u56de\u64a4) \u2461ATR \u79fb\u52a8\u6b62\u76c8(trail_mult) \u2462\u786c\u6b62\u635f(hard_mult)",
+        "exit_trigger": "\u672a\u77e5",
+        "pnl": -9.88,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\u89e6\u53d1\uff0c\u672a\u5230\u786c\u6b62\u635f\u6c34\u4f4d\u5373\u88ab\u79fb\u52a8\u6b62\u76c8\u51fa\u573a\uff08\u65e7\u7248\u903b\u8f91\uff09"
+          ],
+          "suggestions": [
+            "\u3010\u5df2\u4fee\u590d\u3011\u4e8f\u635f\u72b6\u6001\u4e0b\u4e0d\u518d\u89e6\u53d1\u79fb\u52a8\u6b62\u76c8\uff0c\u4ec5\u8d70\u786c\u6b62\u635f"
+          ]
+        }
+      }
+    },
+    "89555809": {
+      "ticket": 89555809,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4472.8,
+      "exit_price": 4467.5,
+      "pnl": -5.3,
+      "hold_seconds": 4500,
+      "sl": 4464.8,
+      "tp": 99999,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "EMA20 \u8ffd\u8e2a\u6b62\u635f",
+        "logic": "\u65e7\u7248 EMA20 \u8ffd\u8e2a\u6b62\u635f\u51fa\u573a",
+        "exit_trigger": "\u4ef7\u683c\u53cd\u5411\u7a7f\u8d8a EMA20",
+        "pnl": -5.3,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "EMA20 \u8ffd\u8e2a\u6b62\u635f\u88ab\u53cd\u5411\u7a81\u7834"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\u7ed3\u5408 ATR \u52a8\u6001\u8c03\u6574 EMA20 \u901a\u9053\u5bbd\u5ea6"
+          ]
+        }
+      }
+    },
+    "89588450": {
+      "ticket": 89588450,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "SELL",
+      "entry_price": 4522.81,
+      "exit_price": 4535.5,
+      "pnl": -12.69,
+      "hold_seconds": 3591,
+      "sl": 4535.39,
+      "tp": 3313.03,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -12.69,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    },
+    "89727980": {
+      "ticket": 89727980,
+      "strategy": "M30_rsi_bb",
+      "magic": 777001,
+      "direction": "SELL",
+      "entry_price": 4314.25,
+      "exit_price": 4329.14,
+      "pnl": -14.89,
+      "hold_seconds": 809,
+      "sl": 4366.0,
+      "tp": 1789.08,
+      "entry_analysis": {
+        "system": "5\u56e0\u5b50\u8bc4\u5206\u7cfb\u7edf\uff0c\u8bc4\u5206 \u2265 3 \u89e6\u53d1",
+        "threshold": 3,
+        "factors": [
+          {
+            "name": "H1 \u8d8b\u52bf",
+            "desc": "H1 SMA200 \u5224\u65ad\u8d8b\u52bf\u65b9\u5411\uff0c\u987a\u52bf +1 \u5206"
+          },
+          {
+            "name": "BB \u89e6\u8f68",
+            "desc": "\u4ef7\u683c\u89e6\u53ca\u5e03\u6797\u5e26\u4e0a\u8f68(\u7a7a)/\u4e0b\u8f68(\u591a) +1 \u5206"
+          },
+          {
+            "name": "RSI \u6781\u7aef",
+            "desc": "RSI \u8d85\u4e70(>65)/\u8d85\u5356(<30) +1 \u5206"
+          },
+          {
+            "name": "M30 RSI \u65b9\u5411",
+            "desc": "M30 RSI \u4e0a\u5347(\u591a)/\u4e0b\u964d(\u7a7a) +1 \u5206"
+          },
+          {
+            "name": "\u4f4e\u6ce2\u52a8\u7387",
+            "desc": "ATR < \u5747\u4ef7\u00d72.5% \u65f6 +1 \u5206"
+          }
+        ],
+        "likely_conditions": [
+          "H1 \u8d8b\u52bf DOWN",
+          "BB \u4e0a\u8f68\u89e6\u8f68",
+          "RSI \u8d85\u4e70\u533a\u57df"
+        ]
+      },
+      "exit_analysis": {
+        "label": "\u7b56\u7565\u51fa\u573a",
+        "logic": "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\uff1a\u2460\u5229\u6da6\u56de\u64a4\u6b62\u76c8(peak\u219225%\u56de\u64a4) \u2461ATR \u79fb\u52a8\u6b62\u76c8(trail_mult) \u2462\u786c\u6b62\u635f(hard_mult)",
+        "exit_trigger": "\u672a\u77e5",
+        "pnl": -14.89,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [
+            "ATR \u52a8\u6001\u51fa\u573a\u7cfb\u7edf\u89e6\u53d1\uff0c\u672a\u5230\u786c\u6b62\u635f\u6c34\u4f4d\u5373\u88ab\u79fb\u52a8\u6b62\u76c8\u51fa\u573a\uff08\u65e7\u7248\u903b\u8f91\uff09",
+            "\u7a7a\u5355\u5728 H1 \u4e0b\u8dcc\u8d8b\u52bf\u4e2d\u53cd\u5f39\u88ab\u626b\uff0cATR trail_mult=1.5 \u504f\u7d27"
+          ],
+          "suggestions": [
+            "\u53ef\u8003\u8651\uff1aH1 \u8d8b\u52bf\u5f3a\u52b2\u53cd\u5f39\u65f6\uff0c\u9002\u5f53\u589e\u5927\u9996\u5355 ATR \u786c\u6b62\u635f\u500d\u6570",
+            "M30_rsi_bb \u80dc\u7387\u8f83\u9ad8(70%)\u4f46\u76c8\u4e8f\u6bd4\u504f\u4f4e\uff0c\u5173\u6ce8\u5355\u7b14\u4e8f\u635f\u63a7\u5236",
+            "\u5f53\u524d H1 DOWN \u8d8b\u52bf\u4e0b SELL \u7684 trail_mult \u4e3a 1.5\uff08\u987a\u52bf\u504f\u677e\uff09\uff0c\n\u4f46\u5b9e\u9645\u6548\u679c\u662f\u4e8f\u635f\u65f6\u4e5f\u89e6\u53d1\uff0c\u5df2\u4fee\u590d\u4e3a\u4ec5\u76c8\u5229\u65f6\u8ffd\u8e2a",
+            "\u3010\u5df2\u4fee\u590d\u3011\u4e8f\u635f\u72b6\u6001\u4e0b\u4e0d\u518d\u89e6\u53d1\u79fb\u52a8\u6b62\u76c8\uff0c\u4ec5\u8d70\u786c\u6b62\u635f"
+          ]
+        }
+      }
+    },
+    "89567596": {
+      "ticket": 89567596,
+      "strategy": "rsi_bollinger",
+      "magic": 777777,
+      "direction": "BUY",
+      "entry_price": 4474.64,
+      "exit_price": 4461.85,
+      "pnl": -12.79,
+      "hold_seconds": 1073,
+      "sl": 4461.91,
+      "tp": 5932.19,
+      "entry_analysis": {
+        "system": "\u672a\u77e5\u7b56\u7565",
+        "likely_conditions": []
+      },
+      "exit_analysis": {
+        "label": "MT4 \u5386\u53f2\u6062\u590d",
+        "logic": "\u8be5\u5355\u7531 MT4 \u5386\u53f2\u8bb0\u5f55\u6062\u590d\uff0c\u975e\u5f53\u524d\u5f15\u64ce\u51b3\u7b56\u5e73\u4ed3",
+        "exit_trigger": "\u5f15\u64ce\u63a5\u7ba1\u65f6\u5df2\u5728 MT4 \u4e2d\u5e73\u4ed3",
+        "pnl": -12.79,
+        "is_loss": true,
+        "loss_analysis": {
+          "possible_reasons": [],
+          "suggestions": []
+        }
+      }
+    }
+  }
+}

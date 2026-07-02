@@ -1,0 +1,8 @@
+EXE=C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\python.exe
+PREFIX=C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none
+BASE=C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none
+PYTHONPATH=NOT_SET
+VIRTUAL_ENV=NOT_SET
+sys.path[0]=D:\backup\baobao\pythonprogram\xauusd
+  PATH[5]=C:\Users\Administrator\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\Lib\site-packages
+aiohttp=FAIL No module named 'aiohttp'

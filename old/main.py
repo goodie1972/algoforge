@@ -24,11 +24,31 @@ from config import settings
 from core.bridge import create_bridge, OrderType
 from services.news_filter import NewsFilter
 from services.mtf_coordinator import MTFResonanceCoordinator
-from services.supervisor import TradeSupervisor
-from core.runtime_config import RuntimeConfig
 from data.downloader import download_timeframe
 from data import database as db
-from strategies.scanner import scan_strategies
+from strategies.m30_rsi import M30RSIStrategy
+from strategies.v6_hybrid import V6HybridStrategy
+from strategies.sanqing_h1 import SanQingH1Strategy
+from strategies.gold_autoresearch_h1 import GoldAutoResearchStrategy
+from strategies.mtf_resonance_h1 import MTFResonanceStrategy
+from strategies.bakome_backup import BAKOMEBackupStrategy
+from strategies.xaubot_backup import XAUBotBackupStrategy
+from strategies.stoch_m30 import MeanReversionM30Strategy
+from strategies.stoch_trend_m30 import StochTrendM30Strategy
+from strategies.rsi_grading_m30 import RSIGradingM30Strategy
+
+STRATEGY_MAP = {
+    "M30_rsi_bb": M30RSIStrategy,
+    "H1_v6_hybrid": V6HybridStrategy,
+    "sanqing_h1": SanQingH1Strategy,
+    "gold_auto_research": GoldAutoResearchStrategy,
+    "mtf_resonance_h1": MTFResonanceStrategy,
+    "bakome_backup": BAKOMEBackupStrategy,
+    "xaubot_backup": XAUBotBackupStrategy,
+    "stoch_m30": MeanReversionM30Strategy,
+    "stoch_trend_m30": StochTrendM30Strategy,
+    "rsi_grading_m30": RSIGradingM30Strategy,
+}
 
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
 if not logging.getLogger().handlers:
@@ -72,7 +92,7 @@ def create_strategies(bridge, pool=None):
         pool = settings.STRATEGY_POOL
     strategies = []
     for name, cfg in pool.items():
-        cls = scan_strategies().get(name)
+        cls = STRATEGY_MAP.get(name)
         if cls is None:
             logger.warning(f"未知策略: {name}，跳过")
             continue
@@ -111,7 +131,6 @@ class TradingEngine:
         self._last_report_time = 0
         self._report_interval = 4 * 3600
         self._config_mtime = 0.0
-        self._rtconfig_mtime = 0.0
         self._last_news_check = 0.0
         self._last_data_sync = 0.0
         self._data_sync_interval = 300  # 每300秒（5分钟）同步一次数据
@@ -127,26 +146,8 @@ class TradingEngine:
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
         self._load_closed_trades()
-        # 监督者系统
-        self.supervisor = TradeSupervisor()
         db.init_db()  # 确保所有表存在
         db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
-
-        # 三轨架构：双桥接 + 数据工厂 + 运动员
-        try:
-            from core.bridge import create_bridge_pair
-            from services.data_factory import DataFactory, get_cache, get_tick
-            from engine_standalone.athlete import Athlete
-            self._data_bridge, self._exec_bridge = create_bridge_pair()
-            self.bridge = self._exec_bridge            # 引擎主桥接 = 命令通道
-            self._data_factory = DataFactory(self._data_bridge)
-            self._athlete = Athlete(self._exec_bridge)
-            logger.info("[三轨] 双桥接 + DataFactory + Athlete 初始化成功，待连接")
-        except Exception as e:
-            logger.warning(f"[三轨] 初始化失败，回退到单桥接旧模式: {e}", exc_info=True)
-            self._data_bridge = None
-            self._data_factory = None
-            self._athlete = None
 
     # ── 运行时配置读取（RuntimeConfig 优先，settings.py 回退）────────
 
@@ -188,10 +189,9 @@ class TradingEngine:
 
     def _get_coordinator(self):
         """获取协调器配置，RuntimeConfig 覆盖优先"""
-        try:
-            return RuntimeConfig().get_coordinator_config()
-        except Exception:
-            return dict(settings.COORDINATOR_CONFIG)
+        if self._config_service is not None:
+            return self._config_service.get_coordinator_config()
+        return dict(settings.COORDINATOR_CONFIG)
 
     def _calibrate_mt4_time(self):
         """启动时校准 MT4 服务器时间 vs 本机 UTC 时间"""
@@ -209,11 +209,10 @@ class TradingEngine:
             logger.warning(f"[时间校准] 失败: {e}")
 
     def _mt4_to_local(self, mt4_ts: int):
-        """将 MT4 时间戳转为本地 datetime（UTC+5）"""
+        """将 MT4 时间戳转为本地 datetime（校准后）"""
         from datetime import datetime
-        from config.settings import LOCAL_TZ
         corrected = mt4_ts - self._mt4_offset
-        return datetime.fromtimestamp(corrected, tz=LOCAL_TZ)
+        return datetime.fromtimestamp(corrected)
 
     @property
     def closed_trades(self) -> list[dict]:
@@ -224,12 +223,10 @@ class TradingEngine:
     @staticmethod
     def _pos_open_time(pos) -> tuple:
         """将 Position 的 open_time 转为 (格式化时间字符串, UNIX时间戳)"""
-        from datetime import datetime
-        from config.settings import LOCAL_TZ
         raw = str(pos.open_time)
         try:
             ts = int(raw)
-            dt = datetime.fromtimestamp(ts, tz=LOCAL_TZ)
+            dt = datetime.fromtimestamp(ts)
             return (dt.strftime("%Y-%m-%d %H:%M:%S"), ts)
         except (ValueError, OSError):
             # 可能是已格式化的时间字符串
@@ -258,10 +255,9 @@ class TradingEngine:
 
     def _db_to_candles(self, db_candles: list[dict]) -> list[Candle]:
         """将数据库 K 线 dict 转为 Candle 对象"""
-        from config.settings import LOCAL_TZ
         result = []
         for c in db_candles:
-            time_str = datetime.fromtimestamp(c["time"], tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            time_str = datetime.fromtimestamp(c["time"]).strftime("%Y-%m-%d %H:%M:%S")
             result.append(Candle(
                 time=time_str,
                 open=c["open"],
@@ -446,7 +442,7 @@ class TradingEngine:
             if any(s.magic == magic for s in self.strategies):
                 logger.warning(f"[策略动态添加] Magic {magic} 已被占用，跳过")
                 return False
-            cls = scan_strategies().get(name)
+            cls = STRATEGY_MAP.get(name)
             if cls is None:
                 logger.warning(f"[策略动态添加] 未知策略: {name}")
                 return False
@@ -813,21 +809,6 @@ class TradingEngine:
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
 
-        # 连接数据桥接（双桥接：引擎用 exec_bridge，工厂用 data_bridge）
-        if self._data_factory and self._data_bridge:
-            logger.info("[三轨] 开始尝试连接数据桥接...")
-            for attempt in range(5):
-                logger.info(f"[三轨] 数据桥接连接尝试 {attempt+1}/5")
-                if self._data_bridge.connect():
-                    logger.info("[三轨] 数据桥接已连接，工厂独立通道")
-                    break
-                time.sleep(1)
-            else:
-                logger.warning("[三轨] 5次重试后仍无法连接数据桥接，工厂回退到引擎桥接")
-                self._data_factory._bridge = self.bridge
-            self._data_factory.start()
-            time.sleep(5)
-
         # 新闻过滤初始化加载
         windows = self.news_filter.get_blackout_windows()
         if windows:
@@ -861,24 +842,9 @@ class TradingEngine:
             if mtime > self._config_mtime:
                 self._config_mtime = mtime
                 importlib.reload(settings)
-                RuntimeConfig().reload()
-                logger.info("[热重载] RuntimeConfig 已重新加载，当前 active 配置已更新")
                 for s in snapshot:
                     s.reload_config()
                 logger.info("[热重载] 配置已更新")
-        except OSError:
-            pass
-
-        # runtime_config.json 热重载（仪表盘配置变更时）
-        try:
-            from core.runtime_config import CONFIG_FILE
-            rt_mtime = os.path.getmtime(CONFIG_FILE)
-            if rt_mtime > self._rtconfig_mtime:
-                self._rtconfig_mtime = rt_mtime
-                RuntimeConfig().reload()
-                for s in snapshot:
-                    s.reload_config()
-                logger.info("[RuntimeConfig] 热重载完成")
         except OSError:
             pass
 
@@ -986,6 +952,9 @@ class TradingEngine:
         if global_blocked or news_blocked or safety_blocked or bias_blocked:
             # 有全局阻断时，跳过本轮开仓，但每策略仍检查浮动亏损
             self._check_floating_loss_blocks()
+            for _ in range(3):
+                time.sleep(20)
+                self.bridge.send_heartbeat()
             return
 
         # ---- 浮动亏损警告/阻断检查 ----
@@ -998,10 +967,6 @@ class TradingEngine:
                 logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
                 continue
             self._run_strategy(strategy)
-
-        # 三轨：运动员验证并发令
-        if self._athlete:
-            self._athlete.run()
 
     def _coordinated_exits(self, snapshot: list):
         """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""
@@ -1235,6 +1200,7 @@ class TradingEngine:
 
     def _run_exits(self, strategy):
         """止损平仓 — 不受风控/新闻禁售限制，但记录试算日志"""
+        strategy.refresh_data()
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
         # 检测 MT4 硬止损平仓（桥接消失但引擎没记录）
@@ -1297,8 +1263,8 @@ class TradingEngine:
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
 
             if broker_close > 0 and broker_open > 0:
-                open_dt = self._mt4_to_local(broker_open)
-                close_dt = self._mt4_to_local(broker_close)
+                open_dt = datetime.fromtimestamp(broker_open)
+                close_dt = datetime.fromtimestamp(broker_close)
                 open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
                 close_time_str = close_dt.strftime('%Y-%m-%d %H:%M:%S')
                 actual_hold = int(broker_close - broker_open)
@@ -1307,8 +1273,7 @@ class TradingEngine:
                 close_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 entry_ts = self._entry_times.get(pos.ticket, 0)
                 if entry_ts > 0:
-                    from config.settings import LOCAL_TZ
-                    open_time_str = datetime.fromtimestamp(entry_ts, tz=LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S')
+                    open_time_str = datetime.fromtimestamp(entry_ts).strftime('%Y-%m-%d %H:%M:%S')
                     actual_hold = int(time.time() - entry_ts)
                 else:
                     open_time_str, open_ts = self._pos_open_time(pos)
@@ -1345,10 +1310,6 @@ class TradingEngine:
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
-            # 通知监督者
-            if hasattr(self, 'supervisor'):
-                exit_type = exit_detail.get("exit_type", "strategy_exit")
-                self.supervisor.on_trade_close(record, exit_type)
             try:
                 with open(self._trades_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -1395,6 +1356,9 @@ class TradingEngine:
 
     def _run_strategy(self, strategy):
         """单个策略的一次 tick — 信号生成 + 开仓"""
+        # 刷新数据
+        strategy.refresh_data()
+
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
         try:
             adx_data = strategy.get_adx_data()
@@ -1500,58 +1464,23 @@ class TradingEngine:
             except Exception:
                 pass
 
-        # 执行开仓
-        if signal_id > 0 and self._athlete:
-            # 提交门票给运动员
-            last_sig = getattr(strategy, '_last_signal', {})
-            if last_sig and last_sig.get("signal"):
-                direction = last_sig["signal"]
-                entry_info = {
-                    "strategy": strategy.name,
-                    "magic": strategy.magic,
-                    "indicator_values": last_sig.get("indicator_values", {}),
-                    "lot_size": self._rt('lot_size') or 0.01,
-                    "sl": 0, "tp": 0,
-                }
-                # 计算 SL/TP
-                bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
-                entry_price = ask if direction == "BUY" else bid
-                try:
-                    if direction == "BUY":
-                        sl, tp = strategy.get_dynamic_sl_tp(OrderType.BUY, entry_price)
-                    else:
-                        sl, tp = strategy.get_dynamic_sl_tp(OrderType.SELL, entry_price)
-                    entry_info["sl"] = sl
-                    entry_info["tp"] = tp
-                except Exception:
-                    sl_pips = self._rt('stop_loss_pips') or 300
-                    tp_pips = self._rt('take_profit_pips') or 600
-                    if direction == "BUY":
-                        entry_info["sl"] = entry_price - sl_pips * 0.01 * 10
-                        entry_info["tp"] = entry_price + tp_pips * 0.01 * 10
-                    else:
-                        entry_info["sl"] = entry_price + sl_pips * 0.01 * 10
-                        entry_info["tp"] = entry_price - tp_pips * 0.01 * 10
-                entry_info["entry_price"] = entry_price
-                self._athlete.submit(signal_id, direction, entry_info)
-        else:
-            # 回退：旧模式直接开仓
-            ticket = 0
-            if signal == "信号: BUY":
-                ticket = self._execute_buy(strategy, signal_id)
-                if strategy.double_first and ticket:
-                    self._execute_buy(strategy, 0)
-            elif signal == "信号: SELL":
-                ticket = self._execute_sell(strategy, signal_id)
-                if strategy.double_first and ticket:
-                    self._execute_sell(strategy, 0)
+        # 执行开仓，传入 signal_id
+        ticket = 0
+        if signal == "信号: BUY":
+            ticket = self._execute_buy(strategy, signal_id)
+            if strategy.double_first and ticket:
+                self._execute_buy(strategy, 0)
+        elif signal == "信号: SELL":
+            ticket = self._execute_sell(strategy, signal_id)
+            if strategy.double_first and ticket:
+                self._execute_sell(strategy, 0)
 
-            # 更新信号状态
-            if signal_id > 0:
-                if ticket > 0:
-                    db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
-                else:
-                    db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})
+        # 更新信号状态
+        if signal_id > 0:
+            if ticket > 0:
+                db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
+            else:
+                db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})
 
     def _execute_buy(self, strategy, signal_id=0):
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
@@ -1590,20 +1519,6 @@ class TradingEngine:
             }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
-            # 通知监督者
-            if hasattr(self, 'supervisor'):
-                direction = "BUY"
-                ed = self._entry_signal_data.get(ticket, {})
-                self.supervisor.on_trade_open(
-                    ticket=ticket, strategy=strategy.name,
-                    direction=direction, price=ask,
-                    magic=strategy.magic,
-                    entry_data={
-                        "entry_factors": ed.get("entry_factors", {}),
-                        "indicator_values": ed.get("indicator_values", {}),
-                        "scores": ed.get("scores", {}),
-                    },
-                )
         return ticket or 0
 
     def _execute_sell(self, strategy, signal_id=0):
@@ -1643,20 +1558,6 @@ class TradingEngine:
             }
             if hasattr(strategy, 'mark_extreme_entry'):
                 strategy.mark_extreme_entry(ticket)
-            # 通知监督者
-            if hasattr(self, 'supervisor'):
-                direction = "SELL"
-                ed = self._entry_signal_data.get(ticket, {})
-                self.supervisor.on_trade_open(
-                    ticket=ticket, strategy=strategy.name,
-                    direction=direction, price=bid,
-                    magic=strategy.magic,
-                    entry_data={
-                        "entry_factors": ed.get("entry_factors", {}),
-                        "indicator_values": ed.get("indicator_values", {}),
-                        "scores": ed.get("scores", {}),
-                    },
-                )
         return ticket or 0
 
     def _get_balance(self) -> float:
@@ -1712,8 +1613,8 @@ class TradingEngine:
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
 
             if broker_close > 0 and broker_open > 0:
-                open_dt = self._mt4_to_local(broker_open)
-                close_dt = self._mt4_to_local(broker_close)
+                open_dt = datetime.fromtimestamp(broker_open)
+                close_dt = datetime.fromtimestamp(broker_close)
                 open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
                 close_time_str = close_dt.strftime('%Y-%m-%d %H:%M:%S')
                 hold_sec = int(broker_close - broker_open)
@@ -1721,8 +1622,7 @@ class TradingEngine:
                 close_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 entry_ts = self._entry_times.get(pos.ticket, 0)
                 if entry_ts > 0:
-                    from config.settings import LOCAL_TZ
-                    open_time_str = datetime.fromtimestamp(entry_ts, tz=LOCAL_TZ).strftime('%Y-%m-%d %H:%M:%S')
+                    open_time_str = datetime.fromtimestamp(entry_ts).strftime('%Y-%m-%d %H:%M:%S')
                     hold_sec = int(time.time() - entry_ts)
                 else:
                     open_time_str, open_ts = self._pos_open_time(pos)
@@ -1749,9 +1649,6 @@ class TradingEngine:
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
-            # 通知监督者
-            if hasattr(self, 'supervisor'):
-                self.supervisor.on_trade_close(record, reason)
             try:
                 with open(self._trades_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -1776,49 +1673,28 @@ class TradingEngine:
     def _check_news_bias_block(self) -> bool:
         """检查 News-Bias 方向阻塞"""
         try:
-            if not self._rt('news_bias_enabled'):
+            import importlib
+            importlib.reload(settings)
+            
+            if not getattr(settings, 'NEWS_BIAS_ENABLED', True):
                 return False
-
+            
             if not hasattr(self.news_filter, 'get_current_bias'):
                 return False
             bias = self.news_filter.get_current_bias()
             if not bias:
                 return False
-
-            bearish = self._rt('block_long_when_bias_bearish')
-            bullish = self._rt('block_short_when_bias_bullish')
-
-            # 从 RuntimeConfig 读取 DI 差值门限（0=关闭绕过）
-            _di_gap_threshold = 0
-            try:
-                _rc = self._config_service.get_coordinator_config()
-                _di_gap_threshold = _rc.get('news_bias_di_gap', 0) or 0
-            except Exception:
-                pass
-
-            # M30 DI 差值判断：M30 |+DI - -DI| < 阈值时绕过新闻阻塞
-            _m30_gap = None
-            if _di_gap_threshold > 0:
-                for _s in getattr(self, 'strategies', []) or []:
-                    if getattr(_s, 'timeframe', '') == 'M30':
-                        _ax = _s.get_adx_data()
-                        if _ax and 'pdi' in _ax and 'ndi' in _ax:
-                            _m30_gap = abs(_ax['pdi'] - _ax['ndi'])
-                            break
-
+            
+            bearish = getattr(settings, 'BLOCK_LONG_WHEN_BIAS_BEARISH', False)
+            bullish = getattr(settings, 'BLOCK_SHORT_WHEN_BIAS_BULLISH', False)
+            
             if bearish and bias.get('overall') == 'BEARISH':
-                if _m30_gap is not None and _m30_gap < _di_gap_threshold:
-                    logger.info(f"[News-Bias] M30 DI差={_m30_gap:.1f} < {_di_gap_threshold}，市场均衡，跳过看跌阻塞")
-                else:
-                    logger.info("[News-Bias] 看跌 → 阻止开多")
-                    return True
-
+                logger.info("[News-Bias] 看跌 → 阻止开多")
+                return True
+            
             if bullish and bias.get('overall') == 'BULLISH':
-                if _m30_gap is not None and _m30_gap < _di_gap_threshold:
-                    logger.info(f"[News-Bias] M30 DI差={_m30_gap:.1f} < {_di_gap_threshold}，市场均衡，跳过看涨阻塞")
-                else:
-                    logger.info("[News-Bias] 看涨 → 阻止开空")
-                    return True
+                logger.info("[News-Bias] 看涨 → 阻止开空")
+                return True
             
             return False
         except Exception as e:
@@ -1826,7 +1702,7 @@ class TradingEngine:
             return False
 
     def _sync_market_data(self):
-        """周期性同步 K 线数据到 SQLite（含交易终端展示周期）"""
+        """周期性同步 K 线数据到 SQLite（含协调器短周期）"""
         now = time.time()
         if now - self._last_data_sync < self._data_sync_interval:
             return
@@ -1842,9 +1718,6 @@ class TradingEngine:
             active_tfs.add("M15")
         if coord.get("m5_reverse_tp_enabled", False):
             active_tfs.add("M5")
-        # 交易终端展示需要的周期（确保 DB 中有数据，避免不同周期显示相同的 K 线图）
-        DISPLAY_TFS = {"M5", "M15", "H4", "D1", "W1"}
-        active_tfs.update(DISPLAY_TFS)
         if not active_tfs:
             return
 
