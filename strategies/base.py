@@ -51,9 +51,9 @@ class BaseStrategy(abc.ABC):
         self.profit_drawdown_pct: float = _coord.get('profit_drawdown_pct', 0.25)
         self.profit_drawdown_min_peak_atr: float = _coord.get('profit_drawdown_min_peak_atr', 0.5)
 
-        # News-Bias 阻塞开关（每次信号动态读取 config_service，覆盖优先）
-        self.block_long_when_bias_bearish: bool = _settings.BLOCK_LONG_WHEN_BIAS_BEARISH
-        self.block_short_when_bias_bullish: bool = _settings.BLOCK_SHORT_WHEN_BIAS_BULLISH
+        # News-Bias 阻塞开关（从 RuntimeConfig 读取，支持热加载）
+        self.block_long_when_bias_bearish: bool = _RuntimeConfig().get('block_long_when_bias_bearish') or False
+        self.block_short_when_bias_bullish: bool = _RuntimeConfig().get('block_short_when_bias_bullish') or False
 
     @property
     def all_magics(self) -> set[int]:
@@ -61,13 +61,29 @@ class BaseStrategy(abc.ABC):
         return {self.magic} | set(self.legacy_magics)
 
     def refresh_data(self, count: int = 200):
-        """刷新K线数据，转为时间顺序（旧→新）"""
+        """从数据工厂缓存读取 K 线数据"""
+        try:
+            from services.data_factory import get_cache
+            cached = get_cache(self.timeframe)
+            if cached and "candles" in cached:
+                self.candles = cached.get("candles", [])
+                self._cached_indicators = cached
+                return
+        except Exception:
+            pass
+        # fallback：数据工厂不可用时从桥接获取
         raw = self.bridge.get_candles(self.symbol, self.timeframe, count)
-        self.candles = list(reversed(raw))
+        self.candles = list(reversed(raw)) if raw else []
 
     def get_close_prices(self) -> list[float]:
         """获取收盘价序列"""
         return [c.close for c in self.candles]
+
+    def get_indicator(self, name: str):
+        """从数据工厂缓存读取预计算指标"""
+        if hasattr(self, '_cached_indicators') and self._cached_indicators:
+            return self._cached_indicators.get(name)
+        return None
 
     def _apply_kline_filters(self, result: tuple):
         """统一 K 线过滤器（保留供外部调用，引擎层使用 calc_gate_state）"""
@@ -183,10 +199,11 @@ class BaseStrategy(abc.ABC):
             from data.database import get_conn
             conn = get_conn()
             rows = conn.execute(
-                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='M30' ORDER BY timestamp"
+                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='M30' ORDER BY timestamp DESC LIMIT 500"
             ).fetchall()
             conn.close()
             if rows:
+                rows = list(reversed(rows))
                 self._m30_candles = [
                     Candle(time=str(r[0]), open=r[1], high=r[2], low=r[3], close=r[4], volume=r[5])
                     for r in rows
@@ -213,10 +230,11 @@ class BaseStrategy(abc.ABC):
             from data.database import get_conn
             conn = get_conn()
             rows = conn.execute(
-                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='H1' ORDER BY timestamp"
+                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='H1' ORDER BY timestamp DESC LIMIT 500"
             ).fetchall()
             conn.close()
             if rows:
+                rows = list(reversed(rows))
                 self._h1_candles = [
                     Candle(time=str(r[0]), open=r[1], high=r[2], low=r[3], close=r[4], volume=r[5])
                     for r in rows
@@ -243,10 +261,11 @@ class BaseStrategy(abc.ABC):
             from data.database import get_conn
             conn = get_conn()
             rows = conn.execute(
-                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='H4' ORDER BY timestamp"
+                "SELECT timestamp, open, high, low, close, volume FROM ohlcv WHERE timeframe='H4' ORDER BY timestamp DESC LIMIT 500"
             ).fetchall()
             conn.close()
             if rows:
+                rows = list(reversed(rows))
                 self._h4_candles = [
                     Candle(time=str(r[0]), open=r[1], high=r[2], low=r[3], close=r[4], volume=r[5])
                     for r in rows

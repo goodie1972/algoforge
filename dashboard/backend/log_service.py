@@ -10,6 +10,7 @@ from typing import Optional
 # 添加项目根目录以导入 data.database
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 from data import database as db
+from config.settings import LOCAL_TZ
 
 
 class LogCaptureHandler(logging.Handler):
@@ -24,7 +25,7 @@ class LogCaptureHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord):
         entry = {
-            "time": datetime.fromtimestamp(record.created).isoformat(),
+            "time": datetime.fromtimestamp(record.created, tz=LOCAL_TZ).isoformat(),
             "level": record.levelname,
             "name": record.name,
             "message": self.format(record),

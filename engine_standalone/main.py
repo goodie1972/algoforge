@@ -132,6 +132,20 @@ class TradingEngine:
         db.init_db()  # 确保所有表存在
         db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
 
+        # 三轨架构：数据工厂 + 运动员
+        try:
+            from core.bridge import create_bridge_pair
+            from services.data_factory import DataFactory, get_cache, get_tick
+            from engine_standalone.athlete import Athlete
+            self._bridges = create_bridge_pair()
+            self._data_factory = DataFactory(self._bridges)
+            self._athlete = Athlete(self._bridges[3])
+            logger.info("[三轨] DataFactory + Athlete 初始化成功")
+        except Exception as e:
+            logger.warning(f"[三轨] 初始化失败，回退到单桥接旧模式: {e}", exc_info=True)
+            self._data_factory = None
+            self._athlete = None
+
     # ── 运行时配置读取（RuntimeConfig 优先，settings.py 回退）────────
 
     _RT_FALLBACK = {
@@ -797,6 +811,11 @@ class TradingEngine:
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
 
+        # 启动数据工厂
+        if self._data_factory:
+            self._data_factory.start()
+            time.sleep(5)  # 等首次数据加载完成
+
         # 新闻过滤初始化加载
         windows = self.news_filter.get_blackout_windows()
         if windows:
@@ -831,6 +850,7 @@ class TradingEngine:
                 self._config_mtime = mtime
                 importlib.reload(settings)
                 RuntimeConfig().reload()
+                logger.info("[热重载] RuntimeConfig 已重新加载，当前 active 配置已更新")
                 for s in snapshot:
                     s.reload_config()
                 logger.info("[热重载] 配置已更新")
@@ -954,9 +974,6 @@ class TradingEngine:
         if global_blocked or news_blocked or safety_blocked or bias_blocked:
             # 有全局阻断时，跳过本轮开仓，但每策略仍检查浮动亏损
             self._check_floating_loss_blocks()
-            for _ in range(3):
-                time.sleep(20)
-                self.bridge.send_heartbeat()
             return
 
         # ---- 浮动亏损警告/阻断检查 ----
@@ -969,6 +986,10 @@ class TradingEngine:
                 logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
                 continue
             self._run_strategy(strategy)
+
+        # 三轨：运动员验证并发令
+        if self._athlete:
+            self._athlete.run()
 
     def _coordinated_exits(self, snapshot: list):
         """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""
@@ -1202,7 +1223,6 @@ class TradingEngine:
 
     def _run_exits(self, strategy):
         """止损平仓 — 不受风控/新闻禁售限制，但记录试算日志"""
-        strategy.refresh_data()
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
         # 检测 MT4 硬止损平仓（桥接消失但引擎没记录）
@@ -1363,9 +1383,6 @@ class TradingEngine:
 
     def _run_strategy(self, strategy):
         """单个策略的一次 tick — 信号生成 + 开仓"""
-        # 刷新数据
-        strategy.refresh_data()
-
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
         try:
             adx_data = strategy.get_adx_data()
@@ -1471,23 +1488,58 @@ class TradingEngine:
             except Exception:
                 pass
 
-        # 执行开仓，传入 signal_id
-        ticket = 0
-        if signal == "信号: BUY":
-            ticket = self._execute_buy(strategy, signal_id)
-            if strategy.double_first and ticket:
-                self._execute_buy(strategy, 0)
-        elif signal == "信号: SELL":
-            ticket = self._execute_sell(strategy, signal_id)
-            if strategy.double_first and ticket:
-                self._execute_sell(strategy, 0)
+        # 执行开仓
+        if signal_id > 0 and self._athlete:
+            # 提交门票给运动员
+            last_sig = getattr(strategy, '_last_signal', {})
+            if last_sig and last_sig.get("signal"):
+                direction = last_sig["signal"]
+                entry_info = {
+                    "strategy": strategy.name,
+                    "magic": strategy.magic,
+                    "indicator_values": last_sig.get("indicator_values", {}),
+                    "lot_size": self._rt('lot_size') or 0.01,
+                    "sl": 0, "tp": 0,
+                }
+                # 计算 SL/TP
+                bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
+                entry_price = ask if direction == "BUY" else bid
+                try:
+                    if direction == "BUY":
+                        sl, tp = strategy.get_dynamic_sl_tp(OrderType.BUY, entry_price)
+                    else:
+                        sl, tp = strategy.get_dynamic_sl_tp(OrderType.SELL, entry_price)
+                    entry_info["sl"] = sl
+                    entry_info["tp"] = tp
+                except Exception:
+                    sl_pips = self._rt('stop_loss_pips') or 300
+                    tp_pips = self._rt('take_profit_pips') or 600
+                    if direction == "BUY":
+                        entry_info["sl"] = entry_price - sl_pips * 0.01 * 10
+                        entry_info["tp"] = entry_price + tp_pips * 0.01 * 10
+                    else:
+                        entry_info["sl"] = entry_price + sl_pips * 0.01 * 10
+                        entry_info["tp"] = entry_price - tp_pips * 0.01 * 10
+                entry_info["entry_price"] = entry_price
+                self._athlete.submit(signal_id, direction, entry_info)
+        else:
+            # 回退：旧模式直接开仓
+            ticket = 0
+            if signal == "信号: BUY":
+                ticket = self._execute_buy(strategy, signal_id)
+                if strategy.double_first and ticket:
+                    self._execute_buy(strategy, 0)
+            elif signal == "信号: SELL":
+                ticket = self._execute_sell(strategy, signal_id)
+                if strategy.double_first and ticket:
+                    self._execute_sell(strategy, 0)
 
-        # 更新信号状态
-        if signal_id > 0:
-            if ticket > 0:
-                db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
-            else:
-                db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})
+            # 更新信号状态
+            if signal_id > 0:
+                if ticket > 0:
+                    db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
+                else:
+                    db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})
 
     def _execute_buy(self, strategy, signal_id=0):
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
@@ -1712,25 +1764,22 @@ class TradingEngine:
     def _check_news_bias_block(self) -> bool:
         """检查 News-Bias 方向阻塞"""
         try:
-            import importlib
-            importlib.reload(settings)
-            
-            if not getattr(settings, 'NEWS_BIAS_ENABLED', True):
+            if not self._rt('news_bias_enabled'):
                 return False
-            
+
             if not hasattr(self.news_filter, 'get_current_bias'):
                 return False
             bias = self.news_filter.get_current_bias()
             if not bias:
                 return False
-            
-            bearish = getattr(settings, 'BLOCK_LONG_WHEN_BIAS_BEARISH', False)
-            bullish = getattr(settings, 'BLOCK_SHORT_WHEN_BIAS_BULLISH', False)
+
+            bearish = self._rt('block_long_when_bias_bearish')
+            bullish = self._rt('block_short_when_bias_bullish')
 
             # 从 RuntimeConfig 读取 DI 差值门限（0=关闭绕过）
             _di_gap_threshold = 0
             try:
-                _rc = self.config_service.get_coordinator_config()
+                _rc = self._config_service.get_coordinator_config()
                 _di_gap_threshold = _rc.get('news_bias_di_gap', 0) or 0
             except Exception:
                 pass

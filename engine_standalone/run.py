@@ -202,7 +202,7 @@ def main() -> None:
         print("  所有关键检查通过，启动 XAUUSD V6 交易引擎...")
         print("=" * 50)
         try:
-            from main import main as engine_main
+            from engine_standalone.main import main as engine_main
             engine_main()
         except Exception as e:
             print(f"\n  [{RED}错误{RESET}] 引擎启动失败: {e}")

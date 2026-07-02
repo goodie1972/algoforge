@@ -185,6 +185,15 @@ class RuntimeConfig:
         with self._data_lock:
             self._load()
 
+    def get_active(self) -> dict:
+        """返回引擎当前实际使用的配置（合并 defaults + overrides），供 /api/config/active 使用"""
+        result = {}
+        for key in _ENGINE_KEYS:
+            result[key] = self.get(key)
+        result['strategy_pool'] = self.get('strategy_pool') or {}
+        result['coordinator'] = self.get_coordinator_config()
+        return result
+
     def reset(self, key: str | None = None):
         """重置指定键或全部覆盖"""
         with self._data_lock:

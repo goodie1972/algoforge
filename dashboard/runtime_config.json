@@ -1,0 +1,127 @@
+{
+  "coordinator": {
+    "news_bias_di_gap": 10,
+    "enabled": true,
+    "m15_reverse_tp_enabled": false,
+    "m15_reverse_tp_sensitivity": 0.5,
+    "mtf_resonance_enabled": false,
+    "position_gate_enabled": true,
+    "position_gate_lookback": 60,
+    "position_gate_bottom": 0.1,
+    "position_gate_top": 0.9,
+    "rally_drop_enabled": true,
+    "rally_drop_lookback": 10,
+    "rally_drop_threshold": 1.5,
+    "di_gate_skip_threshold": 20,
+    "rally_drop_adx_skip": 30,
+    "profit_drawdown_enabled": true,
+    "profit_drawdown_pct": 0.25,
+    "profit_drawdown_min_peak_atr": 0.5,
+    "position_gate_m30_lookback": 40
+  },
+  "profit_exit_cooldown_hours": 0,
+  "news_before_minutes": 120,
+  "safety_lock_timeout_minutes": 400,
+  "news_filter_enabled": true,
+  "news_after_minutes": 120,
+  "news_impact_filter": "High",
+  "news_currency_filter": "USD",
+  "news_bias_enabled": true,
+  "news_bias_report_hours": "8,20",
+  "block_long_when_bias_bearish": false,
+  "block_short_when_bias_bullish": false,
+  "max_positions": 7,
+  "strategy_pool": {
+    "bakome_backup": {
+      "enabled": false,
+      "magic": 777004,
+      "timeframe": "H1",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "entry_score_pro": {
+      "enabled": false,
+      "magic": 661501,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "gold_auto_research": {
+      "enabled": true,
+      "magic": 880306,
+      "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "m30_bb_deepreturn": {
+      "enabled": true,
+      "magic": 661101,
+      "timeframe": "M30",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "mfi_bb_m30": {
+      "enabled": true,
+      "magic": 661001,
+      "timeframe": "M30",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "M30_rsi_bb": {
+      "enabled": true,
+      "magic": 660706,
+      "timeframe": "M30",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "momentum_pulse_pro": {
+      "enabled": false,
+      "magic": 661301,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "multi_confluence_quant": {
+      "enabled": false,
+      "magic": 661601,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "rsi_grading_m30": {
+      "enabled": false,
+      "magic": 660902,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "sanqing_h1": {
+      "enabled": false,
+      "magic": 880107,
+      "timeframe": "H1",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "stoch_trend_h1": {
+      "enabled": true,
+      "magic": 661201,
+      "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "viprasol_sniper": {
+      "enabled": false,
+      "magic": 661401,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "xaubot_backup": {
+      "enabled": false,
+      "magic": 777005,
+      "timeframe": "H1",
+      "max_positions": 0,
+      "double_first": false
+    }
+  }
+}

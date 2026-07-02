@@ -7,12 +7,12 @@ import sys
 from datetime import timezone, timedelta, datetime as _dt
 
 
-# 本地显示时区：UTC+5（用户期望）
-LOCAL_TZ = timezone(timedelta(hours=5))
+# 本地显示时区：UTC+8（用户期望，与系统服务器时区一致）
+LOCAL_TZ = timezone(timedelta(hours=8))
 
 
 def dt_local(ts: float) -> _dt:
-    """将 Unix timestamp 转换为本地显示时间（UTC+5）"""
+    """将 Unix timestamp 转换为本地显示时间（UTC+8）"""
     return _dt.fromtimestamp(ts, tz=LOCAL_TZ)
 
 
@@ -107,13 +107,13 @@ STRATEGY_POOL = {
         "double_first": False,
         "max_positions": 1,
     },
-    # === 共振策略：H1+M15 TA-Lib 形态共振开仓 ===
-    "mtf_resonance_h1": {
-        "magic": 660801,
-        "timeframe": "H1",
-        "double_first": False,
-        "max_positions": 1,
-    },
+    # === 共振策略：H1+M15 TA-Lib 形态共振开仓（已移至 backup） ===
+    # "mtf_resonance_h1": {
+    #     "magic": 660801,
+    #     "timeframe": "H1",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
     # === 后备策略 (随时可启用) ===
     # "bakome_backup": {
     #     "magic": 777004,
@@ -134,12 +134,6 @@ STRATEGY_POOL = {
     #     "double_first": False,
     #     "max_positions": 1,
     # },
-    "stoch_trend_m30": {
-        "magic": 660903,
-        "timeframe": "H1",
-        "double_first": False,
-        "max_positions": 1,
-    },
     "stoch_trend_h1": {
         "magic": 661201,
         "timeframe": "H1",

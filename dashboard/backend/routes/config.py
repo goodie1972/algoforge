@@ -93,6 +93,14 @@ async def update_strategy_pool(req: StrategyPoolUpdate):
         raise HTTPException(422, f"策略池更新失败: {e}")
 
 
+@router.get("/active")
+async def get_active_config():
+    """返回引擎当前实际使用的配置（合并 defaults + overrides）"""
+    if not config_service:
+        raise HTTPException(500, "配置服务未初始化")
+    return config_service.get_active()
+
+
 @router.post("/reset")
 async def reset_config(key: Optional[str] = None):
     """重置配置（指定 key 或全部）"""
