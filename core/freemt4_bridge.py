@@ -30,7 +30,10 @@ class FreeMT4Bridge(MT4BridgeBase):
 
     RECONNECT_INTERVAL = 3.0  # 重连间隔至少 3 秒
 
-    def __init__(self):
+    def __init__(self, host: str = "", port: int = 0, name: str = ""):
+        self._host = host if host else FREEMT4_HOST
+        self._port = port if port else FREEMT4_PORT
+        self._name = name
         self._sock: Optional[socket.socket] = None
         self._connected = False
         self._lock = threading.Lock()
@@ -42,17 +45,18 @@ class FreeMT4Bridge(MT4BridgeBase):
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._sock.settimeout(5)
-            self._sock.connect((FREEMT4_HOST, FREEMT4_PORT))
+            self._sock.connect((self._host, self._port))
             self._connected = True
 
             if not self._check_alive():
                 self.disconnect()
                 return False
 
-            logger.info(f"[FreeMT4] 已连接到 {FREEMT4_HOST}:{FREEMT4_PORT}")
+            name_tag = f" [{self._name}]" if self._name else ""
+            logger.info(f"[FreeMT4{name_tag}] 已连接到 {self._host}:{self._port}")
             info = self.get_account_info()
             if info:
-                logger.info(f"[FreeMT4] 账户 #{info.login} 余额: {info.balance} {info.currency}")
+                logger.info(f"[FreeMT4{name_tag}] 账户 #{info.login} 余额: {info.balance} {info.currency}")
             return True
         except Exception:
             self.disconnect()
@@ -134,7 +138,10 @@ class FreeMT4Bridge(MT4BridgeBase):
         return data is not None
 
     def send_heartbeat(self) -> bool:
-        return self._check_alive()
+        result = self._check_alive()
+        if not result:
+            raise ConnectionError("FreeMT4 bridge heartbeat failed")
+        return result
 
     # ======================== 账户信息 ========================
 

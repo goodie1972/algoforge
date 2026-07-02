@@ -111,12 +111,10 @@ class EngineRunner:
         try:
             from data.database import upsert_strategy_version
             import importlib
-            strategy_modules = [
-                ("strategies.m30_rsi_20260630", "M30_rsi_bb"),
-                ("strategies.sanqing_h1_20260630", "sanqing_h1"),
-                ("strategies.gold_autoresearch_h1_20260630", "gold_auto_research"),
-                ("strategies.m30_mfi_bb_20260630", "mfi_bb_m30"),
-            ]
+            from strategies.scanner import scan_strategies
+            strategy_modules = []
+            for name, cls in scan_strategies().items():
+                strategy_modules.append((cls.__module__, name))
             total = 0
             for mod_name, strat_name in strategy_modules:
                 try:
@@ -284,8 +282,7 @@ class EngineRunner:
         return result[-count:]
 
     def _refresh_candle_cache(self, engine):
-        """从桥接刷新 K 线缓存（每 tick 最多刷一个周期，避免堵塞快速采样）"""
-        from config import settings as _cfg
+        """从数据工厂缓存刷新 K 线缓存（每 tick 最多刷一个周期，避免堵塞快速采样）"""
         now = time.time()
         # 按优先级依次刷新：H1 > M30 > M15 > M5 > H4 > D1 > W1 > M1
         priority = ["H1", "M30", "M15", "M5", "H4", "D1", "W1", "M1"]
@@ -293,15 +290,31 @@ class EngineRunner:
             last_ts = self._cached_candles_ts.get(tf, 0)
             if now - last_ts >= 120 or tf not in self._cached_candles:
                 try:
-                    raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 200)
-                    raw_rev = list(reversed(raw))
-                    offset = int(self.mt4_offset)
-                    self._cached_candles[tf] = [
-                        {"time": int(c.time) - offset, "open": c.open,
-                         "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
-                        for c in raw_rev
-                    ]
-                    self._cached_candles_ts[tf] = now
+                    # 三轨：从数据工厂缓存读取（避免直接调桥接）
+                    df = getattr(engine, '_data_factory', None)
+                    if df:
+                        from services.data_factory import get_cache
+                        cache = get_cache(tf)
+                        raw = cache.get("candles", [])
+                        if raw:
+                            self._cached_candles[tf] = [
+                                {"time": int(c.time) if isinstance(c.time, (int, float)) else int(c.time),
+                                 "open": c.open, "high": c.high, "low": c.low,
+                                 "close": c.close, "volume": c.volume}
+                                for c in raw
+                            ]
+                            self._cached_candles_ts[tf] = now
+                    else:
+                        # 回退：旧模式从桥接获取
+                        from config import settings as _cfg
+                        raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 200)
+                        raw_rev = list(reversed(raw))
+                        self._cached_candles[tf] = [
+                            {"time": int(c.time), "open": c.open,
+                             "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
+                            for c in raw_rev
+                        ]
+                        self._cached_candles_ts[tf] = now
                 except Exception:
                     pass
                 return  # 只刷一个周期就退出，下个 tick 再刷下一个
@@ -379,6 +392,7 @@ class EngineRunner:
             self._run_impl()
         except Exception as e:
             self.logger.exception(f"引擎线程异常终止: {e}")
+            self._stop_requested = True
             self._running = False
             self._engine = None
             self.bridge = None

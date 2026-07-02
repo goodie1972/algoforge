@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from config.settings import MT4_MODE, SYMBOL, LOT_SIZE, MAGIC_NUMBER
+from config.settings import MT4_MODE, SYMBOL, LOT_SIZE, MAGIC_NUMBER, \
+    FREEMT4_HOST, FREEMT4_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -150,3 +151,14 @@ def create_bridge() -> MT4BridgeBase:
         return MetaApiBridge()
     else:
         raise ValueError(f"不支持的 MT4_MODE: {MT4_MODE}")
+
+
+def create_bridge_pair():
+    """创建 4 个独立桥接实例（留给 EA V3 多客户端用）"""
+    from core.freemt4_bridge import FreeMT4Bridge
+    return [
+        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-data-a"),   # 数据推流 M15/M30
+        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-data-b"),   # 数据推流 H1/H4
+        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-tick"),     # tick 价格
+        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="bridge-exec"),     # 命令执行
+    ]

@@ -1,10 +1,10 @@
 //+------------------------------------------------------------------+
 //|                                              FreeMT4Bridge.mq4   |
-//|  免费 MT4 Socket 桥接 EA V3 - 自定义 # 分隔协议                   |
-//|  改进: 多客户端并发接入 (最多4路), 独立超时检测                    |
+//|  免费 MT4 Socket 桥接 EA V2 - 自定义 # 分隔协议                   |
+//|  改进: 非阻塞 Socket, 快速重连, 心跳超时检测                       |
 //+------------------------------------------------------------------+
 #property copyright "Free MT4 Bridge"
-#property version   "3.00"
+#property version   "2.00"
 #property strict
 
 #define INVALID_SOCKET      (-1)
@@ -27,17 +27,16 @@ input int ServerPort = 23232;
 input bool AllowTrade = true;
 
 int serverSocket = INVALID_SOCKET;
-int clientSockets[4];
-int clientCount = 0;
+int clientSocket = INVALID_SOCKET;
 uchar recvBuffer[65536];
 int recvLen = 0;
-datetime lastActivity[4];
+datetime lastActivity = 0;
 #define CLIENT_TIMEOUT_SEC 180  // 180秒无活动则断开（主循环约60秒一次）
 
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   Print("[FreeBridge V3] Starting on port ", ServerPort);
+   Print("[FreeBridge V2] Starting on port ", ServerPort);
 
    // 创建 TCP Socket
    serverSocket = socket(2, 1, 6);  // AF_INET, SOCK_STREAM, IPPROTO_TCP
@@ -67,7 +66,7 @@ int OnInit()
       return INIT_FAILED;
    }
 
-   if(listen(serverSocket, 4) == SOCKET_ERROR) {
+   if(listen(serverSocket, 1) == SOCKET_ERROR) {
       Print("[FreeBridge] listen() failed: ", WSAGetLastError());
       closesocket(serverSocket);
       return INIT_FAILED;
@@ -80,9 +79,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   for(int i = 0; i < 4; i++) {
-      if(clientSockets[i] != INVALID_SOCKET) closesocket(clientSockets[i]);
-   }
+   if(clientSocket != INVALID_SOCKET) closesocket(clientSocket);
    if(serverSocket != INVALID_SOCKET) closesocket(serverSocket);
    EventKillTimer();
    Print("[FreeBridge] Stopped (reason=", reason, ")");
@@ -91,114 +88,103 @@ void OnDeinit(const int reason)
 void OnTimer()
 {
    // === 1. 接受新连接 ===
-   if(clientCount < 4)
+   if(clientSocket == INVALID_SOCKET)
    {
       uchar addr[16];
       int addrlen = 16;
-      int newSock = accept(serverSocket, addr, addrlen);
+      clientSocket = accept(serverSocket, addr, addrlen);
 
-      if(newSock != INVALID_SOCKET) {
-         // 找到第一个空槽
-         for(int slot = 0; slot < 4; slot++) {
-            if(clientSockets[slot] == INVALID_SOCKET) {
-               clientSockets[slot] = newSock;
-               lastActivity[slot] = TimeCurrent();
-               clientCount++;
-               Print("[FreeBridge] === Client connected (slot=", slot, ", total=", clientCount, ") ===");
-               break;
-            }
+      if(clientSocket != INVALID_SOCKET) {
+         Print("[FreeBridge] === Client connected ===");
+         recvLen = 0;
+         lastActivity = TimeCurrent();
+      }
+      // 非阻塞模式下 accept 会立即返回 SOCKET_ERROR (WSAEWOULDBLOCK=10035)
+      // 这是正常的，不需要处理
+      return;
+   }
+
+   // === 2. 心跳超时检测 ===
+   if(TimeCurrent() - lastActivity > CLIENT_TIMEOUT_SEC) {
+      Print("[FreeBridge] Client timeout (", CLIENT_TIMEOUT_SEC, "s), disconnecting");
+      closesocket(clientSocket);
+      clientSocket = INVALID_SOCKET;
+      recvLen = 0;
+      return;
+   }
+
+   // === 3. 接收数据 ===
+   uchar tmp[4096];
+   int bytes = recv(clientSocket, tmp, 4096, 0);
+
+   if(bytes > 0) {
+      lastActivity = TimeCurrent();
+      for(int i = 0; i < bytes; i++) {
+         if(recvLen < 65535) {
+            recvBuffer[recvLen] = tmp[i];
+            recvLen++;
+         }
+         if(tmp[i] == '!') {
+            string cmd = CharArrayToString(recvBuffer, 0, recvLen - 1);
+            ProcessCommand(cmd);
+            recvLen = 0;
          }
       }
    }
-
-   // === 2. 遍历所有连接: 超时检测 + 收数据 ===
-   for(int c = 0; c < 4; c++)
-   {
-      if(clientSockets[c] == INVALID_SOCKET)
-         continue;
-
-      // 心跳超时检测
-      if(TimeCurrent() - lastActivity[c] > CLIENT_TIMEOUT_SEC) {
-         Print("[FreeBridge] Client timeout slot=", c, " (", CLIENT_TIMEOUT_SEC, "s), disconnecting");
-         closesocket(clientSockets[c]);
-         clientSockets[c] = INVALID_SOCKET;
-         clientCount--;
-         continue;
-      }
-
-      // 接收数据
-      uchar tmp[4096];
-      int bytes = recv(clientSockets[c], tmp, 4096, 0);
-
-      if(bytes > 0) {
-         lastActivity[c] = TimeCurrent();
-         for(int i = 0; i < bytes; i++) {
-            if(recvLen < 65535) {
-               recvBuffer[recvLen] = tmp[i];
-               recvLen++;
-            }
-            if(tmp[i] == '!') {
-               string cmd = CharArrayToString(recvBuffer, 0, recvLen - 1);
-               ProcessCommand(cmd, clientSockets[c]);
-               recvLen = 0;
-            }
-         }
-      }
-      else if(bytes == 0) {
-         // 客户端正常断开
-         Print("[FreeBridge] Client disconnected gracefully slot=", c);
-         closesocket(clientSockets[c]);
-         clientSockets[c] = INVALID_SOCKET;
-         clientCount--;
-      }
-      else {
-         // 接收错误
-         int err = WSAGetLastError();
-         if(err != 10035 && err != 10034) {  // 忽略 WSAEWOULDBLOCK 和 WSAEINTR
-            Print("[FreeBridge] recv error slot=", c, ": ", err, ", disconnecting client");
-            closesocket(clientSockets[c]);
-            clientSockets[c] = INVALID_SOCKET;
-            clientCount--;
-         }
+   else if(bytes == 0) {
+      // 客户端正常断开
+      Print("[FreeBridge] Client disconnected gracefully");
+      closesocket(clientSocket);
+      clientSocket = INVALID_SOCKET;
+      recvLen = 0;
+   }
+   else {
+      // 接收错误
+      int err = WSAGetLastError();
+      if(err != 10035 && err != 10034) {  // 忽略 WSAEWOULDBLOCK 和 WSAEINTR
+         Print("[FreeBridge] recv error: ", err, ", disconnecting client");
+         closesocket(clientSocket);
+         clientSocket = INVALID_SOCKET;
+         recvLen = 0;
       }
    }
 }
 //+------------------------------------------------------------------+
-void ProcessCommand(string cmd, int sock)
+void ProcessCommand(string cmd)
 {
    string parts[];
    int n = StringSplit(cmd, '#', parts);
-   if(n < 2) { SendResponse("ERROR#bad command#", sock); return; }
+   if(n < 2) { SendResponse("ERROR#bad command#"); return; }
 
    string fcode = parts[0];
 
    if(fcode == "F000") {
-      SendResponse("F000#OK#", sock);
+      SendResponse("F000#OK#");
    }
    else if(fcode == "F001") {
       string resp = StringFormat("F001#OK#%s#%d#%s#Standard#%d#true#0#100.0#50.0#",
          AccountCompany(), AccountNumber(), AccountCurrency(), AccountLeverage());
-      SendResponse(resp, sock);
+      SendResponse(resp);
    }
    else if(fcode == "F002") {
       double marginLevel = (AccountMargin() > 0) ? (AccountEquity() / AccountMargin() * 100) : 0;
       string resp = StringFormat("F002#OK#%.2f#%.2f#%.2f#%.2f#%.2f#%.2f#",
          AccountBalance(), AccountEquity(), AccountProfit(),
          AccountMargin(), marginLevel, AccountFreeMargin());
-      SendResponse(resp, sock);
+      SendResponse(resp);
    }
    else if(fcode == "F020") {
-      if(n < 3) { SendResponse("F020#ERROR#missing symbol#", sock); return; }
+      if(n < 3) { SendResponse("F020#ERROR#missing symbol#"); return; }
       string sym = parts[2];
       double bid = SymbolInfoDouble(sym, SYMBOL_BID);
       double ask = SymbolInfoDouble(sym, SYMBOL_ASK);
       if(bid == 0) bid = MarketInfo(sym, MODE_BID);
       if(ask == 0) ask = MarketInfo(sym, MODE_ASK);
       datetime t = TimeCurrent();
-      SendResponse(StringFormat("F020#OK#%d#%.5f#%.5f#%.5f#0#", (int)t, ask, bid, bid), sock);
+      SendResponse(StringFormat("F020#OK#%d#%.5f#%.5f#%.5f#0#", (int)t, ask, bid, bid));
    }
    else if(fcode == "F042") {
-      if(n < 6) { SendResponse("F042#ERROR#bad params#", sock); return; }
+      if(n < 6) { SendResponse("F042#ERROR#bad params#"); return; }
       string sym = parts[2];
       int tf = (int)StringToInteger(parts[3]);
       int offset = (int)StringToInteger(parts[4]);
@@ -216,7 +202,7 @@ void ProcessCommand(string cmd, int sock)
          barCount++;
       }
       resp += "#";
-      SendResponse(resp, sock);
+      SendResponse(resp);
    }
    else if(fcode == "F061") {
       string resp = "F061#OK#";
@@ -232,7 +218,7 @@ void ProcessCommand(string cmd, int sock)
             OrderProfit(), OrderSwap(), OrderCommission());
       }
       resp += "#";
-      SendResponse(resp, sock);
+      SendResponse(resp);
    }
    else if(fcode == "F062") {
       string resp = "F062#OK#";
@@ -249,10 +235,10 @@ void ProcessCommand(string cmd, int sock)
             OrderStopLoss(), OrderTakeProfit(), OrderComment());
       }
       resp += "#";
-      SendResponse(resp, sock);
+      SendResponse(resp);
    }
    else if(fcode == "F070") {
-      if(n < 12) { SendResponse("F070#ERROR#bad params#", sock); return; }
+      if(n < 12) { SendResponse("F070#ERROR#bad params#"); return; }
       string sym = parts[2];
       string typeStr = StringLower(parts[3]);
       double volume = StringToDouble(parts[4]);
@@ -267,50 +253,50 @@ void ProcessCommand(string cmd, int sock)
       double openPrice = (typeStr == "buy") ? MarketInfo(sym, MODE_ASK) : MarketInfo(sym, MODE_BID);
       if(price > 0) openPrice = price;
 
-      if(!AllowTrade) { SendResponse("F070#ERROR#trading disabled#", sock); return; }
+      if(!AllowTrade) { SendResponse("F070#ERROR#trading disabled#"); return; }
 
       int ticket = OrderSend(sym, cmdType, volume, openPrice, slippage, sl, tp, comment, magic, 0, clrNONE);
       if(ticket > 0) {
-         SendResponse(StringFormat("F070#OK#%d#ORDER_OPEN#", ticket), sock);
+         SendResponse(StringFormat("F070#OK#%d#ORDER_OPEN#", ticket));
          Print("[FreeBridge] Order opened: ", typeStr, " ", sym, " ", volume, " ticket=", ticket);
       } else {
          int err = GetLastError();
-         SendResponse(StringFormat("F070#ERROR#OrderSend failed error %d#%d#", err, -1), sock);
+         SendResponse(StringFormat("F070#ERROR#OrderSend failed error %d#%d#", err, -1));
          Print("[FreeBridge] OrderSend failed: ", err);
       }
    }
    else if(fcode == "F071") {
-      if(n < 3) { SendResponse("F071#ERROR#bad params#", sock); return; }
+      if(n < 3) { SendResponse("F071#ERROR#bad params#"); return; }
       int ticket = (int)StringToInteger(parts[2]);
       bool ok = ClosePosition(ticket);
-      if(ok) SendResponse("F071#OK#ORDER_CLOSED#", sock);
-      else SendResponse(StringFormat("F071#ERROR#close failed error %d#", GetLastError()), sock);
+      if(ok) SendResponse("F071#OK#ORDER_CLOSED#");
+      else SendResponse(StringFormat("F071#ERROR#close failed error %d#", GetLastError()));
    }
    else if(fcode == "F072") {
-      if(n < 4) { SendResponse("F072#ERROR#bad params#", sock); return; }
+      if(n < 4) { SendResponse("F072#ERROR#bad params#"); return; }
       int ticket = (int)StringToInteger(parts[2]);
       double volume = StringToDouble(parts[3]);
       bool ok = ClosePositionPartial(ticket, volume);
-      if(ok) SendResponse("F072#OK#ORDER_CLOSED#", sock);
-      else SendResponse(StringFormat("F072#ERROR#partial close failed error %d#", GetLastError()), sock);
+      if(ok) SendResponse("F072#OK#ORDER_CLOSED#");
+      else SendResponse(StringFormat("F072#ERROR#partial close failed error %d#", GetLastError()));
    }
    else if(fcode == "F075") {
-      if(n < 5) { SendResponse("F075#ERROR#bad params#", sock); return; }
+      if(n < 5) { SendResponse("F075#ERROR#bad params#"); return; }
       int ticket = (int)StringToInteger(parts[2]);
       double sl = StringToDouble(parts[3]);
       double tp = StringToDouble(parts[4]);
       bool ok = ModifyPosition(ticket, sl, tp);
-      if(ok) SendResponse("F075#OK#MODIFIED#", sock);
-      else SendResponse(StringFormat("F075#ERROR#modify failed error %d#", GetLastError()), sock);
+      if(ok) SendResponse("F075#OK#MODIFIED#");
+      else SendResponse(StringFormat("F075#ERROR#modify failed error %d#", GetLastError()));
    }
    else {
-      SendResponse(StringFormat("%s#ERROR#unknown command#", fcode), sock);
+      SendResponse(StringFormat("%s#ERROR#unknown command#", fcode));
    }
 }
 //+------------------------------------------------------------------+
-void SendResponse(string response, int sock)
+void SendResponse(string response)
 {
-   if(sock == INVALID_SOCKET) return;
+   if(clientSocket == INVALID_SOCKET) return;
 
    uchar buf[];
    int len = StringToCharArray(response, buf);
@@ -320,7 +306,7 @@ void SendResponse(string response, int sock)
    buf[len] = '!';
    len++;
 
-   send(sock, buf, len, 0);
+   send(clientSocket, buf, len, 0);
 }
 //+------------------------------------------------------------------+
 bool ClosePosition(int ticket)

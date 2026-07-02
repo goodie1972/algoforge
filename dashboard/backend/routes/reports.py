@@ -48,20 +48,14 @@ def _build_daily_report() -> dict:
     except Exception:
         pass
 
-    # 当日盈亏（从风险数据获取，或从 trades 表统计）
-    risk_info = {}
+    # 当日盈亏（从 trades 表查询今日实际盈亏）
+    daily_pnl = 0
     try:
-        from dashboard.backend.routes.engine import engine_runner as er
-        if er and hasattr(er, '_engine') and er._engine:
-            eng = er._engine
-            risk_info = {
-                "daily_pnl": getattr(eng, '_daily_pnl', 0),
-                "daily_drawdown": getattr(eng, '_daily_drawdown', 0),
-            }
+        today = datetime.now().strftime("%Y-%m-%d")
+        rows = db.get_trades(limit=1000)
+        daily_pnl = sum(r.get("pnl", 0) for r in rows if str(r.get("close_time", ""))[:10] == today)
     except Exception:
         pass
-
-    daily_pnl = risk_info.get("daily_pnl", 0)
 
     # 持仓按策略分组
     positions_by_strategy = {}
@@ -196,7 +190,7 @@ def _build_daily_report() -> dict:
             "title": "风控状态",
             "data": {
                 "daily_pnl": round(daily_pnl, 2),
-                "daily_drawdown": risk_info.get("daily_drawdown", 0),
+                "daily_drawdown": 0,
                 "strategy_blocks": strategy_blocks,
             },
         },

@@ -81,8 +81,8 @@ route_data.run_bridge = run_bridge
 
 # === 后台轮询任务 ===
 class PollerState:
-    """后台任务状态"""
-    running = True
+    """后台任务状态（类变量，所有实例共享）"""
+    running: bool = True
 
 
 async def broadcast_prices():
@@ -222,7 +222,7 @@ async def lifespan(app: FastAPI):
     """启动/关闭事件 — 自动启动引擎线程"""
     # 在后台线程启动引擎（不阻塞 asyncio 事件循环）
     await asyncio.to_thread(engine_runner.start)
-    poller_state.running = True
+    PollerState.running = True
     tasks = [
         asyncio.create_task(broadcast_prices()),
         asyncio.create_task(broadcast_positions()),
@@ -234,14 +234,13 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(news_bias_loop()),
     ]
     yield
-    poller_state.running = False
+    PollerState.running = False
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     engine_runner.stop()
 
 
-poller_state = PollerState()
 
 # === FastAPI 应用 ===
 app = FastAPI(

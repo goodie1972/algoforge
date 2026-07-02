@@ -196,6 +196,21 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_reports_type_date ON reports(type, created_at);
+
+CREATE TABLE IF NOT EXISTS tick_data (
+    timestamp INTEGER NOT NULL PRIMARY KEY,
+    bid REAL,
+    ask REAL,
+    spread REAL
+);
+
+CREATE TABLE IF NOT EXISTS indicator_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timeframe TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    indicators TEXT NOT NULL,
+    UNIQUE(timeframe, timestamp)
+);
 """
 
 
@@ -536,19 +551,6 @@ def get_trade_stats(strategy: str = None, from_date: str = "",
         conn.close()
 
 
-def get_trades(limit: int = 100) -> list[dict]:
-    """获取最近 N 条成交记录（按平仓时间倒序）"""
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT * FROM trades ORDER BY close_time DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
-
-
 # ── Signals ─────────────────────────────────────────────
 
 def insert_signal(record: dict) -> int:
@@ -559,8 +561,8 @@ def insert_signal(record: dict) -> int:
                (strategy, magic, timeframe, timestamp, signal,
                 score_long, score_short, threshold,
                 factors_long, factors_short, indicator_values,
-                confidence, price_entry, ticket)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                confidence, price_entry, ticket, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 record.get("strategy", ""), record.get("magic", 0),
                 record.get("timeframe", ""), record.get("timestamp", ""),
@@ -570,6 +572,7 @@ def insert_signal(record: dict) -> int:
                 record.get("indicator_values", "{}"),
                 record.get("confidence"), record.get("price_entry"),
                 record.get("ticket"),
+                record.get("status", "pending"),
             ),
         )
         conn.commit()
