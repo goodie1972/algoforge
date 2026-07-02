@@ -29,8 +29,8 @@ input bool AllowTrade = true;
 int serverSocket = INVALID_SOCKET;
 int clientSockets[4];
 int clientCount = 0;
-uchar recvBuffer[65536];
-int recvLen = 0;
+uchar recvBuffers[4][65536];       // 每个连接独立缓冲区
+int recvLens[4];                   // 每个连接独立长度
 datetime lastActivity[4];
 #define CLIENT_TIMEOUT_SEC 180  // 180秒无活动则断开（主循环约60秒一次）
 
@@ -117,11 +117,12 @@ void OnTimer()
       if(clientSockets[c] == INVALID_SOCKET)
          continue;
 
-      // 心跳超时检测
+      // 心跳超时
       if(TimeCurrent() - lastActivity[c] > CLIENT_TIMEOUT_SEC) {
          Print("[FreeBridge] Client timeout slot=", c, " (", CLIENT_TIMEOUT_SEC, "s), disconnecting");
          closesocket(clientSockets[c]);
          clientSockets[c] = INVALID_SOCKET;
+         recvLens[c] = 0;
          clientCount--;
          continue;
       }
@@ -133,31 +134,31 @@ void OnTimer()
       if(bytes > 0) {
          lastActivity[c] = TimeCurrent();
          for(int i = 0; i < bytes; i++) {
-            if(recvLen < 65535) {
-               recvBuffer[recvLen] = tmp[i];
-               recvLen++;
+            if(recvLens[c] < 65535) {
+               recvBuffers[c][recvLens[c]] = tmp[i];
+               recvLens[c]++;
             }
             if(tmp[i] == '!') {
-               string cmd = CharArrayToString(recvBuffer, 0, recvLen - 1);
+               string cmd = CharArrayToString(recvBuffers[c], 0, recvLens[c] - 1);
                ProcessCommand(cmd, clientSockets[c]);
-               recvLen = 0;
+               recvLens[c] = 0;
             }
          }
       }
       else if(bytes == 0) {
-         // 客户端正常断开
          Print("[FreeBridge] Client disconnected gracefully slot=", c);
          closesocket(clientSockets[c]);
          clientSockets[c] = INVALID_SOCKET;
+         recvLens[c] = 0;
          clientCount--;
       }
       else {
-         // 接收错误
          int err = WSAGetLastError();
-         if(err != 10035 && err != 10034) {  // 忽略 WSAEWOULDBLOCK 和 WSAEINTR
+         if(err != 10035 && err != 10034) {
             Print("[FreeBridge] recv error slot=", c, ": ", err, ", disconnecting client");
             closesocket(clientSockets[c]);
             clientSockets[c] = INVALID_SOCKET;
+            recvLens[c] = 0;
             clientCount--;
          }
       }
