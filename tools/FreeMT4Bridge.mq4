@@ -39,6 +39,13 @@ int OnInit()
 {
    Print("[FreeBridge V3] Starting on port ", ServerPort);
 
+   // 初始化所有 slot
+   for(int j = 0; j < 4; j++) {
+      clientSockets[j] = INVALID_SOCKET;
+   }
+   clientCount = 0;
+   recvLen0 = 0; recvLen1 = 0; recvLen2 = 0; recvLen3 = 0;
+
    // 创建 TCP Socket
    serverSocket = socket(2, 1, 6);  // AF_INET, SOCK_STREAM, IPPROTO_TCP
    if(serverSocket == INVALID_SOCKET) {
