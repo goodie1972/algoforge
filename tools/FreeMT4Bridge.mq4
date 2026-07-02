@@ -122,7 +122,7 @@ void OnTimer()
          Print("[FreeBridge] Client timeout slot=", c, " (", CLIENT_TIMEOUT_SEC, "s), disconnecting");
          closesocket(clientSockets[c]);
          clientSockets[c] = INVALID_SOCKET;
-         ClearRecvLen(c);
+         if(c==0) recvLen0=0; else if(c==1) recvLen1=0; else if(c==2) recvLen2=0; else recvLen3=0;
          clientCount--;
          continue;
       }
@@ -134,14 +134,17 @@ void OnTimer()
       if(bytes > 0) {
          lastActivity[c] = TimeCurrent();
          for(int i = 0; i < bytes; i++) {
-            if(GetRecvLen(c) < 65535) {
-               SetRecvBuf(c, GetRecvLen(c), tmp[i]);
-               IncRecvLen(c);
-            }
+            if(c==0) { recvLen0 = (recvLen0 < 65535) ? recvLen0+1 : 65535; recvBuf0[recvLen0-1] = tmp[i]; }
+            else if(c==1) { recvLen1 = (recvLen1 < 65535) ? recvLen1+1 : 65535; recvBuf1[recvLen1-1] = tmp[i]; }
+            else if(c==2) { recvLen2 = (recvLen2 < 65535) ? recvLen2+1 : 65535; recvBuf2[recvLen2-1] = tmp[i]; }
+            else { recvLen3 = (recvLen3 < 65535) ? recvLen3+1 : 65535; recvBuf3[recvLen3-1] = tmp[i]; }
             if(tmp[i] == '!') {
-               string cmd = CharArrayToString(GetRecvBuf(c), 0, GetRecvLen(c) - 1);
+               string cmd = "";
+               if(c==0) { cmd = CharArrayToString(recvBuf0, 0, recvLen0 - 1); recvLen0 = 0; }
+               else if(c==1) { cmd = CharArrayToString(recvBuf1, 0, recvLen1 - 1); recvLen1 = 0; }
+               else if(c==2) { cmd = CharArrayToString(recvBuf2, 0, recvLen2 - 1); recvLen2 = 0; }
+               else { cmd = CharArrayToString(recvBuf3, 0, recvLen3 - 1); recvLen3 = 0; }
                ProcessCommand(cmd, clientSockets[c]);
-               ClearRecvLen(c);
             }
          }
       }
@@ -149,7 +152,7 @@ void OnTimer()
          Print("[FreeBridge] Client disconnected gracefully slot=", c);
          closesocket(clientSockets[c]);
          clientSockets[c] = INVALID_SOCKET;
-         ClearRecvLen(c);
+         if(c==0) recvLen0=0; else if(c==1) recvLen1=0; else if(c==2) recvLen2=0; else recvLen3=0;
          clientCount--;
       }
       else {
@@ -158,7 +161,7 @@ void OnTimer()
             Print("[FreeBridge] recv error slot=", c, ": ", err, ", disconnecting client");
             closesocket(clientSockets[c]);
             clientSockets[c] = INVALID_SOCKET;
-            ClearRecvLen(c);
+            if(c==0) recvLen0=0; else if(c==1) recvLen1=0; else if(c==2) recvLen2=0; else recvLen3=0;
             clientCount--;
          }
       }
@@ -370,38 +373,6 @@ bool ModifyPosition(int ticket, double sl, double tp)
       }
    }
    return false;
-}
-//+------------------------------------------------------------------+
-// slot 帮助函数
-void SetRecvBuf(int slot, int idx, uchar val) {
-   if     (slot==0) recvBuf0[idx]=val;
-   else if(slot==1) recvBuf1[idx]=val;
-   else if(slot==2) recvBuf2[idx]=val;
-   else if(slot==3) recvBuf3[idx]=val;
-}
-int GetRecvLen(int slot) {
-   if     (slot==0) return recvLen0;
-   else if(slot==1) return recvLen1;
-   else if(slot==2) return recvLen2;
-   else             return recvLen3;
-}
-void IncRecvLen(int slot) {
-   if     (slot==0) recvLen0++;
-   else if(slot==1) recvLen1++;
-   else if(slot==2) recvLen2++;
-   else             recvLen3++;
-}
-void ClearRecvLen(int slot) {
-   if     (slot==0) recvLen0=0;
-   else if(slot==1) recvLen1=0;
-   else if(slot==2) recvLen2=0;
-   else             recvLen3=0;
-}
-uchar& GetRecvBuf(int slot) {
-   if     (slot==0) return recvBuf0;
-   else if(slot==1) return recvBuf1;
-   else if(slot==2) return recvBuf2;
-   else             return recvBuf3;
 }
 //+------------------------------------------------------------------+
 string StringLower(string s)
