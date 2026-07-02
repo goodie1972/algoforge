@@ -132,17 +132,19 @@ class TradingEngine:
         db.init_db()  # 确保所有表存在
         db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
 
-        # 三轨架构：数据工厂 + 运动员
+        # 三轨架构：双桥接 + 数据工厂 + 运动员
         try:
             from core.bridge import create_bridge_pair
             from services.data_factory import DataFactory, get_cache, get_tick
             from engine_standalone.athlete import Athlete
-            self._bridges = create_bridge_pair()
-            self._data_factory = DataFactory(self._bridges)
-            self._athlete = Athlete(self._bridges[3])
-            logger.info("[三轨] DataFactory + Athlete 初始化成功")
+            self._data_bridge, self._exec_bridge = create_bridge_pair()
+            self.bridge = self._exec_bridge            # 引擎主桥接 = 命令通道
+            self._data_factory = DataFactory(self._data_bridge)
+            self._athlete = Athlete(self._exec_bridge)
+            logger.info("[三轨] 双桥接 + DataFactory + Athlete 初始化成功，待连接")
         except Exception as e:
             logger.warning(f"[三轨] 初始化失败，回退到单桥接旧模式: {e}", exc_info=True)
+            self._data_bridge = None
             self._data_factory = None
             self._athlete = None
 
@@ -811,10 +813,16 @@ class TradingEngine:
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
 
-        # 启动数据工厂
-        if self._data_factory:
+        # 启动数据工厂（双桥接：引擎用 exec_bridge，工厂用 data_bridge）
+        if self._data_factory and self._data_bridge:
+            time.sleep(2)  # 等 exec bridge 稳定后再连 data bridge
+            if not self._data_bridge.connect():
+                logger.warning("[三轨] 数据桥接连接失败，工厂回退到引擎桥接")
+                self._data_factory._bridge = self.bridge
+            else:
+                logger.info("[三轨] 数据桥接已连接，工厂独立通道")
             self._data_factory.start()
-            time.sleep(5)  # 等首次数据加载完成
+            time.sleep(5)
 
         # 新闻过滤初始化加载
         windows = self.news_filter.get_blackout_windows()
