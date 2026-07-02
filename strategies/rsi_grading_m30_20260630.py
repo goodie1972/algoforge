@@ -12,6 +12,7 @@ M30 RSI分级评分 + MA14 + BB + ADX>28 趋势门禁
 
 import logging
 import math
+import time
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, OrderType
@@ -76,72 +77,28 @@ class RSIGradingM30Strategy(BaseStrategy):
         self._cached_atr_key: int = 0
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
+            return None
+        return {"adx": adx, "pdi": pdi, "ndi": ndi}
 
     def refresh_data(self, count: int = 350):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
 
     # ─────────────── Indicator helpers ───────────────
 
-    def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
-        if len(closes) < period + 1: return None
-        gains, losses = [], []
-        for i in range(1, period + 1):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-        for i in range(period + 1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            avg_gain = (avg_gain * (period - 1) + max(diff, 0)) / period
-            avg_loss = (avg_loss * (period - 1) + max(-diff, 0)) / period
-        if avg_loss == 0: return 100.0
-        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
-
-    def _calc_bb_levels(self) -> Optional[dict]:
-        closes = self.get_close_prices()
-        if len(closes) < self.bb_period: return None
-        recent = closes[-self.bb_period:]
-        sma = sum(recent) / self.bb_period
-        variance = sum((c - sma) ** 2 for c in recent) / self.bb_period
-        std = math.sqrt(variance)
-        return {"sma": sma, "upper": sma + self.bb_std * std, "lower": sma - self.bb_std * std}
-
-    def _calc_atr_values(self, period: int = 20) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h = candles[i].high
-            l_ = candles[i].low
-            pc = candles[i - 1].close
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            tr_values.append(tr)
-        if len(tr_values) < period: return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 20) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        return vals[-1] if vals and len(vals) > 0 else None
-
     def _get_ma14_trend(self) -> str:
-        closes = self.get_close_prices()
-        if len(closes) < self.ma14_period: return 'NEUTRAL'
-        ma14 = sum(closes[-self.ma14_period:]) / self.ma14_period
-        return 'UP' if closes[-1] > ma14 else 'DOWN'
+        """M30 MA14 趋势（保留独有逻辑）"""
+        sma14 = self.get_indicator("sma_14")
+        close = self.get_indicator("close")
+        if sma14 is None or close is None:
+            return 'NEUTRAL'
+        return 'UP' if close > sma14 else 'DOWN'
 
     def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
+        """EMA 计算（保留用于 _get_exit_multipliers 中的 EMA9/21 趋势判断）"""
         if len(closes) < period: return None
         k = 2.0 / (period + 1)
         ema = closes[0]
@@ -163,16 +120,17 @@ class RSIGradingM30Strategy(BaseStrategy):
         closes = self.get_close_prices()
         close = closes[-1]
 
-        bb = self._calc_bb_levels()
+        bb = self.get_indicator("bb")
         if bb is None: return None
 
-        rsi_val = self._calc_rsi(closes, self.rsi_period)
+        rsi_val = self.get_indicator("rsi")
         if rsi_val is None: return None
 
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0: return None
 
-        adx_data = self._calc_adx()
+        adx = self.get_indicator("adx")
+        adx_data = {"adx": adx, "pdi": self.get_indicator("pdi"), "ndi": self.get_indicator("ndi")}
 
         ma14_trend = self._get_ma14_trend()
 
@@ -204,9 +162,9 @@ class RSIGradingM30Strategy(BaseStrategy):
 
         # ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
         gate_side = None  # None=无门禁, 'long'=禁多, 'short'=禁空
-        if adx_data and adx_data["adx"] > self.adx_threshold:
-            ema9 = self._calc_ema(closes, self.ema_fast)
-            ema21 = self._calc_ema(closes, self.ema_slow)
+        if adx is not None and adx > self.adx_threshold:
+            ema9 = self.get_indicator("ema_10")
+            ema21 = self.get_indicator("ema_20")
             if ema9 is not None and ema21 is not None:
                 if ema9 > ema21:
                     gate_side = 'short'
@@ -245,8 +203,8 @@ class RSIGradingM30Strategy(BaseStrategy):
         gate_log = ""
         if gate_side:
             gate_log = " [门禁]" + ("禁空" if gate_side == 'short' else "禁多")
-        ema9_v = ema9 if 'ema9' in dir() else self._calc_ema(closes, self.ema_fast)
-        ema21_v = ema21 if 'ema21' in dir() else self._calc_ema(closes, self.ema_slow)
+        ema9_v = ema9 if 'ema9' in dir() else self.get_indicator("ema_10")
+        ema21_v = ema21 if 'ema21' in dir() else self.get_indicator("ema_20")
         ema_log = ""
         if ema9_v is not None and ema21_v is not None:
             ema_log = f" EMA9={ema9_v:.2f} EMA21={ema21_v:.2f}"
@@ -259,7 +217,7 @@ class RSIGradingM30Strategy(BaseStrategy):
             "close": round(close, 2), "rsi": round(rsi_val, 1),
             "atr": round(atr_val, 2),
             "bb_upper": round(bb["upper"], 2), "bb_lower": round(bb["lower"], 2),
-            "bb_mid": round(bb["sma"], 2), "ma14_trend": ma14_trend,
+            "bb_mid": round(bb["mid"], 2), "ma14_trend": ma14_trend,
             "adx": round(adx_data["adx"], 1) if adx_data else 0,
             "pdi": round(adx_data["pdi"], 1) if adx_data else 0,
             "ndi": round(adx_data["ndi"], 1) if adx_data else 0,
@@ -272,7 +230,7 @@ class RSIGradingM30Strategy(BaseStrategy):
     # ─────────────── SL/TP and Exit ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
@@ -289,9 +247,8 @@ class RSIGradingM30Strategy(BaseStrategy):
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
         """EMA9/21 趋势感知: 顺趋势宽, 逆趋势窄"""
-        closes = self.get_close_prices()
-        ema9 = self._calc_ema(closes, self.ema_fast)
-        ema21 = self._calc_ema(closes, self.ema_slow)
+        ema9 = self.get_indicator("ema_10")
+        ema21 = self.get_indicator("ema_20")
         trend_up = ema9 is not None and ema21 is not None and ema9 > ema21
 
         if (is_buy and trend_up) or (not is_buy and not trend_up):
@@ -312,7 +269,7 @@ class RSIGradingM30Strategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return False
 
@@ -320,8 +277,8 @@ class RSIGradingM30Strategy(BaseStrategy):
         reg = "顺" if (trail == self.trend_trail) else "逆"
         pdd = self.profit_drawdown_pct
         # ADX>25 趋势强 → 放宽回撤
-        _ax = self._calc_adx(14)
-        if _ax and _ax.get("adx", 0) > 25:
+        _ax_adx = self.get_indicator("adx")
+        if _ax_adx and _ax_adx > 25:
             pdd = max(pdd, 0.5)
 
         if is_buy:

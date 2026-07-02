@@ -99,15 +99,6 @@ class StochTrendH1Strategy(BaseStrategy):
 
     # ─────────────── Indicator helpers ───────────────
 
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period:
-            return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
-
     def _calc_stoch(self) -> Optional[dict]:
         candles = self.candles
         if len(candles) < self.stoch_k_period + self.stoch_slowing + self.stoch_d_period + 1:
@@ -132,33 +123,6 @@ class StochTrendH1Strategy(BaseStrategy):
             "curr_d": sum(smooth_k[-dp:]) / dp,
             "prev_d": sum(smooth_k[-(dp + 1):-1]) / dp,
         }
-
-    def _calc_atr_values(self, period: int = 20) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-        candles = self.candles
-        if len(candles) < period + 2:
-            return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h = candles[i].high
-            l_ = candles[i].low
-            pc = candles[i - 1].close
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            tr_values.append(tr)
-        if len(tr_values) < period:
-            return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 20) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        return vals[-1] if vals and len(vals) > 0 else None
 
     # ─────────────── H4 多周期方向 ───────────────
 
@@ -218,7 +182,7 @@ class StochTrendH1Strategy(BaseStrategy):
         if stoch is None:
             return None
 
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return None
 
@@ -226,7 +190,7 @@ class StochTrendH1Strategy(BaseStrategy):
         if adx_data is None:
             return None
 
-        ma_val = self._calc_ema(closes, 21)
+        ma_val = self.get_indicator("ema_20")
         if ma_val is None:
             return None
 
@@ -306,7 +270,7 @@ class StochTrendH1Strategy(BaseStrategy):
     # ─────────────── SL/TP and Exit ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
@@ -329,7 +293,7 @@ class StochTrendH1Strategy(BaseStrategy):
             }
 
         td = self._pos_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return False
 
@@ -356,7 +320,7 @@ class StochTrendH1Strategy(BaseStrategy):
 
         # 保本出场：走过≥0.3ATR盈利后回到成本附近
         mfe = (td["peak"] - entry_price) if is_buy else (entry_price - td["peak"])
-        if mfe >= atr_val * 0.3 and _cp <= atr_val * 0.05:
+        if mfe >= atr_val * 0.3 and 0 <= _cp <= atr_val * 0.05:
             logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} Breakeven ticket={ticket}")
             self._last_exit_detail = {"exit_type": "breakeven", "profit": round(_cp, 2)}
             del self._pos_data[ticket]

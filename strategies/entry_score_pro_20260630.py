@@ -52,7 +52,12 @@ class EntryScoreProStrategy(BaseStrategy):
         self.trail_atr = 1.5
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
+        _adx = self.get_indicator("adx")
+        _pdi = self.get_indicator("pdi")
+        _ndi = self.get_indicator("ndi")
+        if _adx is not None:
+            return {"adx": _adx, "pdi": _pdi, "ndi": _ndi}
+        return None
 
     # ─────────────── Indicator helpers ───────────────
 
@@ -64,32 +69,10 @@ class EntryScoreProStrategy(BaseStrategy):
             ema = (p - ema) * k + ema
         return ema
 
-    def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
-        if len(closes) < period + 1: return None
-        gains, losses = [], []
-        for i in range(1, period + 1):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-        for i in range(period + 1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
-        if avg_loss == 0: return 100.0
-        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
-
     def _calc_atr(self, period: int = 14, offset: int = 0) -> Optional[float]:
         """标准 Wilder ATR（带 offset 偏移，供波动因子计算历史 ATR 使用）"""
         sub = self.candles[:-offset] if offset > 0 else self.candles
         return self.calc_atr_wilder(sub, period)
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
 
     def _find_swing(self, lookback: int = 10) -> Optional[dict]:
         """找最近摆动高点和低点"""
@@ -106,15 +89,6 @@ class EntryScoreProStrategy(BaseStrategy):
             swing_low = lows[mid]
         return {"high": swing_high, "low": swing_low}
 
-    def _calc_bb_levels(self) -> Optional[dict]:
-        closes = self.get_close_prices()
-        if len(closes) < 20: return None
-        recent = closes[-20:]
-        sma = sum(recent) / 20
-        variance = sum((c - sma) ** 2 for c in recent) / 20
-        std = math.sqrt(variance)
-        return {"sma": sma, "upper": sma + 2 * std, "lower": sma - 2 * std}
-
     # ─────────────── Signal generation ───────────────
 
     def generate_signal(self) -> Optional[tuple]:
@@ -123,7 +97,7 @@ class EntryScoreProStrategy(BaseStrategy):
 
         closes = self.get_close_prices()
         close = closes[-1]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None: return None
 
         # ── 计算5因子(每项0-100) ──
@@ -139,7 +113,10 @@ class EntryScoreProStrategy(BaseStrategy):
             else:
                 struct_short += 25
         # 趋势强度
-        adx_data = self._calc_adx()
+        _adx = self.get_indicator("adx")
+        _pdi = self.get_indicator("pdi")
+        _ndi = self.get_indicator("ndi")
+        adx_data = {"adx": _adx, "pdi": _pdi, "ndi": _ndi} if _adx is not None else None
         if adx_data and adx_data["adx"] > 25:
             if adx_data["pdi"] > adx_data["ndi"]:
                 struct_long += 25
@@ -170,7 +147,7 @@ class EntryScoreProStrategy(BaseStrategy):
         mom_long = 50 + body_ratio * 50 if candles[-1].close > candles[-1].open else 50 - body_ratio * 50
 
         # ④ 波动(10%): 当前ATR vs 30根前ATR，适中波动利于入场（方向无关质量分）
-        atr_now = self._calc_atr(period=14)
+        atr_now = self.get_indicator("atr")
         atr_old = self._calc_atr(period=14, offset=30) if len(closes) >= 50 else None
         vol_score = 50  # 数据不足时中性
         if atr_now and atr_old and atr_old > 0:
@@ -188,7 +165,7 @@ class EntryScoreProStrategy(BaseStrategy):
             trend_long += 30
         else:
             trend_short += 30
-        rsi_val = self._calc_rsi(closes)
+        rsi_val = self.get_indicator("rsi")
         if rsi_val is not None:
             if rsi_val > 50:
                 trend_long += 20
@@ -256,7 +233,7 @@ class EntryScoreProStrategy(BaseStrategy):
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
         """SL=±0.55ATR, TP=下一摆动点"""
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return None
         sl_dist = atr_val * self.sl_atr
@@ -280,7 +257,7 @@ class EntryScoreProStrategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return False
 

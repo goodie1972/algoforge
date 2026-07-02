@@ -430,7 +430,7 @@ class XAUBotBackupStrategy(BaseStrategy):
         return vals[-1] if vals else None
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
         dist = atr_val * 3.0
@@ -451,7 +451,7 @@ class XAUBotBackupStrategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return False
 

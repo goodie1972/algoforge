@@ -46,6 +46,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
         self._cached_atr_key: int = 0
         self._cached_adx: Optional[dict] = None
         self._cached_adx_key: int = 0
+        self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
 
         # Exit params — 双重止盈：利润回撤25% + ATR移动止盈 + 硬止损
         self.p_trailing_atr = 1.0   # 回调超过 1 ATR 即止盈（原为 3.5）
@@ -63,8 +64,6 @@ class GoldAutoResearchStrategy(BaseStrategy):
         }
 
     def refresh_data(self, count: int = 300):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         self._cached_adx_key = 0
         self._cached_adx = None
         super().refresh_data(count)
@@ -72,6 +71,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
     # ─────────────── Indicator helpers ───────────────
 
     def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
+        """EMA 计算（保留用于 _get_trend 等需要特定 period 的场景）"""
         if len(closes) < period:
             return None
         k = 2.0 / (period + 1)
@@ -79,11 +79,6 @@ class GoldAutoResearchStrategy(BaseStrategy):
         for p in closes[1:]:
             ema = (p - ema) * k + ema
         return ema
-
-    def _calc_sma(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period:
-            return None
-        return sum(closes[-period:]) / period
 
     def _calc_stddev(self, closes: list[float], period: int) -> Optional[float]:
         if len(closes) < period:
@@ -264,8 +259,8 @@ class GoldAutoResearchStrategy(BaseStrategy):
         n = len(closes)
 
         # ── ① Trend: EMA10 vs EMA20 ──
-        ema10 = self._calc_ema(closes, 10)
-        ema20 = self._calc_ema(closes, 20)
+        ema10 = self.get_indicator("ema_10")
+        ema20 = self.get_indicator("ema_20")
         if ema10 is None or ema20 is None:
             return None
         trend_up = ema10 > ema20
@@ -298,7 +293,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
         # ── ③ Volatility: ADX > 20 or ATR rising ──
         adx_val, pdi, ndi = self._get_adx_at(n - 1)
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
 
         # ATR SMA(20) for comparison
         atr_all = self._calc_atr_values(14)
@@ -314,7 +309,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
         # ── ④ Safety: RSI(10) + BB(20,2) ──
         rsi_val = self._calc_rsi(closes, 10)
-        bb_mid = self._calc_sma(closes, 20)
+        bb_mid = self.get_indicator("sma_20")
         bb_std = self._calc_stddev(closes, 20)
 
         safe_up = True
@@ -388,9 +383,8 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
     def _get_trend(self) -> str:
         """EMA10/20 trend: 'UP' / 'DOWN' / 'NEUTRAL'"""
-        closes = self.get_close_prices()
-        ema10 = self._calc_ema(closes, 10)
-        ema20 = self._calc_ema(closes, 20)
+        ema10 = self.get_indicator("ema_10")
+        ema20 = self.get_indicator("ema_20")
         if ema10 is None or ema20 is None:
             return 'NEUTRAL'
         return 'UP' if ema10 > ema20 else 'DOWN'
@@ -407,7 +401,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
     # ─────────────── SL/TP and Exit ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
         _, hard_mult = self._get_exit_multipliers(direction == OrderType.BUY)
@@ -440,7 +434,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return False
 
@@ -477,9 +471,9 @@ class GoldAutoResearchStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最高点回落（仅盈利时触发，亏损时让硬止损兜底）
+            # 移动止盈：从最高点回落
             drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult and current_profit > 0:
+            if drawdown > atr_val * trail_mult:
                 logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
                 self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                 del self._trail_data[ticket]
@@ -516,9 +510,9 @@ class GoldAutoResearchStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最低点反弹（仅盈利时触发，亏损时让硬止损兜底）
+            # 移动止盈：从最低点反弹
             rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult and current_profit > 0:
+            if rally > atr_val * trail_mult:
                 logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
                 self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
                 del self._trail_data[ticket]

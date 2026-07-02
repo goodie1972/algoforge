@@ -813,14 +813,18 @@ class TradingEngine:
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
 
-        # 启动数据工厂（双桥接：引擎用 exec_bridge，工厂用 data_bridge）
+        # 连接数据桥接（双桥接：引擎用 exec_bridge，工厂用 data_bridge）
         if self._data_factory and self._data_bridge:
-            time.sleep(2)  # 等 exec bridge 稳定后再连 data bridge
-            if not self._data_bridge.connect():
-                logger.warning("[三轨] 数据桥接连接失败，工厂回退到引擎桥接")
-                self._data_factory._bridge = self.bridge
+            logger.info("[三轨] 开始尝试连接数据桥接...")
+            for attempt in range(5):
+                logger.info(f"[三轨] 数据桥接连接尝试 {attempt+1}/5")
+                if self._data_bridge.connect():
+                    logger.info("[三轨] 数据桥接已连接，工厂独立通道")
+                    break
+                time.sleep(1)
             else:
-                logger.info("[三轨] 数据桥接已连接，工厂独立通道")
+                logger.warning("[三轨] 5次重试后仍无法连接数据桥接，工厂回退到引擎桥接")
+                self._data_factory._bridge = self.bridge
             self._data_factory.start()
             time.sleep(5)
 

@@ -70,91 +70,17 @@ class M30MFIBBStrategy(BaseStrategy):
         self._cached_atr_key: int = 0
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
+            return None
+        return {"adx": adx, "pdi": pdi, "ndi": ndi}
 
     def refresh_data(self, count: int = 350):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
 
     # ─────────────── Indicator helpers ───────────────
-
-    def _calc_sma(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        return sum(closes[-period:]) / period
-
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
-
-    def _calc_atr_values(self, period: int = 20) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h = candles[i].high
-            l_ = candles[i].low
-            pc = candles[i - 1].close
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            tr_values.append(tr)
-        if len(tr_values) < period: return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 20) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        if vals is None or len(vals) == 0: return None
-        return vals[-1]
-
-    def _calc_bb_levels(self) -> Optional[dict]:
-        closes = self.get_close_prices()
-        if len(closes) < self.bb_period: return None
-        recent = closes[-self.bb_period:]
-        sma = sum(recent) / self.bb_period
-        variance = sum((c - sma) ** 2 for c in recent) / self.bb_period
-        std = math.sqrt(variance)
-        return {"sma": sma, "upper": sma + self.bb_std * std, "lower": sma - self.bb_std * std}
-
-    def _calc_mfi(self) -> Optional[float]:
-        """计算 MFI(14) — 需 volume 数据"""
-        candles = self.candles
-        if len(candles) < self.mfi_period + 1:
-            return None
-
-        typical = [(c.high + c.low + c.close) / 3.0 for c in candles]
-        money_flow = [tp * c.volume for tp, c in zip(typical, candles)]
-
-        pos_flow, neg_flow = 0.0, 0.0
-        for i in range(-self.mfi_period, 0):
-            if typical[i] > typical[i - 1]:
-                pos_flow += money_flow[i]
-            else:
-                neg_flow += money_flow[i]
-
-        if neg_flow == 0:
-            return 100.0
-        mfr = pos_flow / neg_flow
-        return 100.0 - 100.0 / (1.0 + mfr)
-
-    def _get_m30_trend(self) -> str:
-        """M30 MA20 趋势判断"""
-        closes = self.get_close_prices()
-        if len(closes) < self.ma20_period:
-            return 'NEUTRAL'
-        ma20 = sum(closes[-self.ma20_period:]) / self.ma20_period
-        return 'UP' if closes[-1] > ma20 else 'DOWN'
 
     def _calc_adx(self, period: int = 14) -> Optional[dict]:
         """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
@@ -166,9 +92,9 @@ class M30MFIBBStrategy(BaseStrategy):
         """趋势模式评分 (ADX≥25): 顺 DI 方向交易，MFI 中值回调进场"""
         closes = self.get_close_prices()
         close = closes[-1]
-        bb = self._calc_bb_levels()
-        mfi_val = self._calc_mfi()
-        m30_trend = self._get_m30_trend()
+        bb = self.get_indicator("bb")
+        mfi_val = self.get_indicator("mfi")
+        m30_trend = self.get_indicator("trend")
 
         long_score = 0; long_detail = []
         short_score = 0; short_detail = []
@@ -199,7 +125,7 @@ class M30MFIBBStrategy(BaseStrategy):
 
         # ④ BB 中轨附近: 趋势中价格回到中轨是顺趋势进场点
         if bb:
-            mid = bb["sma"]
+            mid = bb.get("mid", bb.get("sma"))
             dist_pct = abs(close - mid) / (bb["upper"] - bb["lower"]) if (bb["upper"] - bb["lower"]) > 0 else 1
             if dist_pct < 0.3:
                 if di_bull:
@@ -220,9 +146,9 @@ class M30MFIBBStrategy(BaseStrategy):
         """震荡模式评分 (ADX<25): MFI 极端 + BB 触轨均值回归"""
         closes = self.get_close_prices()
         close = closes[-1]
-        bb = self._calc_bb_levels()
-        mfi_val = self._calc_mfi()
-        m30_trend = self._get_m30_trend()
+        bb = self.get_indicator("bb")
+        mfi_val = self.get_indicator("mfi")
+        m30_trend = self.get_indicator("trend")
 
         long_score = 0; long_detail = []
         short_score = 0; short_detail = []
@@ -241,7 +167,7 @@ class M30MFIBBStrategy(BaseStrategy):
             elif mfi_val >= self.mfi_overbought:
                 short_score += 1; short_detail.append(f"MFI-{mfi_val:.0f}")
 
-        # ③ MFI 方向: MFI 回升/回落确认
+        # ③ MFI 方向: MFI 回升/回落确认 (保留独有逻辑)
         if mfi_val is not None and len(closes) >= self.mfi_period + 5:
             mfi_prev = self._calc_mfi_from(closes[:-2])
             if mfi_prev is not None and mfi_val > mfi_prev:
@@ -295,19 +221,22 @@ class M30MFIBBStrategy(BaseStrategy):
         closes = self.get_close_prices()
         close = closes[-1]
 
-        bb = self._calc_bb_levels()
+        bb = self.get_indicator("bb")
         if bb is None: return None
 
-        mfi_val = self._calc_mfi()
+        mfi_val = self.get_indicator("mfi")
         if mfi_val is None: return None
 
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None: return None
 
-        adx_data = self._calc_adx()
-        if adx_data is None: return None
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None: return None
+        adx_data = {"adx": adx, "pdi": pdi, "ndi": ndi}
 
-        is_trend = adx_data["adx"] >= self.adx_trend_threshold
+        is_trend = adx >= self.adx_trend_threshold
 
         # ── Dual-mode scoring ──
         if is_trend:
@@ -382,7 +311,7 @@ class M30MFIBBStrategy(BaseStrategy):
             "atr": round(atr_val, 2), "bb_upper": round(bb["upper"], 2),
             "price_position": round(price_position, 3),
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
-            "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
+            "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["mid"], 2),
             "adx": round(adx_data["adx"], 1),
             "pdi": round(pdi, 1), "ndi": round(ndi, 1),
             "mode": mode_label, "mfi_os": self.mfi_oversold, "mfi_ob": self.mfi_overbought,
@@ -392,7 +321,7 @@ class M30MFIBBStrategy(BaseStrategy):
     # ─────────────── Trend-aware exit multipliers ───────────────
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
-        trend = self._get_m30_trend()
+        trend = self.get_indicator("trend")
         if trend == 'UP':
             return (1.5, 3.0) if is_buy else (1.0, 2.0)
         elif trend == 'DOWN':
@@ -403,7 +332,7 @@ class M30MFIBBStrategy(BaseStrategy):
     # ─────────────── SL/TP and Exit ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
@@ -436,16 +365,18 @@ class M30MFIBBStrategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return False
 
         trail_mult = td["trail_mult"]
         hard_mult = td["hard_mult"]
         pdd = self.profit_drawdown_pct
-        _ax = self._calc_adx(14)
-        if _ax and _ax.get("adx", 0) > 25:
+        _ax_adx = self.get_indicator("adx")
+        if _ax_adx and _ax_adx > 25:
             pdd = max(pdd, 0.4)
+
+        adx_data = {"adx": self.get_indicator("adx"), "pdi": self.get_indicator("pdi"), "ndi": self.get_indicator("ndi")}
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
@@ -472,8 +403,7 @@ class M30MFIBBStrategy(BaseStrategy):
                         return True
 
             drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult and current_profit > 0:
-                adx_data = self._calc_adx()
+            if drawdown > atr_val * trail_mult:
                 if adx_data and current_profit > 0 and (adx_data["pdi"] - adx_data["ndi"]) > 10:
                     logger.info(f"[{self.name}] BUY DI跳过止盈 ticket={ticket} DIs={adx_data['pdi']-adx_data['ndi']:.1f}")
                 else:
@@ -513,7 +443,7 @@ class M30MFIBBStrategy(BaseStrategy):
                         return True
 
             rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult and current_profit > 0:
+            if rally > atr_val * trail_mult:
                 adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["ndi"] - adx_data["pdi"]) > 10:
                     logger.info(f"[{self.name}] SELL DI跳过止盈 ticket={ticket} DIs={adx_data['ndi']-adx_data['pdi']:.1f}")

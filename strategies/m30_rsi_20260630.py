@@ -81,28 +81,18 @@ class M30RSIStrategy(BaseStrategy):
 
     def get_adx_data(self) -> Optional[dict]:
         """返回 ADX 数据（含 +DI/-DI），供引擎门禁使用"""
-        return self._calc_adx(14)
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
+            return None
+        return {"adx": adx, "pdi": pdi, "ndi": ndi}
 
     def refresh_data(self, count: int = 350):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
 
-    # ─────────────── Indicator helpers ───────────────
-
-    def _calc_sma(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        return sum(closes[-period:]) / period
-
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
-
     def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
+        """RSI 计算（保留用于 _get_m30_rsi_direction 的序列切片计算）"""
         if len(closes) < period + 1: return None
         gains, losses = [], []
         for i in range(1, period + 1):
@@ -119,50 +109,6 @@ class M30RSIStrategy(BaseStrategy):
             avg_loss = (avg_loss * (period - 1) + loss) / period
         if avg_loss == 0: return 100.0
         return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
-
-    def _calc_bb_levels(self) -> Optional[dict]:
-        closes = self.get_close_prices()
-        if len(closes) < self.bb_period: return None
-        recent = closes[-self.bb_period:]
-        sma = sum(recent) / self.bb_period
-        variance = sum((c - sma) ** 2 for c in recent) / self.bb_period
-        std = math.sqrt(variance)
-        return {"sma": sma, "upper": sma + self.bb_std * std, "lower": sma - self.bb_std * std}
-
-    def _calc_atr_values(self, period: int = 20) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-
-        candles = self.candles
-        if len(candles) < period + 2: return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h = candles[i].high
-            l_ = candles[i].low
-            pc = candles[i - 1].close
-            tr = max(h - l_, abs(h - pc), abs(l_ - pc))
-            tr_values.append(tr)
-        if len(tr_values) < period: return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 20) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        if vals is None or len(vals) == 0: return None
-        return vals[-1]
-
-    def _get_m30_trend(self) -> str:
-        """M30 MA14趋势判断，返回 'UP' / 'DOWN' / 'NEUTRAL'"""
-        closes = self.get_close_prices()
-        if len(closes) < self.ma14_period:
-            return 'NEUTRAL'
-        ma14 = sum(closes[-self.ma14_period:]) / self.ma14_period
-        return 'UP' if closes[-1] > ma14 else 'DOWN'
 
     def _get_m30_rsi_direction(self) -> str:
         """M30 RSI方向: 连续3根RSI同向确认"""
@@ -181,14 +127,6 @@ class M30RSIStrategy(BaseStrategy):
         return self.calc_adx_wilder(self.candles, period)
 
     # ─────────────── Signal generation ───────────────
-    # --- Volume & Candlestick helpers ---
-
-    def _calc_volume_sma(self, period: int = 20) -> Optional[float]:
-        """Volume SMA(20)"""
-        if len(self.candles) < period + 1:
-            return None
-        vols = [c.volume for c in self.candles[-period-1:-1]]
-        return sum(vols) / period
 
     def _detect_candle_pattern(self) -> tuple:
         """TA-Lib 强反转形态检测（仅高置信度信号）。"""
@@ -243,17 +181,20 @@ class M30RSIStrategy(BaseStrategy):
         high = candles[-1].high
 
         # Indicators
-        bb = self._calc_bb_levels()
+        bb = self.get_indicator("bb")
         if bb is None: return None
 
-        rsi_val = self._calc_rsi(closes, self.rsi_period)
+        rsi_val = self.get_indicator("rsi")
         if rsi_val is None: return None
 
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None: return None
 
-        adx_data = self._calc_adx()
-        m30_trend = self._get_m30_trend()
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        adx_data = {"adx": adx, "pdi": pdi, "ndi": ndi}
+        m30_trend = self.get_indicator("trend")
         m30_rsi_dir = self._get_m30_rsi_direction()
 
         # ── Scoring ──
@@ -309,7 +250,7 @@ class M30RSIStrategy(BaseStrategy):
         h1_block_short = h1_trend == 'UP' and not (close >= bb_top_zone and rsi_val > 70)
 
         # --- Volume confirmation: vol > SMA20*1.3 ---
-        vol_sma = self._calc_volume_sma()
+        vol_sma = self.get_indicator("volume_sma_20")
         if vol_sma and vol_sma > 0:
             cur_vol = candles[-1].volume
             if cur_vol > vol_sma * 1.3:
@@ -388,7 +329,7 @@ class M30RSIStrategy(BaseStrategy):
             "atr": round(atr_val, 2), "bb_upper": round(bb["upper"], 2),
             "price_position": round(price_position, 3),
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
-            "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["sma"], 2),
+            "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["mid"], 2),
             "m30_trend": m30_trend, "m30_rsi_dir": m30_rsi_dir,
             "h1_trend": h1_trend,
             "adx": round(adx_data["adx"], 1) if adx_data else 0,
@@ -399,7 +340,7 @@ class M30RSIStrategy(BaseStrategy):
     # ─────────────── Trend-aware exit multipliers ───────────────
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
-        trend = self._get_m30_trend()
+        trend = self.get_indicator("trend")
         if trend == 'UP':
             return (1.5, 3.0) if is_buy else (1.0, 2.0)
         elif trend == 'DOWN':
@@ -414,11 +355,11 @@ class M30RSIStrategy(BaseStrategy):
         ① 固定 SL/TP：根据 顺势/逆向/震荡 设置不同的 ATR 倍率（MT4 订单级硬边界）
         ② 趋势止盈：由 check_ema20_exit 运行时动态管理（trailing/drawdown）
         """
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
-        m30_trend = self._get_m30_trend()
+        m30_trend = self.get_indicator("trend")
         is_buy = direction == OrderType.BUY
 
         # 三档固定倍率：逆势 / 震荡 / 顺势
@@ -459,7 +400,7 @@ class M30RSIStrategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return False
 
@@ -467,9 +408,11 @@ class M30RSIStrategy(BaseStrategy):
         hard_mult = td["hard_mult"]
         pdd = self.profit_drawdown_pct
         # ADX>25 趋势强 → 放宽回撤
-        _ax = self._calc_adx(14)
-        if _ax and _ax.get("adx", 0) > 25:
+        _ax_adx = self.get_indicator("adx")
+        if _ax_adx and _ax_adx > 25:
             pdd = max(pdd, 0.5)
+
+        adx_data = {"adx": self.get_indicator("adx"), "pdi": self.get_indicator("pdi"), "ndi": self.get_indicator("ndi")}
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
@@ -496,11 +439,10 @@ class M30RSIStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最高点回落（仅盈利时触发，亏损时让硬止损兜底）
+            # 移动止盈：从最高点回落
             drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult and current_profit > 0:
+            if drawdown > atr_val * trail_mult:
                 # DI止盈判定: +DI - -DI > 10 趋势仍强, 忽略止盈
-                adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["pdi"] - adx_data["ndi"]) > 10:
                     logger.info(f"[{self.name}] BUY DI跳过止盈 ticket={ticket} DIs={adx_data['pdi']-adx_data['ndi']:.1f}")
                 else:
@@ -541,11 +483,10 @@ class M30RSIStrategy(BaseStrategy):
                         del self._trail_data[ticket]
                         return True
 
-            # 移动止盈：从最低点反弹（仅盈利时触发，亏损时让硬止损兜底）
+            # 移动止盈：从最低点反弹
             rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult and current_profit > 0:
+            if rally > atr_val * trail_mult:
                 # DI止盈判定: -DI - +DI > 10 趋势仍强, 忽略止盈
-                adx_data = self._calc_adx()
                 if adx_data and current_profit > 0 and (adx_data["ndi"] - adx_data["pdi"]) > 10:
                     logger.info(f"[{self.name}] SELL DI跳过止盈 ticket={ticket} DIs={adx_data['ndi']-adx_data['pdi']:.1f}")
                 else:

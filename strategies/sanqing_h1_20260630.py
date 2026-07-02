@@ -8,6 +8,7 @@ SanQing EA — H1 实盘策略
 
 import logging
 import math
+import time
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, OrderType
@@ -53,16 +54,20 @@ class SanQingH1Strategy(BaseStrategy):
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
+            return None
+        return {"adx": adx, "pdi": pdi, "ndi": ndi}
 
     def refresh_data(self, count: int = 200):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
 
     # ─────────────── Indicator helpers ───────────────
 
     def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
+        """EMA 计算（保留用于上一根 K 线的交叉检测）"""
         if len(closes) < period:
             return None
         k = 2.0 / (period + 1)
@@ -71,59 +76,9 @@ class SanQingH1Strategy(BaseStrategy):
             ema = (p - ema) * k + ema
         return ema
 
-    def _calc_sma(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period:
-            return None
-        return sum(closes[-period:]) / period
-
-    def _calc_atr_values(self, period: int = 14) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-
-        candles = self.candles
-        if len(candles) < period + 2:
-            return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h, l, pc = candles[i].high, candles[i].low, candles[i - 1].close
-            tr_values.append(max(h - l, abs(h - pc), abs(l - pc)))
-        if len(tr_values) < period:
-            return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 14) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        return vals[-1] if vals else None
-
     def _calc_adx(self, period: int = 14) -> Optional[dict]:
         """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
         return self.calc_adx_wilder(self.candles, period)
-
-    def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
-        if len(closes) < period + 1:
-            return None
-        gains, losses = [], []
-        for i in range(1, period + 1):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-        for i in range(period + 1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
-        if avg_loss == 0:
-            return 100.0
-        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
 
     def _get_opens(self) -> list[float]:
         return [c.open for c in self.candles]
@@ -156,8 +111,8 @@ class SanQingH1Strategy(BaseStrategy):
         volume = volumes[-1] if len(volumes) > 0 else 0
 
         # EMA9/21
-        ema9 = self._calc_ema(closes, 9)
-        ema21 = self._calc_ema(closes, 21)
+        ema9 = self.get_indicator("ema_10")
+        ema21 = self.get_indicator("ema_20")
         if ema9 is None or ema21 is None:
             return None
         ema9_p = self._calc_ema(closes[:-1], 9)
@@ -169,13 +124,14 @@ class SanQingH1Strategy(BaseStrategy):
         cross_dn = ema9_p is not None and ema21_p is not None and ema9_p >= ema21_p and ema9 < ema21
 
         # ATR
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return None
 
         # ADX — 趋势中阈值动态放宽
-        adx_data = self._calc_adx(14)
-        effective_threshold = 4 if (adx_data and adx_data["adx"] > self.adx_threshold) else self.score_threshold
+        adx = self.get_indicator("adx")
+        adx_data = {"adx": adx, "pdi": self.get_indicator("pdi"), "ndi": self.get_indicator("ndi")}
+        effective_threshold = 4 if (adx is not None and adx > self.adx_threshold) else self.score_threshold
 
         # Body analysis
         body = abs(close - opens_[-1])
@@ -290,9 +246,8 @@ class SanQingH1Strategy(BaseStrategy):
 
     def _get_trend(self) -> str:
         """EMA9/21 trend: 'UP' / 'DOWN' / 'NEUTRAL'"""
-        closes = self.get_close_prices()
-        ema9 = self._calc_ema(closes, 9)
-        ema21 = self._calc_ema(closes, 21)
+        ema9 = self.get_indicator("ema_10")
+        ema21 = self.get_indicator("ema_20")
         if ema9 is None or ema21 is None:
             return 'NEUTRAL'
         return 'UP' if ema9 > ema21 else 'DOWN'
@@ -309,7 +264,7 @@ class SanQingH1Strategy(BaseStrategy):
     # ─────────────── SL/TP and Exit ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
         _, hard_mult = self._get_exit_multipliers(direction == OrderType.BUY)
@@ -340,7 +295,7 @@ class SanQingH1Strategy(BaseStrategy):
             }
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr(14)
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return False
 
@@ -375,8 +330,8 @@ class SanQingH1Strategy(BaseStrategy):
                         pdd_used = pdd
                         # ADX>25 趋势强 → 放宽回撤
                         if pdd_used < 0.5:
-                            _ax = self._calc_adx(14)
-                            if _ax and _ax.get("adx", 0) > 25:
+                            _ax_adx = self.get_indicator("adx")
+                            if _ax_adx and _ax_adx > 25:
                                 pdd_used = 0.5
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd_used):
@@ -429,8 +384,8 @@ class SanQingH1Strategy(BaseStrategy):
                         pdd_used = pdd
                         # ADX>25 趋势强 → 放宽回撤
                         if pdd_used < 0.5:
-                            _ax = self._calc_adx(14)
-                            if _ax and _ax.get("adx", 0) > 25:
+                            _ax_adx = self.get_indicator("adx")
+                            if _ax_adx and _ax_adx > 25:
                                 pdd_used = 0.5
                     profit_ratio = current_profit / td["peak_profit"]
                     if profit_ratio < (1 - pdd_used):

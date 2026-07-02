@@ -1,0 +1,14 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - img:
+      - generic
+    - img:
+      - generic
+    - toolbar [ref=e53260]:
+      - button "Download plot as a PNG" [ref=e53262] [cursor=pointer]
+      - generic [ref=e53265]
+      - generic [ref=e53278]
+      - link "plotly-logomark" [ref=e53292] [cursor=pointer]:
+        - /url: https://plotly.com/
+    - img
+  - img [ref=e53306]

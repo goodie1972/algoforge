@@ -47,7 +47,12 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
         self.trail_atr = 1.5
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
+        _adx = self.get_indicator("adx")
+        _pdi = self.get_indicator("pdi")
+        _ndi = self.get_indicator("ndi")
+        if _adx is not None:
+            return {"adx": _adx, "pdi": _pdi, "ndi": _ndi}
+        return None
 
     def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
         if len(closes) < period: return None
@@ -94,14 +99,6 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
         k = (recent[-1] - min(recent)) / max(max(recent) - min(recent), 0.001) * 100
         return {"k": k}
 
-    def _calc_atr(self, period: int = 14) -> Optional[float]:
-        """标准 Wilder ATR，委托基类统一实现"""
-        return self.calc_atr_wilder(self.candles, period)
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
-
     def _calc_linear_reg_slope(self, closes: list[float], period: int = 20) -> Optional[float]:
         if len(closes) < period: return None
         y = closes[-period:]
@@ -113,15 +110,6 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
         slope = (n * sxy - sx * sy) / (n * sx2 - sx * sx) if (n * sx2 - sx * sx) != 0 else 0
         return slope
 
-    def _calc_bb_levels(self) -> Optional[dict]:
-        closes = self.get_close_prices()
-        if len(closes) < 20: return None
-        recent = closes[-20:]
-        sma = sum(recent) / 20
-        variance = sum((c - sma) ** 2 for c in recent) / 20
-        std = math.sqrt(variance)
-        return {"sma": sma, "upper": sma + 2 * std, "lower": sma - 2 * std}
-
     # ─────────────── Signal generation ───────────────
 
     def generate_signal(self) -> Optional[tuple]:
@@ -130,16 +118,19 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
 
         closes = self.get_close_prices()
         close = closes[-1]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None: return None
 
         ema20 = self._calc_ema(closes, 20)
         ema50 = self._calc_ema(closes, 50)
         ema200 = self._calc_ema(closes, 200) if len(closes) >= 200 else None
-        rsi_val = self._calc_rsi(closes)
+        rsi_val = self.get_indicator("rsi")
         macd_val = self._calc_macd(closes)
-        adx_data = self._calc_adx()
-        bb = self._calc_bb_levels()
+        _adx = self.get_indicator("adx")
+        _pdi = self.get_indicator("pdi")
+        _ndi = self.get_indicator("ndi")
+        adx_data = {"adx": _adx, "pdi": _pdi, "ndi": _ndi} if _adx is not None else None
+        bb = self.get_indicator("bb")
         stoch_rsi = self._calc_stoch_rsi(closes)
 
         long_score = 0; long_detail = []
@@ -218,15 +209,12 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
                 short_score += 1; short_detail.append("MACD-")
 
         # ⑩ 波动扩张
-        if len(candles) >= 30:
-            atr_old = self._calc_atr(period=14)
-            _ = self._calc_atr(period=14)
-            atr_sma = sum([self._calc_atr(period=14) or atr_val for _ in range(5)]) / 5
-            if atr_val > atr_sma * 1.1:
-                if long_score >= short_score:
-                    long_score += 1; long_detail.append("ATR+")
-                else:
-                    short_score += 1; short_detail.append("ATR+")
+        atr_20 = self.get_indicator("atr_20")
+        if atr_20 is not None and atr_val > atr_20 * 1.1:
+            if long_score >= short_score:
+                long_score += 1; long_detail.append("ATR+")
+            else:
+                short_score += 1; short_detail.append("ATR+")
 
         # ⑪ BB位置
         if bb:
@@ -294,7 +282,7 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
         return (signal, long_score, short_score, long_detail, short_detail, indicator_values)
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return None
         sl_dist = atr_val * self.sl_atr
@@ -315,7 +303,7 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
                 "peak_profit": 0.0,
             }
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return False
 

@@ -58,63 +58,23 @@ class MomentumPulseProStrategy(BaseStrategy):
         self._cooloff_until: float = 0
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
+        _adx = self.get_indicator("adx")
+        _pdi = self.get_indicator("pdi")
+        _ndi = self.get_indicator("ndi")
+        if _adx is not None:
+            return {"adx": _adx, "pdi": _pdi, "ndi": _ndi}
+        return None
 
     # ─────────────── Indicator helpers ───────────────
-
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
-
-    def _calc_sma(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        return sum(closes[-period:]) / period
-
-    def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
-        if len(closes) < period + 1: return None
-        gains, losses = [], []
-        for i in range(1, period + 1):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-        for i in range(period + 1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
-        if avg_loss == 0: return 100.0
-        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
-
-    def _calc_macd(self, closes: list[float]) -> Optional[dict]:
-        if len(closes) < self.macd_slow + self.macd_signal: return None
-        ema_f = self._calc_ema(closes, self.macd_fast)
-        ema_s = self._calc_ema(closes, self.macd_slow)
-        if ema_f is None or ema_s is None: return None
-        return {"macd": ema_f - ema_s, "signal": None}  # simplified
 
     def _calc_roc(self, closes: list[float], period: int = 10) -> Optional[float]:
         if len(closes) < period + 1: return None
         return (closes[-1] - closes[-period - 1]) / closes[-period - 1] * 100
 
-    def _calc_atr(self, period: int = 14) -> Optional[float]:
-        """标准 Wilder ATR，委托基类统一实现"""
-        return self.calc_atr_wilder(self.candles, period)
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
-
     def _calc_amc(self, closes: list[float]) -> Optional[float]:
         """自适应动量复合(AMC): RSI + MACD + ROC Z-score归一化"""
-        rsi = self._calc_rsi(closes)
-        macd_d = self._calc_macd(closes)
+        rsi = self.get_indicator("rsi")
+        macd_d = self.get_indicator("macd")
         roc = self._calc_roc(closes)
         if rsi is None or macd_d is None or roc is None:
             return None
@@ -122,15 +82,6 @@ class MomentumPulseProStrategy(BaseStrategy):
         macd_norm = macd_d["macd"] / max(closes[-1] * 0.001, 0.001)
         roc_norm = max(min(roc / 10, 1), -1)   # -1~1
         return (rsi_norm + macd_norm + roc_norm) / 3
-
-    def _calc_bb_levels(self) -> Optional[dict]:
-        closes = self.get_close_prices()
-        if len(closes) < 20: return None
-        recent = closes[-20:]
-        sma = sum(recent) / 20
-        variance = sum((c - sma) ** 2 for c in recent) / 20
-        std = math.sqrt(variance)
-        return {"sma": sma, "upper": sma + 2 * std, "lower": sma - 2 * std}
 
     # ─────────────── Signal generation ───────────────
 
@@ -141,7 +92,7 @@ class MomentumPulseProStrategy(BaseStrategy):
 
         closes = self.get_close_prices()
         close = closes[-1]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None: return None
 
         # ── 计算7维度 ──
@@ -157,7 +108,7 @@ class MomentumPulseProStrategy(BaseStrategy):
                 short_score += 1; short_detail.append(f"AMC{amc:.2f}")
 
         # ② 信号对齐: MACD方向
-        macd_d = self._calc_macd(closes)
+        macd_d = self.get_indicator("macd")
         if macd_d is not None:
             if macd_d["macd"] > 0:
                 long_score += 1; long_detail.append("MACD+")
@@ -165,7 +116,7 @@ class MomentumPulseProStrategy(BaseStrategy):
                 short_score += 1; short_detail.append("MACD-")
 
         # ③ RSI区域
-        rsi_val = self._calc_rsi(closes)
+        rsi_val = self.get_indicator("rsi")
         if rsi_val is not None:
             if rsi_val > 50:
                 long_score += 1; long_detail.append(f"RSI>{rsi_val:.0f}")
@@ -198,7 +149,10 @@ class MomentumPulseProStrategy(BaseStrategy):
                     short_score += 1; short_detail.append("VOL+")
 
         # ⑥ 市场状态: ADX趋势
-        adx_data = self._calc_adx()
+        _adx = self.get_indicator("adx")
+        _pdi = self.get_indicator("pdi")
+        _ndi = self.get_indicator("ndi")
+        adx_data = {"adx": _adx, "pdi": _pdi, "ndi": _ndi} if _adx is not None else None
         if adx_data and adx_data["adx"] > 22:
             if adx_data["pdi"] > adx_data["ndi"]:
                 long_score += 1; long_detail.append(f"TREND+{adx_data['adx']:.0f}")
@@ -206,7 +160,7 @@ class MomentumPulseProStrategy(BaseStrategy):
                 short_score += 1; short_detail.append(f"TREND-{adx_data['adx']:.0f}")
 
         # ⑦ 无衰竭: BB位置
-        bb = self._calc_bb_levels()
+        bb = self.get_indicator("bb")
         if bb:
             bb_range = bb["upper"] - bb["lower"]
             price_pos = (close - bb["lower"]) / bb_range if bb_range > 0 else 0.5
@@ -248,7 +202,7 @@ class MomentumPulseProStrategy(BaseStrategy):
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
         """初始SL/TP: SL=1.5ATR, TP=TP1(1.5ATR) — 第一层目标"""
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return None  # fallback to settings pips
         sl_dist = atr_val * self.sl_atr
@@ -274,7 +228,7 @@ class MomentumPulseProStrategy(BaseStrategy):
             self._tp_hit[ticket] = 0
 
         td = self._trail_data[ticket]
-        atr_val = self._calc_atr()
+        atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
             return False
 
