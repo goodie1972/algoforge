@@ -70,12 +70,14 @@ def _talib_indicators(candles: list, tf: str) -> dict:
 
     result = {}
 
-    # RSI(14)
-    try:
-        r = talib.RSI(closes, timeperiod=14)
-        result["rsi"] = float(r[-1]) if r[-1] == r[-1] else 50.0
-    except Exception:
-        pass
+    # RSI
+    for p in [5, 10, 14]:
+        try:
+            r = talib.RSI(closes, timeperiod=p)
+            key = "rsi" if p == 14 else f"rsi_{p}"
+            result[key] = float(r[-1]) if r[-1] == r[-1] else 50.0
+        except Exception:
+            pass
 
     # MFI(14)
     try:
@@ -94,7 +96,7 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         pass
 
     # EMA
-    for p in [10, 20]:
+    for p in [9, 21]:
         try:
             e = talib.EMA(closes, timeperiod=p)
             result[f"ema_{p}"] = float(e[-1]) if e[-1] == e[-1] else float(closes[-1])

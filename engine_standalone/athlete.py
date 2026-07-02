@@ -53,88 +53,40 @@ class Athlete:
         self._pending = valid
 
     def _verify(self, item: dict, tick: dict) -> bool:
-        """用实时 tick 价 + 数据工厂最新缓存指标，重新验证入场条件。
-
-        策略出的门票只是候选，运动员用最新数据独立判断。
-        """
-        direction = item["direction"]
+        """委托策略自己的 _verify_entry 方法，用最新 tick + 工厂缓存重算。"""
         signal = item["signal"]
-        tf = signal.get("timeframe", "M30")
-        factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
-        old_iv = signal.get("indicator_values", {})
+        direction = item["direction"]
 
-        # 从工厂拿最新预计算指标（比信号时新了 0.3~3 秒）
-        latest = get_cache(tf)
-        if not latest:
-            latest = old_iv  # 工厂不干活时回退
-
-        tick_price = tick["ask"] if direction == "BUY" else tick["bid"]
-        bb = latest.get("bb") or old_iv.get("bb") or {}
-        bb_lower = bb.get("lower", 0)
-        bb_upper = bb.get("upper", 0)
-        latest_rsi = latest.get("rsi", 50)
-        latest_mfi = latest.get("mfi", 50)
-        latest_adx = latest.get("adx", 20)
-        latest_pdi = latest.get("pdi", 15)
-        latest_ndi = latest.get("ndi", 15)
-
-        # ── 基础校验：spread 正常 ──
         if tick.get("ask", 0) <= 0 or tick.get("bid", 0) <= 0:
             return False
         if tick["ask"] <= tick["bid"]:
             return False
 
-        # ── 方向校验：按入场因子逐条验证 ──
+        tick_price = tick["ask"] if direction == "BUY" else tick["bid"]
+        tf = signal.get("timeframe", "M30")
+        latest = get_cache(tf)
+        if not latest:
+            latest = signal.get("indicator_values", {})
+
+        # 策略自己有 _verify_entry 就用，没有就走基础 BB 校验
+        strategy_name = signal.get("strategy", "")
+        from strategies.base import BaseStrategy
+        try:
+            from strategies.scanner import scan_strategies
+            cls = scan_strategies().get(strategy_name)
+            if cls and hasattr(cls, '_verify_entry'):
+                return cls._verify_entry(signal, tick_price, latest)
+        except Exception:
+            pass
+
+        # 默认 fallback: tick 不能跑出 BB 边界
+        bb = latest.get("bb") or signal.get("indicator_values", {}).get("bb") or {}
         if direction == "BUY":
-            # BB下轨: tick 价不能跑离下轨超过 0.5%
-            if bb_lower and tick_price > bb_lower * 1.005:
+            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
                 return False
-            # RSI: 不能反弹超过 45（超卖区已失效）
-            for f in factors:
-                if f.startswith("RSI-") and latest_rsi > 45:
-                    return False
-                if f.startswith("MFI-") and latest_mfi > 45:
-                    return False
-            # DI方向: +DI 必须仍 > -DI
-            for f in factors:
-                if f.startswith("DI+"):
-                    if latest_pdi <= latest_ndi:
-                        return False
-                    break
-            # trend: MA20必须仍为UP
-            for f in factors:
-                if f == "MA20-UP" and latest.get("trend") != "UP":
-                    return False
-                if f == "M30-UP" and latest.get("trend") != "UP":
-                    return False
-        else:  # SELL
-            # BB上轨: tick 价不能跌回上轨内 0.5%
-            if bb_upper and tick_price < bb_upper * 0.995:
+        else:
+            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
                 return False
-            # RSI: 不能跌回 55 以下
-            for f in factors:
-                if f.startswith("RSI-") and latest_rsi < 55:
-                    return False
-                if f.startswith("MFI-") and latest_mfi < 55:
-                    return False
-            # DI方向: -DI 必须仍 > +DI
-            for f in factors:
-                if f.startswith("DI-") or f.startswith("DI"):
-                    if latest_ndi <= latest_pdi:
-                        return False
-                    break
-            # trend: MA20必须仍为DOWN
-            for f in factors:
-                if f == "MA20-DN" and latest.get("trend") != "DOWN":
-                    return False
-                if f == "M30-DN" and latest.get("trend") != "DOWN":
-                    return False
-
-        # ── ADX 崩溃校验: 趋势突然消失则放弃 ──
-        old_adx = old_iv.get("adx", 20)
-        if old_adx > 25 and latest_adx < 18:
-            return False
-
         return True
 
     def _execute(self, item: dict, tick: dict):
