@@ -1,4 +1,21 @@
-# XAUUSD 量化交易系统 — CLAUDE.md
+# XAUUSD 量化交易系统 v2.0.0 — CLAUDE.md
+
+## 三轨架构
+
+- **轨1: DataFactory** — `services/data_factory.py` 独立线程，双桥接(exec+data)，增量拉取K线，TA-Lib统一计算指标
+- **轨2: 策略员** — 主引擎循环，`get_indicator(key)` 读缓存指标，评分达标出门票（候选信号）
+- **轨3: 运动员** — `engine_standalone/athlete.py` tick验证层，调用 `_verify_entry` 实时重算入场条件，10秒过期作废
+
+## 通用指标缓存 (DataFactory TA-Lib)
+
+| key | 说明 | key | 说明 |
+|:----|:----|:----|:----|
+| `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
+| `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
+| `bb{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
+| `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
+| `macd{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch |
+| `volume_sma_20` | VolSMA(20) | | |
 
 ## 时区规则 (CRITICAL)
 
