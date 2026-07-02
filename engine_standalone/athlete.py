@@ -53,33 +53,86 @@ class Athlete:
         self._pending = valid
 
     def _verify(self, item: dict, tick: dict) -> bool:
-        """用实时 tick 重新验证关键入场条件
+        """用实时 tick 价 + 数据工厂最新缓存指标，重新验证入场条件。
 
-        验证内容：
-        - 价格仍然在入场区间内（BB 极值 ±0.5%）
-        - 实时 tick 方向与信号方向一致
+        策略出的门票只是候选，运动员用最新数据独立判断。
         """
         direction = item["direction"]
         signal = item["signal"]
-        indicators = signal.get("indicator_values", {})
-        bb_lower = indicators.get("bb_lower")
-        bb_upper = indicators.get("bb_upper")
-        rsi = indicators.get("rsi")
+        tf = signal.get("timeframe", "M30")
+        factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+        old_iv = signal.get("indicator_values", {})
 
-        if direction == "BUY":
-            if bb_lower and tick["ask"] > bb_lower * 1.005:
-                return False
-            if rsi and tick.get("bid", 0) > signal.get("entry_price", 0) * 1.003:
-                return False
-        else:  # SELL
-            if bb_upper and tick["bid"] < bb_upper * 0.995:
-                return False
-            if rsi and tick.get("ask", 99999) < signal.get("entry_price", 99999) * 0.997:
-                return False
+        # 从工厂拿最新预计算指标（比信号时新了 0.3~3 秒）
+        latest = get_cache(tf)
+        if not latest:
+            latest = old_iv  # 工厂不干活时回退
 
+        tick_price = tick["ask"] if direction == "BUY" else tick["bid"]
+        bb = latest.get("bb") or old_iv.get("bb") or {}
+        bb_lower = bb.get("lower", 0)
+        bb_upper = bb.get("upper", 0)
+        latest_rsi = latest.get("rsi", 50)
+        latest_mfi = latest.get("mfi", 50)
+        latest_adx = latest.get("adx", 20)
+        latest_pdi = latest.get("pdi", 15)
+        latest_ndi = latest.get("ndi", 15)
+
+        # ── 基础校验：spread 正常 ──
         if tick.get("ask", 0) <= 0 or tick.get("bid", 0) <= 0:
             return False
         if tick["ask"] <= tick["bid"]:
+            return False
+
+        # ── 方向校验：按入场因子逐条验证 ──
+        if direction == "BUY":
+            # BB下轨: tick 价不能跑离下轨超过 0.5%
+            if bb_lower and tick_price > bb_lower * 1.005:
+                return False
+            # RSI: 不能反弹超过 45（超卖区已失效）
+            for f in factors:
+                if f.startswith("RSI-") and latest_rsi > 45:
+                    return False
+                if f.startswith("MFI-") and latest_mfi > 45:
+                    return False
+            # DI方向: +DI 必须仍 > -DI
+            for f in factors:
+                if f.startswith("DI+"):
+                    if latest_pdi <= latest_ndi:
+                        return False
+                    break
+            # trend: MA20必须仍为UP
+            for f in factors:
+                if f == "MA20-UP" and latest.get("trend") != "UP":
+                    return False
+                if f == "M30-UP" and latest.get("trend") != "UP":
+                    return False
+        else:  # SELL
+            # BB上轨: tick 价不能跌回上轨内 0.5%
+            if bb_upper and tick_price < bb_upper * 0.995:
+                return False
+            # RSI: 不能跌回 55 以下
+            for f in factors:
+                if f.startswith("RSI-") and latest_rsi < 55:
+                    return False
+                if f.startswith("MFI-") and latest_mfi < 55:
+                    return False
+            # DI方向: -DI 必须仍 > +DI
+            for f in factors:
+                if f.startswith("DI-") or f.startswith("DI"):
+                    if latest_ndi <= latest_pdi:
+                        return False
+                    break
+            # trend: MA20必须仍为DOWN
+            for f in factors:
+                if f == "MA20-DN" and latest.get("trend") != "DOWN":
+                    return False
+                if f == "M30-DN" and latest.get("trend") != "DOWN":
+                    return False
+
+        # ── ADX 崩溃校验: 趋势突然消失则放弃 ──
+        old_adx = old_iv.get("adx", 20)
+        if old_adx > 25 and latest_adx < 18:
             return False
 
         return True

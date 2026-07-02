@@ -1502,15 +1502,21 @@ class TradingEngine:
 
         # 执行开仓
         if signal_id > 0 and self._athlete:
-            # 提交门票给运动员
+            # 提交门票给运动员 — 带完整入场条件
             last_sig = getattr(strategy, '_last_signal', {})
             if last_sig and last_sig.get("signal"):
                 direction = last_sig["signal"]
                 entry_info = {
                     "strategy": strategy.name,
                     "magic": strategy.magic,
+                    "timeframe": strategy.timeframe,
+                    "direction": direction,
                     "indicator_values": last_sig.get("indicator_values", {}),
-                    "lot_size": self._rt('lot_size') or 0.01,
+                    "score_long": last_sig.get("score_long", 0),
+                    "score_short": last_sig.get("score_short", 0),
+                    "factors_long": last_sig.get("factors_long", []),
+                    "factors_short": last_sig.get("factors_short", []),
+                    "entry_price": 0, "lot_size": self._rt('lot_size') or 0.01,
                     "sl": 0, "tp": 0,
                 }
                 # 计算 SL/TP
