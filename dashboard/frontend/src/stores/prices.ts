@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getPrice, getCandles } from '@/api/client'
+import { getPrice } from '@/api/client'
 import type { Candle } from '@/types'
 
 export const usePriceStore = defineStore('prices', () => {
@@ -28,14 +28,15 @@ export const usePriceStore = defineStore('prices', () => {
   async function fetchCandles(timeframe = 'H1', count = 500) {
     loading.value = true
     try {
-      const data = await getCandles(timeframe, count)
+      const resp = await fetch(`/api/market/candles?timeframe=${timeframe}&count=${count}`)
+      const data: Candle[] = await resp.json()
       if (data && data.length > 0) {
         candles.value = data
       } else {
         // 返回空数据时清空旧图（避免不同周期显示相同 K 线）
         candles.value = []
       }
-    } catch { 
+    } catch {
       // 请求失败时清空旧图（避免残留上一周期数据）
       candles.value = []
     }
@@ -45,7 +46,8 @@ export const usePriceStore = defineStore('prices', () => {
   /** 轻量刷新：只拉最后 N 根 K 线（用于定时轮询），按时间戳匹配更新 */
   async function fetchLatestCandles(timeframe = 'H1', count = 10) {
     try {
-      const data = await getCandles(timeframe, count)
+      const resp = await fetch(`/api/market/candles?timeframe=${timeframe}&count=${count}`)
+      const data: Candle[] = await resp.json()
       if (data.length === 0) return data
       // 按时间戳匹配更新，新蜡烛追加到尾部
       const timeMap = new Map(candles.value.map(c => [c.time, true]))

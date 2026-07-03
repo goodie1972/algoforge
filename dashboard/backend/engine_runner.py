@@ -270,15 +270,22 @@ class EngineRunner:
         if not candles or len(candles) < 3:
             return None
         # 用最新中间价 (bid+ask)/2 扩展最后一根 K 线，与页面"现价"一致
-        result = list(candles)
-        last = dict(result[-1])
+        result = [dict(c) for c in candles]
+        last = result[-1]
         price = self._cached_price
-        if price and price.get("bid", 0) > 0:
+        if price and price.get("bid", 0) > 0 and price.get("ask", 0) > 0:
             mid = round((price["bid"] + price["ask"]) / 2, 2)
             last["high"] = round(max(last["high"], mid), 2)
             last["low"] = round(min(last["low"], mid), 2)
             last["close"] = mid
         result[-1] = last
+        # 过滤无效值，防止轻量级图表报错
+        _valid = all(
+            isinstance(c.get(k), (int, float))
+            for c in result for k in ("open", "high", "low", "close")
+        )
+        if not _valid:
+            return None
         return result[-count:]
 
     def _refresh_candle_cache(self, engine):
@@ -297,8 +304,9 @@ class EngineRunner:
                         cache = get_cache(tf)
                         raw = cache.get("candles", [])
                         if raw:
+                            offset = int(getattr(engine, '_mt4_offset', 0))
                             self._cached_candles[tf] = [
-                                {"time": int(c.time) if isinstance(c.time, (int, float)) else int(c.time),
+                                {"time": int(c.time) - offset,
                                  "open": c.open, "high": c.high, "low": c.low,
                                  "close": c.close, "volume": c.volume}
                                 for c in raw
@@ -309,8 +317,9 @@ class EngineRunner:
                         from config import settings as _cfg
                         raw = engine.bridge.get_candles(_cfg.SYMBOL, tf, 200)
                         raw_rev = list(reversed(raw))
+                        offset = int(getattr(engine, '_mt4_offset', 0))
                         self._cached_candles[tf] = [
-                            {"time": int(c.time), "open": c.open,
+                            {"time": int(c.time) - offset, "open": c.open,
                              "high": c.high, "low": c.low, "close": c.close, "volume": c.volume}
                             for c in raw_rev
                         ]

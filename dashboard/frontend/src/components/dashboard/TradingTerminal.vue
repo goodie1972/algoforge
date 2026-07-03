@@ -20,6 +20,18 @@ import {
   type CandleData, type LinePoint, type BandPoint, type HistogramPoint,
 } from '@/utils/indicators'
 
+function sanitizeCandleData(candles: CandleData[]) {
+  return candles
+    .filter(c => c.open != null && c.high != null && c.low != null && c.close != null)
+    .map(c => ({
+      time: c.time as UTCTimestamp,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }))
+}
+
 const store = usePriceStore()
 const chartContainer = ref<HTMLDivElement>()
 
@@ -83,13 +95,8 @@ function startAutoRefresh() {
     if (!candleSeries) return
     await store.fetchCandles(activeTf.value, 500)
     if (store.candles.length === 0) return
-    candleSeries.setData(store.candles.map(c => ({
-      time: c.time as UTCTimestamp,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    })))
+    try { candleSeries.setData(sanitizeCandleData(store.candles)) }
+    catch (e) { console.warn('[K线] auto-refresh setData失败', e) }
     afterDataLoad()
     nextTick(() => {
       scrollAllToRealTime()
@@ -602,15 +609,8 @@ function syncAllPriceScaleWidths() {
 async function loadCandles() {
   await store.fetchCandles(activeTf.value, 500)
   if (candleSeries && store.candles.length > 0) {
-    candleSeries.setData(
-      store.candles.map(c => ({
-        time: c.time as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }))
-    )
+    try { candleSeries.setData(sanitizeCandleData(store.candles)) }
+  catch (e) { console.warn('[K线] setData失败', e) }
     // 先计算所有指标（异步创建副图）
     afterDataLoad()
     // 等所有副图创建完毕后，统一右对齐所有图表
