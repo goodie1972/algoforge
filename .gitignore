@@ -38,3 +38,4 @@ strategies/test_*.txt
 
 # 备份
 *.bak
+.backup/
