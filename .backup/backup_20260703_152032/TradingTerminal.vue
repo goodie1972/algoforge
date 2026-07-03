@@ -93,8 +93,7 @@ function startAutoRefresh() {
   const ms = getRefreshInterval(activeTf.value)
   refreshTimer = setInterval(async () => {
     if (!candleSeries) return
-    // 只拉最新 3 根增量更新，不触发 loading 转圈
-    await store.fetchLatestCandles(activeTf.value, 3)
+    await store.fetchCandles(activeTf.value, 500)
     if (store.candles.length === 0) return
     try { candleSeries.setData(sanitizeCandleData(store.candles)) }
     catch (e) { console.warn('[K线] auto-refresh setData失败', e) }
@@ -282,27 +281,9 @@ watch(() => store.spread, (n) => {
   _sTimer = setTimeout(() => { spreadFlash.value = false }, 600)
 })
 
-// K 线实时跳动：WebSocket tick 驱动 candleSeries.update() 更新最后一根
-// 时间戳偏移已修复，update 时间戳与缓存数据一致
-
-let _lastMid = -1
-watch([() => store.bid, () => store.ask], ([bid, ask]) => {
-  if (!candleSeries || bid <= 0 || ask <= 0) return
-  const mid = (bid + ask) / 2
-  if (Math.abs(mid - _lastMid) < 0.01) return
-  _lastMid = mid
-  const lastCandle = store.candles[store.candles.length - 1]
-  if (!lastCandle) return
-  try {
-    candleSeries.update({
-      time: lastCandle.time as UTCTimestamp,
-      open: lastCandle.open,
-      high: Math.max(lastCandle.high, mid),
-      low: Math.min(lastCandle.low, mid),
-      close: mid,
-    })
-  } catch (e) { /* ignore */ }
-})
+// K 线实时跳动：每 2s setData 覆盖全量 K 线（含后端按中间价扩展的最后一条）
+// 不由 WebSocket tick 更新，避免 lightweight-charts update 时间戳不兼容
+// 现价与 K 线 close 的统一由后端 get_cached_candles 保证
 
 function getCandleData(): CandleData[] {
   return store.candles.map(c => ({
