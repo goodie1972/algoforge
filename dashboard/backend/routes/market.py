@@ -40,7 +40,33 @@ async def get_candles(
     cached = engine_runner.get_cached_candles(timeframe, count)
     if cached is not None:
         return cached
-    # 缓存未就绪 → 回退到桥接直接获取
+    # 缓存未就绪 → 优先回退到 SQLite（快，不受桥接超时影响）
+    try:
+        from data.database import get_conn
+        conn = get_conn()
+        rows = conn.execute(
+            "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+            "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
+            (timeframe, count),
+        ).fetchall()
+        conn.close()
+        if rows:
+            rows.reverse()
+            return [
+                {
+                    "time": r[0],
+                    "open": r[1],
+                    "high": r[2],
+                    "low": r[3],
+                    "close": r[4],
+                    "volume": r[5],
+                }
+                for r in rows
+            ]
+    except Exception:
+        pass
+
+    # SQLite 也无数据 → 回退到桥接直接获取（可能超时，所以 SQLite 优先）
     if engine_runner.bridge is not None:
         try:
             candles = await run_bridge(engine_runner.bridge.get_candles, settings.SYMBOL, timeframe, count)
@@ -59,29 +85,4 @@ async def get_candles(
             ]
         except Exception as e:
             raise HTTPException(502, f"获取 K 线失败: {e}")
-    # 桥接不可用 → 回退到 SQLite 数据库
-    try:
-        from data.database import get_conn
-        conn = get_conn()
-        rows = conn.execute(
-            "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
-            "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
-            (timeframe, count),
-        ).fetchall()
-        conn.close()
-        if not rows:
-            return []
-        rows.reverse()
-        return [
-            {
-                "time": r[0],
-                "open": r[1],
-                "high": r[2],
-                "low": r[3],
-                "close": r[4],
-                "volume": r[5],
-            }
-            for r in rows
-        ]
-    except Exception as e:
-        return []
+    return []
