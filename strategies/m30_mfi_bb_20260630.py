@@ -286,21 +286,32 @@ class M30MFIBBStrategy(BaseStrategy):
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
         """
-        v5 验证：检查当前是否仍满足 MFI+BB 条件
+        v5 验证：3根内容差已由 generate_signal 确认，这里只验证信号有效性：
+        - SELL: 价格还在BB上轨±1%以内，MFI未跌到20以下
+        - BUY:  价格还在BB下轨±1%以内，MFI未涨到80以上
         """
         direction = signal.get("direction", "BUY")
         bb = latest.get("bb") or {}
         mfi = latest.get("mfi", 50)
+        bb_u = bb.get("upper", 0)
+        bb_l = bb.get("lower", 0)
+
+        logger = logging.getLogger(__name__)
 
         if direction == "BUY":
-            # 仍需满足价格在下轨附近
-            if bb.get("lower") and tick_price > bb["lower"] * 1.01:
+            if bb_l and tick_price > bb_l * 1.01:
+                logger.info(f"[verify] BUY REJECT: price={tick_price:.2f} > bb_lower*1.01={bb_l*1.01:.2f}")
                 return False
-            if mfi > 30:  # 放宽到30，因为3根容差内MFI可能回升
+            if mfi > 80:
+                logger.info(f"[verify] BUY REJECT: mfi={mfi:.1f} > 80")
                 return False
+            logger.info(f"[verify] BUY PASS: price={tick_price:.2f} bb_l={bb_l:.2f} mfi={mfi:.1f}")
         else:
-            if bb.get("upper") and tick_price < bb["upper"] * 0.99:
+            if bb_u and tick_price < bb_u * 0.99:
+                logger.info(f"[verify] SELL REJECT: price={tick_price:.2f} < bb_upper*0.99={bb_u*0.99:.2f} bb_u={bb_u}")
                 return False
-            if mfi < 70:  # 同理放宽
+            if mfi < 20:
+                logger.info(f"[verify] SELL REJECT: mfi={mfi:.1f} < 20")
                 return False
+            logger.info(f"[verify] SELL PASS: price={tick_price:.2f} bb_u={bb_u:.2f} mfi={mfi:.1f}")
         return True

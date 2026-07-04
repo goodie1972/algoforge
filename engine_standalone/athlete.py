@@ -72,7 +72,8 @@ class Athlete:
         strategy_name = signal.get("strategy", "")
         from strategies.base import BaseStrategy
         try:
-            from strategies.scanner import scan_strategies
+            from strategies.scanner import scan_strategies, clear_cache
+            clear_cache()  # 清除扫描器缓存，确保加载最新策略代码
             cls = scan_strategies().get(strategy_name)
             if cls and hasattr(cls, '_verify_entry'):
                 return cls._verify_entry(signal, tick_price, latest)
