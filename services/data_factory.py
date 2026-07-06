@@ -219,7 +219,10 @@ class DataFactory:
 
     def _sync_tf(self, tf: str, bridge, full: bool = False):
         try:
-            count = 350 if full else 2
+            with _CACHE_LOCK:
+                has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles")
+            # 缓存为空时自动全量加载
+            count = 350 if (full or not has_data) else 2
             raw = bridge.get_candles("XAUUSD", tf, count)
             if not raw:
                 return
