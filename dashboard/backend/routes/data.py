@@ -104,13 +104,20 @@ async def get_data_factory_indicators(
     timeframe: str = Query(default="M30"),
 ):
     """返回数据工厂缓存中该周期的全部预计算指标（TA-Lib 统一计算）"""
+    if not engine_runner or not engine_runner._engine:
+        return {"error": "引擎未运行"}
+    engine = engine_runner._engine
     try:
         from services.data_factory import get_cache
         cache = get_cache(timeframe)
         if not cache:
             return {"error": f"周期 {timeframe} 缓存未就绪"}
-        # 去掉 candles（太大），只返回指标
-        result = {k: v for k, v in cache.items() if k != "candles"}
-        return result
+        # 去掉 candles（太大），只返回指标，确保 JSON 可序列化
+        import json
+        result = {k: v for k, v in cache.items() if k != "candles" and k != "atr_list"}
+        # 递归转换 numpy 类型为 Python 原生类型
+        return json.loads(json.dumps(result, default=float))
     except Exception as e:
-        return {"error": str(e)}
+        import traceback
+        logger.exception(f"[indicators] 获取指标失败: {e}")
+        return {"error": f"获取指标失败: {e}", "trace": traceback.format_exc()[-500:]}

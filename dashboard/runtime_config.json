@@ -40,10 +40,10 @@
       "double_first": false
     },
     "entry_score_pro": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661501,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "gold_auto_research": {
@@ -68,24 +68,24 @@
       "double_first": false
     },
     "M30_rsi_bb": {
-      "enabled": true,
+      "enabled": false,
       "magic": 660706,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "momentum_pulse_pro": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661301,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "multi_confluence_quant": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661601,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "rsi_grading_m30": {
@@ -117,10 +117,10 @@
       "double_first": false
     },
     "xaubot_backup": {
-      "enabled": true,
+      "enabled": false,
       "magic": 777005,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     }
   }
