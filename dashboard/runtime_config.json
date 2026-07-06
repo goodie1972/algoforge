@@ -103,10 +103,10 @@
       "double_first": false
     },
     "stoch_trend_h1": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661201,
       "timeframe": "H1",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "viprasol_sniper": {
