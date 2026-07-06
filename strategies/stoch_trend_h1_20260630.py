@@ -99,6 +99,20 @@ class StochTrendH1Strategy(BaseStrategy):
 
     # ─────────────── Indicator helpers ───────────────
 
+    def _calc_ema(self, closes: list[float], period: int):
+        """EMA 计算"""
+        if len(closes) < period:
+            return None
+        k = 2.0 / (period + 1)
+        ema = closes[0]
+        for i in range(1, period):
+            ema = closes[i] * k + ema * (1 - k)
+        avg = sum(closes[:period]) / period
+        ema = avg
+        for i in range(period, len(closes)):
+            ema = closes[i] * k + ema * (1 - k)
+        return ema
+
     def _calc_stoch(self) -> Optional[dict]:
         candles = self.candles
         if len(candles) < self.stoch_k_period + self.stoch_slowing + self.stoch_d_period + 1:
