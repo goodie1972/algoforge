@@ -205,7 +205,14 @@ class DataFactory:
 
     def _run(self):
         logger.info("[数据工厂] 开始首次全量加载...")
-        self._initial_load()
+        # 首次加载如果失败（桥接还没好），重试直到成功
+        for attempt in range(10):
+            if self._initial_load():
+                break
+            logger.info(f"[数据工厂] 首次加载未完成({attempt+1}/10)，1秒后重试...")
+            time.sleep(1)
+        else:
+            logger.warning("[数据工厂] 首次加载10次重试后仍有缺失，继续增量循环")
         logger.info("[数据工厂] 首次加载完成，进入增量循环")
         while self._running:
             for tf in ["M15", "M30", "H1", "H4"]:
@@ -213,29 +220,37 @@ class DataFactory:
             self._sync_tick(self._bridge)
             time.sleep(0.3)
 
-    def _initial_load(self):
+    def _initial_load(self) -> bool:
+        """初始全量加载，返回是否所有周期加载成功"""
+        all_ok = True
         for tf in ["M15", "M30", "H1", "H4"]:
-            self._sync_tf(tf, self._bridge, full=True)
+            ok = self._sync_tf(tf, self._bridge, full=True)
+            if not ok:
+                all_ok = False
+        return all_ok
 
-    def _sync_tf(self, tf: str, bridge, full: bool = False):
+    def _sync_tf(self, tf: str, bridge, full: bool = False) -> bool:
+        """同步一个周期，返回是否成功获取数据"""
         try:
             with _CACHE_LOCK:
-                has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles")
-            # 缓存为空时自动全量加载
-            count = 350 if (full or not has_data) else 2
+                has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles") and "rsi" in _DATA_CACHE[tf]
+            # 缓存为空或指标不全时自动全量加载
+            needs_full = full or not has_data
+            count = 350 if needs_full else 2
             raw = bridge.get_candles("XAUUSD", tf, count)
             if not raw:
-                return
+                return False
             new_candles = list(reversed(raw))
             with _CACHE_LOCK:
                 old = _DATA_CACHE.get(tf, {}).get("candles", [])
                 merged = _merge_candles(old, new_candles, max_len=350)
                 ta = _talib_indicators(merged, tf)
                 _DATA_CACHE[tf] = {"candles": merged, **ta}
+            return True
         except Exception as e:
             if full:
-                logger.warning(f"[数据工厂] 初始加载 {tf} 失败: {e}")
-            # 增量失败静默跳过
+                logger.warning(f"[数据工厂] 加载 {tf} 失败: {e}")
+            return False
 
     def _sync_tick(self, bridge):
         try:

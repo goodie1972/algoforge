@@ -486,6 +486,15 @@ class EngineRunner:
         self._running = True
         self.logger.info("进入主循环...")
 
+        # 启动数据工厂独立线程（用已连上的执行桥接）
+        try:
+            if getattr(engine, '_data_factory', None):
+                engine._data_factory._bridge = engine.bridge
+                engine._data_factory.start()
+                self.logger.info("[数据工厂] 已启动（引擎桥接模式）")
+        except Exception as e:
+            self.logger.warning(f"[数据工厂] 启动失败: {e}")
+
         # 自动补充遗漏历史成交
         engine._recover_missing_trades()
 
