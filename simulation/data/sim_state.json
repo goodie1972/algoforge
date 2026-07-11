@@ -1,25 +1,25 @@
 {
   "capital": 10000.0,
-  "equity": 10000.0,
+  "equity": 9859.1,
   "positions": [
     {
-      "strategy": "EMA_CROSS",
-      "direction": "SELL",
-      "open_price": 4154.47,
+      "strategy": "IB_BREAKOUT",
+      "direction": "BUY",
+      "open_price": 4116.1,
       "lots": 0.1,
-      "open_time": "2026-07-06 16:16:56"
+      "open_time": "2026-07-10 13:18:36"
     },
     {
-      "strategy": "ADX_RIDER",
-      "direction": "BUY",
-      "open_price": 4154.47,
+      "strategy": "MULTI_CONFLUENCE",
+      "direction": "SELL",
+      "open_price": 4102.01,
       "lots": 0.1,
-      "open_time": "2026-07-06 16:16:56"
+      "open_time": "2026-07-11 03:08:44"
     }
   ],
   "trades": [],
   "total_trades": 0,
   "wins": 0,
   "losses": 0,
-  "_last_price": 4154.05
+  "_last_price": 4119.15
 }
