@@ -1,6 +1,6 @@
 # XAUUSD 量化交易系统
 
-基于 Python + MetaTrader 4 的黄金自动化交易系统，支持多策略并行、多层风控、实时 Web 监控。
+基于 Python + MetaTrader 4 的黄金自动化交易系统，支持多策略并行、多层风控、实时 Web 监控、纸面测试。
 
 ## 架构概览
 
@@ -9,29 +9,41 @@ MT4 + FreeMT4Bridge EA (Socket :23232)
         │
     core/bridge.py (桥接抽象层)
         │
-    TradingEngine (引擎主循环)
-        ├── M30_rsi_bb       (M30 均值回归)
-        ├── H1_v6_hybrid     (H1 多因子混合)
-        ├── sanqing_h1       (H1 EMA9/21 趋势)
-        └── gold_auto_research (H1 共识投票)
+    TradingEngine (引擎主循环 — 三轨架构)
+        ├── 轨1: DataFactory (独立线程拉K线+TA-Lib计算指标)
+        ├── 轨2: 策略员 (主循环评分出门票)
+        └── 轨3: Athlete (tick验证+开仓)
         │
     Dashboard (FastAPI + Vue 3)
         │
-    monitor/patrol_daemon.py (独立巡检)
+    tools/ (监控+纸面测试+分析)
+        ├── status_monitor.py (每5分钟检查+自动修复)
+        ├── signal_analysis_recorder.py (信号全指标记录)
+        ├── paper_trader.py (纸面交易模拟)
+        └── weekly_analysis.py (周分析报告)
 ```
+
+## 当前运行策略 (7个)
+
+| 策略 | Magic | 周期 | 说明 |
+|:-----|:-----:|:----:|:-----|
+| sanqing_h1 | 880107 | H1 | 6因子评分 ≥5, ATR动态追踪 |
+| sanqing_h1_original | 880101 | H1 | 原始v1还原(阈值5, trail=4.0 hard=2.5) |
+| stoch_trend_h1_optimized | 661202 | H1 | 优化版: Stoch(14,3,3)+评分制 |
+| mfi_bb_m30_optimized | 661002 | M30 | 优化版: 容差2根, MFI 85/15 |
+| m30_bb_deepreturn_optimized | 661102 | M30 | 优化版: 阈值2+ADX动态 |
+| rsi_grading_m30_optimized | 660903 | M30 | 优化版: ADX≤28阈值=2 |
+| bakome_backup_optimized | 777006 | H1 | 优化版: 时段10h+FVG放宽 |
 
 ## 核心特性
 
-- **多策略并行** — 4 个独立策略同时运行，独立 Magic Number 和风控状态
-- **三层退出体系** — 利润回撤止盈 + ATR 移动止盈 + ATR 硬止损，趋势感知乘数
-- **信号生命周期** — 从信号生成→开仓→平仓的全链路追踪，含废票管理
-- **持仓位门控** — 60 根 K 线高低 10% 范围内限制逆势开仓
-- **多策略协调器** — 跨策略联动出场 + M15 EMA20 斜率归一化反向止盈
-- **新闻保护** — 集成 ForexFactory 财经日历，三级新闻防护（收紧→强平→黑名单）
-- **十层风控** — 全局硬止损、浮动/已实现亏损阻断、快速出场检测、连续亏损冷却、安全锁
-- **实时 Web 仪表盘** — 价格图表、持仓管理、信号日志、策略统计、运行时配置
-- **策略版本管理** — Magic Number 标准化（PP+NN+VV），结构化 Changelog 写入数据库
-- **独立巡检守护** — 独立进程 30 秒轮询，异常自动告警
+- **多策略并行** — 7个独立策略同时运行，独立 Magic Number 和风控状态
+- **三轨架构** — DataFactory(数据)+ 策略员(信号)+ Athlete(开仓)
+- **三层退出体系** — 利润回撤止盈 + ATR 移动止盈 + ATR 硬止损
+- **信号全生命周期** — 从信号生成→开仓→平仓的全链路追踪
+- **纸面测试系统** — 信号全量模拟入场+出场，按策略规则模拟平仓
+- **状态监控+自修复** — 每5分钟检查，引擎崩溃/桥接断连自动重启
+- **更多特性**见下方
 
 ## 快速开始
 
