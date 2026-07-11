@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
+import { getStrategyColor } from '@/utils/strategyColors'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -344,31 +345,8 @@ const strategyLogics: Record<string, StratLogic> = {
   },
 }
 
-// 策略颜色映射 (按 name)
-const strategyColors: Record<string, string> = {
-  M30_rsi_bb: '#f0a020',
-  gold_auto_research: '#20c080',
-  mfi_bb_m30: '#00bcd4',
-  mfi_bb_m30_optimized: '#00838f',
-  m30_bb_deepreturn: '#ff7043',
-  m30_bb_deepreturn_optimized: '#d84315',
-  entry_score_pro: '#7c4dff',
-  momentum_pulse_pro: '#ffa726',
-  stoch_trend_h1: '#26c6da',
-  stoch_trend_h1_optimized: '#00695c',
-  sanqing_h1: '#9220f0',
-  sanqing_h1_original: '#4a148c',
-  rsi_grading_m30: '#e040a0',
-  rsi_grading_m30_optimized: '#880e4f',
-  bakome_backup: '#66bb6a',
-  bakome_backup_optimized: '#2e7d32',
-  viprasol_sniper: '#ef5350',
-  xaubot_backup: '#8d6e63',
-  multi_confluence_quant: '#808080',
-  stoch_m30: '#20c080',
-  stoch_trend_m30: '#2080f0',
-  mtf_resonance_h1: '#2080f0',
-}
+// 策略颜色由 getStrategyColor(name) 动态分配
+// 带 _optimized / _original 后缀的策略自动同色系不同深浅
 
 // 已启用策略
 const enabledCount = computed(() =>
@@ -424,7 +402,7 @@ function getLogic(name: string): StratLogic | null {
 }
 
 function getColor(name: string): string {
-  return strategyColors[name] || '#808080'
+  return getStrategyColor(name)
 }
 
 function updateMagic(id: string, val: string) {
