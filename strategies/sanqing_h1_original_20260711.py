@@ -26,7 +26,7 @@ STRATEGY_CHANGELOG = [
 class SanQingEA_v1(BaseStrategy):
     """SanQing EA 原始v1版本 — 不做任何修改"""
 
-    name = "sanqing_h1_v1"
+    name = "sanqing_h1_original"
     legacy_magics = STRATEGY_LEGACY_MAGICS
 
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
