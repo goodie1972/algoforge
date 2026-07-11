@@ -3,6 +3,7 @@ import { h, ref, computed, onMounted } from 'vue'
 import { usePositionStore } from '@/stores/positions'
 import { useAccountStore } from '@/stores/account'
 import { useTradeStore } from '@/stores/trades'
+import { getStrategyColor } from '@/utils/strategyColors'
 import { useMessage, useDialog, NButton, NTag, NSpace, NInput, NDataTable, NCard, NEmpty, NText, NModal } from 'naive-ui'
 import { closePosition, modifyPosition } from '@/api/client'
 import AccountPanel from '@/components/dashboard/AccountPanel.vue'
@@ -158,31 +159,7 @@ const columns = [
   },
 ]
 
-// 策略颜色映射（与持仓保持一致）
-const strategyColors: Record<string, string> = {
-  'M30_rsi_bb': '#f0a020',
-  'gold_auto_research': '#20c080',
-  'mfi_bb_m30': '#00bcd4',
-  'mfi_bb_m30_optimized': '#00838f',
-  'm30_bb_deepreturn': '#ff7043',
-  'm30_bb_deepreturn_optimized': '#d84315',
-  'entry_score_pro': '#7c4dff',
-  'momentum_pulse_pro': '#ffa726',
-  'stoch_trend_h1': '#26c6da',
-  'stoch_trend_h1_optimized': '#00695c',
-  'sanqing_h1': '#9220f0',
-  'sanqing_h1_original': '#4a148c',
-  'rsi_grading_m30': '#e040a0',
-  'rsi_grading_m30_optimized': '#880e4f',
-  'bakome_backup': '#66bb6a',
-  'bakome_backup_optimized': '#2e7d32',
-  'viprasol_sniper': '#ef5350',
-  'xaubot_backup': '#8d6e63',
-  'multi_confluence_quant': '#808080',
-  'stoch_m30': '#20c080',
-  'stoch_trend_m30': '#2080f0',
-  'mtf_resonance_h1': '#2080f0',
-}
+// 策略颜色由 getStrategyColor(name) 动态分配
 
 const exitReasonLabels: Record<string, string> = {
   'strategy_exit': '策略出场',
@@ -198,7 +175,7 @@ const tradeColumns = [
     title: '策略', key: 'strategy', width: 100,
     render(row: any) {
       const name = row.strategy || row.comment || ''
-      const color = strategyColors[name] || '#808080'
+      const color = getStrategyColor(name)
       return h(NTag, { color: { color, textColor: '#fff' }, size: 'small' },
         { default: () => name || '-' }
       )

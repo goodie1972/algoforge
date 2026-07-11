@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSignalStore } from '@/stores/signals'
 import { usePriceStore } from '@/stores/prices'
 import { useConfigStore } from '@/stores/config'
+import { getStrategyColor } from '@/utils/strategyColors'
 
 const signalStore = useSignalStore()
 const priceStore = usePriceStore()
@@ -167,31 +168,8 @@ const activeStrategies = computed(() => {
     }))
 })
 
-// 策略颜色（与持仓表一致，按 magic 固定）
-const strategyColors: Record<string, string> = {
-  'M30_rsi_bb': '#f0a020',
-  'gold_auto_research': '#20c080',
-  'mfi_bb_m30': '#00bcd4',
-  'mfi_bb_m30_optimized': '#00838f',
-  'm30_bb_deepreturn': '#ff7043',
-  'm30_bb_deepreturn_optimized': '#d84315',
-  'entry_score_pro': '#7c4dff',
-  'momentum_pulse_pro': '#ffa726',
-  'stoch_trend_h1': '#26c6da',
-  'stoch_trend_h1_optimized': '#00695c',
-  'sanqing_h1': '#9220f0',
-  'sanqing_h1_original': '#4a148c',
-  'rsi_grading_m30': '#e040a0',
-  'rsi_grading_m30_optimized': '#880e4f',
-  'bakome_backup': '#66bb6a',
-  'bakome_backup_optimized': '#2e7d32',
-  'viprasol_sniper': '#ef5350',
-  'xaubot_backup': '#8d6e63',
-  'multi_confluence_quant': '#808080',
-  'stoch_m30': '#20c080',
-  'stoch_trend_m30': '#2080f0',
-  'mtf_resonance_h1': '#2080f0',
-}
+// 策略颜色统一由 getStrategyColor(name) 动态分配
+// 同一基名的策略（如 mfi_bb_m30 / mfi_bb_m30_optimized）自动同色系不同深浅
 
 interface StratSide {
   title: string; color: string; entry: string[]; exit: string[];
@@ -543,11 +521,11 @@ onUnmounted(() => {
     <n-card size="small" :bordered="true">
       <n-collapse :expanded-names="expandedStratKeys" @update:expanded-names="expandedStratKeys = $event">
         <n-collapse-item v-for="s in activeStrategies" :key="s.name" :name="s.name"
-          :style="{ borderLeft: `3px solid ${strategyColors[s.name] || '#808080'}`,
+          :style="{ borderLeft: `3px solid ${getStrategyColor(s.name)}`,
                    marginBottom: '4px', borderRadius: '4px' }">
           <template #header>
             <n-space align="center" size="small">
-              <n-tag :color="{ color: strategyColors[s.name] || '#808080' }" size="tiny" text-color="#fff">
+              <n-tag :color="{ color: getStrategyColor(s.name) }" size="tiny" text-color="#fff">
                 {{ s.name }}
               </n-tag>
               <n-text depth="3" style="font-size: 11px;">TF:{{ s.timeframe }}</n-text>
