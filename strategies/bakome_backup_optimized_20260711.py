@@ -1,0 +1,261 @@
+"""
+BAKOME GoldScalper 优化版 (v2_optimized)
+=========================================
+ICT 概念: FVG (Fair Value Gap) + Order Block + Silver Bullet 时段
+
+核心变化 vs v1:
+  - 交易时段从 6 小时扩到 10 小时（London 5h + NY 5h）
+  - FVG 检测放宽：取消蜡烛实体方向要求，仅保留缺口条件
+  - Magic 从 777004 改为 777006
+
+时段规则:
+  London Silver Bullet: 服务器时间 6,7,8,9,10（5 小时）
+  NY Silver Bullet:     服务器时间 12,13,14,15,16（5 小时）
+
+版本履历:
+  v1 (777004) — 初始 FVG+OB, Silver Bullet 6h
+  v2_optimized (777006) — 时段扩至 10h, FVG 条件放宽
+"""
+
+import logging
+from datetime import datetime
+from typing import Optional
+
+from core.bridge import MT4BridgeBase, Candle, OrderType
+from strategies.base import BaseStrategy
+
+logger = logging.getLogger(__name__)
+
+STRATEGY_VERSION = "v2_optimized"
+STRATEGY_MAGIC = 777006
+STRATEGY_LEGACY_MAGICS: list[int] = [777004]
+STRATEGY_CHANGELOG = [
+    {"version": "v1", "magic": 777004, "date": "2026-06-01",
+     "desc": "初始: FVG+OB, Silver Bullet 6h (London 8-10, NY 13-15)"},
+    {"version": "v2_optimized", "magic": 777006, "date": "2026-07-11",
+     "desc": "优化: 时段扩至 10h (London 6-10, NY 12-16), FVG 条件放宽(取消实体方向)"},
+]
+
+
+class BakomeBackupOptimized(BaseStrategy):
+    """BAKOME GoldScalper — ICT FVG + OB + Silver Bullet (v2_optimized)"""
+
+    name = "bakome_backup_optimized"
+    legacy_magics = STRATEGY_LEGACY_MAGICS
+
+    def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
+        super().__init__(bridge, magic, timeframe)
+        self._trail_data: dict[int, dict] = {}
+        self._cached_atr_values: Optional[list[float]] = None
+        self._cached_atr_key: int = 0
+
+        # Exit params
+        self.p_trailing_atr = 2.5
+        self.p_hard_atr = 1.5
+
+    def refresh_data(self, count: int = 200):
+        self._cached_atr_key = 0
+        self._cached_atr_values = None
+        super().refresh_data(count)
+
+    # ─────────────── Indicator helpers ───────────────
+
+    def _calc_atr_values(self, period: int = 14) -> Optional[list[float]]:
+        cache_key = len(self.candles)
+        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
+            return self._cached_atr_values
+
+        candles = self.candles
+        if len(candles) < period + 2:
+            return None
+        tr_values = []
+        for i in range(1, len(candles)):
+            h, l, pc = candles[i].high, candles[i].low, candles[i - 1].close
+            tr_values.append(max(h - l, abs(h - pc), abs(l - pc)))
+        if len(tr_values) < period:
+            return None
+        atr_list = [sum(tr_values[:period]) / period]
+        for i in range(period, len(tr_values)):
+            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
+        self._cached_atr_values = atr_list
+        self._cached_atr_key = cache_key
+        return atr_list
+
+    def _calc_atr(self, period: int = 14) -> Optional[float]:
+        vals = self._calc_atr_values(period)
+        return vals[-1] if vals else None
+
+    # ─────────────── ICT Detection ───────────────
+
+    def _is_silver_bullet(self) -> Optional[str]:
+        """Check if current candle is in a Silver Bullet session.
+        Expanded hours: London 6-10, NY 12-16 (server time, UTC+3).
+        Returns 'london', 'ny', or None."""
+        if not self.candles:
+            return None
+        now = datetime.now()
+        h = now.hour
+        # Expanded Silver Bullet windows (server time, UTC+3)
+        if h in [6, 7, 8, 9, 10]:  # London session (5h)
+            return 'london'
+        if h in [12, 13, 14, 15, 16]:  # NY session (5h)
+            return 'ny'
+        return None
+
+    def _detect_fvg(self) -> Optional[OrderType]:
+        """Detect Fair Value Gap (3-candle pattern).
+        Relaxed: only requires gap condition (midpoint comparison),
+        no longer requires candle body direction."""
+        candles = self.candles
+        if len(candles) < 4:
+            return None
+        c0 = candles[-3]  # prev.prev
+        c2 = candles[-1]  # current
+
+        # Bullish FVG: prev.prev.low > current.high (gap)
+        if c0.low > c2.high:
+            return OrderType.BUY
+        # Bearish FVG: prev.prev.high < current.low (gap)
+        if c0.high < c2.low:
+            return OrderType.SELL
+        return None
+
+    def _detect_order_block(self) -> Optional[OrderType]:
+        """Detect Order Block: strong breakout preceded by opposite candle."""
+        candles = self.candles
+        if len(candles) < 6:
+            return None
+        n = len(candles)
+        c1 = candles[-1]
+        c2 = candles[-2]
+        c3 = candles[-3]
+
+        avg_body = sum(abs(candles[i].close - candles[i].open) for i in range(max(0, n - 11), n)) / min(10, n)
+
+        # BUY OB: 2 big bullish candles → find previous bearish candle
+        if c1.close > c1.open and c2.close > c2.open:
+            body1 = abs(c1.close - c1.open)
+            body2 = abs(c2.close - c2.open)
+            if body2 > avg_body * 1.2 and body1 > avg_body * 1.5:
+                for j in range(n - 3, max(0, n - 7), -1):
+                    if candles[j].close < candles[j].open:
+                        # Price returned to OB zone
+                        ob_price = candles[j].close
+                        if c1.low <= ob_price * 1.003:
+                            return OrderType.BUY
+
+        # SELL OB: 2 big bearish candles → find previous bullish candle
+        if c1.close < c1.open and c2.close < c2.open:
+            body1 = abs(c1.close - c1.open)
+            body2 = abs(c2.close - c2.open)
+            if body2 > avg_body * 1.2 and body1 > avg_body * 1.5:
+                for j in range(n - 3, max(0, n - 7), -1):
+                    if candles[j].close > candles[j].open:
+                        ob_price = candles[j].close
+                        if c1.high >= ob_price * 0.997:
+                            return OrderType.SELL
+        return None
+
+    # ─────────────── Signal generation ───────────────
+
+    def generate_signal(self):
+        candles = self.candles
+        if len(candles) < 30:
+            return (None, 0, 0, [], [], {})
+
+        # 1. Silver Bullet session check
+        session = self._is_silver_bullet()
+        if not session:
+            return (None, 0, 0, [], [], {})
+
+        # 2. ATR filter
+        atr_val = self.get_indicator("atr")
+        if atr_val is None or atr_val <= 0:
+            return (None, 0, 0, [], [], {})
+
+        # 3. Check FVG
+        indicator_values = {"close": round(self.candles[-1].close, 2), "atr": round(atr_val, 2)}
+        fvg_sig = self._detect_fvg()
+        if fvg_sig is not None:
+            logger.info(f"[{self.name}] FVG {fvg_sig.value} in {session} session, ATR={atr_val:.2f}")
+            indicator_values["pattern"] = "FVG"
+            indicator_values["session"] = session
+            return (fvg_sig, 1, 0, [session, "FVG"], [], indicator_values)
+
+        # 4. Check Order Block
+        ob_sig = self._detect_order_block()
+        if ob_sig is not None:
+            logger.info(f"[{self.name}] OB {ob_sig.value} in {session} session, ATR={atr_val:.2f}")
+            indicator_values["pattern"] = "OB"
+            indicator_values["session"] = session
+            return (ob_sig, 1, 0, [session, "OB"], [], indicator_values)
+
+        return (None, 0, 0, [], [], indicator_values)
+
+    # ─────────────── SL/TP and Exit ───────────────
+
+    def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
+        atr_val = self.get_indicator("atr")
+        if atr_val is None or atr_val <= 0:
+            return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
+        dist = atr_val * 2.0
+        if direction == OrderType.BUY:
+            return round(entry_price - dist, 2), round(entry_price + dist * 50, 2)
+        else:
+            return round(entry_price + dist, 2), round(entry_price - dist * 50, 2)
+
+    def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
+        ticket = position.ticket
+        is_buy = position.order_type in ("OP_BUY", "BUY")
+
+        if ticket not in self._trail_data:
+            self._trail_data[ticket] = {
+                "highest": position.open_price if is_buy else 0,
+                "lowest": position.open_price if not is_buy else float("inf"),
+                "entry": position.open_price,
+            }
+
+        td = self._trail_data[ticket]
+        atr_val = self.get_indicator("atr")
+        if atr_val is None or atr_val <= 0:
+            return False
+
+        if is_buy:
+            td["highest"] = max(td["highest"], bid)
+            drawdown = td["highest"] - bid
+            loss = td["entry"] - bid
+            if drawdown > atr_val * self.p_trailing_atr:
+                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f}")
+                del self._trail_data[ticket]
+                return True
+            if loss > atr_val * self.p_hard_atr:
+                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f}")
+                del self._trail_data[ticket]
+                return True
+        else:
+            td["lowest"] = min(td["lowest"], ask)
+            rally = ask - td["lowest"]
+            loss = ask - td["entry"]
+            if rally > atr_val * self.p_trailing_atr:
+                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f}")
+                del self._trail_data[ticket]
+                return True
+            if loss > atr_val * self.p_hard_atr:
+                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f}")
+                del self._trail_data[ticket]
+                return True
+
+        return False
+
+    @staticmethod
+    def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+        """默认验证：tick 价不跑出 BB 边界"""
+        direction = signal.get("direction", "BUY")
+        bb = latest.get("bb") or signal.get("indicator_values", {}).get("bb") or {}
+        if direction == "BUY":
+            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                return False
+        else:
+            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                return False
+        return True
