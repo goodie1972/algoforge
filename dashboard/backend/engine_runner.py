@@ -279,6 +279,15 @@ class EngineRunner:
             last["low"] = round(min(last["low"], mid), 2)
             last["close"] = mid
         result[-1] = last
+        # 按时间戳去重（保留最后出现的一条），轻量级图表不允许重复时间戳
+        seen: set = set()
+        deduped = []
+        for c in reversed(result[-count:]):
+            t = c["time"]
+            if t not in seen:
+                seen.add(t)
+                deduped.append(c)
+        deduped.reverse()
         # 过滤无效值，防止轻量级图表报错
         _valid = all(
             isinstance(c.get(k), (int, float))
@@ -286,7 +295,7 @@ class EngineRunner:
         )
         if not _valid:
             return None
-        return result[-count:]
+        return deduped
 
     def _refresh_candle_cache(self, engine):
         """从数据工厂缓存刷新 K 线缓存（每 tick 最多刷一个周期，避免堵塞快速采样）"""
@@ -327,6 +336,48 @@ class EngineRunner:
                 except Exception:
                     pass
                 return  # 只刷一个周期就退出，下个 tick 再刷下一个
+
+
+    # ======================== DataFactory 健康监控 ========================
+
+    def _check_data_factory_health(self, engine):
+        """检查 DataFactory 数据健康状况，发现异常时报警"""
+        df = getattr(engine, '_data_factory', None)
+        if not df or not df._running:
+            return
+        now = time.time()
+        if now - getattr(self, '_last_df_health_check', 0) < 60:
+            return
+        self._last_df_health_check = now
+
+        try:
+            from services.data_factory import get_health
+            health = get_health()
+            tfs = health.get("tfs", {})
+
+            for tf, status in tfs.items():
+                if not status.get("ok", False):
+                    self.logger.warning(f"[数据工厂监控] {tf} 同步失败")
+                    continue
+                age = now - status.get("last_sync", 0)
+                if age > 60:
+                    self.logger.warning(f"[数据工厂监控] {tf} 数据过期 {age:.0f}s（超过 60s 未同步）")
+                if status.get("candles", 0) < 30:
+                    self.logger.warning(f"[数据工厂监控] {tf} 数据不足: {status.get('candles', 0)} 根")
+
+            tick_age = now - health.get("last_tick_time", 0)
+            if tick_age > 60 and health.get("bridging", False):
+                self.logger.warning(f"[数据工厂监控] 报价过期 {tick_age:.0f}s")
+
+            if not health.get("bridging", False):
+                self.logger.error("[数据工厂监控] 桥接未连接！")
+
+            errs = health.get("sync_errors", [])
+            if errs:
+                last = errs[-1]
+                self.logger.warning(f"[数据工厂监控] 最近同步错误: {last.get('tf','?')} - {last.get('err','?')[:60]}")
+        except Exception as e:
+            self.logger.warning(f"[数据工厂监控] 检查失败: {e}")
 
 
     # ======================== 独立价格轮询线程 ========================
@@ -486,12 +537,12 @@ class EngineRunner:
         self._running = True
         self.logger.info("进入主循环...")
 
-        # 启动数据工厂独立线程（用已连上的执行桥接）
+        # 连接数据桥接 + 启动数据工厂独立线程
         try:
             if getattr(engine, '_data_factory', None):
-                engine._data_factory._bridge = engine.bridge
+                engine._data_factory.connect()
                 engine._data_factory.start()
-                self.logger.info("[数据工厂] 已启动（引擎桥接模式）")
+                self.logger.info("[数据工厂] 已启动（数据桥接模式）")
         except Exception as e:
             self.logger.warning(f"[数据工厂] 启动失败: {e}")
 
@@ -518,6 +569,9 @@ class EngineRunner:
                 self._refresh_candle_cache(engine)
             except Exception:
                 pass
+
+            # DataFactory 健康检查（每 60 秒一次）
+            self._check_data_factory_health(engine)
 
         # 清理
         if engine.bridge:

@@ -2,6 +2,7 @@
 /api/engine/* 路由 - 引擎启停、状态查询、动态策略管理、健康检查
 """
 import logging
+import time
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -114,12 +115,14 @@ async def get_health():
     database_block = _build_database_block()
     exit_block = _build_exit_systems_block()
 
+    datafactory_block = _build_datafactory_block()
     strategy_blocks_block = _build_strategy_blocks_block()
 
     # Derive overall verdict from all blocks
     verdict, reason = _compute_verdict(
         engine_block, bridge_block, risk_block, account_block,
         database_block=database_block,
+        datafactory_block=datafactory_block,
         positions_block=positions_block,
     )
 
@@ -135,6 +138,7 @@ async def get_health():
         "signals": signals_block,
         "database": database_block,
         "exit_systems": exit_block,
+        "datafactory": datafactory_block,
         "strategy_blocks": strategy_blocks_block,
     }
 
@@ -147,6 +151,41 @@ def _build_engine_block() -> dict:
     if not engine_runner:
         return {"status": "uninitialized", "uptime_seconds": 0}
     return engine_runner.get_status()
+
+
+def _build_datafactory_block() -> dict:
+    """DataFactory 健康状况"""
+    try:
+        from services.data_factory import get_health
+        health = get_health()
+        now = time.time()
+        tfs = health.get("tfs", {})
+        ok = True
+        issues = []
+        for tf, st in tfs.items():
+            if not st.get("ok"):
+                ok = False
+                issues.append(f"{tf}:sync_failed")
+            age = now - st.get("last_sync", 0)
+            if age > 60:
+                ok = False
+                issues.append(f"{tf}:stale({age:.0f}s)")
+        if not health.get("bridging"):
+            ok = False
+            issues.append("bridge_disconnected")
+        return {
+            "ok": ok,
+            "bridging": health.get("bridging", False),
+            "tfs": {tf: {"ok": st.get("ok"), "candles": st.get("candles", 0),
+                         "age_s": round(now - st.get("last_sync", 0), 1)}
+                    for tf, st in tfs.items()},
+            "tick_age_s": round(now - health.get("last_tick_time", 0), 1) if health.get("last_tick_time") else -1,
+            "tick_count": health.get("tick_count", 0),
+            "errors": health.get("sync_errors", [])[-5:],
+            "issues": issues,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:100]}
 
 
 def _build_bridge_block() -> dict:
@@ -423,6 +462,7 @@ def _compute_verdict(
     account_block: dict | None,
     database_block: dict | None = None,
     positions_block: dict | None = None,
+    datafactory_block: dict | None = None,
 ) -> tuple:
     """Return (verdict: str, reason: str) based on current state."""
     reasons: list[str] = []
@@ -439,6 +479,17 @@ def _compute_verdict(
     bridge_ok = bridge_block.get("connected", False)
     if not bridge_ok:
         return "RED", "Engine running but bridge disconnected"
+
+    # --- YELLOW: DataFactory health ---
+    if datafactory_block:
+        if not datafactory_block.get("ok", True):
+            issues = datafactory_block.get("issues", [])
+            return "YELLOW", f"DataFactory issues: {'; '.join(issues)}"
+        # 检查各周期年龄
+        tfs = datafactory_block.get("tfs", {})
+        stale_tfs = [tf for tf, st in tfs.items() if st.get("age_s", 0) > 120]
+        if stale_tfs:
+            return "YELLOW", f"DataFactory {', '.join(stale_tfs)} 过期"
 
     # --- RED: critical risk (global loss block) ---
     if engine_runner and engine_runner._engine:

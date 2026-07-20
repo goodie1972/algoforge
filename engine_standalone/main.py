@@ -21,7 +21,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from config import settings
-from core.bridge import create_bridge, OrderType
+from core.bridge import create_bridge_pair, OrderType
 from services.news_filter import NewsFilter
 from services.mtf_coordinator import MTFResonanceCoordinator
 from services.supervisor import TradeSupervisor
@@ -96,7 +96,15 @@ class TradingEngine:
 
     def __init__(self, config_service=None):
         self._config_service = config_service
-        self.bridge = create_bridge()
+        # 三轨架构：双桥接 + 数据工厂 + 运动员
+        # 数据桥接(推送K线/报价) 和 执行桥接(下单)，纸面模式下执行桥接用PaperBridge包装
+        from services.data_factory import DataFactory, get_cache, get_tick
+        from engine_standalone.athlete import Athlete
+        self._data_bridge, self._exec_bridge = create_bridge_pair()
+        self.bridge = self._exec_bridge            # 引擎主桥接 = 执行通道
+        self._data_factory = DataFactory(self._data_bridge)
+        self._athlete = Athlete(self._exec_bridge)
+        logger.info("[三轨] 双桥接 + DataFactory + Athlete 初始化成功，待连接")
         pool = self._get_strategy_pool()
         self.strategies = create_strategies(self.bridge, pool)
         self._strategies_lock = threading.Lock()
@@ -131,22 +139,6 @@ class TradingEngine:
         self.supervisor = TradeSupervisor()
         db.init_db()  # 确保所有表存在
         db.migrate_from_jsonl()  # 导入 JSONL 历史记录到 trades 表
-
-        # 三轨架构：双桥接 + 数据工厂 + 运动员
-        try:
-            from core.bridge import create_bridge_pair
-            from services.data_factory import DataFactory, get_cache, get_tick
-            from engine_standalone.athlete import Athlete
-            self._data_bridge, self._exec_bridge = create_bridge_pair()
-            self.bridge = self._exec_bridge            # 引擎主桥接 = 命令通道
-            self._data_factory = DataFactory(self._data_bridge)
-            self._athlete = Athlete(self._exec_bridge)
-            logger.info("[三轨] 双桥接 + DataFactory + Athlete 初始化成功，待连接")
-        except Exception as e:
-            logger.warning(f"[三轨] 初始化失败，回退到单桥接旧模式: {e}", exc_info=True)
-            self._data_bridge = None
-            self._data_factory = None
-            self._athlete = None
 
     # ── 运行时配置读取（RuntimeConfig 优先，settings.py 回退）────────
 
@@ -813,9 +805,8 @@ class TradingEngine:
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
 
-        # 数据工厂直接用引擎的执行桥接（已连好），跳过独立数据桥接
+        # 启动数据工厂独立线程（使用专用数据桥接）
         if self._data_factory:
-            self._data_factory._bridge = self.bridge
             self._data_factory.start()
             time.sleep(5)
 
