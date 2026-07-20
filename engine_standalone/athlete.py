@@ -21,15 +21,21 @@ class Athlete:
     def __init__(self, exec_bridge):
         self._bridge = exec_bridge
         self._pending: list[dict] = []
-        self._max_age = 10.0  # 门票有效期 10 秒
+        self._max_age = 8.0  # 门票有效期 8 秒
+        self._recently_opened: list[tuple] = []  # (ticket, strategy_name) 开仓成功队列
 
     def submit(self, signal_id: int, direction: str, signal: dict):
-        """策略员提交候选门票"""
+        """策略员提交候选门票 — 重复的策略+方向不再提交"""
+        strategy_name = signal.get("strategy", "")
+        for item in self._pending:
+            if item["signal"].get("strategy") == strategy_name and item["direction"] == direction:
+                logger.debug(f"[运动员] 重复门票 #{signal_id} {direction}，跳过（已有 #{item['signal_id']} 在等待）")
+                return
         self._pending.append({
             "signal_id": signal_id,
             "direction": direction,
             "signal": signal,
-            "time": time.time()
+            "time": time.time(),
         })
         logger.info(f"[运动员] 收到候选门票 #{signal_id} {direction}")
 
@@ -40,7 +46,7 @@ class Athlete:
         for item in self._pending:
             if now - item["time"] > self._max_age:
                 self._void(item, "candidate_timeout")
-                logger.info(f"[运动员] 门票 #{item['signal_id']} 过期作废 (>10s)")
+                logger.info(f"[运动员] 门票 #{item['signal_id']} 过期作废 (>8s)")
                 continue
             tick = get_tick()
             if not tick:
@@ -76,7 +82,11 @@ class Athlete:
             clear_cache()  # 清除扫描器缓存，确保加载最新策略代码
             cls = scan_strategies().get(strategy_name)
             if cls and hasattr(cls, '_verify_entry'):
-                return cls._verify_entry(signal, tick_price, latest)
+                try:
+                    # v7+ 策略可能需要 item dict 做跨 tick 跟踪
+                    return cls._verify_entry(signal, tick_price, latest, item)
+                except TypeError:
+                    return cls._verify_entry(signal, tick_price, latest)
         except Exception:
             pass
 
@@ -112,6 +122,8 @@ class Athlete:
             if ticket:
                 db.update_signal_status(item["signal_id"], {"status": "opened", "ticket": ticket})
                 logger.info(f"[运动员] 开仓成功 #{ticket} {direction} @ {price:.2f}")
+                # 记录开仓成功的 (ticket, strategy_name)，供引擎回调策略的 mark_extreme_entry
+                self._recently_opened.append((ticket, signal.get("strategy", "")))
             else:
                 self._void(item, "order_failed")
         except Exception as e:

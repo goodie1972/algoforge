@@ -281,9 +281,19 @@ def migrate_risk_states_exit_timestamps():
 def migrate_timezone_fix():
     """将表中已存在的 UTC created_at/updated_at 转为本地时 (UTC+8)。
     SQLite 的 datetime('now') 返回 UTC，此前所有表的默认值都用它。
-    新数据已改为 datetime('now', 'localtime')，老数据用此迁移加 8 小时。"""
+    新数据已改为 datetime('now', 'localtime')，老数据用此迁移加 8 小时。
+
+    只在首次启动时执行一次（通过 metadata 表标记），防止重复迁移造成数据损坏。"""
     conn = get_conn()
     try:
+        # 检查是否已执行过
+        done = conn.execute(
+            "SELECT 1 FROM metadata WHERE key='timezone_migrated'"
+        ).fetchone()
+        if done:
+            logger.debug("时区迁移: 已完成（metadata 标记），跳过")
+            return
+
         tables = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
@@ -315,6 +325,12 @@ def migrate_timezone_fix():
             logger.info(f"时区迁移: 已修正 {fixed} 条记录的 created_at/updated_at (UTC → UTC+8)")
         else:
             logger.info("时区迁移: 无需修正")
+        # 写入迁移标记，防止下次启动重复执行
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+            ("timezone_migrated", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        conn.commit()
     except Exception as e:
         logger.warning(f"时区迁移异常: {e}")
     finally:

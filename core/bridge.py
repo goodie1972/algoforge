@@ -145,7 +145,16 @@ def create_bridge() -> MT4BridgeBase:
     """工厂方法：根据配置创建桥接实例"""
     if MT4_MODE == "freemt4":
         from core.freemt4_bridge import FreeMT4Bridge
-        return FreeMT4Bridge()
+        bridge = FreeMT4Bridge()
+        try:
+            from config.settings import PAPER_MODE
+            if PAPER_MODE:
+                from core.paper_bridge import PaperBridge
+                bridge = PaperBridge(bridge)
+                logger.info("[桥接] 纸面模式：PaperBridge 包装单桥接")
+        except (ImportError, AttributeError):
+            pass
+        return bridge
     elif MT4_MODE == "metaapi":
         from core.metaapi_bridge import MetaApiBridge
         return MetaApiBridge()
@@ -154,9 +163,26 @@ def create_bridge() -> MT4BridgeBase:
 
 
 def create_bridge_pair():
-    """创建双桥接：data_bridge(推流) + exec_bridge(下单)"""
+    """创建双桥接：data_bridge(推流) + exec_bridge(下单)
+
+    纸面模式 (settings.PAPER_MODE=True) 时 exec_bridge 使用 PaperBridge 包装，
+    数据委托给真实桥接，交易操作本地模拟。
+    """
     from core.freemt4_bridge import FreeMT4Bridge
+    real_exec = FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="exec")
+    # 纸面模式：用 PaperBridge 包装执行桥接
+    try:
+        from config.settings import PAPER_MODE
+        if PAPER_MODE:
+            from core.paper_bridge import PaperBridge
+            exec_bridge = PaperBridge(real_exec)
+            logger.info("[桥接] 纸面模式：PaperBridge 包装执行桥接")
+        else:
+            exec_bridge = real_exec
+    except (ImportError, AttributeError):
+        exec_bridge = real_exec
+
     return (
         FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="data"),
-        FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="exec"),
+        exec_bridge,
     )

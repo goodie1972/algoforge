@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 _DATA_CACHE: dict = {}
 _CACHE_LOCK = threading.RLock()
 
+# 全局 tick 计数器：DataFactory 每收到一次 tick 报价就 +1
+_TICK_COUNTER: int = 0
+
 def get_cache(timeframe: str) -> dict:
     """策略读取缓存"""
     with _CACHE_LOCK:
@@ -24,6 +27,11 @@ def get_tick() -> dict:
     """Athlete 读取 tick"""
     with _CACHE_LOCK:
         return _DATA_CACHE.get("tick", {}).copy()
+
+def get_tick_count() -> int:
+    """返回当前全局 tick 计数器值（DataFactory 每更新一次报价就 +1）"""
+    with _CACHE_LOCK:
+        return _TICK_COUNTER
 
 
 def _get_candle_ts(c):
@@ -253,9 +261,11 @@ class DataFactory:
             return False
 
     def _sync_tick(self, bridge):
+        global _TICK_COUNTER
         try:
             bid, ask = bridge.get_tick_price("XAUUSD")
             with _CACHE_LOCK:
                 _DATA_CACHE["tick"] = {"bid": bid, "ask": ask, "time": time.time()}
+                _TICK_COUNTER += 1
         except Exception:
             pass
