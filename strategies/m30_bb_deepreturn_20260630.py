@@ -274,7 +274,7 @@ class BBDeepReturnStrategy(BaseStrategy):
 
     # ─────────────── Entry tracking (引擎调用) ───────────────
 
-    def mark_extreme_entry(self, ticket: int):
+    def mark_extreme_entry(self, ticket: int | str):
         """引擎开仓后调用，记录极值入场时的指标快照"""
         sig = getattr(self, '_last_signal', None) or {}
         iv = sig.get('indicator_values', {})

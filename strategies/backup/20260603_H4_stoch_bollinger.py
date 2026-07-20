@@ -30,7 +30,7 @@ class StochBollingerStrategy(BaseStrategy):
         self._load_settings()
         self._prev_k: Optional[float] = None
         self._prev_d: Optional[float] = None
-        self._in_extreme_entry: set[int] = set()  # 从极端区入场的 ticket 集合
+        self._in_extreme_entry: set[int | str] = set()  # 从极端区入场的 ticket 集合
         self._mark_next: int = 0  # 待标记为极端区入场的开仓计数（支持双单）
 
     def _load_settings(self):

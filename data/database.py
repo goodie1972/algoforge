@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS ohlcv (
 CREATE INDEX IF NOT EXISTS idx_ohlcv_tf_ts ON ohlcv(timeframe, timestamp);
 
 CREATE TABLE IF NOT EXISTS trades (
-    ticket INTEGER PRIMARY KEY,
+    ticket TEXT PRIMARY KEY,
     symbol TEXT NOT NULL DEFAULT 'XAUUSD',
     order_type TEXT NOT NULL,
     volume REAL NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS signals (
     indicator_values TEXT DEFAULT '',
     confidence REAL,
     price_entry REAL,
-    ticket INTEGER,
+    ticket TEXT,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_signals_strategy_ts ON signals(strategy, timestamp);
@@ -222,10 +222,49 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _migrate_ticket_to_text(conn):
+    """检测旧 INTEGER ticket 表 → 重命名，让 SCHEMA 创建新 TEXT 表"""
+    info = {r[1]: r[2].upper() for r in conn.execute("PRAGMA table_info(trades)").fetchall()}
+    if 'TICKET' in info and info['TICKET'] in ('INTEGER', 'INT', 'BIGINT'):
+        conn.execute("ALTER TABLE trades RENAME TO trades_old_int")
+        logger.info("[DB] trades.ticket INTEGER→TEXT 迁移：旧表已重命名")
+    info2 = {r[1]: r[2].upper() for r in conn.execute("PRAGMA table_info(signals)").fetchall()}
+    if 'TICKET' in info2 and info2['TICKET'] in ('INTEGER', 'INT', 'BIGINT'):
+        conn.execute("ALTER TABLE signals RENAME TO signals_old_int")
+        logger.info("[DB] signals.ticket INTEGER→TEXT 迁移：旧表已重命名")
+
+
+def _restore_old_ticket_data(conn):
+    """从旧表恢复数据到新 TEXT 表"""
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if 'trades_old_int' in tables:
+        conn.execute("""INSERT INTO trades (ticket, symbol, order_type, volume, entry_price, exit_price,
+            pnl, stop_loss, take_profit, swap, commission, magic, strategy,
+            open_time, close_time, hold_seconds, exit_reason, indicator_snapshot, created_at)
+            SELECT CAST(ticket AS TEXT), symbol, order_type, volume, entry_price, exit_price,
+            pnl, stop_loss, take_profit, swap, commission, magic, strategy,
+            open_time, close_time, hold_seconds, exit_reason, indicator_snapshot, created_at
+            FROM trades_old_int""")
+        conn.execute("DROP TABLE trades_old_int")
+        logger.info("[DB] trades 旧数据恢复完成")
+    if 'signals_old_int' in tables:
+        conn.execute("""INSERT INTO signals (id, strategy, magic, timeframe, timestamp, signal,
+            score_long, score_short, threshold, factors_long, factors_short,
+            indicator_values, confidence, price_entry, ticket, created_at)
+            SELECT id, strategy, magic, timeframe, timestamp, signal,
+            score_long, score_short, threshold, factors_long, factors_short,
+            indicator_values, confidence, price_entry, CAST(ticket AS TEXT), created_at
+            FROM signals_old_int""")
+        conn.execute("DROP TABLE signals_old_int")
+        logger.info("[DB] signals 旧数据恢复完成")
+
+
 def init_db():
     conn = get_conn()
     try:
-        conn.executescript(SCHEMA)
+        _migrate_ticket_to_text(conn)           # ① 旧表重命名
+        conn.executescript(SCHEMA)               # ② 创建新 TEXT 表
+        _restore_old_ticket_data(conn)           # ③ 恢复旧数据
         conn.commit()
         # 统计表数
         tables = conn.execute(
@@ -257,9 +296,9 @@ def migrate_signals_lifecycle():
             if col not in existing:
                 conn.execute(f"ALTER TABLE signals ADD COLUMN {col} {dtype}")
         # 回填旧信号：空status + 无ticket → voided
-        conn.execute("UPDATE signals SET status='voided', void_reason='历史记录' WHERE (status IS NULL OR status = '') AND (ticket IS NULL OR ticket = 0)")
+        conn.execute("UPDATE signals SET status='voided', void_reason='历史记录' WHERE (status IS NULL OR status = '') AND (ticket IS NULL OR ticket = '' OR ticket = '0')")
         # 回填旧信号：空status + 有ticket → opened
-        conn.execute("UPDATE signals SET status='opened' WHERE (status IS NULL OR status = '') AND ticket > 0")
+        conn.execute("UPDATE signals SET status='opened' WHERE (status IS NULL OR status = '') AND ticket IS NOT NULL AND ticket != '' AND ticket != '0'")
         conn.commit()
     finally:
         conn.close()
@@ -354,7 +393,7 @@ def update_signal_status(signal_id: int, updates: dict) -> bool:
         conn.close()
 
 
-def get_signal_by_ticket(ticket: int) -> Optional[dict]:
+def get_signal_by_ticket(ticket: int | str) -> Optional[dict]:
     conn = get_conn()
     try:
         row = conn.execute("SELECT * FROM signals WHERE ticket=?", (ticket,)).fetchone()
@@ -1168,7 +1207,7 @@ def migrate_from_jsonl() -> int:
 
     # 已导入的 ticket
     conn = get_conn()
-    existing: set[int] = set()
+    existing: set[int | str] = set()
     try:
         rows = conn.execute("SELECT ticket FROM trades").fetchall()
         existing = {r["ticket"] for r in rows}
