@@ -290,7 +290,7 @@ class FreeMT4Bridge(MT4BridgeBase):
 
     def open_order(self, symbol: str, order_type: OrderType, volume: float,
                    price: float = 0, sl: float = 0, tp: float = 0,
-                   comment: str = "", magic: int = 0) -> Optional[int]:
+                   comment: str = "", magic: int = 0) -> int | None:
         if magic == 0:
             magic = MAGIC_NUMBER
         # 防御: None → 0，防止 f-string 格式化为 "None" 导致 EA 无法解析
@@ -313,7 +313,7 @@ class FreeMT4Bridge(MT4BridgeBase):
             logger.error(f"[FreeMT4] 开仓响应解析失败: {data}")
             return None
 
-    def close_order(self, ticket: int, volume: float = 0) -> bool:
+    def close_order(self, ticket: int | str, volume: float = 0) -> bool:
         if volume > 0:
             cmd = f"F072#2#{ticket}#{volume}#"
         else:
@@ -326,7 +326,7 @@ class FreeMT4Bridge(MT4BridgeBase):
         logger.error(f"[FreeMT4] 平仓失败: Ticket={ticket}")
         return False
 
-    def modify_order(self, ticket: int, sl: float = 0, tp: float = 0) -> bool:
+    def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
         data = self._send_cmd(f"F075#3#{ticket}#{sl}#{tp}#")
         if data:
             logger.info(f"[FreeMT4] 修改成功: Ticket={ticket} SL={sl} TP={tp}")

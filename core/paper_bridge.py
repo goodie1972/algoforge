@@ -16,9 +16,9 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from core.bridge import MT4BridgeBase, AccountInfo, Position, Candle, OrderType
+from config.settings import LOCAL_TZ
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +38,16 @@ class PaperBridge(MT4BridgeBase):
     """纸面交易桥接器 — 数据委托 + 交易模拟"""
 
     LOT_SCALE = 100  # 0.01 手 → 1 盎司
+    _SEQ_CHARS = '0123456789abcdefghijklmnopqrstuvwxyz'  # 36 进制
+    _MONTH_CHARS = '123456789abc'  # 1月→1, 10月→a, 11月→b, 12月→c
 
     def __init__(self, real_bridge: MT4BridgeBase):
-        self._real = real_bridge                 # 真实桥接（只用于数据）
-        self._positions: dict[int, Position] = {}   # ticket → 模拟持仓
-        self._closed: list[dict] = []               # 已平仓记录
-        self._next_ticket: int = self._load_max_ticket()
+        self._real = real_bridge                     # 真实桥接（只用于数据）
+        self._positions: dict[int | str, Position] = {}  # ticket → 模拟持仓
+        self._closed: list[dict] = []                    # 已平仓记录
+        self._ticket_seq_next: int = 0                   # 当前分钟内的 seq
+        self._ticket_minute_key: str = ""                # 当前 YYMHHMM
+        self._init_ticket_seq()
         self._balance: float = 0.0
         self._start_balance: float = 0.0
         self._connected: bool = False
@@ -51,32 +55,71 @@ class PaperBridge(MT4BridgeBase):
         self._tick_time: float = 0
         self._equity: float = 0.0
 
-    @staticmethod
-    def _load_max_ticket() -> int:
-        """从 CSV 文件和 DB 加载最大 ticket 号，确保重启后不重复"""
-        max_ticket = 90000000
-        # 从 CSV 读取
+    def _init_ticket_seq(self):
+        """扫描已有 ticket，初始化当前分钟的 seq 计数器"""
+        from datetime import datetime, timezone
+        now = datetime.now(tz=LOCAL_TZ)
+        yy = str(now.year)[-2:]
+        m_char = self._MONTH_CHARS[now.month - 1]
+        hh = f"{now.hour:02d}"
+        mm = f"{now.minute:02d}"
+        self._ticket_minute_key = f"{yy}{m_char}{hh}{mm}"
+        max_seq = -1
+
+        # 从 CSV 扫描当前分钟
         if CSV_TRADES.exists():
             try:
                 with open(str(CSV_TRADES), 'r') as f:
                     for line in f:
                         if line.strip():
                             tid = line.split(',')[0].strip()
-                            if tid.isdigit():
-                                max_ticket = max(max_ticket, int(tid))
+                            if len(tid) == 8 and tid[:6] == self._ticket_minute_key:
+                                val = self._SEQ_CHARS.find(tid[7])
+                                if val > max_seq:
+                                    max_seq = val
             except Exception:
                 pass
-        # 从 DB 读取
+        # 从 DB 扫描当前分钟
         try:
             from data.database import get_conn
             conn = get_conn()
-            rows = conn.execute("SELECT MAX(ticket) FROM trades").fetchone()
+            rows = conn.execute(
+                "SELECT ticket FROM trades WHERE ticket LIKE ?",
+                (self._ticket_minute_key + '%',)
+            ).fetchall()
             conn.close()
-            if rows and rows[0]:
-                max_ticket = max(max_ticket, int(rows[0]))
+            for row in rows:
+                tid = str(row[0])
+                if len(tid) == 8 and tid[:6] == self._ticket_minute_key:
+                    val = self._SEQ_CHARS.find(tid[7])
+                    if val > max_seq:
+                        max_seq = val
         except Exception:
             pass
-        return max_ticket + 1
+
+        self._ticket_seq_next = max_seq + 1
+
+    def _generate_ticket(self) -> str:
+        """生成 8 位时间型票号: YYMHHMMSEQ (26a14300)"""
+        from datetime import datetime
+        now = datetime.now(tz=LOCAL_TZ)
+        yy = str(now.year)[-2:]
+        m_char = self._MONTH_CHARS[now.month - 1]
+        hh = f"{now.hour:02d}"
+        mm = f"{now.minute:02d}"
+        key = f"{yy}{m_char}{hh}{mm}"
+
+        # 分钟变了 → 重置 seq
+        if key != self._ticket_minute_key:
+            self._ticket_minute_key = key
+            self._ticket_seq_next = 0
+
+        seq = self._ticket_seq_next
+        if seq > 35:
+            seq = 0  # wrap，实际几乎不可能
+        self._ticket_seq_next = seq + 1
+
+        return f"{key}{self._SEQ_CHARS[seq]}"
 
     # ═══════════════ 连接管理 ═══════════════
 
@@ -182,7 +225,7 @@ class PaperBridge(MT4BridgeBase):
 
     def open_order(self, symbol: str, order_type: OrderType, volume: float,
                    price: float = 0, sl: float = 0, tp: float = 0,
-                   comment: str = "", magic: int = 0) -> Optional[int]:
+                   comment: str = "", magic: int = 0) -> str | None:
         """用当前价格模拟开仓"""
         bid, ask = self.get_tick_price(symbol)
         open_price = ask if order_type == OrderType.BUY else bid
@@ -192,8 +235,7 @@ class PaperBridge(MT4BridgeBase):
             logger.error(f"[PaperBridge] 无法开仓：无行情数据")
             return None
 
-        ticket = self._next_ticket
-        self._next_ticket += 1
+        ticket = self._generate_ticket()
 
         self._positions[ticket] = Position(
             ticket=ticket,
@@ -239,7 +281,7 @@ class PaperBridge(MT4BridgeBase):
         })
         return ticket
 
-    def close_order(self, ticket: int, volume: float = 0) -> bool:
+    def close_order(self, ticket: int | str, volume: float = 0) -> bool:
         """用当前价格模拟平仓"""
         if ticket not in self._positions:
             logger.warning(f"[PaperBridge] 平仓失败：Ticket={ticket} 不存在")
@@ -307,7 +349,7 @@ class PaperBridge(MT4BridgeBase):
         })
         return True
 
-    def modify_order(self, ticket: int, sl: float = 0, tp: float = 0) -> bool:
+    def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
         """本地更新 SL/TP"""
         if ticket in self._positions:
             self._positions[ticket].stop_loss = sl

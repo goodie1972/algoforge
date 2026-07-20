@@ -126,9 +126,9 @@ class TradingEngine:
         self._last_recover_time = 0.0   # 上次成交恢复时间
         self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
         self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
-        self._entry_times: dict[int, float] = {}           # ticket → 开仓时间戳
+        self._entry_times: dict[int | str, float] = {}     # ticket → 开仓时间戳
         self._shutdown_requested = False                   # 优雅关闭标记
-        self._entry_signal_data: dict[int, dict] = {}      # ticket → 开仓时信号数据
+        self._entry_signal_data: dict[int | str, dict] = {}  # ticket → 开仓时信号数据
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
         self._closed_trades: list[dict] = []               # 已平仓记录（内存）
@@ -536,7 +536,7 @@ class TradingEngine:
             my_pos = [p for p in all_positions if p.magic in magics]
             state.floating_pnl = sum(p.profit for p in my_pos)
 
-    def _record_close(self, ticket: int, pnl: float, magic: int, direction: str = ""):
+    def _record_close(self, ticket: int | str, pnl: float, magic: int, direction: str = ""):
         """记录平仓：更新已实现盈亏 + 快速出场检测（legacy magic 自动映射到主策略）"""
         # 如果 magic 是某个策略的 legacy，映射到主 magic
         for s in self.strategies:
@@ -1554,7 +1554,7 @@ class TradingEngine:
 
             # 更新信号状态
             if signal_id > 0:
-                if ticket > 0:
+                if ticket:  # ticket 可能是 str 或 int，非空/非0 即为成功
                     db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
                 else:
                     db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})

@@ -149,15 +149,15 @@ class MetaApiBridge(MT4BridgeBase):
 
     def open_order(self, symbol: str, order_type: OrderType, volume: float,
                    price: float = 0, sl: float = 0, tp: float = 0,
-                   comment: str = "", magic: int = 0) -> Optional[int]:
+                   comment: str = "", magic: int = 0) -> int | str | None:
         # MetaApi 下单实现略，需根据 MetaApi SDK 文档适配
         logger.warning("[MetaApi] open_order 需根据 MetaApi SDK 文档适配")
         return None
 
-    def close_order(self, ticket: int, volume: float = 0) -> bool:
+    def close_order(self, ticket: int | str, volume: float = 0) -> bool:
         logger.warning("[MetaApi] close_order 需根据 MetaApi SDK 文档适配")
         return False
 
-    def modify_order(self, ticket: int, sl: float = 0, tp: float = 0) -> bool:
+    def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
         logger.warning("[MetaApi] modify_order 需根据 MetaApi SDK 文档适配")
         return False

@@ -40,15 +40,15 @@ def main():
         writer.writeheader()
         f.flush()
 
-    seen_ids = set()
+    seen_ids: set[int | str] = set()
     # 加载已有记录
     if exists:
         with open(CSV_PATH, "r", encoding="utf-8") as rf:
             reader = csv.DictReader(rf)
             for row in reader:
                 tid = row.get("ticket", "")
-                if tid and tid.isdigit():
-                    seen_ids.add(int(tid))
+                if tid:
+                    seen_ids.add(int(tid) if tid.isdigit() else tid)
 
     print(f"信号记录器启动，已记录 {len(seen_ids)} 个ticket")
     price = fetch_price()

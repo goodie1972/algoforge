@@ -26,7 +26,7 @@ class OrderType(Enum):
 @dataclass
 class Position:
     """持仓信息"""
-    ticket: int
+    ticket: int | str
     symbol: str
     order_type: str  # OP_BUY / OP_SELL
     volume: float
@@ -104,17 +104,17 @@ class MT4BridgeBase(abc.ABC):
     @abc.abstractmethod
     def open_order(self, symbol: str, order_type: OrderType, volume: float,
                    price: float = 0, sl: float = 0, tp: float = 0,
-                   comment: str = "", magic: int = 0) -> Optional[int]:
+                   comment: str = "", magic: int = 0) -> int | str | None:
         """下单，返回 ticket"""
         ...
 
     @abc.abstractmethod
-    def close_order(self, ticket: int, volume: float = 0) -> bool:
+    def close_order(self, ticket: int | str, volume: float = 0) -> bool:
         """平仓"""
         ...
 
     @abc.abstractmethod
-    def modify_order(self, ticket: int, sl: float = 0, tp: float = 0) -> bool:
+    def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
         """修改止损止盈"""
         ...
 
