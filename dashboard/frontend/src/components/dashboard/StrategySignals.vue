@@ -181,6 +181,13 @@ interface StratLogic {
 
 const strategyLogics = ref<Record<string, StratLogic>>({})
 
+function renderLogic(l: any): string {
+  if (typeof l === 'string') return l
+  if (l.name != null) return `${l.score} ${l.name} — ${l.detail}`
+  if (l.method != null) return `${l.method} — ${l.normal}`
+  return String(l)
+}
+
 async function fetchLogics() {
   try {
     const res = await fetch('/api/strategies/logics')
@@ -355,20 +362,20 @@ onUnmounted(() => {
                 <div style="font-weight:700; color:#f6465d; font-size:12px; margin-bottom:4px;">▼ 做空</div>
                 <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.short.entry" :key="'se'+li"
-                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ l }}</div>
+                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ renderLogic(l) }}</div>
                 <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.short.exit" :key="'sx'+li"
-                  style="font-size:10px; color:#999; padding:1px 0;">{{ l }}</div>
+                  style="font-size:10px; color:#999; padding:1px 0;">{{ renderLogic(l) }}</div>
               </div>
               <!-- 做多 -->
               <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #0ecb81;">
                 <div style="font-weight:700; color:#0ecb81; font-size:12px; margin-bottom:4px;">▲ 做多</div>
                 <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.long.entry" :key="'le'+li"
-                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ l }}</div>
+                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ renderLogic(l) }}</div>
                 <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.long.exit" :key="'lx'+li"
-                  style="font-size:10px; color:#999; padding:1px 0;">{{ l }}</div>
+                  style="font-size:10px; color:#999; padding:1px 0;">{{ renderLogic(l) }}</div>
               </div>
             </div>
           </template>
