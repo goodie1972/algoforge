@@ -38,15 +38,13 @@ class PaperBridge(MT4BridgeBase):
     """纸面交易桥接器 — 数据委托 + 交易模拟"""
 
     LOT_SCALE = 100  # 0.01 手 → 1 盎司
-    _SEQ_CHARS = '0123456789abcdefghijklmnopqrstuvwxyz'  # 36 进制
-    _MONTH_CHARS = '123456789abc'  # 1月→1, 10月→a, 11月→b, 12月→c
 
     def __init__(self, real_bridge: MT4BridgeBase):
         self._real = real_bridge                     # 真实桥接（只用于数据）
         self._positions: dict[int | str, Position] = {}  # ticket → 模拟持仓
         self._closed: list[dict] = []                    # 已平仓记录
-        self._ticket_seq_next: int = 0                   # 当前分钟内的 seq
-        self._ticket_minute_key: str = ""                # 当前 YYMHHMM
+        self._ticket_seq_next: int = 0                   # 当天 seq
+        self._ticket_day_key: str = ""                   # 当前 YYMMDD
         self._init_ticket_seq()
         self._balance: float = 0.0
         self._start_balance: float = 0.0
@@ -56,70 +54,74 @@ class PaperBridge(MT4BridgeBase):
         self._equity: float = 0.0
 
     def _init_ticket_seq(self):
-        """扫描已有 ticket，初始化当前分钟的 seq 计数器"""
-        from datetime import datetime, timezone
+        """扫描已有 ticket，初始化当天的 seq 计数器"""
+        from datetime import datetime
         now = datetime.now(tz=LOCAL_TZ)
         yy = str(now.year)[-2:]
-        m_char = self._MONTH_CHARS[now.month - 1]
-        hh = f"{now.hour:02d}"
-        mm = f"{now.minute:02d}"
-        self._ticket_minute_key = f"{yy}{m_char}{hh}{mm}"
+        mm = f"{now.month:02d}"
+        dd = f"{now.day:02d}"
+        self._ticket_day_key = f"{yy}{mm}{dd}"
         max_seq = -1
 
-        # 从 CSV 扫描当前分钟
+        # 从 CSV 扫描当天
         if CSV_TRADES.exists():
             try:
                 with open(str(CSV_TRADES), 'r') as f:
                     for line in f:
                         if line.strip():
                             tid = line.split(',')[0].strip()
-                            if len(tid) == 8 and tid[:6] == self._ticket_minute_key:
-                                val = self._SEQ_CHARS.find(tid[7])
-                                if val > max_seq:
-                                    max_seq = val
+                            if len(tid) == 8 and tid[:6] == self._ticket_day_key:
+                                try:
+                                    s = int(tid[6:8])
+                                    if s > max_seq:
+                                        max_seq = s
+                                except ValueError:
+                                    pass
             except Exception:
                 pass
-        # 从 DB 扫描当前分钟
+        # 从 DB 扫描当天
         try:
             from data.database import get_conn
             conn = get_conn()
             rows = conn.execute(
                 "SELECT ticket FROM trades WHERE ticket LIKE ?",
-                (self._ticket_minute_key + '%',)
+                (self._ticket_day_key + '%',)
             ).fetchall()
             conn.close()
             for row in rows:
                 tid = str(row[0])
-                if len(tid) == 8 and tid[:6] == self._ticket_minute_key:
-                    val = self._SEQ_CHARS.find(tid[7])
-                    if val > max_seq:
-                        max_seq = val
+                if len(tid) == 8 and tid[:6] == self._ticket_day_key:
+                    try:
+                        s = int(tid[6:8])
+                        if s > max_seq:
+                            max_seq = s
+                    except ValueError:
+                        pass
         except Exception:
             pass
 
         self._ticket_seq_next = max_seq + 1
 
     def _generate_ticket(self) -> str:
-        """生成 8 位时间型票号: YYMHHMMSEQ (26a14300)"""
+        """生成 8 位纯数字票号: YYMMDDSEQ (26072000)，每天重置"""
         from datetime import datetime
         now = datetime.now(tz=LOCAL_TZ)
         yy = str(now.year)[-2:]
-        m_char = self._MONTH_CHARS[now.month - 1]
-        hh = f"{now.hour:02d}"
-        mm = f"{now.minute:02d}"
-        key = f"{yy}{m_char}{hh}{mm}"
+        mm = f"{now.month:02d}"
+        dd = f"{now.day:02d}"
+        key = f"{yy}{mm}{dd}"
 
-        # 分钟变了 → 重置 seq
-        if key != self._ticket_minute_key:
-            self._ticket_minute_key = key
+        # 天变了 → 重置 seq
+        if key != self._ticket_day_key:
+            self._ticket_day_key = key
             self._ticket_seq_next = 0
 
         seq = self._ticket_seq_next
-        if seq > 35:
-            seq = 0  # wrap，实际几乎不可能
+        if seq > 99:
+            seq = 0  # wrap，一天 100 张几乎不可能
         self._ticket_seq_next = seq + 1
 
-        return f"{key}{self._SEQ_CHARS[seq]}"
+        return f"{key}{seq:02d}"
 
     # ═══════════════ 连接管理 ═══════════════
 

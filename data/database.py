@@ -224,11 +224,11 @@ def get_conn() -> sqlite3.Connection:
 
 def _migrate_ticket_to_text(conn):
     """检测旧 INTEGER ticket 表 → 重命名，让 SCHEMA 创建新 TEXT 表"""
-    info = {r[1]: r[2].upper() for r in conn.execute("PRAGMA table_info(trades)").fetchall()}
+    info = {r[1].upper(): r[2].upper() for r in conn.execute("PRAGMA table_info(trades)").fetchall()}
     if 'TICKET' in info and info['TICKET'] in ('INTEGER', 'INT', 'BIGINT'):
         conn.execute("ALTER TABLE trades RENAME TO trades_old_int")
         logger.info("[DB] trades.ticket INTEGER→TEXT 迁移：旧表已重命名")
-    info2 = {r[1]: r[2].upper() for r in conn.execute("PRAGMA table_info(signals)").fetchall()}
+    info2 = {r[1].upper(): r[2].upper() for r in conn.execute("PRAGMA table_info(signals)").fetchall()}
     if 'TICKET' in info2 and info2['TICKET'] in ('INTEGER', 'INT', 'BIGINT'):
         conn.execute("ALTER TABLE signals RENAME TO signals_old_int")
         logger.info("[DB] signals.ticket INTEGER→TEXT 迁移：旧表已重命名")
