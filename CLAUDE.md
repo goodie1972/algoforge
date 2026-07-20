@@ -68,6 +68,43 @@ dt_local(ts)
 - 末行：`数据源: 全部指标从 DataFactory TA-Lib 读取`
 - 新增策略必须包含 `STRATEGY_VERSION`、`STRATEGY_MAGIC`、`STRATEGY_CHANGELOG`
 
+**策略说明书标准（系统展示用）：**
+- 每次新建/修改策略，必须同步更新 `docs/strategies/{策略文件名}.md`
+- 文件格式为 YAML frontmatter + Markdown 正文，结构如下：
+  ```markdown
+  ---
+  name: 策略类名 (name 属性)
+  magic: STRATEGY_MAGIC
+  version: STRATEGY_VERSION
+  display: 策略显示名
+  desc: 一句话描述（系统 UI 展示用）
+  ---
+  
+  ## 评分因子
+  
+  ### BUY（做多）
+  | # | 因子 | 得分 | 说明 |
+  |:-:|:----|:----:|:----|
+  | 1 | ... | +1 | ... |
+  | 2 | ... | +2 | ... |
+  
+  ### SELL（做空）
+  | # | 因子 | 得分 | 说明 |
+  |:-:|:----|:----:|:----|
+  
+  ## 出场逻辑
+  
+  | # | 条件 | 说明 |
+  |:-:|:----|:----|
+  | ① | ... | ... |
+  
+  ## 特别规则
+  
+  - ...
+  - 数据源: 全部指标从 DataFactory TA-Lib 读取
+  ```
+- 系统 API `GET /api/strategies/{name}/logic` 从此文件读取并返回结构化 JSON 给前端展示
+
 ## 策略注册流程
 
 1. 创建策略文件到 `strategies/` 目录

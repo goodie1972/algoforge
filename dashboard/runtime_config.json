@@ -33,10 +33,10 @@
   "max_positions": 7,
   "strategy_pool": {
     "bakome_backup": {
-      "enabled": false,
+      "enabled": true,
       "magic": 777004,
       "timeframe": "H1",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "bakome_backup_optimized": {

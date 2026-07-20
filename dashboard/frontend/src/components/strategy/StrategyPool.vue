@@ -54,295 +54,20 @@ interface StratLogic {
   short: { entry: EntryFactor[]; exit: ExitRow[] }
 }
 
-const strategyLogics: Record<string, StratLogic> = {
-  m30_rsi_v7: {
-    desc: 'M30 RSI+布林带 v11 (5因子评分≥3, DI强度因子⑤, ADX>28趋势门禁EMA9/21, DI止盈判定)',
-    exitWiden: true,
-    exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列。DI止盈判定：移动止盈触发时+DI- -DI>10(BUY)/-DI-+DI>10(SELL)则趋势强，忽略止盈',
-    long: {
-      entry: [
-        { name: 'MA14趋势', score: '+1', detail: 'MA14上升' },
-        { name: 'BB触轨', score: '+1', detail: '触碰BB下轨' },
-        { name: 'RSI超卖', score: '+1', detail: 'RSI < 30' },
-        { name: 'RSI方向', score: '+1', detail: 'RSI连续3根上升' },
-        { name: 'DI强度', score: '±1', detail: '|+DI- -DI|>10 给强度分(新⑤)' },
-        { name: '总分门槛', score: '', detail: '阈值≥3入场' },
-        { name: 'ADX门禁', score: '', detail: 'ADX>28时EMA9<EMA21禁多' },
-        { name: '位置门禁', score: '', detail: '60根K线区间顶部10%禁多' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%(可配置)', widen: '同左' },
-        { method: 'DI止盈判定', normal: 'DI差值>10忽略止盈', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: 'MA14趋势', score: '+1', detail: 'MA14下降' },
-        { name: 'BB触轨', score: '+1', detail: '触碰BB上轨' },
-        { name: 'RSI超买', score: '+1', detail: 'RSI > 65' },
-        { name: 'RSI方向', score: '+1', detail: 'RSI连续3根下降' },
-        { name: 'DI强度', score: '±1', detail: '|+DI- -DI|>10 给强度分(新⑤)' },
-        { name: '总分门槛', score: '', detail: '阈值≥3入场' },
-        { name: 'ADX门禁', score: '', detail: 'ADX>28时EMA9>EMA21禁空' },
-        { name: '位置门禁', score: '', detail: '60根K线区间底部10%禁空' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%(可配置)', widen: '同左' },
-        { method: 'DI止盈判定', normal: 'DI差值>10忽略止盈', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
-      ],
-    },
-  },
-  m30_stoch_T6V1: {
-    desc: 'M30 Stoch 均值回归 (ADX<30+BB宽≤1.0纯震荡, v11 A5)',
-    long: {
-      entry: [
-        { name: '震荡条件', score: '+1', detail: 'ADX<30 且 BB宽度≤1.0' },
-        { name: 'K值位置', score: '+1', detail: 'K < 20 (超卖区)' },
-        { name: '金叉确认', score: '+1', detail: 'K线上穿D线' },
-        { name: '价格位置', score: '+1', detail: 'close < EMA21' },
-        { name: '总分门槛', score: '', detail: '4条件全满足+无冲突入场' },
-      ],
-      exit: [
-        { method: 'Stoch反向交叉', normal: 'close≥EMA21出场' },
-        { method: 'misalign检测', normal: 'BB中轨方向≠K方向时提前出' },
-        { method: 'ATR硬止损', normal: '1.0×ATR' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: '震荡条件', score: '+1', detail: 'ADX<30 且 BB宽度≤1.0' },
-        { name: 'K值位置', score: '+1', detail: 'K > 80 (超买区)' },
-        { name: '死叉确认', score: '+1', detail: 'K线下穿D线' },
-        { name: '价格位置', score: '+1', detail: 'close > EMA21' },
-        { name: '总分门槛', score: '', detail: '4条件全满足+无冲突入场' },
-      ],
-      exit: [
-        { method: 'Stoch反向交叉', normal: 'close≤EMA21出场' },
-        { method: 'misalign检测', normal: '提前出场' },
-        { method: 'ATR硬止损', normal: '1.0×ATR' },
-      ],
-    },
-  },
-  m30_stoch_T6V8: {
-    desc: 'M30 Stoch v3 震荡+趋势双模 (ADX<28窄幅/宽幅震荡, ≥28趋势顺势; 利润回撤止盈)',
-    long: {
-      entry: [
-        { name: '窄幅震荡', score: '', detail: 'ADX<28+BB≤2%: K<20+金叉+close<EMA21' },
-        { name: '宽幅震荡', score: '', detail: 'ADX<28+BB>2%: low≤BB下轨+K<15+DI金叉' },
-        { name: '趋势模式', score: '', detail: 'ADX≥28: +DI->DI-+10+close>EMA21+金叉' },
-        { name: 'ADX判定', score: '', detail: 'ADX<28→震荡, ≥28→趋势顺势' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%止盈(可配置)' },
-        { method: '震荡出场', normal: 'Stoch反向交叉出场 / misalign提前出' },
-        { method: '趋势出场', normal: '峰谷回撤2.0ATR止盈 / 固定TP 4.0ATR' },
-        { method: '趋势衰减', normal: 'ADX<20衰减出场 / DI方向反转出' },
-        { method: '硬止损', normal: '震荡1.0×ATR / 趋势2.0×ATR' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: '窄幅震荡', score: '', detail: 'ADX<28+BB≤2%: K>80+死叉+close>EMA21' },
-        { name: '宽幅震荡', score: '', detail: 'ADX<28+BB>2%: high≥BB上轨+K>85+DI死叉' },
-        { name: '趋势模式', score: '', detail: 'ADX≥28: -DI->+DI+10+close<EMA21+死叉' },
-        { name: 'ADX判定', score: '', detail: 'ADX<28→震荡, ≥28→趋势顺势' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%止盈(可配置)' },
-        { method: '震荡出场', normal: 'Stoch反向交叉出场 / misalign提前出' },
-        { method: '趋势出场', normal: '峰谷回撤2.0ATR止盈 / 固定TP 4.0ATR' },
-        { method: '趋势衰减', normal: 'ADX<20衰减出场 / DI方向反转出' },
-        { method: '硬止损', normal: '震荡1.0×ATR / 趋势2.0×ATR' },
-      ],
-    },
-  },
-  rsi_grading_m30: {
-    desc: 'M30 RSI分级评分 v5 (5因子评分≥2, ADX>28趋势门禁EMA9/21, 趋势感知出场顺2.0逆1.0, 利润回撤止盈)',
-    exitWiden: true,
-    exitNote: '出场趋势感知：顺趋势(同向)用加宽列，逆趋势(反向)用正常列',
-    long: {
-      entry: [
-        { name: 'RSI深度超卖', score: '+2', detail: 'RSI < 20' },
-        { name: 'RSI轻度超卖', score: '+1', detail: 'RSI 20~30' },
-        { name: 'MA14趋势', score: '+1', detail: 'MA14上升' },
-        { name: 'BB触轨', score: '+1', detail: '触碰BB下轨' },
-        { name: '趋势增强(⑤)', score: '+1~+2', detail: 'ADX>28时: EMA9/21定方向+DI差值定强度' },
-        { name: '总分门槛', score: '', detail: '阈值≥2入场' },
-        { name: 'ADX门禁', score: '', detail: 'ADX>28时禁反向(EMA9/21)' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%(可配置)', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR(逆势)', widen: '2.0×ATR(顺势)' },
-        { method: 'ATR硬止损(hard)', normal: '1.0×ATR(逆势)', widen: '2.0×ATR(顺势)' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: 'RSI深度超买', score: '+2', detail: 'RSI > 70' },
-        { name: 'RSI轻度超买', score: '+1', detail: 'RSI 65~70' },
-        { name: 'MA14趋势', score: '+1', detail: 'MA14下降' },
-        { name: 'BB触轨', score: '+1', detail: '触碰BB上轨' },
-        { name: '趋势增强(⑤)', score: '+1~+2', detail: 'ADX>28时: EMA9/21定方向+DI差值定强度' },
-        { name: '总分门槛', score: '', detail: '阈值≥2入场' },
-        { name: 'ADX门禁', score: '', detail: 'ADX>28时禁反向(EMA9/21)' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%(可配置)', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR(逆势)', widen: '2.0×ATR(顺势)' },
-        { method: 'ATR硬止损(hard)', normal: '1.0×ATR(逆势)', widen: '2.0×ATR(顺势)' },
-      ],
-    },
-  },
-  h1_v6_hybrid_v6: {
-    desc: '[已下架] H1 8因子评分 V6 混合 (602笔亏$166, 4个超卖因子全亏)',
-    exitWiden: true,
-    exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列',
-    long: {
-      entry: [
-        { name: 'SMA200趋势', score: '+1', detail: 'close > SMA200 (趋势评分+)' },
-        { name: 'KDJ超卖', score: '+1', detail: 'Stoch K < 30' },
-        { name: 'BB位置', score: '+1', detail: '触碰BB下轨' },
-        { name: 'KC位置', score: '+1', detail: '触碰Keltner下轨' },
-        { name: 'M30方向', score: '+1', detail: 'M30 K线上升 (小周期共振)' },
-        { name: 'MACD底背离', score: '+1', detail: '价格新低+MACD柱升高' },
-        { name: 'RSI偏低', score: '+1', detail: 'RSI < 30' },
-        { name: '低波动', score: '+1', detail: 'ATR < 均值 (波动收缩)' },
-        { name: '总分门槛', score: '', detail: '8因子≥3入场, 逆势≥5' },
-        { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
-        { name: '急跌惩罚', score: '', detail: '急跌>1.5%暂停做多' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: 'SMA200趋势', score: '+1', detail: 'close < SMA200 (趋势评分-)' },
-        { name: 'KDJ超买', score: '+1', detail: 'Stoch K > 65' },
-        { name: 'BB位置', score: '+1', detail: '触碰BB上轨' },
-        { name: 'KC位置', score: '+1', detail: '触碰Keltner上轨' },
-        { name: 'M30方向', score: '+1', detail: 'M30 K线下降' },
-        { name: 'MACD顶背离', score: '+1', detail: '价格新高+MACD柱降低' },
-        { name: 'RSI偏高', score: '+1', detail: 'RSI > 65' },
-        { name: 'M30趋势门禁', score: '', detail: 'M30上升+close>SMA200时空单阈值3→4' },
-        { name: '总分门槛', score: '', detail: '8因子≥3入场, 逆势≥4' },
-        { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
-        { name: '急涨惩罚', score: '', detail: '急涨>1.5%暂停做空' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤止盈(可配置)', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '1.5×ATR' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '3.0×ATR' },
-      ],
-    },
-  },
-  sanqing_h1_v6: {
-    desc: 'H1 EMA9/21 + ATR14 6因子评分 v7 (ADX>25阈值4/ADX≤25阈值5, 纯顺趋势, 自适应回撤止盈, 位置门禁)',
-    exitWiden: true,
-    exitNote: '趋势感知：同向(顺势)用加宽列，逆向(逆势)用正常列。自适应回撤：峰值<1ATR→50%, 1~2ATR→40%, ≥2ATR→25%',
-    long: {
-      entry: [
-        { name: 'EMA趋势', score: '+2', detail: 'EMA9 > EMA21 (上升趋势)' },
-        { name: 'EMA金叉', score: '+1', detail: 'EMA9上穿EMA21' },
-        { name: '触碰EMA9反弹', score: '+2', detail: 'low≤EMA9×1.002 且 close>EMA9' },
-        { name: '实体幅度', score: '+1', detail: '实体/ATR > 1.0' },
-        { name: '高成交量', score: '+1', detail: 'volume > 均量×1.3' },
-        { name: '吞没形态', score: '+2', detail: 'body中值≥1.5 且 body/prev_max≥1.5' },
-        { name: 'ADX规则', score: '', detail: 'ADX>25时阈值4, ADX≤25时阈值5' },
-        { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
-      ],
-      exit: [
-        { method: '自适应回撤止盈', normal: '峰值<1ATR:回撤50%', widen: '峰值≥2ATR:回撤25%' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '2.5×ATR' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '4.0×ATR' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: 'EMA趋势', score: '+2', detail: 'EMA9 < EMA21 (下降趋势)' },
-        { name: 'EMA死叉', score: '+1', detail: 'EMA9下穿EMA21' },
-        { name: '触碰EMA9回落', score: '+2', detail: 'high≥EMA9×0.998 且 close<EMA9' },
-        { name: '实体幅度', score: '+1', detail: '实体/ATR > 1.0' },
-        { name: '高成交量', score: '+1', detail: 'volume > 均量×1.3' },
-        { name: '吞没形态', score: '+2', detail: 'body中值≥1.5 且 body/prev_max≥1.5' },
-        { name: 'ADX规则', score: '', detail: 'ADX>25时阈值4, ADX≤25时阈值5' },
-        { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
-      ],
-      exit: [
-        { method: '自适应回撤止盈', normal: '峰值<1ATR:回撤50%', widen: '峰值≥2ATR:回撤25%' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR', widen: '2.5×ATR' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR', widen: '4.0×ATR' },
-      ],
-    },
-  },
-  gold_autoresearch_h1_v5: {
-    desc: 'H1 4因子共识投票 v6 (4因子全真入场, 趋势感知出场, 利润回撤止盈, 位置门禁+RSI安全过滤)',
-    exitWiden: true,
-    exitNote: '趋势感知出场：同向(顺势)用加宽列，逆向(逆势)用正常列',
-    long: {
-      entry: [
-        { name: '趋势', score: '+1', detail: 'EMA10 > EMA20 (上升趋势)' },
-        { name: '动量', score: '+1', detail: 'MACD>信号线 或 Stoch金叉' },
-        { name: '波动', score: '+1', detail: 'ADX>20 或 ATR上升 (有活性)' },
-        { name: '安全过滤', score: '', detail: '非(BB上轨+RSI≥70), 防止追高' },
-        { name: '入场规则', score: '', detail: '4因子全真才入场 (共识投票)' },
-        { name: '位置门禁', score: '', detail: '60根K线顶部10%禁多' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%(可配置)', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR(逆势)', widen: '1.5×ATR(顺势)' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR(逆势)', widen: '3.0×ATR(顺势)' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: '趋势', score: '+1', detail: 'EMA10 < EMA20 (下降趋势)' },
-        { name: '动量', score: '+1', detail: 'MACD<信号线 或 Stoch死叉' },
-        { name: '波动', score: '+1', detail: 'ADX>20 或 ATR上升 (有活性)' },
-        { name: '安全过滤', score: '', detail: 'RSI > 35 (RSI≤35封空)' },
-        { name: '入场规则', score: '', detail: '4因子全真才入场 (共识投票)' },
-        { name: '位置门禁', score: '', detail: '60根K线底部10%禁空' },
-      ],
-      exit: [
-        { method: '利润回撤止盈', normal: '峰值回撤25%(可配置)', widen: '同左' },
-        { method: 'ATR移动止盈(trail)', normal: '1.0×ATR(逆势)', widen: '1.5×ATR(顺势)' },
-        { method: 'ATR硬止损(hard)', normal: '2.0×ATR(逆势)', widen: '3.0×ATR(顺势)' },
-      ],
-    },
-  },
-  mtf_resonance_h1: {
-    desc: 'H1+M15 TA-Lib 形态共振 v3 (双周期同向反转+质量过滤, trail>hard让盈利多飞)',
-    long: {
-      entry: [
-        { name: 'H1反转形态', score: '', detail: 'TA-Lib检测到反转形态 (CDLHAMMER, CDLMORNINGSTAR等)' },
-        { name: 'M15共振', score: '', detail: '同窗口M15出现同向反转信号(完整M15数据)' },
-        { name: '质量过滤', score: '', detail: 'H1 RSI中位超卖 + H1趋势向下 (BULL_FILTERS)' },
-        { name: '共振原则', score: '', detail: '双周期形态一致才开仓, 否则等待' },
-      ],
-      exit: [
-        { method: 'ATR移动止盈(trail)', normal: '2.0×ATR(宽松止盈)' },
-        { method: 'ATR硬止损(hard)', normal: '1.0×ATR(紧止损)' },
-      ],
-    },
-    short: {
-      entry: [
-        { name: 'H1反转形态', score: '', detail: 'TA-Lib检测到反转形态 (CDLSHOOTINGSTAR, CDLEVENINGSTAR等)' },
-        { name: 'M15共振', score: '', detail: '同窗口M15出现同向反转信号(完整M15数据)' },
-        { name: '质量过滤', score: '', detail: 'H1 RSI中位超买 + H1趋势向上 (BEAR_FILTERS)' },
-        { name: '共振原则', score: '', detail: '双周期形态一致才开仓, 否则等待' },
-      ],
-      exit: [
-        { method: 'ATR移动止盈(trail)', normal: '2.0×ATR(宽松止盈)' },
-        { method: 'ATR硬止损(hard)', normal: '1.0×ATR(紧止损)' },
-      ],
-    },
-  },
+const strategyLogics = ref<Record<string, StratLogic>>({})
+
+function getLogic(name: string): StratLogic | null {
+  return strategyLogics.value[name] || null
+}
+
+async function fetchLogics() {
+  try {
+    const res = await fetch('/api/strategies/logics')
+    const data = await res.json()
+    strategyLogics.value = data.logics || {}
+  } catch (e) {
+    console.error('获取策略逻辑失败:', e)
+  }
 }
 
 // 策略颜色由 getStrategyColor(name) 动态分配
@@ -362,6 +87,7 @@ onMounted(async () => {
   } catch (e) {
     console.error('获取策略清单失败', e)
   }
+  fetchLogics()
 
   await store.fetch()
   const existing = store.items.strategy_pool || {}
@@ -395,10 +121,6 @@ function toggleExpand(id: string) {
     expanded.value.add(id)
   }
   expanded.value = new Set(expanded.value)
-}
-
-function getLogic(name: string): StratLogic | null {
-  return strategyLogics[name] || null
 }
 
 function getColor(name: string): string {
