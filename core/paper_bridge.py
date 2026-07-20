@@ -43,13 +43,40 @@ class PaperBridge(MT4BridgeBase):
         self._real = real_bridge                 # 真实桥接（只用于数据）
         self._positions: dict[int, Position] = {}   # ticket → 模拟持仓
         self._closed: list[dict] = []               # 已平仓记录
-        self._next_ticket: int = 90000000
+        self._next_ticket: int = self._load_max_ticket()
         self._balance: float = 0.0
         self._start_balance: float = 0.0
         self._connected: bool = False
         self._tick_cache: tuple[float, float] = (0.0, 0.0)  # (bid, ask)
         self._tick_time: float = 0
         self._equity: float = 0.0
+
+    @staticmethod
+    def _load_max_ticket() -> int:
+        """从 CSV 文件和 DB 加载最大 ticket 号，确保重启后不重复"""
+        max_ticket = 90000000
+        # 从 CSV 读取
+        if CSV_TRADES.exists():
+            try:
+                with open(str(CSV_TRADES), 'r') as f:
+                    for line in f:
+                        if line.strip():
+                            tid = line.split(',')[0].strip()
+                            if tid.isdigit():
+                                max_ticket = max(max_ticket, int(tid))
+            except Exception:
+                pass
+        # 从 DB 读取
+        try:
+            from data.database import get_conn
+            conn = get_conn()
+            rows = conn.execute("SELECT MAX(ticket) FROM trades").fetchone()
+            conn.close()
+            if rows and rows[0]:
+                max_ticket = max(max_ticket, int(rows[0]))
+        except Exception:
+            pass
+        return max_ticket + 1
 
     # ═══════════════ 连接管理 ═══════════════
 
