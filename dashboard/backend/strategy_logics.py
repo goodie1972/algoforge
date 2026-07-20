@@ -59,10 +59,11 @@ def _parse_entry_table(body: str, section_title: str) -> list[dict]:
         if not line.startswith('|') or '---' in line:
             continue
         cols = [c.strip() for c in line.split('|')]
-        if len(cols) >= 5:
-            rows.append({"name": cols[1], "score": cols[2], "detail": cols[3]})
-        elif len(cols) >= 4:
-            rows.append({"name": cols[1], "score": cols[2], "detail": cols[3]})
+        # cols[0]='', cols[1]=序号, cols[2]=因子名, cols[3]=得分, cols[4]=说明(可选)
+        name = cols[2] if len(cols) > 2 else ''
+        score = cols[3] if len(cols) > 3 else ''
+        detail = cols[4] if len(cols) > 4 else ''
+        rows.append({"name": name, "score": score, "detail": detail})
     return rows
 
 
@@ -78,41 +79,44 @@ def _parse_exit_table(body: str) -> list[dict]:
         if not line.startswith('|') or '---' in line:
             continue
         cols = [c.strip() for c in line.split('|')]
-        if len(cols) >= 4:
-            # 有#列
-            rows.append({"method": f"{cols[1]} {cols[2]}", "normal": cols[3]})
-        elif len(cols) >= 3:
-            rows.append({"method": cols[1], "normal": cols[2]})
+        # cols[0]='', cols[1]=序号, cols[2]=条件, cols[3]=说明(可选)
+        method = cols[2] if len(cols) > 2 else ''
+        normal = cols[3] if len(cols) > 3 else ''
+        rows.append({"method": method, "normal": normal})
     return rows
 
 
 def load_strategy_logic(name: str) -> StratLogic | None:
     """加载单个策略的进出场逻辑"""
-    # 找到对应的 .md 文件
     doc_dir = DOCS_DIR
     if not os.path.isdir(doc_dir):
         return None
 
-    for fname in os.listdir(doc_dir):
-        if fname.startswith(name) and fname.endswith('.md'):
-            fpath = os.path.join(doc_dir, fname)
-            break
+    files = sorted(f for f in os.listdir(doc_dir) if f.endswith('.md'))
+    fpath = None
+    # 1. 精确文件名匹配 {name}.md
+    exact = [f for f in files if f.lower() == f'{name}.md'.lower()]
+    if exact:
+        fpath = os.path.join(doc_dir, exact[0])
     else:
-        # 按 name 前缀找
-        for fname in os.listdir(doc_dir):
-            if not fname.endswith('.md'):
-                continue
-            try:
-                with open(os.path.join(doc_dir, fname), 'r', encoding='utf-8') as f:
-                    content = f.read()
-                meta, _ = _parse_frontmatter(content)
-                if meta.get('name') == name or meta.get('name', '').replace('_', '') == name.replace('_', ''):
-                    fpath = os.path.join(doc_dir, fname)
-                    break
-            except Exception:
-                continue
+        # 2. 前缀+下划线匹配 {name}_.md (取最短)
+        prefix = sorted([f for f in files if f.lower().startswith(f'{name}_'.lower())], key=len)
+        if prefix:
+            fpath = os.path.join(doc_dir, prefix[0])
         else:
-            return None
+            # 3. frontmatter name 精确匹配
+            for fname in files:
+                try:
+                    with open(os.path.join(doc_dir, fname), 'r', encoding='utf-8') as f:
+                        fc = f.read()
+                    meta, _ = _parse_frontmatter(fc)
+                    if meta.get('name') == name:
+                        fpath = os.path.join(doc_dir, fname)
+                        break
+                except Exception:
+                    continue
+    if fpath is None:
+        return None
 
     try:
         with open(fpath, 'r', encoding='utf-8') as f:
