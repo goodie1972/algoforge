@@ -8,6 +8,7 @@ Gold-AutoResearch — H1 实盘策略
   - RSI(10) + BB(20,2) → 安全过滤
 - 全部4条件一致才触发信号
 - ATR动态追踪止损出场
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
@@ -15,7 +16,7 @@ import math
 import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -245,10 +246,10 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
     # ─────────────── Signal generation ───────────────
 
-    def generate_signal(self) -> Optional[OrderType]:
+    def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
         if len(candles) < 100:
-            return None
+            return (None, 0, 0, [], [], {})
 
         closes = self.get_close_prices()
         highs = [c.high for c in candles]
@@ -262,7 +263,7 @@ class GoldAutoResearchStrategy(BaseStrategy):
         ema10 = self.get_indicator("ema_9")
         ema20 = self.get_indicator("ema_21")
         if ema10 is None or ema20 is None:
-            return None
+            return (None, 0, 0, [], [], {})
         trend_up = ema10 > ema20
         trend_dn = ema10 < ema20
 
@@ -530,22 +531,22 @@ class GoldAutoResearchStrategy(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-            direction = signal.get("direction", "BUY")
-            ema10, ema20 = latest.get("ema_9"), latest.get("ema_21")
-            rsi = latest.get("rsi", 50)
-            adx = latest.get("adx", 20)
-            trend_up = ema10 and ema20 and ema10 > ema20
-            trend_dn = ema10 and ema20 and ema10 < ema20
-            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+        direction = signal.get("direction", "BUY")
+        ema10, ema20 = latest.get("ema_9"), latest.get("ema_21")
+        rsi = latest.get("rsi", 50)
+        adx = latest.get("adx", 20)
+        trend_up = ema10 and ema20 and ema10 > ema20
+        trend_dn = ema10 and ema20 and ema10 < ema20
+        factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
 
-            if direction == "BUY":
-                if any(f == "TREND-UP" for f in factors) and not trend_up:
-                    return False
-                if any(f == "SAFE-UP" for f in factors) and rsi > 72:
-                    return False
-            else:
-                if any(f == "TREND-DN" for f in factors) and not trend_dn:
-                    return False
-                if any(f == "SAFE-DN" for f in factors) and rsi < 32:
-                    return False
-            return True
+        if direction == "BUY":
+            if any(f == "TREND-UP" for f in factors) and not trend_up:
+                return False
+            if any(f == "SAFE-UP" for f in factors) and rsi > 72:
+                return False
+        else:
+            if any(f == "TREND-DN" for f in factors) and not trend_dn:
+                return False
+            if any(f == "SAFE-DN" for f in factors) and rsi < 32:
+                return False
+        return True

@@ -1,19 +1,19 @@
 """
-M30 RSI + 布林带均值回归
+M30 RSI + 布林带均值回归 — 7因子评分系统
 =========================
 - 入场: 7因子评分系统 ≥4直接开, =3需diff≥2
 - 7因子: M30趋势, BB位置(90%), RSI分层(25/35/65/75), RSI方向(3根), DI强度, 成交量, K线形态
 - ADX>28趋势门禁已移除（2026-06-30）
 - 出场: 保本出场 + 利润回撤止盈 + ATR追踪 + DI跳过(盈利时) + 硬止损
 - 双向交易 (Long / Short)
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
-import math
 import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -75,10 +75,6 @@ class M30RSIStrategy(BaseStrategy):
         self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
         self._exit_cooldown_seconds: int = 1800  # 30分钟
 
-        # ATR cache
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
-
     def get_adx_data(self) -> Optional[dict]:
         """返回 ADX 数据（含 +DI/-DI），供引擎门禁使用"""
         adx = self.get_indicator("adx")
@@ -121,10 +117,6 @@ class M30RSIStrategy(BaseStrategy):
         if rsi_3 < rsi_2 < rsi_1: return 'up'
         if rsi_3 > rsi_2 > rsi_1: return 'down'
         return 'flat'
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
 
     # ─────────────── Signal generation ───────────────
 
@@ -173,7 +165,7 @@ class M30RSIStrategy(BaseStrategy):
         candles = self.candles
         if len(candles) < 100:
             logger.debug(f"[{self.name}] 数据不足: {len(candles)} < 100")
-            return None
+            return (None, 0, 0, [], [], {})
 
         closes = self.get_close_prices()
         close = closes[-1]
@@ -182,18 +174,19 @@ class M30RSIStrategy(BaseStrategy):
 
         # Indicators
         bb = self.get_indicator("bb")
-        if bb is None: return None
+        if bb is None: return (None, 0, 0, [], [], {})
 
         rsi_val = self.get_indicator("rsi")
-        if rsi_val is None: return None
+        if rsi_val is None: return (None, 0, 0, [], [], {})
 
         atr_val = self.get_indicator("atr_20")
-        if atr_val is None: return None
+        if atr_val is None: return (None, 0, 0, [], [], {})
 
         adx = self.get_indicator("adx")
         pdi = self.get_indicator("pdi")
         ndi = self.get_indicator("ndi")
-        adx_data = {"adx": adx, "pdi": pdi, "ndi": ndi}
+        # ADX 缺失时 adx_data 置 None，避免后续 None - None TypeError
+        adx_data = {"adx": adx, "pdi": pdi, "ndi": ndi} if adx is not None else None
         m30_trend = self.get_indicator("trend")
         m30_rsi_dir = self._get_m30_rsi_direction()
 
@@ -508,31 +501,31 @@ class M30RSIStrategy(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-            '''用最新 tick 价 + 工厂缓存重算入场条件'''
-            direction = signal.get("direction", "BUY")
-            bb = latest.get("bb") or {}
-            rsi = latest.get("rsi", 50)
-            pdi = latest.get("pdi", 15)
-            ndi = latest.get("ndi", 15)
-            trend = latest.get("trend", "NEUTRAL")
-            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+        '''用最新 tick 价 + 工厂缓存重算入场条件'''
+        direction = signal.get("direction", "BUY")
+        bb = latest.get("bb") or {}
+        rsi = latest.get("rsi", 50)
+        pdi = latest.get("pdi", 15)
+        ndi = latest.get("ndi", 15)
+        trend = latest.get("trend", "NEUTRAL")
+        factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
 
-            if direction == "BUY":
-                if bb.get("lower") and tick_price > bb["lower"] * 1.005:
-                    return False
-                if any(f.startswith("RSI-") for f in factors) and rsi > 45:
-                    return False
-                if any(f.startswith("DI+") for f in factors) and pdi <= ndi:
-                    return False
-                if any(f in ("M30-UP","MA20-UP") for f in factors) and trend != "UP":
-                    return False
-            else:
-                if bb.get("upper") and tick_price < bb["upper"] * 0.995:
-                    return False
-                if any(f.startswith("RSI-") for f in factors) and rsi < 55:
-                    return False
-                if any(f.startswith("DI-") or f.startswith("DI") for f in factors) and ndi <= pdi:
-                    return False
-                if any(f in ("M30-DN","MA20-DN") for f in factors) and trend != "DOWN":
-                    return False
-            return True
+        if direction == "BUY":
+            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                return False
+            if any(f.startswith("RSI-") for f in factors) and rsi > 45:
+                return False
+            if any(f.startswith("DI+") for f in factors) and pdi <= ndi:
+                return False
+            if any(f in ("M30-UP","MA20-UP") for f in factors) and trend != "UP":
+                return False
+        else:
+            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                return False
+            if any(f.startswith("RSI-") for f in factors) and rsi < 55:
+                return False
+            if any(f.startswith("DI-") or f.startswith("DI") for f in factors) and ndi <= pdi:
+                return False
+            if any(f in ("M30-DN","MA20-DN") for f in factors) and trend != "DOWN":
+                return False
+        return True

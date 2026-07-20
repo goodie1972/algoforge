@@ -12,13 +12,13 @@ M30 BB DeepReturn Optimized — 超跌反弹策略优化版
   - 盈利冷却缩短至 900s
 
 作者: goodie1972
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 import logging
-import math
 import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -75,10 +75,6 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
         self._exit_cooldown_seconds: int = 900
 
-        # ATR cache
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
-
     # ─────────────── Indicator helpers ───────────────
 
     def get_adx_data(self) -> Optional[dict]:
@@ -93,28 +89,24 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         super().refresh_data(count)
 
     def _calc_mfi_from(self, closes: list) -> Optional[float]:
-        """用给定收盘价之前的 K 线算 MFI（用于趋势比较）- 保留独有逻辑"""
-        idx = len(closes) - 1
-        if idx < self.mfi_period + 1:
+        """用给定收盘价之前的 K 线算 MFI（DataFactory TA-Lib 一致）。"""
+        n = len(closes)
+        if n < self.mfi_period + 1:
             return None
-        candles = self.candles[:idx + 1]
-        if len(candles) < self.mfi_period + 1:
+        try:
+            import talib
+            import numpy as np
+            candles = self.candles[:n]
+            if len(candles) < self.mfi_period + 1:
+                return None
+            highs = np.array([c.high for c in candles], dtype=float)
+            lows = np.array([c.low for c in candles], dtype=float)
+            close_a = np.array(closes, dtype=float)
+            vols = np.array([c.volume for c in candles], dtype=float)
+            m = talib.MFI(highs, lows, close_a, vols, timeperiod=self.mfi_period)
+            return float(m[-1]) if not np.isnan(m[-1]) else None
+        except Exception:
             return None
-        typical = [(c.high + c.low + c.close) / 3.0 for c in candles]
-        money_flow = [tp * c.volume for tp, c in zip(typical, candles)]
-        pos_flow, neg_flow = 0.0, 0.0
-        for i in range(-self.mfi_period, 0):
-            if typical[i] > typical[i - 1]:
-                pos_flow += money_flow[i]
-            else:
-                neg_flow += money_flow[i]
-        if neg_flow == 0:
-            return 100.0
-        return 100.0 - 100.0 / (1.0 + pos_flow / neg_flow)
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
 
     # ─────────────── BB 方向检测 ───────────────
 
@@ -151,14 +143,17 @@ class M30BBDeepReturnOptimized(BaseStrategy):
 
     # ─────────────── Entry scoring ───────────────
 
-    def _get_dynamic_threshold(self) -> int:
-        """根据 ADX 动态决定分数阈值：趋势中(>25)用3分，震荡中(<=25)用2分"""
+    def _get_dynamic_threshold(self) -> tuple[int, int]:
+        """返回 (顺趋势阈值, 逆趋势阈值)
+        ADX>25 趋势中：顺2分入场，逆4分（防逆势乱做）
+        ADX≤25 震荡中：都3分
+        """
         adx = self.get_indicator("adx")
         if adx is not None and adx > self.adx_trend_threshold:
-            return self.score_threshold_trending
-        return self.score_threshold
+            return (2, 4)  # 趋势中：顺2分，逆4分
+        return (3, 3)  # 震荡中：全部3分
 
-    def generate_signal(self) -> Optional[OrderType]:
+    def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
         if len(candles) < 100:
             return None
@@ -180,8 +175,12 @@ class M30BBDeepReturnOptimized(BaseStrategy):
 
         m30_trend = self.get_indicator("trend")
 
-        # ── 动态阈值 ──
-        threshold = self._get_dynamic_threshold()
+        # ── 动态阈值：趋势方向决定顺/逆 ──
+        with_t, counter_t = self._get_dynamic_threshold()
+        pdi_v = self.get_indicator("pdi")
+        ndi_v = self.get_indicator("ndi")
+        long_th = with_t if (pdi_v is not None and ndi_v is not None and pdi_v > ndi_v) else counter_t
+        short_th = with_t if (pdi_v is not None and ndi_v is not None and ndi_v > pdi_v) else counter_t
 
         # ── 评分 ──
         long_score = 0
@@ -250,12 +249,12 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         now = time.time()
 
         # ── 盈利平仓冷却 ──
-        if long_score >= threshold:
+        if long_score >= min(with_t, counter_t):
             remaining = self._exit_cooldown_seconds - (now - self._last_profit_exit_time.get("BUY", 0))
             if remaining > 0:
                 long_detail.append(f"COOLDOWN({int(remaining)}s)")
                 long_score = 0
-        if short_score >= threshold:
+        if short_score >= min(with_t, counter_t):
             remaining = self._exit_cooldown_seconds - (now - self._last_profit_exit_time.get("SELL", 0))
             if remaining > 0:
                 short_detail.append(f"COOLDOWN({int(remaining)}s)")
@@ -264,10 +263,10 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         # ── Decision ──
         signal = None
         signal_str = "无信号"
-        if long_score >= threshold:
+        if long_score >= long_th:
             signal = OrderType.BUY
             signal_str = "LONG"
-        elif short_score >= threshold:
+        elif short_score >= short_th:
             signal = OrderType.SELL
             signal_str = "SELL"
 
@@ -279,7 +278,7 @@ class M30BBDeepReturnOptimized(BaseStrategy):
             detail_parts.append("SHORT: " + " ".join(short_detail))
         adx_v = self.get_indicator("adx")
         logger.info(
-            f"[{self.name}] 评分: {long_score}/{short_score} 阈值={threshold} {signal_str}  "
+            f"[{self.name}] 评分: {long_score}/{short_score} 阈值=多{long_th}/空{short_th} {signal_str}  "
             f"明细: {' | '.join(detail_parts) if detail_parts else '无'}"
         )
         pdi_v = self.get_indicator("pdi")
@@ -303,7 +302,7 @@ class M30BBDeepReturnOptimized(BaseStrategy):
             "recent_high": round(recent_high, 2), "recent_low": round(recent_low, 2),
             "bb_lower": round(bb["lower"], 2), "bb_mid": round(bb["mid"], 2),
             "mfi_os": self.mfi_oversold, "mfi_ob": self.mfi_overbought,
-            "threshold": threshold,
+            "long_th": long_th, "short_th": short_th,
         }
         if adx_v is not None:
             indicator_values.update({
@@ -536,24 +535,24 @@ class M30BBDeepReturnOptimized(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-            direction = signal.get("direction", "BUY")
-            bb = latest.get("bb") or {}
-            mfi = latest.get("mfi", 50)
-            trend = latest.get("trend", "NEUTRAL")
-            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+        direction = signal.get("direction", "BUY")
+        bb = latest.get("bb") or {}
+        mfi = latest.get("mfi", 50)
+        trend = latest.get("trend", "NEUTRAL")
+        factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
 
-            if direction == "BUY":
-                if bb.get("lower") and tick_price > bb["lower"] * 1.005:
-                    return False
-                if any(f.startswith("MFI-") for f in factors) and mfi > 45:
-                    return False
-                if any(f == "MA20-UP" for f in factors) and trend != "UP":
-                    return False
-            else:
-                if bb.get("upper") and tick_price < bb["upper"] * 0.995:
-                    return False
-                if any(f.startswith("MFI-") for f in factors) and mfi < 55:
-                    return False
-                if any(f == "MA20-DN" for f in factors) and trend != "DOWN":
-                    return False
-            return True
+        if direction == "BUY":
+            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                return False
+            if any(f.startswith("MFI-") for f in factors) and mfi > 45:
+                return False
+            if any(f == "MA20-UP" for f in factors) and trend != "UP":
+                return False
+        else:
+            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                return False
+            if any(f.startswith("MFI-") for f in factors) and mfi < 55:
+                return False
+            if any(f == "MA20-DN" for f in factors) and trend != "DOWN":
+                return False
+        return True

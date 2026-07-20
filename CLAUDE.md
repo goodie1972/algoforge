@@ -39,6 +39,35 @@ dt_local(ts)
 - `trades` 表的 `open_time / close_time`：已由引擎 `_mt4_to_local()` 转为 UTC+8（整型存储），与用户期望的 UTC+8 一致。
 - `signals.timestamp` 及其他 `created_at / updated_at`：Python `datetime.now()` 设置，系统时区 UTC+8。
 
+## 数据源铁律 (CRITICAL)
+
+**DataFactory + TA-Lib 是唯一数据来源的充要条件。** 所有策略的指标读写必须通过 `get_indicator(key)` 访问 DataFactory 缓存。禁止：
+- ❌ 禁止在策略中自算任何 TA-Lib 已提供的指标（RSI, MFI, BB, EMA, SMA, ATR, ADX, Stoch, MACD 等）
+- ❌ 禁止使用 `bridge.get_candles()` 获取 K 线数据（应使用 `self.candles` 或 `get_cache(timeframe)`）
+- ❌ 禁止 `_calc_ema`、`_calc_rsi`、`_calc_stoch`、`_calc_adx` 等任何自算方法
+
+**策略编写规范：**
+- ✅ 所有公共指标 → `self.get_indicator(key)` 从 DataFactory 读取
+- ✅ 多周期数据 → `from services.data_factory import get_cache` → `get_cache("H4")`
+- ✅ 自定义逻辑（K线实体、评分体系等）可使用 `self.candles` 自行计算，但标准指标不得自算
+
+**DataFactory TA-Lib 可用指标表：**
+
+| key | 说明 | key | 说明 |
+|:----|:----|:----|:----|
+| `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
+| `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
+| `bb` = `{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
+| `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
+| `macd` = `{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch(14,3,3)/(21,5,3) |
+| `volume_sma_20` | VolSMA(20) | `price_position` | 20周期位置 0~1 |
+| `close` | 最新收盘价 | `atr_list` | ATR 历史序列 |
+
+**策略文件文档标准：**
+- 第 1 行：`策略显示名 — 简短描述`（用作系统 UI 的 display 字段）
+- 末行：`数据源: 全部指标从 DataFactory TA-Lib 读取`
+- 新增策略必须包含 `STRATEGY_VERSION`、`STRATEGY_MAGIC`、`STRATEGY_CHANGELOG`
+
 ## 策略注册流程
 
 1. 创建策略文件到 `strategies/` 目录

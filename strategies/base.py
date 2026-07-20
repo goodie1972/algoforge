@@ -31,6 +31,10 @@ class BaseStrategy(abc.ABC):
         self._trail_sl: dict[int, float] = {}
         # 最近一次信号详情（供引擎写入 DB）
         self._last_signal: Optional[dict] = None
+        # 最近一次出场详情（exit_type/peak_profit 等，供引擎写入 trades 表）
+        self._last_exit_detail: Optional[dict] = None
+        # 保本出场时间戳（按方向记录，用于出场冷却）
+        self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
         self._m30_candles: list[Candle] = []
         self._h1_candles: list[Candle] = []
         self._h4_candles: list[Candle] = []

@@ -1,16 +1,16 @@
 """
-M30 MFI + 布林带均值回归策略
+M30 MFI + 布林带均值回归 — 均值回归策略
 =============================
 - 开仓：MFI 极端值 + BB 触轨（3根K线容差）
 - 平仓：顺势（另一极端+另一轨）/ 逆势（中轴 或 半宽）
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
 import math
-import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType, Position
+from core.bridge import MT4BridgeBase, OrderType, Position
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -47,12 +47,6 @@ class M30MFIBBStrategy(BaseStrategy):
         # Exit params (无 ATR，用 BB 中轴/半宽)
 
     # ─────────────── 本地指标计算（用于历史3根容差检测）───────────────
-
-    @staticmethod
-    def _calc_sma(closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period:
-            return None
-        return sum(closes[-period:]) / period
 
     @staticmethod
     def _calc_stddev(closes: list[float], sma: float) -> float:
@@ -194,6 +188,13 @@ class M30MFIBBStrategy(BaseStrategy):
             "has_bb_upper_3bar": False, "has_bb_lower_3bar": False,
             "has_mfi_ob_3bar": False, "has_mfi_os_3bar": False,
         }
+        # 补充嵌套 bb 键，与数据工厂缓存结构对齐（_verify_entry 回退路径需要）
+        if "bb" not in indicator_values:
+            indicator_values["bb"] = {
+                "upper": indicator_values.get("bb_upper", 0),
+                "mid": indicator_values.get("bb_mid", 0),
+                "lower": indicator_values.get("bb_lower", 0),
+            }
         return (signal, score_long, score_short, factors_long, factors_short, indicator_values)
 
     # ─────────────── SL/TP ───────────────

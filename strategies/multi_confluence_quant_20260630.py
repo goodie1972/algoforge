@@ -5,6 +5,7 @@ Multi-Confluence Quant — 14因子综合评分
 - 14个技术指标因子, 每位+1分
 - 阈值: ≥10/14 = 信号, ≥11/14 = God-Tier
 - 覆盖趋势/动量/波动/成交量/结构5大类别
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
@@ -114,12 +115,12 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
 
     def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
-        if len(candles) < 200: return None
+        if len(candles) < 200: return (None, 0, 0, [], [], {})
 
         closes = self.get_close_prices()
         close = closes[-1]
         atr_val = self.get_indicator("atr")
-        if atr_val is None: return None
+        if atr_val is None: return (None, 0, 0, [], [], {})
 
         ema20 = self._calc_ema(closes, 20)
         ema50 = self._calc_ema(closes, 50)
@@ -284,7 +285,7 @@ class MultiConfluenceQuantStrategy(BaseStrategy):
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
         atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
-            return None
+            return (0, 0)  # ATR 缺失时返回 (0,0) 让引擎走 fallback
         sl_dist = atr_val * self.sl_atr
         tp_dist = atr_val * self.tp1_atr
         if direction == OrderType.BUY:

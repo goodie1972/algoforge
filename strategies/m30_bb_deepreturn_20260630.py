@@ -7,13 +7,13 @@ M30 BB DeepReturn — 超跌反弹策略
   - BB 同向（有动量）: ATR追踪 + BB对侧轨/MFI反向15%
 
 作者: goodie1972
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 import logging
-import math
 import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -64,10 +64,6 @@ class BBDeepReturnStrategy(BaseStrategy):
         self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
         self._exit_cooldown_seconds: int = 1800
 
-        # ATR cache
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
-
     # ─────────────── Indicator helpers ───────────────
 
     def get_adx_data(self) -> Optional[dict]:
@@ -100,10 +96,6 @@ class BBDeepReturnStrategy(BaseStrategy):
         if neg_flow == 0:
             return 100.0
         return 100.0 - 100.0 / (1.0 + pos_flow / neg_flow)
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
 
     # ─────────────── BB 方向检测 ───────────────
 
@@ -140,7 +132,7 @@ class BBDeepReturnStrategy(BaseStrategy):
 
     # ─────────────── Entry scoring ───────────────
 
-    def generate_signal(self) -> Optional[OrderType]:
+    def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
         if len(candles) < 100:
             return None
@@ -503,24 +495,24 @@ class BBDeepReturnStrategy(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-            direction = signal.get("direction", "BUY")
-            bb = latest.get("bb") or {}
-            mfi = latest.get("mfi", 50)
-            trend = latest.get("trend", "NEUTRAL")
-            factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
+        direction = signal.get("direction", "BUY")
+        bb = latest.get("bb") or {}
+        mfi = latest.get("mfi", 50)
+        trend = latest.get("trend", "NEUTRAL")
+        factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
 
-            if direction == "BUY":
-                if bb.get("lower") and tick_price > bb["lower"] * 1.005:
-                    return False
-                if any(f.startswith("MFI-") for f in factors) and mfi > 45:
-                    return False
-                if any(f == "MA20-UP" for f in factors) and trend != "UP":
-                    return False
-            else:
-                if bb.get("upper") and tick_price < bb["upper"] * 0.995:
-                    return False
-                if any(f.startswith("MFI-") for f in factors) and mfi < 55:
-                    return False
-                if any(f == "MA20-DN" for f in factors) and trend != "DOWN":
-                    return False
-            return True
+        if direction == "BUY":
+            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                return False
+            if any(f.startswith("MFI-") for f in factors) and mfi > 45:
+                return False
+            if any(f == "MA20-UP" for f in factors) and trend != "UP":
+                return False
+        else:
+            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                return False
+            if any(f.startswith("MFI-") for f in factors) and mfi < 55:
+                return False
+            if any(f == "MA20-DN" for f in factors) and trend != "DOWN":
+                return False
+        return True

@@ -1,42 +1,29 @@
 """
-Stoch 回调顺势策略 (v7_optimized)
+Stoch 回调顺势策略 (v8_upgraded)
 ==================================
-大师理论: ADX>20 趋势确认 + Stoch 超买超卖回调入场
+大师理论: ADX>25 趋势确认 + Stoch 超买超卖回调入场
 XAUUSD 专用参数: Stoch(14,3,3) 更快信号响应
 
-核心变化 vs v6:
-  - ADX 阈值从 25 降到 20，在较弱趋势中也能产生信号
-  - Stoch(21,5,3) → Stoch(14,3,3)，信号响应更快
-  - AND 逻辑 → 加权评分系统（满分 8 分，4 分及格）
+核心变化 vs v7:
+  - ADX 阈值从 20 提到 25，只在较强趋势中交易
+  - Stoch 极端不再独立给分，有金叉/死叉时额外 +1
+  - 金叉/死叉本身 +2 分不变
 
-评分因子:
-  - Stoch 极端区 (K<20 / K>80): +2
-  - Stoch 金叉/死叉: +2
-  - EMA21 方向对齐: +1
-  - DI 方向对齐: +1
-  - H4 趋势对齐: +1
-  - M15 Stoch 对齐: +1
-  阈值: 4 分
-
-多周期架构:
-  H4: EMA21 趋势方向过滤
-  H1: ADX>20 + Stoch 评分 + DI 方向
-  M15: Stoch(14,3,3) 精确入场时机
+运动员验证:
+  SELL: K>80(极端)→直接入场; K=60~80→需>=65
+  BUY:  K<20(极端)→直接入场; K=20~40→需<=35
 
 出场:
-  - 硬止损: 2.0 ATR
-  - ATR追踪止盈: 峰值回撤 1.5 ATR
-  - 利润回撤止盈: 峰值利润回撤 N%
-  - ADX<20: 趋势衰竭出场
-  - DI反转: 趋势可能反转出场
-
-版本履历:
-  v6 (661201) — 初始多周期, Stoch(21,5,3)
-  v7_optimized (661202) — 评分系统, Stoch(14,3,3), ADX>20
+  - 硬止损: 1.5 ATR
+  - 止盈: 3.0 ATR (止损×2)
+  - DI反转: 趋势方向变化
+  - ADX<20: 趋势衰竭
+  - 趋势走完: Stoch 反向交叉确认
+    - SELL死叉入场 → 金叉 或 K回到超卖区(<20) → 平
+    - BUY金叉入场  → 死叉 或 K回到超买区(>80) → 平
 
 数据源: 全部指标从 DataFactory TA-Lib 读取
 """
-
 import logging
 from typing import Optional
 
@@ -46,30 +33,28 @@ from services.data_factory import get_cache
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v7_optimized"
-STRATEGY_MAGIC = 661202
-STRATEGY_LEGACY_MAGICS: list[int] = [661201]
+STRATEGY_VERSION = "v8_upgraded"
+STRATEGY_MAGIC = 661203
+STRATEGY_LEGACY_MAGICS: list[int] = [661201, 661202]
 STRATEGY_CHANGELOG = [
-    {"version": "v6", "magic": 661201, "date": "2026-06-29",
-     "desc": "初始: 多周期 H4→H1→M15, Stoch(21,5,3)@H1 + Stoch(14,3,3)@M15"},
-    {"version": "v7_optimized", "magic": 661202, "date": "2026-07-11",
-     "desc": "优化: 评分系统代替AND逻辑, Stoch(14,3,3), ADX>20, 阈值4/8"},
+    {"version": "v8_upgraded", "magic": 661203, "date": "2026-07-19",
+     "desc": "升级版: ADX>25; 极端不独立给分; 1.5ATR止损3.0ATR止盈; Stoch交叉趋势走完出场"},
 ]
 
 
-class StochTrendH1Optimized(BaseStrategy):
-    """Stoch 多周期回调顺势策略 — v7_optimized 评分系统"""
+class StochTrendH1Upgraded(BaseStrategy):
+    """Stoch 多周期回调顺势策略 — v8_upgraded"""
 
-    name = "stoch_trend_h1_optimized"
+    name = "stoch_trend_h1_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
 
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
 
-        # v7 参数（XAUUSD — 更快 Stoch 响应）
-        self.adx_threshold = 20          # 从 25 降到 20，在较弱趋势也产生信号
-        self.sl_atr = 2.0                # 硬止损倍数
-        self.trail_atr = 1.5             # ATR 追踪止盈距离
+        # 参数
+        self.adx_threshold = 25          # 从 20 提到 25
+        self.sl_atr = 1.5                # 硬止损 1.5 ATR
+        self.tp_atr = 3.0                # 止盈 3.0 ATR（2×止损）
 
         # 评分系统参数
         self.score_threshold = 4         # 满分 8 分，4 分及格
@@ -149,62 +134,68 @@ class StochTrendH1Optimized(BaseStrategy):
         cross_up_now = (k_curr > d_curr) and (k_prev <= d_prev)
         cross_down_now = (k_curr < d_curr) and (k_prev >= d_prev)
 
-        # ADX <= 20: 弱势震荡，不交易
+        # ADX <= 25 不交易
         if adx <= self.adx_threshold:
             return None
 
-        # ── H4 趋势方向（多周期过滤，DataFactory 缓存无数据时跳过） ──
+        # ── H4 趋势（DataFactory 缓存） ──
         h4_trend = self._get_h4_trend()
-        if h4_trend is None:
-            h4_tag = "H4:NODATA"
-        else:
-            h4_tag = f"H4:{h4_trend}"
+        h4_tag = f"H4:{h4_trend}" if h4_trend else "H4:NODATA"
 
-        # ── M15 Stoch 精确入场时机（DataFactory 缓存） ──
+        # ── M15 Stoch（DataFactory 缓存） ──
         m15 = get_cache("M15")
         m15_stoch = m15.get("stoch_14_3_3") if m15 else None
         m15_k = m15_stoch["k"] if m15_stoch else None
 
-        # ── 评分系统（满分 8 分，阈值 4 分） ──
+        # ── 评分系统 ──
         long_score, short_score = 0, 0
         long_factors, short_factors = [], []
 
-        # BUY 评分
-        if k_curr < 20:
-            long_score += 2
-            long_factors.append("StochExtreme")
+        # v8: 极端不独立给分，只在有交叉时额外 +1
+        has_extreme_buy = k_curr < 20
+        has_extreme_sell = k_curr > 80
+
         if cross_up_now:
             long_score += 2
             long_factors.append("StochCross")
-        if close > ma_val:
-            long_score += 1
-            long_factors.append("EMA21Dir")
-        if pdi > ndi:
-            long_score += 1
-            long_factors.append("DIDir")
-        if h4_trend == 'UP':
-            long_score += 1
-            long_factors.append("H4Trend")
-        if m15_k is not None and m15_k < 30:
-            long_score += 1
-            long_factors.append("M15Align")
-
-        # SELL 评分
-        if k_curr > 80:
-            short_score += 2
-            short_factors.append("StochExtreme")
+            if has_extreme_buy:
+                long_score += 1
+                long_factors.append("StochExtreme")
         if cross_down_now:
             short_score += 2
             short_factors.append("StochCross")
+            if has_extreme_sell:
+                short_score += 1
+                short_factors.append("StochExtreme")
+
+        # EMA21 方向
+        if close > ma_val:
+            long_score += 1
+            long_factors.append("EMA21Dir")
         if close < ma_val:
             short_score += 1
             short_factors.append("EMA21Dir")
+
+        # DI 方向
+        if pdi > ndi:
+            long_score += 1
+            long_factors.append("DIDir")
         if ndi > pdi:
             short_score += 1
             short_factors.append("DIDir")
+
+        # H4 趋势
+        if h4_trend == 'UP':
+            long_score += 1
+            long_factors.append("H4Trend")
         if h4_trend == 'DOWN':
             short_score += 1
             short_factors.append("H4Trend")
+
+        # M15 Stoch 对齐
+        if m15_k is not None and m15_k < 30:
+            long_score += 1
+            long_factors.append("M15Align")
         if m15_k is not None and m15_k > 70:
             short_score += 1
             short_factors.append("M15Align")
@@ -212,10 +203,10 @@ class StochTrendH1Optimized(BaseStrategy):
         signal = None
         if long_score >= self.score_threshold:
             signal = OrderType.BUY
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val}
+            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_buy}
         elif short_score >= self.score_threshold:
             signal = OrderType.SELL
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val}
+            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_sell}
 
         iv = {
             "close": round(close, 2), "atr": round(atr_val, 2),
@@ -225,8 +216,7 @@ class StochTrendH1Optimized(BaseStrategy):
             "ema21": round(ma_val, 2),
             "h4_trend": h4_trend or "NODATA",
             "m15_k": round(m15_k, 1) if m15_k is not None else None,
-            "long_score": long_score,
-            "short_score": short_score,
+            "long_score": long_score, "short_score": short_score,
         }
 
         logger.info(
@@ -238,18 +228,21 @@ class StochTrendH1Optimized(BaseStrategy):
 
         return (signal, long_score, short_score, long_factors, short_factors, iv)
 
-    # ─────────────── SL/TP and Exit ───────────────
+    # ─────────────── SL/TP ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
         atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
-        dist = atr_val * self.sl_atr
+        sl_dist = atr_val * self.sl_atr
+        tp_dist = atr_val * self.tp_atr  # 3.0 ATR = 1.5 ATR × 2
         if direction == OrderType.BUY:
-            return round(entry_price - dist, 2), round(entry_price + dist * 50, 2)
+            return round(entry_price - sl_dist, 2), round(entry_price + tp_dist, 2)
         else:
-            return round(entry_price + dist, 2), max(round(entry_price - dist * 50, 2), 0)
+            return round(entry_price + sl_dist, 2), max(round(entry_price - tp_dist, 2), 0)
+
+    # ─────────────── 出场 ───────────────
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
         ticket = position.ticket
@@ -259,8 +252,8 @@ class StochTrendH1Optimized(BaseStrategy):
             self._pos_data[ticket] = {
                 "entry_price": position.open_price,
                 "peak": position.open_price,
-                "peak_profit": 0.0,
-                "adx_entry": self._pending_entry_info.get("adx", 0),
+                "entry_adx": self._pending_entry_info.get("adx", 0),
+                "stoch_cross_done": False,
             }
 
         td = self._pos_data[ticket]
@@ -275,97 +268,99 @@ class StochTrendH1Optimized(BaseStrategy):
         entry_price = td["entry_price"]
         pnl_pts = (bid - entry_price) if is_buy else (entry_price - ask)
 
-        # 硬止损: 2.0 ATR
+        # ① 硬止损: 1.5 ATR
         if pnl_pts < -atr_val * self.sl_atr:
-            logger.info(f"[{self.name}] HardStop ticket={ticket}")
-            self._last_exit_detail = {"exit_type": "hard_stop"}
+            logger.info(f"[{self.name}] HardStop 1.5ATR ticket={ticket}")
+            self._last_exit_detail = {"exit_type": "hard_stop", "atr_mult": self.sl_atr}
             del self._pos_data[ticket]
             return True
 
-        # 更新峰值 + 利润峰值跟踪
-        if is_buy:
-            td["peak"] = max(td["peak"], bid)
-            _cp = bid - entry_price
-        else:
-            td["peak"] = min(td["peak"], ask)
-            _cp = entry_price - ask
-        if abs(_cp) < atr_val * 10:
-            td["peak_profit"] = max(td["peak_profit"], _cp)
-
-        # 保本出场：走过≥0.3ATR盈利后回到成本附近
-        mfe = (td["peak"] - entry_price) if is_buy else (entry_price - td["peak"])
-        if mfe >= atr_val * 0.3 and 0 <= _cp <= atr_val * 0.05:
-            logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} Breakeven ticket={ticket}")
-            self._last_exit_detail = {"exit_type": "breakeven", "profit": round(_cp, 2)}
+        # ② 止盈: 3.0 ATR
+        if pnl_pts > atr_val * self.tp_atr:
+            logger.info(f"[{self.name}] TakeProfit 3.0ATR ticket={ticket}")
+            self._last_exit_detail = {"exit_type": "take_profit", "atr_mult": self.tp_atr}
             del self._pos_data[ticket]
             return True
 
-        # 利润回撤止盈
-        if _cp > 0 and self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
-            profit_ratio = _cp / td["peak_profit"]
-            _pdd = self.profit_drawdown_pct
-            if adx is not None and adx > 25:
-                _pdd = max(_pdd, 0.5)
-            if profit_ratio < (1 - _pdd):
-                logger.info(f"[{self.name}] ProfitStop ticket={ticket} profit=${_cp:.2f}")
-                self._last_exit_detail = {"exit_type": "profit_drawdown",
-                                          "peak_profit": round(td["peak_profit"], 2),
-                                          "current_profit": round(_cp, 2)}
-                del self._pos_data[ticket]
-                return True
-
-        # ATR追踪止盈: 峰值回撤 1.5 ATR
-        if is_buy:
-            if bid < td["peak"] - atr_val * self.trail_atr:
-                self._last_exit_detail = {"exit_type": "trend_trail"}
-                del self._pos_data[ticket]
-                return True
-        else:
-            if ask > td["peak"] + atr_val * self.trail_atr:
-                self._last_exit_detail = {"exit_type": "trend_trail"}
-                del self._pos_data[ticket]
-                return True
-
-        # ADX < 20: 趋势衰竭
-        if adx is not None and adx < 20:
-            self._last_exit_detail = {"exit_type": "trend_adx_drop"}
-            del self._pos_data[ticket]
-            return True
-
-        # DI反转: 趋势可能反转
-        if adx is not None:
+        # ③ DI反转
+        if adx is not None and pdi is not None and ndi is not None:
             if is_buy and ndi > pdi:
-                self._last_exit_detail = {"exit_type": "trend_di_flip"}
+                logger.info(f"[{self.name}] DI反转平BUY ticket={ticket}")
+                self._last_exit_detail = {"exit_type": "di_flip"}
                 del self._pos_data[ticket]
                 return True
             elif not is_buy and pdi > ndi:
-                self._last_exit_detail = {"exit_type": "trend_di_flip"}
+                logger.info(f"[{self.name}] DI反转平SELL ticket={ticket}")
+                self._last_exit_detail = {"exit_type": "di_flip"}
                 del self._pos_data[ticket]
                 return True
+
+        # ④ ADX < 20 趋势衰竭
+        if adx is not None and adx < 20:
+            logger.info(f"[{self.name}] ADX衰竭(<20) ticket={ticket}")
+            self._last_exit_detail = {"exit_type": "adx_fade"}
+            del self._pos_data[ticket]
+            return True
+
+        # ⑤ 趋势走完：Stoch 反向交叉确认（从 DataFactory 读取）
+        stoch = self.get_indicator("stoch_14_3_3")
+        if stoch:
+            curr_k = stoch["k"]
+            curr_d = stoch["d"]
+            golden_cross = (curr_k > curr_d)
+            death_cross = (curr_k < curr_d)
+
+            if is_buy:
+                # BUY金叉入场 → 等死叉 + K>65
+                if death_cross or curr_k > 80:
+                    logger.info(f"[{self.name}] BUY趋势走完(死叉K={curr_k:.1f}) ticket={ticket}")
+                    self._last_exit_detail = {"exit_type": "stoch_reversal", "k": round(curr_k, 1)}
+                    del self._pos_data[ticket]
+                    return True
+            else:
+                # SELL死叉入场 → 等金叉 + K<35
+                if golden_cross or curr_k < 20:
+                    logger.info(f"[{self.name}] SELL趋势走完(金叉K={curr_k:.1f}) ticket={ticket}")
+                    self._last_exit_detail = {"exit_type": "stoch_reversal", "k": round(curr_k, 1)}
+                    del self._pos_data[ticket]
+                    return True
 
         self._last_exit_detail = None
         return False
 
+    # ─────────────── 验票 ───────────────
+
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
+        """v8 验票:
+        SELL: K>80(极端)→直接入场; K在60~80→需>=65
+        BUY:  K<20(极端)→直接入场; K在20~40→需<=35
+
+        latest 来自 DataFactory 缓存（get_cache），包含 stoch_14_3_3
+        """
         direction = signal.get("direction", "BUY")
         adx = latest.get("adx", 20)
         pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
         stoch = latest.get("stoch_14_3_3") or {}
         stoch_k = stoch.get("k", 50)
 
+        # ADX > 25 前置条件
+        if adx < 25:
+            return False
+
         if direction == "BUY":
-            if adx < 20:
-                return False
             if pdi <= ndi:
                 return False
-            if stoch_k > 40:
-                return False
+            if stoch_k < 20:
+                return True   # 极端金叉，直接入场
+            if 20 <= stoch_k <= 40:
+                return stoch_k <= 35  # 需 <= 35
+            return False
         else:
-            if adx < 20:
-                return False
             if ndi <= pdi:
                 return False
-            if stoch_k < 60:
-                return False
-        return True
+            if stoch_k > 80:
+                return True   # 极端死叉，直接入场
+            if 60 <= stoch_k <= 80:
+                return stoch_k >= 65  # 需 >= 65
+            return False

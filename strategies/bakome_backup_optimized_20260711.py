@@ -1,5 +1,5 @@
 """
-BAKOME GoldScalper 优化版 (v2_optimized)
+BAKOME GoldScalper 优化版 (v2_optimized) — ICT FVG + OB + Silver Bullet
 =========================================
 ICT 概念: FVG (Fair Value Gap) + Order Block + Silver Bullet 时段
 
@@ -15,13 +15,14 @@ ICT 概念: FVG (Fair Value Gap) + Order Block + Silver Bullet 时段
 版本履历:
   v1 (777004) — 初始 FVG+OB, Silver Bullet 6h
   v2_optimized (777006) — 时段扩至 10h, FVG 条件放宽
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
 from datetime import datetime
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -46,59 +47,28 @@ class BakomeBackupOptimized(BaseStrategy):
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
 
         # Exit params
         self.p_trailing_atr = 2.5
         self.p_hard_atr = 1.5
 
     def refresh_data(self, count: int = 200):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
-
-    # ─────────────── Indicator helpers ───────────────
-
-    def _calc_atr_values(self, period: int = 14) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-
-        candles = self.candles
-        if len(candles) < period + 2:
-            return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h, l, pc = candles[i].high, candles[i].low, candles[i - 1].close
-            tr_values.append(max(h - l, abs(h - pc), abs(l - pc)))
-        if len(tr_values) < period:
-            return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 14) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        return vals[-1] if vals else None
 
     # ─────────────── ICT Detection ───────────────
 
     def _is_silver_bullet(self) -> Optional[str]:
         """Check if current candle is in a Silver Bullet session.
-        Expanded hours: London 6-10, NY 12-16 (server time, UTC+3).
-        Returns 'london', 'ny', or None."""
+        Hours: London 11-15, NY 17-21 (local UTC+8, converted from MT4 UTC+3)."""
         if not self.candles:
             return None
         now = datetime.now()
         h = now.hour
-        # Expanded Silver Bullet windows (server time, UTC+3)
-        if h in [6, 7, 8, 9, 10]:  # London session (5h)
+        # London session (UTC+3 6-10 → UTC+8 11-15)
+        if h in [11, 12, 13, 14, 15]:
             return 'london'
-        if h in [12, 13, 14, 15, 16]:  # NY session (5h)
+        # NY session (UTC+3 12-16 → UTC+8 17-21)
+        if h in [17, 18, 19, 20, 21]:
             return 'ny'
         return None
 
@@ -130,7 +100,7 @@ class BakomeBackupOptimized(BaseStrategy):
         c2 = candles[-2]
         c3 = candles[-3]
 
-        avg_body = sum(abs(candles[i].close - candles[i].open) for i in range(max(0, n - 11), n)) / min(10, n)
+        avg_body = sum(abs(candles[i].close - candles[i].open) for i in range(max(0, n - 10), n)) / min(10, n)
 
         # BUY OB: 2 big bullish candles → find previous bearish candle
         if c1.close > c1.open and c2.close > c2.open:

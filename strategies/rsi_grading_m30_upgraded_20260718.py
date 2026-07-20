@@ -1,15 +1,12 @@
 """
-M30 RSI分级评分优化版 v3_optimized — RSI+MA14+BB优化
+M30 RSI分级评分升级版 v4_upgraded — RSI+MA14+BB升级
 ===================================
-基于 rsi_grading_m30_20260630.py v5 优化:
-  - CRITICAL: ADX<=28 时保持阈值 2 (原提升到 3, 导致整周零信号)
-  - 恢复 RSI 方向反转因子 (v3 去除的 RSI 短侧过滤)
-  - 放宽 RSI 阈值: oversold<=35, overbought>=60
-  - 保留 ADX>28 趋势门禁 + EMA9/21 趋势感知出场
-  - 魔术码 660903, 旧魔术 660902 保留供回测
+基于 rsi_grading_m30_optimized 升级:
+  - RSI 阈值重定义: <20=+2, 20~35=+1, 35~65=0, 65~80=+1, >80=+2
+  - 阈值锁定 3 分（极端 RSI 自带 2 分→只需 1 个其他因子；正常 RSI 需 3 个因子对齐）
+  - 其他逻辑不变: ADX>28 趋势门禁 + EMA9/21 趋势感知出场
 数据源: 全部指标从 DataFactory TA-Lib 读取
 """
-
 import logging
 import time
 from typing import Optional
@@ -19,42 +16,38 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v3_optimized"
-STRATEGY_MAGIC = 660903
-STRATEGY_LEGACY_MAGICS: list[int] = [660902]
+STRATEGY_VERSION = "v4_upgraded"
+STRATEGY_MAGIC = 660904
+STRATEGY_LEGACY_MAGICS: list[int] = [660902, 660903]
 STRATEGY_CHANGELOG = [
-    {"version": "v1", "magic": 660902, "date": "2026-06-21", "desc": "初始上线: RSI分级评分+MA14+BB, thr=2, trail=2.0 hard=3.0"},
-    {"version": "v2", "magic": 660902, "date": "2026-06-22", "desc": "新增ADX>28趋势增强: +DI/-DI方向评分+2"},
-    {"version": "v3", "magic": 660902, "date": "2026-06-22", "desc": "移除tight_exit_mode和RSI短侧过滤, exit改trail=1.5 hard=1.5"},
-    {"version": "v4", "magic": 660902, "date": "2026-06-22", "desc": "趋势增强改EMA9/21定方向+DI差值定强度"},
-    {"version": "v5", "magic": 660902, "date": "2026-06-22", "desc": "重构: ADX>28趋势门禁(禁反向), EMA9/21趋势感知出场(顺2.0逆1.0)"},
-    {"version": "v3_optimized", "magic": 660903, "date": "2026-07-11", "desc": "优化版: ADX<=28保持阈值2, 恢复RSI方向反转因子, 放宽RSI阈值至35/60"},
+    {"version": "v4_upgraded", "magic": 660904, "date": "2026-07-18",
+     "desc": "升级版: RSI<20/+2, 20~35/+1, 35~65/0, 65~80/+1, >80/+2; 固定阈值3分"},
 ]
 
 
-class RSIGradingM30Optimized(BaseStrategy):
-    """M30 RSI分级评分优化版 (恢复RSI方向反转因子 + 放宽阈值 + ADX低阈值不提升)"""
+class RSIGradingM30Upgraded(BaseStrategy):
+    """M30 RSI分级评分升级版 (固定阈值3分 + RSI极端+2/边界+1/正常0)"""
 
-    name = "rsi_grading_m30_optimized"
+    name = "rsi_grading_m30_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
 
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
 
-        # Entry params (from optimization)
-        self.score_threshold = 2
+        # Entry params
+        self.score_threshold = 3          # 固定 3 分
 
-        # RSI 阈值 (放宽)
-        self.rsi_os = 35          # oversold (was 30)
-        self.rsi_ob = 60          # overbought (was 65)
-        self.rsi_deep_os = 25     # deep oversold (was 20)
-        self.rsi_deep_ob = 75     # deep overbought (was 70)
+        # RSI 阈值（升级版定义）
+        self.rsi_extreme_os = 20          # 极端超卖 <20 → +2
+        self.rsi_os = 35                  # 超卖 <35 → +1
+        self.rsi_ob = 65                  # 超买 >65 → +1
+        self.rsi_extreme_ob = 80          # 极端超买 >80 → +2
 
         # Exit params (EMA趋势感知, 顺宽逆窄)
-        self.trend_trail = 2.0   # 顺趋势: 峰谷回撤 2*ATR
-        self.trend_hard = 2.0    # 顺趋势: 亏损 2*ATR 硬止损
-        self.counter_trail = 1.0 # 逆趋势: 峰谷回撤 1*ATR
-        self.counter_hard = 1.0  # 逆趋势: 亏损 1*ATR 硬止损
+        self.trend_trail = 2.0
+        self.trend_hard = 2.0
+        self.counter_trail = 1.0
+        self.counter_hard = 1.0
 
         # ADX>28 趋势门禁
         self.adx_threshold = 28
@@ -86,36 +79,21 @@ class RSIGradingM30Optimized(BaseStrategy):
     # ─────────────── Indicator helpers ───────────────
 
     def _get_ma14_trend(self) -> str:
-        """M30 MA14 趋势（保留独有逻辑）"""
         sma14 = self.get_indicator("sma_14")
         close = self.get_indicator("close")
         if sma14 is None or close is None:
             return 'NEUTRAL'
         return 'UP' if close > sma14 else 'DOWN'
 
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        """EMA 计算（保留用于 _get_exit_multipliers 中的 EMA9/21 趋势判断）"""
-        if len(closes) < period:
-            return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
+    # ─────────────── RSI 方向反转检测 ───────────────
 
     def _get_rsi_direction(self, closes: list[float]) -> tuple[bool, bool]:
-        """检测 RSI 反转方向.
-
-        基于连续 3 个 RSI 值判断趋势反转:
-          - long_boost: RSI 之前下跌、现在回升 (反转看多)
-          - short_boost: RSI 之前上涨、现在回落 (反转看空)
-        """
+        """RSI 方向反转检测"""
         period = self.rsi_period
         if len(closes) < period + 4:
             return (False, False)
 
         def _rsi_sma(prices: list[float]) -> float:
-            """SMA-based RSI 计算（用于判断方向，无需精确 Wilder 平滑）"""
             gains = 0.0
             losses = 0.0
             for i in range(1, len(prices)):
@@ -130,17 +108,34 @@ class RSIGradingM30Optimized(BaseStrategy):
                 return 100.0
             return 100.0 - 100.0 / (1.0 + ag / al)
 
-        # RSI for 3 consecutive bars: t (latest), t-1, t-2
-        rsi_t = _rsi_sma(closes[-(period + 1):])         # latest
-        rsi_t1 = _rsi_sma(closes[-(period + 2):-1])      # one bar before
-        rsi_t2 = _rsi_sma(closes[-(period + 3):-2])      # two bars before
+        rsi_t = _rsi_sma(closes[-(period + 1):])
+        rsi_t1 = _rsi_sma(closes[-(period + 2):-1])
+        rsi_t2 = _rsi_sma(closes[-(period + 3):-2])
 
-        # RSI was falling (t-1 < t-2) and now rising (t > t-1) -> reversal up
         long_boost = rsi_t1 < rsi_t2 and rsi_t > rsi_t1
-        # RSI was rising (t-1 > t-2) and now falling (t < t-1) -> reversal down
         short_boost = rsi_t1 > rsi_t2 and rsi_t < rsi_t1
-
         return (long_boost, short_boost)
+
+    # ─────────────── 新版 RSI 评分 ───────────────
+
+    def _score_rsi(self, rsi_val: float) -> tuple[int, int, str]:
+        """RSI 评分规则（区分多空方向）:
+          <20  → long+2 (极端超卖), short+0
+          20~35 → long+1, short+0
+          35~65 → long+0, short+0 (正常区)
+          65~80 → long+0, short+1
+          >80  → long+0, short+2 (极端超买)
+        返回: (long_add, short_add, label)
+        """
+        if rsi_val < self.rsi_extreme_os:
+            return (2, 0, f"RSI-{rsi_val:.0f}(极低)")
+        if rsi_val < self.rsi_os:
+            return (1, 0, f"RSI-{rsi_val:.0f}")
+        if rsi_val > self.rsi_extreme_ob:
+            return (0, 2, f"RSI-{rsi_val:.0f}(极高)")
+        if rsi_val > self.rsi_ob:
+            return (0, 1, f"RSI-{rsi_val:.0f}")
+        return (0, 0, "")
 
     # ─────────────── Signal generation ───────────────
 
@@ -165,14 +160,11 @@ class RSIGradingM30Optimized(BaseStrategy):
             return None
 
         adx = self.get_indicator("adx")
-        adx_data = {"adx": adx, "pdi": self.get_indicator("pdi"), "ndi": self.get_indicator("ndi")}
-
         ma14_trend = self._get_ma14_trend()
 
-        # RSI 方向反转因子
         rsi_long_boost, rsi_short_boost = self._get_rsi_direction(closes)
 
-        # ── Scoring ──
+        # ── Scoring — 阈值固定 3 分 ──
         long_score = 0
         long_factors = []
         short_score = 0
@@ -194,21 +186,16 @@ class RSIGradingM30Optimized(BaseStrategy):
             short_score += 1
             short_factors.append(f"BB-TOP({bb['upper']:.1f})")
 
-        # RSI 分级 (放宽阈值)
-        if rsi_val < self.rsi_deep_os:
-            long_score += 2
-            long_factors.append(f"RSI-{rsi_val:.0f}(deep)")
-        elif rsi_val < self.rsi_os:
-            long_score += 1
-            long_factors.append(f"RSI-{rsi_val:.0f}")
-        if rsi_val > self.rsi_deep_ob:
-            short_score += 2
-            short_factors.append(f"RSI-{rsi_val:.0f}(deep)")
-        elif rsi_val > self.rsi_ob:
-            short_score += 1
-            short_factors.append(f"RSI-{rsi_val:.0f}")
+        # RSI 新版评分（区分多空方向）
+        rsi_long_add, rsi_short_add, rsi_label = self._score_rsi(rsi_val)
+        if rsi_long_add > 0:
+            long_score += rsi_long_add
+            long_factors.append(rsi_label)
+        if rsi_short_add > 0:
+            short_score += rsi_short_add
+            short_factors.append(rsi_label)
 
-        # RSI 方向反转因子 (恢复)
+        # RSI 方向反转
         if rsi_long_boost:
             long_score += 1
             long_factors.append("RSI-反转↑")
@@ -216,8 +203,8 @@ class RSIGradingM30Optimized(BaseStrategy):
             short_score += 1
             short_factors.append("RSI-反转↓")
 
-        # ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
-        gate_side = None  # None=无门禁, 'long'=禁多, 'short'=禁空
+        # ADX>28 趋势门禁
+        gate_side = None
         if adx is not None and adx > self.adx_threshold:
             ema9 = self.get_indicator("ema_9")
             ema21 = self.get_indicator("ema_21")
@@ -228,15 +215,13 @@ class RSIGradingM30Optimized(BaseStrategy):
                     gate_side = 'long'
 
         # ── Decision ──
-        # CRITICAL FIX: 始终使用固定阈值 2, 不再因 ADX<=28 提升到 3
-        # (原策略整周零信号, 因为 ADX 长期 <=28)
         signal = None
         signal_str = "无信号"
 
         can_long = gate_side != 'long'
         can_short = gate_side != 'short'
 
-        effective_threshold = self.score_threshold
+        effective_threshold = self.score_threshold  # 始终 3
 
         if can_long and long_score >= effective_threshold:
             signal = OrderType.BUY
@@ -248,7 +233,6 @@ class RSIGradingM30Optimized(BaseStrategy):
         if gate_side and not signal:
             signal_str += f" ({'上升趋势禁空' if gate_side == 'short' else '下降趋势禁多'})"
 
-        # Log
         detail_parts = []
         if long_factors:
             detail_parts.append("LONG: " + " ".join(long_factors))
@@ -258,9 +242,7 @@ class RSIGradingM30Optimized(BaseStrategy):
             f"[{self.name}] 评分: {long_score}/{short_score} {signal_str}  "
             f"{' | '.join(detail_parts) if detail_parts else '无'}"
         )
-        adx_log = f" ADX={adx_data['adx']:.1f}" if adx_data else ""
 
-        # 读取 EMA 用于日志 (独立于 if adx 块, 避免作用域问题)
         ema9_v = self.get_indicator("ema_9")
         ema21_v = self.get_indicator("ema_21")
         gate_log = ""
@@ -269,9 +251,11 @@ class RSIGradingM30Optimized(BaseStrategy):
         ema_log = ""
         if ema9_v is not None and ema21_v is not None:
             ema_log = f" EMA9={ema9_v:.2f} EMA21={ema21_v:.2f}"
+        adx_log = f" ADX={adx:.1f}" if adx else ""
         logger.info(
             f"[{self.name}] Price={close:.2f} RSI={rsi_val:.1f}"
-            f" BB={bb['lower']:.1f}/{bb['upper']:.1f} ATR={atr_val:.2f}{adx_log}{ema_log}{gate_log}"
+            f" BB={bb['lower']:.1f}/{bb['upper']:.1f} ATR={atr_val:.2f}"
+            f"{adx_log}{ema_log}{gate_log}"
         )
 
         iv = {
@@ -279,9 +263,9 @@ class RSIGradingM30Optimized(BaseStrategy):
             "atr": round(atr_val, 2),
             "bb_upper": round(bb["upper"], 2), "bb_lower": round(bb["lower"], 2),
             "bb_mid": round(bb["mid"], 2), "ma14_trend": ma14_trend,
-            "adx": round(adx_data["adx"], 1) if adx_data else 0,
-            "pdi": round(adx_data["pdi"], 1) if adx_data else 0,
-            "ndi": round(adx_data["ndi"], 1) if adx_data else 0,
+            "adx": round(adx, 1) if adx else 0,
+            "pdi": self.get_indicator("pdi") or 0,
+            "ndi": self.get_indicator("ndi") or 0,
             "ema9": round(ema9_v, 2) if ema9_v is not None else 0,
             "ema21": round(ema21_v, 2) if ema21_v is not None else 0,
             "gate": gate_side or "",
@@ -307,7 +291,7 @@ class RSIGradingM30Optimized(BaseStrategy):
         return sl, tp
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
-        """EMA9/21 趋势感知: 顺趋势宽, 逆趋势窄"""
+        """EMA9/21 趋势感知"""
         ema9 = self.get_indicator("ema_9")
         ema21 = self.get_indicator("ema_21")
         trend_up = ema9 is not None and ema21 is not None and ema9 > ema21
@@ -317,7 +301,7 @@ class RSIGradingM30Optimized(BaseStrategy):
         return self.counter_trail, self.counter_hard
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """EMA趋势感知出场: 顺趋势宽/逆趋势窄"""
+        """趋势感知出场（与优化版完全相同）"""
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
@@ -347,7 +331,6 @@ class RSIGradingM30Optimized(BaseStrategy):
             loss = td["entry"] - bid
             td["peak_profit"] = max(td["peak_profit"], current_profit)
 
-            # 保本出场：走过>=0.3ATR盈利后回到成本附近
             if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
                 logger.info(f"[{self.name}] BUY Breakeven ticket={ticket} profit=${current_profit:.2f}")
                 self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
@@ -381,7 +364,6 @@ class RSIGradingM30Optimized(BaseStrategy):
             loss = ask - td["entry"]
             td["peak_profit"] = max(td["peak_profit"], current_profit)
 
-            # 保本出场：走过>=0.3ATR盈利后回到成本附近
             if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
                 logger.info(f"[{self.name}] SELL Breakeven ticket={ticket} profit=${current_profit:.2f}")
                 self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}

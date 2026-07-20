@@ -4,20 +4,20 @@ SanQing EA — H1 实盘策略
 - EMA9/21 趋势 + ATR14 评分系统
 - 评分阈值: ADX>20 趋势中=4, ADX≤20=3, 触发 BUY/SELL
 - ATR动态追踪止损出场
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
-import math
 import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
 STRATEGY_VERSION = "v7"
-STRATEGY_MAGIC = 880106
+STRATEGY_MAGIC = 880107
 STRATEGY_CHANGELOG = [
     {"version": "v1", "magic": 880101, "date": "2026-06-08", "desc": "初始上线：6因子评分≥5，ATR跟踪止损 trail=4.0 hard=2.5"},
     {"version": "v2", "magic": 880102, "date": "2026-06-08", "desc": "修复出场逻辑：区分盈利/亏损阶段，新增 peak_profit 跟踪"},
@@ -26,7 +26,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v5", "magic": 880105, "date": "2026-06-11", "desc": "位置门禁：60根K线区间底部10%禁空、顶部10%禁多"},
     {"version": "v6", "magic": 880106, "date": "2026-06-12", "desc": "自适应回撤止盈：微利单profit_drawdown按peak_profit占比ATR动态放松至50%/40%"},
     {"version": "v6r", "magic": 880106, "date": "2026-06-21", "desc": "回退v6纯顺趋势逻辑，去掉逆势因子；顺趋势出场加宽至trail=2.5 hard=4.0"},
-    {"version": "v7", "magic": 880106, "date": "2026-06-22", "desc": "ADX>25 趋势中阈值从5降到4；ADX≤25保持阈值5"},
+    {"version": "v7", "magic": 880107, "date": "2026-06-22", "desc": "ADX>25 趋势中阈值从5降到4；ADX≤25保持阈值5"},
 ]
 
 
@@ -39,8 +39,6 @@ class SanQingH1Strategy(BaseStrategy):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
         self._last_exit_detail: Optional[dict] = None
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
 
         # Entry params
         self.score_threshold = 3
@@ -53,6 +51,10 @@ class SanQingH1Strategy(BaseStrategy):
         self.p_hard_atr = 2.0    # 硬止损 ATR×2（原为 2.5）
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25，由 settings.py 控制）
 
+        # EMA 交叉检测：记录上一次的值（来自 DataFactory）
+        self._prev_ema9: float = 0.0
+        self._prev_ema21: float = 0.0
+
     def get_adx_data(self) -> Optional[dict]:
         adx = self.get_indicator("adx")
         pdi = self.get_indicator("pdi")
@@ -64,21 +66,7 @@ class SanQingH1Strategy(BaseStrategy):
     def refresh_data(self, count: int = 200):
         super().refresh_data(count)
 
-    # ─────────────── Indicator helpers ───────────────
-
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        """EMA 计算（保留用于上一根 K 线的交叉检测）"""
-        if len(closes) < period:
-            return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
+    # ─────────────── K线数据提取 ───────────────
 
     def _get_opens(self) -> list[float]:
         return [c.open for c in self.candles]
@@ -110,18 +98,20 @@ class SanQingH1Strategy(BaseStrategy):
         low = lows[-1]
         volume = volumes[-1] if len(volumes) > 0 else 0
 
-        # EMA9/21
+        # EMA9/21（全部从 DataFactory 读取）
         ema9 = self.get_indicator("ema_9")
         ema21 = self.get_indicator("ema_21")
         if ema9 is None or ema21 is None:
             return None
-        ema9_p = self._calc_ema(closes[:-1], 9)
-        ema21_p = self._calc_ema(closes[:-1], 21)
+        ema9_p = self._prev_ema9
+        ema21_p = self._prev_ema21
+        self._prev_ema9 = ema9
+        self._prev_ema21 = ema21
 
         uptrend = ema9 > ema21
         downtrend = ema9 < ema21
-        cross_up = ema9_p is not None and ema21_p is not None and ema9_p <= ema21_p and ema9 > ema21
-        cross_dn = ema9_p is not None and ema21_p is not None and ema9_p >= ema21_p and ema9 < ema21
+        cross_up = ema9_p > 0 and ema21_p > 0 and ema9_p <= ema21_p and ema9 > ema21
+        cross_dn = ema9_p > 0 and ema21_p > 0 and ema9_p >= ema21_p and ema9 < ema21
 
         # ATR
         atr_val = self.get_indicator("atr")

@@ -82,8 +82,15 @@
       "double_first": false
     },
     "mfi_bb_m30_optimized": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661002,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "mfi_bb_m30_upgraded": {
+      "enabled": true,
+      "magic": 661003,
       "timeframe": "M30",
       "max_positions": 1,
       "double_first": false
@@ -117,15 +124,36 @@
       "double_first": false
     },
     "rsi_grading_m30_optimized": {
-      "enabled": true,
+      "enabled": false,
       "magic": 660903,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "rsi_grading_m30_upgraded": {
+      "enabled": true,
+      "magic": 660904,
       "timeframe": "M30",
       "max_positions": 1,
       "double_first": false
     },
     "sanqing_h1": {
-      "enabled": true,
+      "enabled": false,
       "magic": 880107,
+      "timeframe": "H1",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "sanqing_h1_original": {
+      "enabled": true,
+      "magic": 880101,
+      "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "sanqing_h1_upgraded": {
+      "enabled": true,
+      "magic": 880108,
       "timeframe": "H1",
       "max_positions": 1,
       "double_first": false
@@ -138,8 +166,15 @@
       "double_first": false
     },
     "stoch_trend_h1_optimized": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661202,
+      "timeframe": "H1",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "stoch_trend_h1_upgraded": {
+      "enabled": true,
+      "magic": 661203,
       "timeframe": "H1",
       "max_positions": 1,
       "double_first": false
@@ -156,13 +191,6 @@
       "magic": 777005,
       "timeframe": "H1",
       "max_positions": 0,
-      "double_first": false
-    },
-    "sanqing_h1_original": {
-      "enabled": true,
-      "magic": 880101,
-      "timeframe": "H1",
-      "max_positions": 1,
       "double_first": false
     }
   }

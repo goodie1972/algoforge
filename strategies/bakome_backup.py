@@ -6,13 +6,14 @@ ICT 概念: FVG (Fair Value Gap) + Order Block + Silver Bullet 时段
 - FVG: 3-K线 gap 模式检测
 - OB: 强势突破前的反向K线
 - ATR 过滤低波动环境
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
 from datetime import datetime
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -69,18 +70,16 @@ class BAKOMEBackupStrategy(BaseStrategy):
 
     def _is_silver_bullet(self) -> Optional[str]:
         """Check if current candle is in a Silver Bullet session.
-        Returns 'london', 'ny', or None."""
+        Hours: London 13-15, NY 18-20 (local UTC+8, converted from MT4 UTC+3)."""
         if not self.candles:
             return None
-        ts = self.candles[-1].time
-        dt = datetime.strptime(ts.split()[0] if ' ' in ts else ts, '%Y.%m.%d') if '.' in ts else datetime.now()
-        # Use current time for server-time check
         now = datetime.now()
         h = now.hour
-        # Silver Bullet windows (server time, typically UTC+2/+3 for MT5)
-        if h in [8, 9, 10]:  # London session
+        # London session (MT4 UTC+3 8-10 -> UTC+8 13-15)
+        if h in [13, 14, 15]:
             return 'london'
-        if h in [13, 14, 15]:  # NY session
+        # NY session (MT4 UTC+3 13-15 -> UTC+8 18-20)
+        if h in [18, 19, 20]:
             return 'ny'
         return None
 
@@ -111,7 +110,7 @@ class BAKOMEBackupStrategy(BaseStrategy):
         c2 = candles[-2]
         c3 = candles[-3]
 
-        avg_body = sum(abs(candles[i].close - candles[i].open) for i in range(max(0, n - 11), n)) / min(10, n)
+        avg_body = sum(abs(candles[i].close - candles[i].open) for i in range(max(0, n - 10), n)) / min(10, n)
 
         # BUY OB: 2 big bullish candles → find previous bearish candle
         if c1.close > c1.open and c2.close > c2.open:

@@ -5,6 +5,7 @@ Momentum Pulse PRO — 7维度多因子评分 + 三层TP出场
 - AMC: RSI+MACD+ROC 合成动量分
 - 7维度评分: AMC强度, 信号对齐, RSI区域, 多周期对齐, 成交量确认, 市场状态, 无衰竭
 - 三层TP: TP1=1.5ATR(50%) → TP2=3.0ATR(30%) → 剩余移动追踪
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
@@ -88,12 +89,12 @@ class MomentumPulseProStrategy(BaseStrategy):
     def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
         if len(candles) < 60:
-            return None
+            return (None, 0, 0, [], [], {})
 
         closes = self.get_close_prices()
         close = closes[-1]
         atr_val = self.get_indicator("atr")
-        if atr_val is None: return None
+        if atr_val is None: return (None, 0, 0, [], [], {})
 
         # ── 计算7维度 ──
         long_score = 0; long_detail = []
@@ -123,10 +124,11 @@ class MomentumPulseProStrategy(BaseStrategy):
             else:
                 short_score += 1; short_detail.append(f"RSI<{rsi_val:.0f}")
 
-        # ④ 多周期对齐: H1方向
+        # ④ 多周期对齐: H1方向（用 DataFactory 缓存避免阻塞主循环）
         try:
-            h1_raw = self.bridge.get_candles(self.symbol, "H1", 50)
-            h1_candles = list(reversed(h1_raw))
+            from services.data_factory import get_cache
+            h1_cached = get_cache("H1")
+            h1_candles = h1_cached.get("candles", []) if h1_cached else []
             h1_closes = [c.close for c in h1_candles]
             h1_ma = sum(h1_closes[-20:]) / 20 if len(h1_closes) >= 20 else None
             if h1_ma is not None:
@@ -204,7 +206,7 @@ class MomentumPulseProStrategy(BaseStrategy):
         """初始SL/TP: SL=1.5ATR, TP=TP1(1.5ATR) — 第一层目标"""
         atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
-            return None  # fallback to settings pips
+            return (0, 0)  # ATR 缺失时返回 (0,0) 让引擎走 fallback
         sl_dist = atr_val * self.sl_atr
         tp_dist = atr_val * self.tp1_atr  # TP1
         if direction == OrderType.BUY:

@@ -993,6 +993,24 @@ class TradingEngine:
         # 三轨：运动员验证并发令
         if self._athlete:
             self._athlete.run()
+            # 处理开仓成功的回调：对 deepreturn 等策略调用 mark_extreme_entry
+            self._handle_athlete_opened()
+
+    def _handle_athlete_opened(self):
+        """处理运动员开仓成功队列，回调策略的 mark_extreme_entry"""
+        if not self._athlete._recently_opened:
+            return
+        opened = self._athlete._recently_opened
+        self._athlete._recently_opened = []
+        # 构建 strategy_name -> 实例 映射
+        strat_map = {s.name: s for s in self.strategies}
+        for ticket, strategy_name in opened:
+            strategy = strat_map.get(strategy_name)
+            if strategy and hasattr(strategy, "mark_extreme_entry"):
+                try:
+                    strategy.mark_extreme_entry(ticket)
+                except Exception as e:
+                    logger.warning(f"[运动员回调] {strategy_name}.mark_extreme_entry({ticket}) 失败: {e}")
 
     def _coordinated_exits(self, snapshot: list):
         """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""

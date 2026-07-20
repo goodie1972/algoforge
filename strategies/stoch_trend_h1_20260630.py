@@ -22,14 +22,16 @@ XAUUSD 专用参数: Stoch(21,5,3) 减少黄金趋势中的假信号
   - 利润回撤止盈: 峰值利润回撤 N%
   - ADX<20: 趋势衰竭出场
   - DI反转: 趋势可能反转出场
+
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
-import math
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
+from services.data_factory import get_cache
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +54,6 @@ class StochTrendH1Strategy(BaseStrategy):
         super().__init__(bridge, magic, timeframe)
 
         # v6 参数（XAUUSD 黄金专用 — 大师推荐 (21,5,3)）
-        self.stoch_k_period = 21         # 黄金趋势持久，更慢的参数减少假信号
-        self.stoch_slowing = 5
-        self.stoch_d_period = 3
         self.adx_threshold = 25          # 标准 ADX 趋势阈值
         self.sl_atr = 2.0                # 硬止损倍数
         self.trail_atr = 1.5             # ATR 追踪止盈距离
@@ -64,123 +63,36 @@ class StochTrendH1Strategy(BaseStrategy):
         self._pending_entry_info: dict = {}
         self._last_exit_detail: Optional[dict] = None
 
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
-
-        # 多周期数据（桥接实时加载，refresh_data 时刷新）
-        self._h4_candles: list[Candle] = []
-        self._m15_candles: list[Candle] = []
-
-        # M15 Stoch 参数（比 H1 更快，用于精确入场时机）
-        self.m15_stoch_k_period = 14
-        self.m15_stoch_slowing = 3
-        self.m15_stoch_d_period = 3
+        # Stoch 交叉检测：记录上一次的值（来自 DataFactory）
+        self._prev_stoch_k: float = 50.0
+        self._prev_stoch_d: float = 50.0
 
     def refresh_data(self, count: int = 350):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
-        # 多周期实时数据（桥接直接拉，SQLite 有滞后不可用）
-        try:
-            raw_h4 = self.bridge.get_candles(self.symbol, "H4", 100)
-            self._h4_candles = list(reversed(raw_h4))
-        except Exception as e:
-            logger.warning(f"[{self.name}] H4 bridge load failed: {e}")
-            self._h4_candles = []
-        try:
-            raw_m15 = self.bridge.get_candles(self.symbol, "M15", 200)
-            self._m15_candles = list(reversed(raw_m15))
-        except Exception as e:
-            logger.warning(f"[{self.name}] M15 bridge load failed: {e}")
-            self._m15_candles = []
+        # 多周期数据全部从 DataFactory 缓存读取，无需额外加载
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx()
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
+            return None
+        return {"adx": adx, "pdi": pdi, "ndi": ndi}
 
-    # ─────────────── Indicator helpers ───────────────
-
-    def _calc_ema(self, closes: list[float], period: int):
-        """EMA 计算"""
-        if len(closes) < period:
+    def _get_h4_trend(self) -> Optional[str]:
+        """从 DataFactory 缓存读取 H4 EMA21 判断趋势"""
+        try:
+            h4 = get_cache("H4")
+            if not h4:
+                return None
+            ema21 = h4.get("ema_21")
+            candles = h4.get("candles", [])
+            if ema21 is None or not candles:
+                return None
+            close = candles[-1].close
+            return 'UP' if close > ema21 else 'DOWN' if close < ema21 else None
+        except Exception:
             return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for i in range(1, period):
-            ema = closes[i] * k + ema * (1 - k)
-        avg = sum(closes[:period]) / period
-        ema = avg
-        for i in range(period, len(closes)):
-            ema = closes[i] * k + ema * (1 - k)
-        return ema
-
-    def _calc_stoch(self) -> Optional[dict]:
-        candles = self.candles
-        if len(candles) < self.stoch_k_period + self.stoch_slowing + self.stoch_d_period + 1:
-            return None
-        highs = [c.high for c in candles]
-        lows = [c.low for c in candles]
-        closes = [c.close for c in candles]
-        n = len(closes)
-        kp, sp, dp = self.stoch_k_period, self.stoch_slowing, self.stoch_d_period
-        raw_k = []
-        for i in range(kp - 1, n):
-            hi = max(highs[i - kp + 1:i + 1])
-            lo = min(lows[i - kp + 1:i + 1])
-            raw_k.append(50.0 if hi == lo else (closes[i] - lo) / (hi - lo) * 100)
-        if len(raw_k) < sp + dp + 1:
-            return None
-        smooth_k = [sum(raw_k[i - sp + 1:i + 1]) / sp for i in range(sp - 1, len(raw_k))]
-        if len(smooth_k) < dp + 1:
-            return None
-        return {
-            "curr_k": smooth_k[-1], "prev_k": smooth_k[-2],
-            "curr_d": sum(smooth_k[-dp:]) / dp,
-            "prev_d": sum(smooth_k[-(dp + 1):-1]) / dp,
-        }
-
-    # ─────────────── H4 多周期方向 ───────────────
-
-    def _calc_h4_trend(self) -> Optional[str]:
-        """判断 H4 趋势方向（close vs EMA21），返回 'UP' | 'DOWN' | None"""
-        c = self._h4_candles
-        if len(c) < 26:
-            return None
-        closes = [x.close for x in c]
-        ema21 = self._calc_ema(closes, 21)
-        if ema21 is None:
-            return None
-        return 'UP' if c[-1].close > ema21 else 'DOWN' if c[-1].close < ema21 else None
-
-    # ─────────────── M15 精确入场时机 ───────────────
-
-    def _calc_m15_stoch(self) -> Optional[dict]:
-        """M15 Stoch 计算（快参数，用于精确入场时机）"""
-        candles = self._m15_candles
-        n = len(candles)
-        kp, sp, dp = self.m15_stoch_k_period, self.m15_stoch_slowing, self.m15_stoch_d_period
-        if n < kp + sp + dp + 1:
-            return None
-        highs = [c.high for c in candles]
-        lows = [c.low for c in candles]
-        closes = [c.close for c in candles]
-        raw_k = []
-        for i in range(kp - 1, n):
-            hi = max(highs[i - kp + 1:i + 1])
-            lo = min(lows[i - kp + 1:i + 1])
-            raw_k.append(50.0 if hi == lo else (closes[i] - lo) / (hi - lo) * 100)
-        if len(raw_k) < sp + dp + 1:
-            return None
-        smooth_k = [sum(raw_k[i - sp + 1:i + 1]) / sp for i in range(sp - 1, len(raw_k))]
-        if len(smooth_k) < dp + 1:
-            return None
-        return {
-            "k": smooth_k[-1],
-            "d": sum(smooth_k[-dp:]) / dp,
-        }
-
-    def _calc_adx(self) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现（与 talib 一致）"""
-        return self.calc_adx_wilder(self.candles, 14)
 
     # ─────────────── Signal generation ───────────────
 
@@ -192,7 +104,8 @@ class StochTrendH1Strategy(BaseStrategy):
         closes = self.get_close_prices()
         close = closes[-1]
 
-        stoch = self._calc_stoch()
+        # ── 全部从 DataFactory 读取 ──
+        stoch = self.get_indicator("stoch_21_5_3")
         if stoch is None:
             return None
 
@@ -200,21 +113,22 @@ class StochTrendH1Strategy(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return None
 
-        adx_data = self._calc_adx()
-        if adx_data is None:
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
             return None
 
         ma_val = self.get_indicator("ema_21")
         if ma_val is None:
             return None
 
-        adx = adx_data['adx']
-        pdi = adx_data['pdi']
-        ndi = adx_data['ndi']
-        k_curr = stoch["curr_k"]
-        k_prev = stoch["prev_k"]
-        d_curr = stoch["curr_d"]
-        d_prev = stoch["prev_d"]
+        k_curr = stoch["k"]
+        d_curr = stoch["d"]
+        k_prev = self._prev_stoch_k
+        d_prev = self._prev_stoch_d
+        self._prev_stoch_k = k_curr
+        self._prev_stoch_d = d_curr
 
         cross_up_now = (k_curr > d_curr) and (k_prev <= d_prev)
         cross_down_now = (k_curr < d_curr) and (k_prev >= d_prev)
@@ -228,15 +142,16 @@ class StochTrendH1Strategy(BaseStrategy):
         long_score, short_score = 0, 0
         long_factors, short_factors = [], []
 
-        # ── H4 趋势方向（多周期过滤，桥接无数据时跳过） ──
-        h4_trend = self._calc_h4_trend()
+        # ── H4 趋势方向（多周期过滤，DataFactory 缓存无数据时跳过） ──
+        h4_trend = self._get_h4_trend()
         if h4_trend is None:
             h4_tag = "H4:NODATA"
         else:
             h4_tag = f"H4:{h4_trend}"
 
-        # ── M15 Stoch 精确入场时机 ──
-        m15_stoch = self._calc_m15_stoch()
+        # ── M15 Stoch 精确入场时机（DataFactory 缓存） ──
+        m15 = get_cache("M15")
+        m15_stoch = m15.get("stoch_14_3_3") if m15 else None
         m15_k = m15_stoch["k"] if m15_stoch else None
 
         # BUY: 超卖区金叉 + EMA21上方 + +DI主导 + H4上升 + M15超卖
@@ -265,8 +180,8 @@ class StochTrendH1Strategy(BaseStrategy):
 
         iv = {
             "close": round(close, 2), "atr": round(atr_val, 2),
-            "adx": round(adx, 1), "pdi": round(adx_data['pdi'], 1),
-            "ndi": round(adx_data['ndi'], 1),
+            "adx": round(adx, 1), "pdi": round(pdi, 1),
+            "ndi": round(ndi, 1),
             "k": round(k_curr, 1), "d": round(d_curr, 1),
             "ema21": round(ma_val, 2),
             "h4_trend": h4_trend or "NODATA",
@@ -311,7 +226,10 @@ class StochTrendH1Strategy(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return False
 
-        adx_data = self._calc_adx()
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+
         entry_price = td["entry_price"]
         pnl_pts = (bid - entry_price) if is_buy else (entry_price - ask)
 
@@ -344,7 +262,7 @@ class StochTrendH1Strategy(BaseStrategy):
         if _cp > 0 and self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
             profit_ratio = _cp / td["peak_profit"]
             _pdd = self.profit_drawdown_pct
-            if adx_data and adx_data.get("adx", 0) > 25:
+            if adx is not None and adx > 25:
                 _pdd = max(_pdd, 0.5)
             if profit_ratio < (1 - _pdd):
                 logger.info(f"[{self.name}] ProfitStop ticket={ticket} profit=${_cp:.2f}")
@@ -367,18 +285,18 @@ class StochTrendH1Strategy(BaseStrategy):
                 return True
 
         # ADX < 20: 趋势衰竭
-        if adx_data and adx_data["adx"] < 20:
+        if adx is not None and adx < 20:
             self._last_exit_detail = {"exit_type": "trend_adx_drop"}
             del self._pos_data[ticket]
             return True
 
         # DI反转: 趋势可能反转
-        if adx_data:
-            if is_buy and adx_data["ndi"] > adx_data["pdi"]:
+        if adx is not None:
+            if is_buy and ndi > pdi:
                 self._last_exit_detail = {"exit_type": "trend_di_flip"}
                 del self._pos_data[ticket]
                 return True
-            elif not is_buy and adx_data["pdi"] > adx_data["ndi"]:
+            elif not is_buy and pdi > ndi:
                 self._last_exit_detail = {"exit_type": "trend_di_flip"}
                 del self._pos_data[ticket]
                 return True
@@ -388,24 +306,24 @@ class StochTrendH1Strategy(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-            direction = signal.get("direction", "BUY")
-            adx = latest.get("adx", 20)
-            pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
-            stoch = latest.get("stoch_21_5_3") or {}
-            stoch_k = stoch.get("k", 50)
+        direction = signal.get("direction", "BUY")
+        adx = latest.get("adx", 20)
+        pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
+        stoch = latest.get("stoch_21_5_3") or {}
+        stoch_k = stoch.get("k", 50)
 
-            if direction == "BUY":
-                if adx < 25:
-                    return False
-                if pdi <= ndi:
-                    return False
-                if stoch_k > 40:
-                    return False
-            else:
-                if adx < 25:
-                    return False
-                if ndi <= pdi:
-                    return False
-                if stoch_k < 60:
-                    return False
-            return True
+        if direction == "BUY":
+            if adx < 25:
+                return False
+            if pdi <= ndi:
+                return False
+            if stoch_k > 40:
+                return False
+        else:
+            if adx < 25:
+                return False
+            if ndi <= pdi:
+                return False
+            if stoch_k < 60:
+                return False
+        return True

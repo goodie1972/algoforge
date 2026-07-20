@@ -6,6 +6,7 @@ Entry Score PRO — 5因子加权评分 + 结构/临近/动量/波动
 - 评分0-100, 阈值≥75触发
 - STRONG(≥85) / PRIME(≥80) / SUSTAINED(≥80连续3根) / ENTRY WINDOW(≥75)
 - SL=入场区±0.55ATR, TP=下一摆动点
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
@@ -93,12 +94,12 @@ class EntryScoreProStrategy(BaseStrategy):
 
     def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
-        if len(candles) < 60: return None
+        if len(candles) < 60: return (None, 0, 0, [], [], {})
 
         closes = self.get_close_prices()
         close = closes[-1]
         atr_val = self.get_indicator("atr")
-        if atr_val is None: return None
+        if atr_val is None: return (None, 0, 0, [], [], {})
 
         # ── 计算5因子(每项0-100) ──
 
@@ -235,7 +236,7 @@ class EntryScoreProStrategy(BaseStrategy):
         """SL=±0.55ATR, TP=下一摆动点"""
         atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
-            return None
+            return (0, 0)  # ATR 缺失时返回 (0,0) 让引擎走 fallback
         sl_dist = atr_val * self.sl_atr
         # TP设为3×SL (默认R:R)
         tp_dist = sl_dist * 3

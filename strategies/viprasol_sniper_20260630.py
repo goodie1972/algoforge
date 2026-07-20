@@ -5,6 +5,7 @@ Viprasol Sniper — 7因子共识 + 多级RR出场
 - 7因子评分: VWAP替代→EMA位置, RSI, MACD, EMA排列, ADX+DI, 成交量, 次级RSI
 - 多级RR出场: 1R/2R/3R/4R/5R, TP1命中后移到保本
 - K线收盘确认
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
@@ -40,68 +41,32 @@ class ViprasolSniperStrategy(BaseStrategy):
 
         # === Exit params — 多级RR ===
         self.sl_atr = 1.5    # 初始止损 = 1R
-        self.rr_levels = [1, 2, 3, 4, 5]  # 5级TP
+        self.rr_levels = [2, 3, 4, 5]  # 出场级别从 2R 开始（1R 只触发保本，不平仓）
+        self.breakeven_r = 1.0  # 保本触发级别（1R）
         self.trail_atr = 1.0  # 移动追踪
 
     def get_adx_data(self) -> Optional[dict]:
-        return self._calc_adx(14)
-
-    # ─────────────── Indicator helpers ───────────────
-
-    def _calc_ema(self, closes: list[float], period: int) -> Optional[float]:
-        if len(closes) < period: return None
-        k = 2.0 / (period + 1)
-        ema = closes[0]
-        for p in closes[1:]:
-            ema = (p - ema) * k + ema
-        return ema
-
-    def _calc_rsi(self, closes: list[float], period: int = 14) -> Optional[float]:
-        """RSI 计算（保留供 M15 跨周期使用）"""
-        if len(closes) < period + 1: return None
-        gains, losses = [], []
-        for i in range(1, period + 1):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-        for i in range(period + 1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
-        if avg_loss == 0: return 100.0
-        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
-
-    def _calc_macd(self, closes: list[float]) -> Optional[dict]:
-        if len(closes) < 35: return None
-        ema12 = self._calc_ema(closes, 12)
-        ema26 = self._calc_ema(closes, 26)
-        if ema12 is None or ema26 is None: return None
-        macd_line = ema12 - ema26
-        return {"macd": macd_line}
-
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
+        adx = self.get_indicator("adx")
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+        if adx is None:
+            return None
+        return {"adx": adx, "pdi": pdi, "ndi": ndi}
 
     # ─────────────── Signal generation ───────────────
 
     def generate_signal(self) -> Optional[tuple]:
         candles = self.candles
-        if len(candles) < 60: return None
+        if len(candles) < 60: return (None, 0, 0, [], [], {})
 
         closes = self.get_close_prices()
         close = closes[-1]
         atr_val = self.get_indicator("atr")
-        if atr_val is None: return None
+        if atr_val is None: return (None, 0, 0, [], [], {})
 
-        ema9 = self._calc_ema(closes, 9)
-        ema21 = self._calc_ema(closes, 21)
-        if ema9 is None or ema21 is None: return None
+        ema9 = self.get_indicator("ema_9")
+        ema21 = self.get_indicator("ema_21")
+        if ema9 is None or ema21 is None: return (None, 0, 0, [], [], {})
 
         long_score = 0; long_detail = []
         short_score = 0; short_detail = []
@@ -120,8 +85,8 @@ class ViprasolSniperStrategy(BaseStrategy):
             elif rsi_val < 50:
                 short_score += 1; short_detail.append(f"RSI<{rsi_val:.0f}")
 
-        # ③ MACD方向
-        macd_d = self._calc_macd(closes)
+        # ③ MACD方向（DataFactory）
+        macd_d = self.get_indicator("macd")
         if macd_d is not None:
             if macd_d["macd"] > 0:
                 long_score += 1; long_detail.append("MACD+")
@@ -156,12 +121,11 @@ class ViprasolSniperStrategy(BaseStrategy):
                 else:
                     short_score += 1; short_detail.append("VOL+")
 
-        # ⑦ 次级RSI (M15)
+        # ⑦ 次级RSI (M15) - DataFactory TA-Lib 值
         try:
-            m15_raw = self.bridge.get_candles(self.symbol, "M15", 30)
-            m15_candles = list(reversed(m15_raw))
-            m15_closes = [c.close for c in m15_candles]
-            rsi_m15 = self._calc_rsi(m15_closes)
+            from services.data_factory import get_cache
+            m15_cached = get_cache("M15")
+            rsi_m15 = m15_cached.get("rsi") if m15_cached else None
             if rsi_m15 is not None:
                 if rsi_m15 > 50:
                     long_score += 1; long_detail.append(f"M15-RSI>{rsi_m15:.0f}")
@@ -203,7 +167,7 @@ class ViprasolSniperStrategy(BaseStrategy):
         """初始SL/TP: SL=1.5ATR, TP=1R(1.5ATR)"""
         atr_val = self.get_indicator("atr")
         if atr_val is None or atr_val <= 0:
-            return None
+            return (0, 0)  # ATR 缺失时返回 (0,0) 让引擎走 fallback
         dist = atr_val * self.sl_atr
         if direction == OrderType.BUY:
             return round(entry_price - dist, 2), round(entry_price + dist, 2)
@@ -245,7 +209,7 @@ class ViprasolSniperStrategy(BaseStrategy):
             td["peak_profit"] = max(td["peak_profit"], current_profit)
 
             # TP1命中→移到保本
-            if not td["breakeven"] and current_profit > risk_r * self.rr_levels[0]:
+            if not td["breakeven"] and current_profit > risk_r * self.breakeven_r:
                 td["breakeven"] = True
                 self.bridge.modify_order(ticket, sl=entry, tp=0)
                 logger.info(f"[{self.name}] BUY 保本触发 ticket={ticket}")
@@ -279,7 +243,7 @@ class ViprasolSniperStrategy(BaseStrategy):
             current_profit = entry - ask
             td["peak_profit"] = max(td["peak_profit"], current_profit)
 
-            if not td["breakeven"] and current_profit > risk_r * self.rr_levels[0]:
+            if not td["breakeven"] and current_profit > risk_r * self.breakeven_r:
                 td["breakeven"] = True
                 self.bridge.modify_order(ticket, sl=entry, tp=0)
                 logger.info(f"[{self.name}] SELL 保本触发 ticket={ticket}")

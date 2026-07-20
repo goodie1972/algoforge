@@ -37,10 +37,17 @@ class PaperTrader:
         with open(CSV_OUT, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for r in reader:
+                entry = r.get("入场价格", "")
+                if not entry:  # 跳过损坏行
+                    continue
+                try:
+                    entry_price = float(entry)
+                except (ValueError, TypeError):
+                    continue
                 if not r.get("出场价格"):  # 未平仓
                     self.positions[r["编号"]] = {
                         "signal_id": r["编号"], "strategy": r["策略"],
-                        "direction": r["方向"], "entry_price": float(r["入场价格"]),
+                        "direction": r["方向"], "entry_price": entry_price,
                         "score": r["评分"], "factors": r.get("因子",""),
                         "time": r["时间"], "tf": "M30",
                     }
@@ -130,7 +137,8 @@ class PaperTrader:
                 pos["reason"] = reason
                 to_close.append(pos)
 
-        # 写入平仓记录
+        # 写入平仓记录（追加模式，同一个信号可能有多次更新，
+        # 分析时取每个signal_id的最后一条记录即为最终结果）
         for pos in to_close:
             print(f"[平仓] #{pos['signal_id']} {pos['strategy']} {pos['direction']} "
                   f"入场={pos['entry_price']:.2f} 出场={pos['exit_price']:.2f} "

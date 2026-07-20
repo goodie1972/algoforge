@@ -1,16 +1,15 @@
 """
 SanQing EA v1 原始版 — H1 纯原版
 ================================
-- 6因子评分 + 固定阈值 5
+- 6因子评分 + 固定阈值 4
 - ATR动态追踪止损 trail=4.0 hard=2.5
 - 无任何后加特性（无利润回撤止盈、无保本出场、无门禁、无新闻过滤）
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 import logging
-import math
-import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ class SanQingEA_v1(BaseStrategy):
         self._last_exit_detail: Optional[dict] = None
 
         # 原始v1参数
-        self.score_threshold = 5
+        self.score_threshold = 4
         self.p_trailing_atr = 4.0
         self.p_hard_atr = 2.5
         self.adx_threshold = 20  # 仅用于评分提示，不做动态阈值调整

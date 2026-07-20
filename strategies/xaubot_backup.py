@@ -10,6 +10,7 @@ xaubot-ai — XGBoost ML 后备策略
   - 优先加载 models/xaubot_model.ubj（预训练模型）
   - 无预训练模型时首次加载自动从 SQLite 训练
   - 需要 xgboost + polars
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import json
@@ -18,6 +19,8 @@ import math
 import os
 from datetime import datetime
 from typing import Optional
+
+from config.settings import LOCAL_TZ
 
 import numpy as np
 
@@ -40,6 +43,11 @@ try:
 except ImportError:
     HAS_POLARS = False
     logger.warning("[xaubot_backup] polars not installed, ML disabled")
+
+
+STRATEGY_VERSION = "v1"
+STRATEGY_MAGIC = 777005
+STRATEGY_LEGACY_MAGICS: list[int] = []
 
 
 class _FeatureEngineer:
@@ -180,6 +188,7 @@ class XAUBotBackupStrategy(BaseStrategy):
     """xaubot-ai — XGBoost ML 后备策略 (H1)"""
 
     name = "xaubot_backup"
+    legacy_magics = STRATEGY_LEGACY_MAGICS
 
     _model_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
     _model_path = os.path.join(_model_dir, "xaubot_model.ubj")
@@ -242,9 +251,12 @@ class XAUBotBackupStrategy(BaseStrategy):
         self._cached_atr_values = None
         super().refresh_data(count)
 
-        # 仅在无已保存模型时训练
+        # 仅在无已保存模型时训练，加 5 分钟冷却避免每 tick 重试
         if not self.fitted and HAS_XGB and HAS_POLARS and len(self.candles) >= 300:
-            self._load_and_train()
+            now = datetime.now(LOCAL_TZ).timestamp()
+            if now - getattr(self, "_last_train_attempt", 0) > 300:
+                self._last_train_attempt = now
+                self._load_and_train()
 
     def _load_and_train(self):
         """Load H1 data from SQLite, compute features, train XGBoost."""
@@ -266,7 +278,7 @@ class XAUBotBackupStrategy(BaseStrategy):
             return
 
         df = pl.DataFrame({
-            'time': [datetime.fromtimestamp(r[0]) for r in rows],
+            'time': [datetime.fromtimestamp(r[0], tz=LOCAL_TZ) for r in rows],
             'open': [float(r[1]) for r in rows],
             'high': [float(r[2]) for r in rows],
             'low': [float(r[3]) for r in rows],
@@ -352,7 +364,7 @@ class XAUBotBackupStrategy(BaseStrategy):
                 try:
                     dt = datetime.strptime(ts.split('.')[0], '%Y-%m-%d')
                 except ValueError:
-                    dt = datetime.now()
+                    dt = datetime.now(LOCAL_TZ)
             records.append({
                 'time': dt,
                 'open': c.open,
@@ -439,6 +451,13 @@ class XAUBotBackupStrategy(BaseStrategy):
         else:
             return round(entry_price + dist, 2), round(entry_price - dist * 50, 2)
 
+    def get_adx_data(self) -> Optional[dict]:
+        """提供 ADX/DI 数据给引擎门禁"""
+        _adx = self.get_indicator("adx")
+        if _adx is None:
+            return None
+        return {"adx": _adx, "pdi": self.get_indicator("pdi"), "ndi": self.get_indicator("ndi")}
+
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
@@ -461,10 +480,12 @@ class XAUBotBackupStrategy(BaseStrategy):
             loss = td["entry"] - bid
             if drawdown > atr_val * self.p_trailing_atr:
                 logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f}")
+                self._last_exit_detail = {"exit_type": "trail_stop", "drawdown": round(drawdown, 2)}
                 del self._trail_data[ticket]
                 return True
             if loss > atr_val * self.p_hard_atr:
                 logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f}")
+                self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss, 2)}
                 del self._trail_data[ticket]
                 return True
         else:
@@ -473,13 +494,16 @@ class XAUBotBackupStrategy(BaseStrategy):
             loss = ask - td["entry"]
             if rally > atr_val * self.p_trailing_atr:
                 logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f}")
+                self._last_exit_detail = {"exit_type": "trail_stop", "rally": round(rally, 2)}
                 del self._trail_data[ticket]
                 return True
             if loss > atr_val * self.p_hard_atr:
                 logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f}")
+                self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss, 2)}
                 del self._trail_data[ticket]
                 return True
 
+        self._last_exit_detail = None
         return False
 
     @staticmethod

@@ -1,5 +1,5 @@
 """
-M30 RSI分级评分 + MA14 + BB + ADX>28 趋势门禁
+M30 RSI分级评分 — MA14 + BB + ADX>28 趋势门禁
 ===========================================
 基于回测最优配置 (m30_final_bt.py section 4):
   - RSI 分级评分: <20→+2, 20-30→+1, >70→+2, 65-70→+1
@@ -8,14 +8,14 @@ M30 RSI分级评分 + MA14 + BB + ADX>28 趋势门禁
   - ADX>28 趋势门禁: EMA9>EMA21→禁空, EMA9<EMA21→禁多
   - 无 RSI 方向因子，无短侧过滤
   - 阈值 2, EMA趋势感知出场: 顺2.0/逆1.0
+数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 
 import logging
-import math
 import time
 from typing import Optional
 
-from core.bridge import MT4BridgeBase, Candle, OrderType
+from core.bridge import MT4BridgeBase, OrderType
 from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
@@ -72,10 +72,6 @@ class RSIGradingM30Strategy(BaseStrategy):
         self._trail_data: dict[int, dict] = {}
         self._last_exit_detail: Optional[dict] = None
 
-        # 指标缓存
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
-
     def get_adx_data(self) -> Optional[dict]:
         adx = self.get_indicator("adx")
         pdi = self.get_indicator("pdi")
@@ -105,10 +101,6 @@ class RSIGradingM30Strategy(BaseStrategy):
         for p in closes[1:]:
             ema = (p - ema) * k + ema
         return ema
-
-    def _calc_adx(self, period: int = 14) -> Optional[dict]:
-        """标准 Wilder ADX/+DI/-DI（0-100 量纲），委托基类统一实现"""
-        return self.calc_adx_wilder(self.candles, period)
 
     # ─────────────── Signal generation ───────────────
 
@@ -141,7 +133,7 @@ class RSIGradingM30Strategy(BaseStrategy):
         # MA14
         if ma14_trend == 'UP':
             long_score += 1; long_factors.append("MA14-UP")
-        else:
+        elif ma14_trend == 'DOWN':
             short_score += 1; short_factors.append("MA14-DN")
 
         # BB touch
