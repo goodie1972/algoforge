@@ -9,6 +9,8 @@ import threading
 import time
 import numpy as np
 
+from core.bridge import Candle
+
 logger = logging.getLogger(__name__)
 
 # 全局缓存
@@ -17,6 +19,24 @@ _CACHE_LOCK = threading.RLock()
 
 # 全局 tick 计数器：DataFactory 每收到一次 tick 报价就 +1
 _TICK_COUNTER: int = 0
+
+# DataFactory 健康状态（跨线程只读，线程安全通过 CACHE_LOCK 保障）
+_HEALTH: dict = {
+    "bridging": False,           # 桥接是否连接成功
+    "started_at": 0.0,           # 启动时间戳
+    "tfs": {},                   # {tf: {"last_sync": ts, "candles": n, "has_indicators": bool, "ok": bool}}
+    "sync_errors": [],           # 最近的同步错误 [{"time": ts, "tf": str, "err": str}]
+    "last_tick_time": 0.0,       # 最近一次报价时间
+    "tick_count": 0,             # 总报价次数
+}
+
+# 限制 sync_errors 长度，防止无限增长
+_SYNC_ERRORS_MAX = 20
+
+def get_health() -> dict:
+    """获取 DataFactory 健康状态快照（供外部监控/API 调用）"""
+    with _CACHE_LOCK:
+        return _HEALTH.copy()
 
 def get_cache(timeframe: str) -> dict:
     """策略读取缓存"""
@@ -199,10 +219,27 @@ class DataFactory:
         self._running = False
         self._thread = None
 
+    def connect(self) -> bool:
+        """连接数据桥接"""
+        try:
+            ok = self._bridge.connect()
+            with _CACHE_LOCK:
+                _HEALTH["bridging"] = ok
+            return ok
+        except Exception as e:
+            logger.warning(f"[数据工厂] 桥接连接失败: {e}")
+            with _CACHE_LOCK:
+                _HEALTH["bridging"] = False
+                _HEALTH["sync_errors"].append({"time": time.time(), "tf": "bridge", "err": str(e)})
+                _HEALTH["sync_errors"] = _HEALTH["sync_errors"][-_SYNC_ERRORS_MAX:]
+            return False
+
     def start(self):
         if self._running:
             return
         self._running = True
+        with _CACHE_LOCK:
+            _HEALTH["started_at"] = time.time()
         self._thread = threading.Thread(target=self._run, daemon=True, name="data-factory")
         self._thread.start()
         logger.info("[数据工厂] 已启动")
@@ -242,20 +279,61 @@ class DataFactory:
         try:
             with _CACHE_LOCK:
                 has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles") and "rsi" in _DATA_CACHE[tf]
-            # 缓存为空或指标不全时自动全量加载
             needs_full = full or not has_data
             count = 350 if needs_full else 2
             raw = bridge.get_candles("XAUUSD", tf, count)
-            if not raw:
+            new_candles = list(reversed(raw)) if raw else []
+
+            # 如果桥接数据不足（<30根），从 SQLite 补充历史
+            if needs_full and len(new_candles) < 30:
+                try:
+                    from data.database import get_conn
+                    conn = get_conn()
+                    rows = conn.execute(
+                        "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+                        "WHERE timeframe=? ORDER BY timestamp DESC LIMIT 350",
+                        (tf,),
+                    ).fetchall()
+                    conn.close()
+                    if rows:
+                        rows.reverse()
+                        db_candles = [Candle(r[0], r[1], r[2], r[3], r[4], r[5]) for r in rows]
+                        if len(new_candles) > 0:
+                            # 用最新桥接蜡烛替换最后1根（可能有未闭合数据）
+                            db_candles[-1] = new_candles[-1]
+                        new_candles = db_candles
+                except Exception:
+                    if not new_candles:
+                        return False
+
+            if not new_candles:
                 return False
-            new_candles = list(reversed(raw))
+
             with _CACHE_LOCK:
-                old = _DATA_CACHE.get(tf, {}).get("candles", [])
-                merged = _merge_candles(old, new_candles, max_len=350)
+                if needs_full:
+                    # 全量加载：直接替换整个缓存
+                    merged = new_candles[-350:]
+                else:
+                    # 增量加载：只更新最新的2根（替换尾部，防止重复累积）
+                    old = _DATA_CACHE.get(tf, {}).get("candles", [])
+                    merged = old[:-2] + new_candles[-2:] if len(old) >= 2 else new_candles
+                    merged = merged[-350:]
                 ta = _talib_indicators(merged, tf)
                 _DATA_CACHE[tf] = {"candles": merged, **ta}
+                # 更新健康状态
+                _HEALTH["tfs"][tf] = {
+                    "last_sync": time.time(),
+                    "candles": len(merged),
+                    "has_indicators": bool(ta),
+                    "ok": True,
+                }
             return True
         except Exception as e:
+            with _CACHE_LOCK:
+                _HEALTH["tfs"].setdefault(tf, {})
+                _HEALTH["tfs"][tf].update({"ok": False, "last_sync": time.time()})
+                _HEALTH["sync_errors"].append({"time": time.time(), "tf": tf, "err": str(e)[:100]})
+                _HEALTH["sync_errors"] = _HEALTH["sync_errors"][-_SYNC_ERRORS_MAX:]
             if full:
                 logger.warning(f"[数据工厂] 加载 {tf} 失败: {e}")
             return False
@@ -267,5 +345,7 @@ class DataFactory:
             with _CACHE_LOCK:
                 _DATA_CACHE["tick"] = {"bid": bid, "ask": ask, "time": time.time()}
                 _TICK_COUNTER += 1
+                _HEALTH["last_tick_time"] = time.time()
+                _HEALTH["tick_count"] = _TICK_COUNTER
         except Exception:
             pass
