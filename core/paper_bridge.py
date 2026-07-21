@@ -139,6 +139,15 @@ class PaperBridge(MT4BridgeBase):
                 if isinstance(data, str):
                     continue  # 已平仓
                 is_buy = "BUY" in data["direction"].upper()
+                # CSV entry_time 是格式化字符串 → 转 Unix 时间戳（与 open_order 格式一致）
+                _raw = data["entry_time"]
+                _ts = 0
+                try:
+                    from datetime import datetime
+                    _dt = datetime.strptime(_raw, "%Y-%m-%d %H:%M:%S")
+                    _ts = int(_dt.timestamp())
+                except (ValueError, OSError):
+                    pass
                 self._positions[ticket] = Position(
                     ticket=ticket,
                     symbol="XAUUSD",
@@ -153,7 +162,7 @@ class PaperBridge(MT4BridgeBase):
                     commission=0.0,
                     magic=data["magic"],
                     comment=data["strategy"],
-                    open_time=data["entry_time"],
+                    open_time=str(_ts),
                 )
                 count += 1
             if count:
