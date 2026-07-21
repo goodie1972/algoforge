@@ -1431,12 +1431,14 @@ class TradingEngine:
         if n_bridge != n_local:
             logger.warning(f"[{strategy.name}] 持仓不一致: 桥接={n_bridge} 本地={n_local}，取较大值={n_total}")
 
-        if n_total >= strategy.max_positions:
-            return  # 已达上限
+        # 纸面交易不限仓，有多少信号开多少
+        if not settings.PAPER_MODE:
+            if n_total >= strategy.max_positions:
+                return  # 已达上限
 
-        # 已有持仓则不加仓
-        if n_total > 0:
-            return
+            # 已有持仓则不加仓
+            if n_total > 0:
+                return
 
         # 生成信号
         signal = strategy.on_tick()
