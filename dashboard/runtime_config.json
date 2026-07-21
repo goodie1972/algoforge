@@ -15,7 +15,7 @@
     "di_gate_skip_threshold": 50,
     "rally_drop_adx_skip": 50,
     "profit_drawdown_enabled": true,
-    "profit_drawdown_pct": 0.25,
+    "profit_drawdown_pct": 0.4,
     "profit_drawdown_min_peak_atr": 0.5,
     "position_gate_m30_lookback": 40
   },
