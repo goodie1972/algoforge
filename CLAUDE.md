@@ -13,7 +13,7 @@
 | `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
 | `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
 | `bb{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
-| `bb_width` | BB带宽(up-lo) | `bb_width_ratio` | 当前/20根前宽度比 |
+| `bb_width` | BB带宽(up-lo) | `bb_width_ratio` | 当前/上根宽度比 |
 | `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
 | `macd{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch |
 | `volume_sma_20` | VolSMA(20) | | |
@@ -59,7 +59,7 @@ dt_local(ts)
 | `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
 | `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
 | `bb` = `{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
-| `bb_width` / `bb_width_ratio` | BB带宽/20根前宽度比 | `price_position` | 20周期位置 0~1 |
+| `bb_width` / `bb_width_ratio` | BB带宽/上根宽度比 | `price_position` | 20周期位置 0~1 |
 | `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
 | `macd` = `{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch(14,3,3)/(21,5,3) |
 | `volume_sma_20` | VolSMA(20) | `close` | 最新收盘价 |

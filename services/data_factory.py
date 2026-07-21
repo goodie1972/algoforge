@@ -123,10 +123,10 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         # BB 宽度（绝对值）
         bb_width = float(upper[-1] - lower[-1])
         result["bb_width"] = bb_width
-        # BB 宽度比率：当前 / 20 根前（≈ 10 小时前 M30），判断开口扩张
-        if len(upper) > 22:
-            old_width = float(upper[-22] - lower[-22])
-            result["bb_width_ratio"] = round(bb_width / old_width, 3) if old_width > 0 else 1.0
+        # BB 宽度比率：当前 / 上一根（判断突然扩张，1根K线即响应）
+        if len(upper) > 2:
+            prev_width = float(upper[-2] - lower[-2])
+            result["bb_width_ratio"] = round(bb_width / prev_width, 3) if prev_width > 0 else 1.0
         else:
             result["bb_width_ratio"] = 1.0
     except Exception:
