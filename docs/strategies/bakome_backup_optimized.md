@@ -27,8 +27,8 @@ desc: ICT FVG + Order Block + Silver Bullet 时段交易 + ADX自适应出场
 | # | 条件 | 震荡(ADX≤25) | 中等趋势(ADX 25~35) | 强趋势(ADX>35) |
 |:-:|:----|:----:|:----:|:----:|
 | ① | ADX自适应止盈 | 1.5 ATR | 3.0 ATR | 5.0 ATR |
-| ② | ADX自适应追踪止损 | 1.5 ATR 回撤 | 2.5 ATR 回撤 | 4.0 ATR 回撤 |
-| ③ | ATR硬止损 | 1.5 ATR | 1.5 ATR | 1.5 ATR |
+| ② | ADX自适应追踪止损 | 1.0 ATR 回撤 | 2.0 ATR 回撤 | 3.0 ATR 回撤 |
+| ③ | ADX自适应硬止损 | 2.0 ATR | 3.5 ATR | 5.0 ATR |
 
 ## 特别规则
 

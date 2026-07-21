@@ -51,10 +51,12 @@ class BakomeBackupOptimized(BaseStrategy):
         self._trail_data: dict[int, dict] = {}
 
         # Exit params (ADX 自适应，在 check_ema20_exit 中计算)
-        self.p_hard_atr = 1.5
-        self.p_trail_chop = 1.5     # 震荡: 窄追踪
-        self.p_trail_normal = 2.5   # 中等: 正常追踪
-        self.p_trail_trend = 4.0    # 强趋势: 宽追踪让利润跑
+        self.p_hard_chop = 2.0      # 震荡: 硬止损宽于追踪
+        self.p_hard_normal = 3.5    # 中等: 硬止损宽于追踪
+        self.p_hard_trend = 5.0     # 强趋势: 硬止损宽于追踪
+        self.p_trail_chop = 1.0     # 震荡: 窄追踪
+        self.p_trail_normal = 2.0   # 中等: 正常追踪
+        self.p_trail_trend = 3.0    # 强趋势: 宽追踪让利润跑
         self.p_profit_chop = 1.5    # 震荡: 小目标落袋
         self.p_profit_normal = 3.0  # 中等: 正常止盈
         self.p_profit_trend = 5.0   # 强趋势: 大目标让利润跑
@@ -181,6 +183,15 @@ class BakomeBackupOptimized(BaseStrategy):
         else:
             return round(entry_price + dist, 2), round(entry_price - dist * 50, 2)
 
+    def _get_adx_multipliers(self):
+        """ADX 自适应：返回 (trail_atr, profit_atr, hard_atr)"""
+        adx = self.get_indicator("adx")
+        if adx is None or adx <= 25:
+            return self.p_trail_chop, self.p_profit_chop, self.p_hard_chop
+        if adx > 35:
+            return self.p_trail_trend, self.p_profit_trend, self.p_hard_trend
+        return self.p_trail_normal, self.p_profit_normal, self.p_hard_normal
+
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
@@ -190,6 +201,7 @@ class BakomeBackupOptimized(BaseStrategy):
                 "highest": position.open_price if is_buy else 0,
                 "lowest": position.open_price if not is_buy else float("inf"),
                 "entry": position.open_price,
+                "peak_profit": 0.0,
             }
 
         td = self._trail_data[ticket]
@@ -197,28 +209,50 @@ class BakomeBackupOptimized(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return False
 
+        trail_mult, profit_mult, hard_mult = self._get_adx_multipliers()
+
         if is_buy:
             td["highest"] = max(td["highest"], bid)
             drawdown = td["highest"] - bid
             loss = td["entry"] - bid
-            if drawdown > atr_val * self.p_trailing_atr:
-                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f}")
+            profit = bid - td["entry"]
+            td["peak_profit"] = max(td["peak_profit"], profit)
+
+            # 止盈: 利润达标主动出场
+            if profit > atr_val * profit_mult:
+                logger.info(f"[{self.name}] BUY TakeProfit ticket={ticket} profit=${profit:.2f} mult={profit_mult:.1f}")
                 del self._trail_data[ticket]
                 return True
-            if loss > atr_val * self.p_hard_atr:
-                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f}")
+            # 追踪止损
+            if drawdown > atr_val * trail_mult:
+                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} mult={trail_mult:.1f}")
+                del self._trail_data[ticket]
+                return True
+            # 硬止损（最后防线，始终宽于追踪）
+            if loss > atr_val * hard_mult:
+                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} mult={hard_mult:.1f}")
                 del self._trail_data[ticket]
                 return True
         else:
             td["lowest"] = min(td["lowest"], ask)
             rally = ask - td["lowest"]
             loss = ask - td["entry"]
-            if rally > atr_val * self.p_trailing_atr:
-                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f}")
+            profit = td["entry"] - ask
+            td["peak_profit"] = max(td["peak_profit"], profit)
+
+            # 止盈
+            if profit > atr_val * profit_mult:
+                logger.info(f"[{self.name}] SELL TakeProfit ticket={ticket} profit=${profit:.2f} mult={profit_mult:.1f}")
                 del self._trail_data[ticket]
                 return True
-            if loss > atr_val * self.p_hard_atr:
-                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f}")
+            # 追踪止损
+            if rally > atr_val * trail_mult:
+                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} mult={trail_mult:.1f}")
+                del self._trail_data[ticket]
+                return True
+            # 硬止损（最后防线，始终宽于追踪）
+            if loss > atr_val * hard_mult:
+                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} mult={hard_mult:.1f}")
                 del self._trail_data[ticket]
                 return True
 
