@@ -1,9 +1,9 @@
 ---
 name: bakome_backup_optimized
 magic: 777006
-version: v2_optimized
+version: v3_optimized
 display: BAKOME GoldScalper 优化版
-desc: ICT FVG + Order Block + Silver Bullet 时段交易
+desc: ICT FVG + Order Block + Silver Bullet 时段交易 + ADX自适应出场
 ---
 
 ## 评分因子
@@ -22,16 +22,18 @@ desc: ICT FVG + Order Block + Silver Bullet 时段交易
 | 2 | FVG向下缺口 | 1 | prev.prev.high < current.low（价格缺口）|
 | 3 | Order Block | 1 | 2根大跌后找到前一根大阳线为OB，价格回抽OB区 |
 
-## 出场逻辑
+## 出场逻辑（ADX 自适应）
 
-| # | 条件 | 说明 |
-|:-:|:----|:----|
-| ① | ATR追踪止损(trail) | 2.5 ATR 回撤 |
-| ② | ATR硬止损(hard) | 1.5 ATR |
+| # | 条件 | 震荡(ADX≤25) | 中等趋势(ADX 25~35) | 强趋势(ADX>35) |
+|:-:|:----|:----:|:----:|:----:|
+| ① | ADX自适应止盈 | 1.5 ATR | 3.0 ATR | 5.0 ATR |
+| ② | ADX自适应追踪止损 | 1.5 ATR 回撤 | 2.5 ATR 回撤 | 4.0 ATR 回撤 |
+| ③ | ATR硬止损 | 1.5 ATR | 1.5 ATR | 1.5 ATR |
 
 ## 特别规则
 
 - **非Silver Bullet时段不出信号**
+- **ADX自适应出场**：强趋势（ADX>35）放宽追踪和止盈让利润跑，震荡（ADX≤25）收紧快速落袋
 - 初始SL/TP: 2.0ATR（宽止损）+ 超大TP，出场全权交给 check_ema20_exit
 - ATR过滤器：无ATR数据不出信号
 - 数据源: 全部指标从 DataFactory TA-Lib 读取

@@ -27,7 +27,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v2_optimized"
+STRATEGY_VERSION = "v3_optimized"
 STRATEGY_MAGIC = 777006
 STRATEGY_LEGACY_MAGICS: list[int] = [777004]
 STRATEGY_CHANGELOG = [
@@ -35,6 +35,8 @@ STRATEGY_CHANGELOG = [
      "desc": "初始: FVG+OB, Silver Bullet 6h (London 8-10, NY 13-15)"},
     {"version": "v2_optimized", "magic": 777006, "date": "2026-07-11",
      "desc": "优化: 时段扩至 10h (London 6-10, NY 12-16), FVG 条件放宽(取消实体方向)"},
+    {"version": "v3_optimized", "magic": 777006, "date": "2026-07-21",
+     "desc": "ADX自适应出场: 追踪止盈随波动率调整, 强趋势放宽让利润跑"},
 ]
 
 
@@ -48,9 +50,14 @@ class BakomeBackupOptimized(BaseStrategy):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
 
-        # Exit params
-        self.p_trailing_atr = 2.5
+        # Exit params (ADX 自适应，在 check_ema20_exit 中计算)
         self.p_hard_atr = 1.5
+        self.p_trail_chop = 1.5     # 震荡: 窄追踪
+        self.p_trail_normal = 2.5   # 中等: 正常追踪
+        self.p_trail_trend = 4.0    # 强趋势: 宽追踪让利润跑
+        self.p_profit_chop = 1.5    # 震荡: 小目标落袋
+        self.p_profit_normal = 3.0  # 中等: 正常止盈
+        self.p_profit_trend = 5.0   # 强趋势: 大目标让利润跑
 
     def refresh_data(self, count: int = 200):
         super().refresh_data(count)
