@@ -1,8 +1,9 @@
 """
-M30 MFI + BB Upgraded v7 — 超跌反弹升级版
+M30 MFI + BB Upgraded v8 — 超跌反弹升级版
 =============================================
 入场:
   - 收盘价超过BB轨道 (close > bb_upper / close < bb_lower)
+  - BB开口扩张>20%时禁用同向入场（防趋势加速接飞刀）
   - 不看MFI
   - 运动员跟踪下一根K线回抽入场
 
@@ -14,6 +15,7 @@ M30 MFI + BB Upgraded v7 — 超跌反弹升级版
 数据源: 全部指标从 DataFactory TA-Lib 读取
 """
 import logging
+from collections import deque
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, OrderType, Position
@@ -21,17 +23,21 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v7_upgraded"
+STRATEGY_VERSION = "v8_upgraded"
 STRATEGY_MAGIC = 661003
 STRATEGY_LEGACY_MAGICS: list[int] = [661001, 661002]
 STRATEGY_CHANGELOG = [
     {"version": "v7_upgraded", "magic": 661003, "date": "2026-07-18",
      "desc": "升级版: 进场不看MFI只看出轨; 运动员回抽入场; 顺势平改穿轨回抽+MFI50线"},
+    {"version": "v8_upgraded", "magic": 661003, "date": "2026-07-21",
+     "desc": "BB开口扩张保护：当前BB宽度比历史均值>20%时禁用同向入场，防趋势加速接飞刀"},
 ]
+_BB_WIDTH_LOOKBACK = 6      # 追踪最近6根M30的BB宽度（约3小时）
+_BB_EXPAND_THRESHOLD = 0.20  # 开口扩张 >20% 时禁用同向入场
 
 
 class M30MFIBBUpgraded(BaseStrategy):
-    """M30 MFI+BB 升级版 v7 — 收盘穿轨入场 + 回抽验证 + 顺势穿轨离场"""
+    """M30 MFI+BB 升级版 v8 — 收盘穿轨入场 + BB扩张保护 + 回抽验证 + 顺势穿轨离场"""
 
     name = "mfi_bb_m30_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -39,6 +45,7 @@ class M30MFIBBUpgraded(BaseStrategy):
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
+        self._bb_width_history: deque = deque(maxlen=_BB_WIDTH_LOOKBACK)
 
         # Entry params
         self.tolerance_bars = 2  # 2根K线容差（检查最近 N 根收盘是否出轨）
@@ -48,6 +55,7 @@ class M30MFIBBUpgraded(BaseStrategy):
     def _check_3bar_condition(self) -> tuple[bool, bool, Optional[dict]]:
         """检查最近 price_position 内收盘是否出轨道。
         所有指标从 DataFactory 读取。
+        加入 BB 开口扩张保护：宽度比历史均值 >20% 时禁用同向入场。
         """
         closes = self.get_close_prices()
         if len(closes) < 2:
@@ -58,8 +66,30 @@ class M30MFIBBUpgraded(BaseStrategy):
         if bb is None:
             return False, False, None
 
+        current_width = bb["upper"] - bb["lower"]
+
+        # ── BB扩张检查 ──
+        width_expanded = False
+        if len(self._bb_width_history) >= 3:
+            avg_width = sum(self._bb_width_history) / len(self._bb_width_history)
+            if avg_width > 0 and current_width > avg_width * (1 + _BB_EXPAND_THRESHOLD):
+                width_expanded = True
+                logger.info(f"[{self.name}] BB开口扩张 {current_width:.1f}/{avg_width:.1f} ({(current_width/avg_width-1)*100:.0f}%)，禁用同向入场")
+
+        # 记录当前宽度供下次比较
+        self._bb_width_history.append(current_width)
+
         buy_signal = close < bb["lower"]
         sell_signal = close > bb["upper"]
+
+        # BB扩张保护：开口暴拉时禁止追方向（防接飞刀）
+        if width_expanded:
+            if sell_signal:
+                logger.info(f"[{self.name}] BB扩张中，禁止做空（close={close:.2f} > upper={bb['upper']:.2f}）")
+                sell_signal = False
+            if buy_signal:
+                logger.info(f"[{self.name}] BB扩张中，禁止做多（close={close:.2f} < lower={bb['lower']:.2f}）")
+                buy_signal = False
 
         iv = {
             "close": round(close, 2),
@@ -68,6 +98,7 @@ class M30MFIBBUpgraded(BaseStrategy):
             "bb_mid": bb["mid"],
             "bb_lower": bb["lower"],
             "bb": bb,
+            "bb_width": round(current_width, 2),
         }
         return buy_signal, sell_signal, iv
 
