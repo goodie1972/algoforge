@@ -46,6 +46,7 @@ class PaperBridge(MT4BridgeBase):
         self._ticket_seq_next: int = 0                   # 当天 seq
         self._ticket_day_key: str = ""                   # 当前 YYMMDD
         self._init_ticket_seq()
+        self._restore_open_positions()                   # 恢复 CSV 中未平仓的单子
         self._balance: float = 0.0
         self._start_balance: float = 0.0
         self._connected: bool = False
@@ -101,6 +102,64 @@ class PaperBridge(MT4BridgeBase):
             pass
 
         self._ticket_seq_next = max_seq + 1
+
+    def _restore_open_positions(self):
+        """从 CSV 恢复未平仓持仓（引擎重启后重建 _positions）"""
+        if not CSV_TRADES.exists():
+            return
+        try:
+            import csv
+            with open(str(CSV_TRADES), 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                # CSV 按开仓行 + 平仓行排列，开仓行有完整字段，平仓行只有出场字段
+                seen = {}
+                for row in reader:
+                    t = row.get("ticket", "").strip()
+                    if not t:
+                        continue
+                    # 有出场信息 → 该 ticket 已平仓
+                    if row.get("exit_time", "").strip():
+                        seen[t] = "closed"
+                    # 有入场信息且未标记为已平仓 → 可能是开仓行
+                    elif row.get("entry_time", "").strip():
+                        if t not in seen or seen[t] != "closed":
+                            seen[t] = {
+                                "entry_price": float(row.get("entry_price", 0) or 0),
+                                "volume": float(row.get("volume", 0) or 0.01),
+                                "direction": str(row.get("direction", "BUY")),
+                                "strategy": str(row.get("strategy", "")),
+                                "magic": int(row.get("magic", 0) or 0),
+                                "entry_bid": float(row.get("entry_bid", 0) or 0),
+                                "entry_ask": float(row.get("entry_ask", 0) or 0),
+                                "entry_time": str(row.get("entry_time", "")),
+                            }
+            # 重建 Position 对象
+            count = 0
+            for ticket, data in seen.items():
+                if isinstance(data, str):
+                    continue  # 已平仓
+                is_buy = "BUY" in data["direction"].upper()
+                self._positions[ticket] = Position(
+                    ticket=ticket,
+                    symbol="XAUUSD",
+                    order_type="OP_BUY" if is_buy else "OP_SELL",
+                    volume=data["volume"],
+                    open_price=data["entry_price"],
+                    current_price=data["entry_price"],
+                    stop_loss=0.0,
+                    take_profit=0.0,
+                    profit=0.0,
+                    swap=0.0,
+                    commission=0.0,
+                    magic=data["magic"],
+                    comment=data["strategy"],
+                    open_time=data["entry_time"],
+                )
+                count += 1
+            if count:
+                logger.info(f"[PaperBridge] 重启恢复 {count} 张未平仓持仓")
+        except Exception as e:
+            logger.warning(f"[PaperBridge] 恢复持仓失败: {e}")
 
     def _generate_ticket(self) -> str:
         """生成 8 位纯数字票号: YYMMDDSEQ (26072000)，每天重置"""
