@@ -203,16 +203,9 @@ class RSIGradingM30Upgraded(BaseStrategy):
             short_score += 1
             short_factors.append("RSI-反转↓")
 
-        # ADX>28 趋势门禁
+        # ADX>28 趋势门禁 — 纸笔测试期间临时注释(2026-07-21)
+        # 恢复后 gate_side 决定 can_long/can_short 方向拦截
         gate_side = None
-        if adx is not None and adx > self.adx_threshold:
-            ema9 = self.get_indicator("ema_9")
-            ema21 = self.get_indicator("ema_21")
-            if ema9 is not None and ema21 is not None:
-                if ema9 > ema21:
-                    gate_side = 'short'
-                elif ema9 < ema21:
-                    gate_side = 'long'
 
         # ── Decision ──
         signal = None
