@@ -45,6 +45,7 @@ class SanQingH1Upgraded(BaseStrategy):
         self.tp_atr = 3.0                # 止盈 3.0 ATR (2×止损)
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25）
         # DI 方向保护：profit_drawdown 方向一致时不执行
+        self._drawdown_min_hold = 1800  # 利润回撤最小持仓：30 分钟（H1 策略，给趋势发展时间）
 
         # EMA 交叉检测：记录上一次的值（来自 DataFactory）
         self._prev_ema9: float = 0.0
@@ -317,13 +318,17 @@ class SanQingH1Upgraded(BaseStrategy):
             del self._trail_data[ticket]
             return True
 
-        # ── ③ 利润回撤止盈（DI 保护） ──
+        # ── ③ 利润回撤止盈（DI 保护 + 最小持仓保护） ──
         if pnl_pts > 0 and self.profit_drawdown_enabled and \
            td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
             profit_ratio = pnl_pts / td["peak_profit"]
             if profit_ratio < (1 - self.profit_drawdown_pct):
+                # 最小持仓保护：开仓不足 N 秒不执行利润回撤，给趋势发展时间
+                if time.time() - td.get("entry_ts", 0) < self._drawdown_min_hold:
+                    logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} "
+                                f"利润回撤触发但持仓不足{self._drawdown_min_hold//60}min，跳过")
                 # DI 方向保护：如果 DI 仍然对齐，说明趋势完好，不执行利润回撤
-                if di_aligned and adx is not None and adx > 20:
+                elif di_aligned and adx is not None and adx > 20:
                     logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} "
                                 f"利润回撤触发但DI对齐(ADX={adx:.1f})，跳过")
                 else:

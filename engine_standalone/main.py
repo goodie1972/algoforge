@@ -950,40 +950,41 @@ class TradingEngine:
                 except Exception:
                     pass
 
-        # ---- 阻断检查 ----
-        global_blocked = self._check_global_loss()
+        # ---- 阻断检查（纸面模式全量测试，跳过所有风控） ----
+        if not settings.PAPER_MODE:
+            global_blocked = self._check_global_loss()
 
-        news_blocked = False
-        if not global_blocked:
-            news_blocked = self._check_news_blackout()
+            news_blocked = False
+            if not global_blocked:
+                news_blocked = self._check_news_blackout()
 
-        # ---- News-Bias 方向阻塞检查 ----
-        bias_blocked = False
-        if not global_blocked and not news_blocked:
-            bias_blocked = self._check_news_bias_block()
-            if bias_blocked:
-                logger.warning("[News-Bias] 方向阻塞触发，跳过开仓")
+            # ---- News-Bias 方向阻塞检查 ----
+            bias_blocked = False
+            if not global_blocked and not news_blocked:
+                bias_blocked = self._check_news_bias_block()
+                if bias_blocked:
+                    logger.warning("[News-Bias] 方向阻塞触发，跳过开仓")
 
-        safety_blocked = False
-        if not global_blocked and not news_blocked:
-            if self._is_safety_locked():
-                safety_blocked = True
-                logger.warning("[安全锁] 检测到锁文件，暂停开新仓")
+            safety_blocked = False
+            if not global_blocked and not news_blocked:
+                if self._is_safety_locked():
+                    safety_blocked = True
+                    logger.warning("[安全锁] 检测到锁文件，暂停开新仓")
 
-        if global_blocked or news_blocked or safety_blocked or bias_blocked:
-            # 有全局阻断时，跳过本轮开仓，但每策略仍检查浮动亏损
-            self._check_floating_loss_blocks()
-            return
+            if global_blocked or news_blocked or safety_blocked or bias_blocked:
+                # 有全局阻断时，跳过本轮开仓
+                return
 
-        # ---- 浮动亏损警告/阻断检查 ----
+        # ---- 浮动亏损检查/阻断 ----
         self._check_floating_loss_blocks()
 
         # ---- 开仓：逐策略判断 ----
         for strategy in snapshot:
-            block_reason = self._is_strategy_blocked(strategy.magic)
-            if block_reason:
-                logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
-                continue
+            if not settings.PAPER_MODE:
+                block_reason = self._is_strategy_blocked(strategy.magic)
+                if block_reason:
+                    logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
+                    continue
             self._run_strategy(strategy)
 
         # 三轨：运动员验证（每 tick 轮询 + 处理回调）
