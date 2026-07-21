@@ -1398,8 +1398,18 @@ class TradingEngine:
             pass
         return False
 
+    # 纸面交易单策略最大持仓（防止单策略耗尽所有额度）
+    _PAPER_MAX_POSITIONS = 10
+
     def _run_strategy(self, strategy):
         """单个策略的一次 tick — 信号生成 + 开仓"""
+        # ── 纸面交易单策略持仓上限检查 ──
+        if settings.PAPER_MODE and self._PAPER_MAX_POSITIONS > 0:
+            _my_positions = [p for p in self.bridge.get_positions(settings.SYMBOL)
+                             if p.magic in self._strategy_magics(strategy)]
+            if len(_my_positions) >= self._PAPER_MAX_POSITIONS:
+                return
+
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
         try:
             adx_data = strategy.get_adx_data()
