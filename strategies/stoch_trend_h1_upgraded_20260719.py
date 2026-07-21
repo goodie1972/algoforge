@@ -203,10 +203,10 @@ class StochTrendH1Upgraded(BaseStrategy):
         signal = None
         if long_score >= self.score_threshold:
             signal = OrderType.BUY
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_buy}
+            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_buy, "pdi": pdi, "ndi": ndi}
         elif short_score >= self.score_threshold:
             signal = OrderType.SELL
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_sell}
+            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_sell, "pdi": pdi, "ndi": ndi}
 
         iv = {
             "close": round(close, 2), "atr": round(atr_val, 2),
@@ -253,6 +253,8 @@ class StochTrendH1Upgraded(BaseStrategy):
                 "entry_price": position.open_price,
                 "peak": position.open_price,
                 "entry_adx": self._pending_entry_info.get("adx", 0),
+                "entry_pdi": self._pending_entry_info.get("pdi", 0),
+                "entry_ndi": self._pending_entry_info.get("ndi", 0),
                 "stoch_cross_done": False,
             }
 
@@ -282,15 +284,18 @@ class StochTrendH1Upgraded(BaseStrategy):
             del self._pos_data[ticket]
             return True
 
-        # ③ DI反转
+        # ③ DI反转（与入场时的DI方向比较，不是绝对大小）
         if adx is not None and pdi is not None and ndi is not None:
-            if is_buy and ndi > pdi:
-                logger.info(f"[{self.name}] DI反转平BUY ticket={ticket}")
+            entry_pdi = td.get("entry_pdi", 0)
+            entry_ndi = td.get("entry_ndi", 0)
+            if entry_pdi > entry_ndi and ndi > pdi:
+                # 入场时PDI>NDI(多头)，现在NDI>PDI(空头)→真正翻转
+                logger.info(f"[{self.name}] DI反转平{'BUY' if is_buy else 'SELL'} ticket={ticket} entry=({entry_pdi:.0f}/{entry_ndi:.0f}) now=({pdi:.0f}/{ndi:.0f})")
                 self._last_exit_detail = {"exit_type": "di_flip"}
                 del self._pos_data[ticket]
                 return True
-            elif not is_buy and pdi > ndi:
-                logger.info(f"[{self.name}] DI反转平SELL ticket={ticket}")
+            elif entry_ndi > entry_pdi and pdi > ndi:
+                logger.info(f"[{self.name}] DI反转平{'BUY' if is_buy else 'SELL'} ticket={ticket} entry=({entry_pdi:.0f}/{entry_ndi:.0f}) now=({pdi:.0f}/{ndi:.0f})")
                 self._last_exit_detail = {"exit_type": "di_flip"}
                 del self._pos_data[ticket]
                 return True
