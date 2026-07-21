@@ -1,5 +1,5 @@
 """
-SanQing EA v8_upgraded — H1 实盘策略升级版
+SanQing EA v9_upgraded — H1 实盘策略升级版
 ===========================================
 - EMA9/21 趋势 + ATR14 评分系统（保留原评分逻辑）
 - 评分阈值: ADX>20=4, ADX≤20=3
@@ -16,17 +16,19 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v8_upgraded"
+STRATEGY_VERSION = "v9_upgraded"
 STRATEGY_MAGIC = 880108
 STRATEGY_LEGACY_MAGICS: list[int] = [880102, 880103, 880104, 880105, 880106]
 STRATEGY_CHANGELOG = [
     {"version": "v8_upgraded", "magic": 880108, "date": "2026-07-19",
      "desc": "升级版: 运动员等回抽EMA9入场; 1.5ATR止损3.0ATR止盈; DI保护利润回撤; DI反转出场"},
+    {"version": "v9_upgraded", "magic": 880108, "date": "2026-07-21",
+     "desc": "ADX自适应出场: 强趋势放宽追踪/止盈让利润跑, 震荡收紧, 新增追踪止损"},
 ]
 
 
 class SanQingH1Upgraded(BaseStrategy):
-    """SanQing v8_upgraded — 升级版"""
+    """SanQing v9_upgraded — ADX自适应出场"""
 
     name = "sanqing_h1_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -41,11 +43,19 @@ class SanQingH1Upgraded(BaseStrategy):
         self.adx_threshold = 20          # ADX>20 趋势中阈值升到 4
 
         # Exit params
-        self.sl_atr = 1.5                # 硬止损 1.5 ATR
-        self.tp_atr = 3.0                # 止盈 3.0 ATR (2×止损)
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25）
         # DI 方向保护：profit_drawdown 方向一致时不执行
         self._drawdown_min_hold = 1800  # 利润回撤最小持仓：30 分钟（H1 策略，给趋势发展时间）
+        # ADX 自适应出场参数
+        self.p_trail_chop = 1.5         # 震荡: 窄追踪
+        self.p_trail_normal = 2.5       # 中等: 正常追踪
+        self.p_trail_trend = 3.5        # 强趋势: 宽追踪让利润跑
+        self.p_profit_chop = 2.5        # 震荡: 小目标落袋
+        self.p_profit_normal = 4.0      # 中等: 正常止盈
+        self.p_profit_trend = 6.0       # 强趋势: 大目标让利润跑
+        self.p_hard_chop = 3.0          # 震荡: 硬止损宽于追踪
+        self.p_hard_normal = 5.0        # 中等: 硬止损宽于追踪
+        self.p_hard_trend = 7.0         # 强趋势: 硬止损宽于追踪
 
         # EMA 交叉检测：记录上一次的值（来自 DataFactory）
         self._prev_ema9: float = 0.0
@@ -227,15 +237,14 @@ class SanQingH1Upgraded(BaseStrategy):
 
     # ─────────────── SL/TP ───────────────
 
-    def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
-        """趋势感知，用于 get_dynamic_sl_tp。缩小幅度。"""
-        ema9 = self.get_indicator("ema_9")
-        ema21 = self.get_indicator("ema_21")
-        trend_up = ema9 is not None and ema21 is not None and ema9 > ema21
-
-        if (is_buy and trend_up) or (not is_buy and not trend_up):
-            return (1.5, 3.0)  # 顺趋势
-        return (1.0, 2.0)     # 逆趋势
+    def _get_adx_multipliers(self) -> tuple[float, float, float]:
+        """ADX 自适应：返回 (trail_atr, profit_atr, hard_atr)"""
+        adx = self.get_indicator("adx")
+        if adx is None or adx <= 25:
+            return self.p_trail_chop, self.p_profit_chop, self.p_hard_chop
+        if adx > 35:
+            return self.p_trail_trend, self.p_profit_trend, self.p_hard_trend
+        return self.p_trail_normal, self.p_profit_normal, self.p_hard_normal
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
         atr_val = self.get_indicator("atr")
@@ -243,7 +252,8 @@ class SanQingH1Upgraded(BaseStrategy):
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
         is_buy = direction == OrderType.BUY
-        sl_mult, tp_mult = self._get_exit_multipliers(is_buy)
+        _, _, hard_mult = self._get_adx_multipliers()
+        sl_mult = hard_mult
         sl_dist = atr_val * sl_mult
         tp_dist = atr_val * tp_mult
         if is_buy:
@@ -257,28 +267,17 @@ class SanQingH1Upgraded(BaseStrategy):
     # ─────────────── 出场 ───────────────
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """
-        v8 出场：
-        ① 硬止损: 1.5 ATR（顺）/ 1.0 ATR（逆）
-        ② 止盈: 3.0 ATR（顺）/ 2.0 ATR（逆）
-        ③ 利润回撤止盈 + DI 方向保护
-        ④ DI反转出场
-        """
+        """v9 ADX自适应出场"""
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
         if ticket not in self._trail_data:
-            ema9 = self.get_indicator("ema_9")
-            ema21 = self.get_indicator("ema_21")
-            trend_up = ema9 is not None and ema21 is not None and ema9 > ema21
-            sl_mult, tp_mult = self._get_exit_multipliers(is_buy)
             self._trail_data[ticket] = {
                 "entry": position.open_price,
+                "highest": position.open_price if is_buy else 0,
+                "lowest": position.open_price if not is_buy else float("inf"),
                 "peak_profit": 0.0,
-                "sl_mult": sl_mult,
-                "tp_mult": tp_mult,
-                "trend_up_entry": trend_up,  # 锁定入场时的趋势方向
-                "entry_ts": time.time(),  # 入场时间戳，用于DI反转出场门槛
+                "entry_ts": time.time(),
             }
 
         td = self._trail_data[ticket]
@@ -286,75 +285,74 @@ class SanQingH1Upgraded(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return False
 
-        sl_mult = td["sl_mult"]
-        tp_mult = td["tp_mult"]
+        trail_mult, tp_mult, hard_mult = self._get_adx_multipliers()
         pnl_pts = (bid - td["entry"]) if is_buy else (td["entry"] - ask)
         loss_pts = (td["entry"] - bid) if is_buy else (ask - td["entry"])
 
-        # 当前 ADX/DI
         adx = self.get_indicator("adx")
         pdi = self.get_indicator("pdi")
         ndi = self.get_indicator("ndi")
+        di_aligned = (is_buy and pdi is not None and ndi is not None and pdi > ndi) or (not is_buy and pdi is not None and ndi is not None and ndi > pdi)
 
-        # 方向是否与 DI 对齐（DI 方向保护用）
-        di_aligned = (is_buy and pdi is not None and ndi is not None and pdi > ndi) or \
-                     (not is_buy and pdi is not None and ndi is not None and ndi > pdi)
-
-        # ── 更新 peak_profit ──
+        if is_buy:
+            td["highest"] = max(td["highest"], bid)
+        else:
+            td["lowest"] = min(td["lowest"], ask)
         if pnl_pts > 0:
             td["peak_profit"] = max(td["peak_profit"], pnl_pts)
 
-        # ── ① 硬止损 ──
-        if loss_pts > atr_val * sl_mult:
-            logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} HardStop ticket={ticket} loss={loss_pts:.2f}")
-            self._last_exit_detail = {"exit_type": "hard_stop", "loss": round(loss_pts, 2)}
-            del self._trail_data[ticket]
-            return True
+        side = "BUY" if is_buy else "SELL"
 
-        # ── ② 止盈 ──
+        # (1) Trail stop
+        if is_buy:
+            d = td["highest"] - bid
+            if d > atr_val * trail_mult:
+                logger.info(f"[{self.name}] {side} TrailStop ticket={ticket} dd={d:.2f} m={trail_mult:.1f}")
+                del self._trail_data[ticket]
+                return True
+        else:
+            r = ask - td["lowest"]
+            if r > atr_val * trail_mult:
+                logger.info(f"[{self.name}] {side} TrailStop ticket={ticket} rally={r:.2f} m={trail_mult:.1f}")
+                del self._trail_data[ticket]
+                return True
+
+        # (2) Take profit
         if pnl_pts > atr_val * tp_mult:
-            logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} TakeProfit ticket={ticket} profit=${pnl_pts:.2f}")
-            self._last_exit_detail = {"exit_type": "take_profit", "profit": round(pnl_pts, 2)}
+            logger.info(f"[{self.name}] {side} TP ticket={ticket} p=${pnl_pts:.2f} m={tp_mult:.1f}")
             del self._trail_data[ticket]
             return True
 
-        # ── ③ 利润回撤止盈（DI 保护 + 最小持仓保护） ──
-        if pnl_pts > 0 and self.profit_drawdown_enabled and \
-           td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
-            profit_ratio = pnl_pts / td["peak_profit"]
-            if profit_ratio < (1 - self.profit_drawdown_pct):
-                # 最小持仓保护：开仓不足 N 秒不执行利润回撤，给趋势发展时间
+        # (3) Hard stop
+        if loss_pts > atr_val * hard_mult:
+            logger.info(f"[{self.name}] {side} HardStop ticket={ticket} loss={loss_pts:.2f} m={hard_mult:.1f}")
+            del self._trail_data[ticket]
+            return True
+
+        # (4) Drawdown protection
+        if pnl_pts > 0 and self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
+            ratio = pnl_pts / td["peak_profit"]
+            if ratio < (1 - self.profit_drawdown_pct):
                 if time.time() - td.get("entry_ts", 0) < self._drawdown_min_hold:
-                    logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} "
-                                f"利润回撤触发但持仓不足{self._drawdown_min_hold//60}min，跳过")
-                # DI 方向保护：如果 DI 仍然对齐，说明趋势完好，不执行利润回撤
+                    logger.info(f"[{self.name}] {side} dd skip: hold < {self._drawdown_min_hold//60}min")
                 elif di_aligned and adx is not None and adx > 20:
-                    logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} "
-                                f"利润回撤触发但DI对齐(ADX={adx:.1f})，跳过")
+                    logger.info(f"[{self.name}] {side} dd skip: DI aligned ADX={adx:.1f}")
                 else:
-                    logger.info(f"[{self.name}] {'BUY' if is_buy else 'SELL'} "
-                                f"ProfitStop ticket={ticket} profit=${pnl_pts:.2f} "
-                                f"peak=${td['peak_profit']:.2f} di_aligned={di_aligned}")
-                    self._last_exit_detail = {"exit_type": "profit_drawdown",
-                                              "peak": round(td["peak_profit"], 2),
-                                              "profit": round(pnl_pts, 2)}
+                    logger.info(f"[{self.name}] {side} ProfitStop t={ticket} p=${pnl_pts:.2f} peak=${td["peak_profit"]:.2f}")
                     del self._trail_data[ticket]
                     return True
 
-        # ── ④ DI反转出场（开仓5分钟后才检查，避免开仓即平） ──
+        # (5) DI flip
         if pdi is not None and ndi is not None and time.time() - td["entry_ts"] > 300:
             if is_buy and ndi > pdi:
-                logger.info(f"[{self.name}] BUY DI反转出场 ticket={ticket}")
-                self._last_exit_detail = {"exit_type": "di_flip"}
+                logger.info(f"[{self.name}] BUY DI flip ticket={ticket}")
                 del self._trail_data[ticket]
                 return True
             elif not is_buy and pdi > ndi:
-                logger.info(f"[{self.name}] SELL DI反转出场 ticket={ticket}")
-                self._last_exit_detail = {"exit_type": "di_flip"}
+                logger.info(f"[{self.name}] SELL DI flip ticket={ticket}")
                 del self._trail_data[ticket]
                 return True
 
-        self._last_exit_detail = None
         return False
 
     # ─────────────── 运动员验票（回抽 EMA9） ───────────────

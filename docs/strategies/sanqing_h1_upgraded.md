@@ -1,9 +1,9 @@
 ---
 name: sanqing_h1_upgraded
 magic: 880108
-version: v8_upgraded
+version: v9_upgraded
 display: H1 SanQing 升级版
-desc: EMA9/21趋势评分 + 运动员回抽EMA9入场 + DI保护出场
+desc: EMA9/21趋势评分 + 运动员回抽EMA9入场 + ADX自适应出场
 ---
 
 ## 评分因子
@@ -35,14 +35,15 @@ desc: EMA9/21趋势评分 + 运动员回抽EMA9入场 + DI保护出场
 | BUY | 等价格回抽到 ≤ EMA9×1.002 再入场 |
 | SELL | 等价格反弹到 ≥ EMA9×0.998 再入场 |
 
-## 出场逻辑
+## 出场逻辑（ADX 自适应）
 
-| # | 条件 | 说明 |
-|:-:|:----|:----|
-| ① | 硬止损 | 顺趋势 1.5ATR / 逆趋势 1.0ATR |
-| ② | 止盈 | 顺趋势 3.0ATR / 逆趋势 2.0ATR |
-| ③ | 利润回撤+DI保护 | 峰值回撤25%，DI对齐(趋势完好)时跳过回撤止盈 |
-| ④ | DI反转出场 | 开仓5分钟后: BUY持仓NDI>PDI / SELL持仓PDI>NDI |
+| # | 条件 | 震荡(ADX≤25) | 中等趋势(ADX 25~35) | 强趋势(ADX>35) |
+|:-:|:----|:----:|:----:|:----:|
+| ① | ADX自适应追踪止损 | 1.5 ATR 回撤 | 2.5 ATR 回撤 | 3.5 ATR 回撤 |
+| ② | ADX自适应止盈 | 2.5 ATR | 4.0 ATR | 6.0 ATR |
+| ③ | ADX自适应硬止损 | 3.0 ATR | 5.0 ATR | 7.0 ATR |
+| ④ | 利润回撤+DI保护 | 峰值回撤25%，DI对齐(趋势完好)时跳过回撤止盈 |
+| ⑤ | DI反转出场 | 开仓5分钟后: BUY持仓NDI>PDI / SELL持仓PDI>NDI |
 
 ## 特别规则
 
