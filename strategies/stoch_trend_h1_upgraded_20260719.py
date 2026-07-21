@@ -332,35 +332,29 @@ class StochTrendH1Upgraded(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-        """v8 验票:
-        SELL: K>80(极端)→直接入场; K在60~80→需>=65
-        BUY:  K<20(极端)→直接入场; K在20~40→需<=35
-
-        latest 来自 DataFactory 缓存（get_cache），包含 stoch_14_3_3
-        """
+        """v9 验票: 极端Stoch条件优先，DI仅过滤非极端情况"""
         direction = signal.get("direction", "BUY")
         adx = latest.get("adx", 20)
         pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
         stoch = latest.get("stoch_14_3_3") or {}
         stoch_k = stoch.get("k", 50)
 
-        # ADX > 25 前置条件
         if adx < 25:
             return False
 
         if direction == "BUY":
-            if pdi <= ndi:
-                return False
             if stoch_k < 20:
                 return True   # 极端金叉，直接入场
+            if pdi <= ndi:
+                return False
             if 20 <= stoch_k <= 40:
-                return stoch_k <= 35  # 需 <= 35
+                return stoch_k <= 35
             return False
         else:
+            if stoch_k > 80:
+                return True   # 极端死叉，直接入场（不检查DI）
             if ndi <= pdi:
                 return False
-            if stoch_k > 80:
-                return True   # 极端死叉，直接入场
             if 60 <= stoch_k <= 80:
-                return stoch_k >= 65  # 需 >= 65
+                return stoch_k >= 65
             return False
