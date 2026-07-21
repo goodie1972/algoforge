@@ -541,18 +541,27 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         trend = latest.get("trend", "NEUTRAL")
         factors = signal.get("factors_long", []) if direction == "BUY" else signal.get("factors_short", [])
 
+        _log = logging.getLogger(__name__)
+
         if direction == "BUY":
             if bb.get("lower") and tick_price > bb["lower"] * 1.005:
+                _log.info(f"[verify] BUY REJECT: price={tick_price:.2f} > lower*1.005={bb['lower']*1.005:.2f}")
                 return False
             if any(f.startswith("MFI-") for f in factors) and mfi > 45:
+                _log.info(f"[verify] BUY REJECT: factors={factors} mfi={mfi:.1f} > 45")
                 return False
             if any(f == "MA20-UP" for f in factors) and trend != "UP":
+                _log.info(f"[verify] BUY REJECT: MA20-UP but trend={trend}")
                 return False
         else:
             if bb.get("upper") and tick_price < bb["upper"] * 0.995:
+                _log.info(f"[verify] SELL REJECT: price={tick_price:.2f} < upper*0.995={bb['upper']*0.995:.2f}")
                 return False
             if any(f.startswith("MFI-") for f in factors) and mfi < 55:
+                _log.info(f"[verify] SELL REJECT: factors={factors} mfi_cache={mfi:.1f} < 55")
                 return False
             if any(f == "MA20-DN" for f in factors) and trend != "DOWN":
+                _log.info(f"[verify] SELL REJECT: MA20-DN but trend={trend}")
                 return False
+        _log.info(f"[verify] SELL PASS: price={tick_price:.2f} upper={bb.get('upper',0):.2f} mfi={mfi:.1f} trend={trend}")
         return True

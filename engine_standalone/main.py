@@ -837,6 +837,11 @@ class TradingEngine:
         with self._strategies_lock:
             snapshot = list(self.strategies)
 
+        # ★ 运动员先跑：处理上一轮遗留门票，避免策略处理耗时导致过期 ★
+        if self._athlete:
+            self._athlete.run()
+            self._handle_athlete_opened()
+
         # 配置热重载
         try:
             mtime = os.path.getmtime(settings.__file__)
@@ -981,10 +986,9 @@ class TradingEngine:
                 continue
             self._run_strategy(strategy)
 
-        # 三轨：运动员验证并发令
+        # 三轨：运动员验证（每 tick 轮询 + 处理回调）
         if self._athlete:
             self._athlete.run()
-            # 处理开仓成功的回调：对 deepreturn 等策略调用 mark_extreme_entry
             self._handle_athlete_opened()
 
     def _handle_athlete_opened(self):
@@ -1540,6 +1544,8 @@ class TradingEngine:
                         entry_info["tp"] = entry_price - tp_pips * 0.01 * 10
                 entry_info["entry_price"] = entry_price
                 self._athlete.submit(signal_id, direction, entry_info)
+                # ★ 提交后立即处理开仓成功回调 ★
+                self._handle_athlete_opened()
         else:
             # 回退：旧模式直接开仓
             ticket = 0
