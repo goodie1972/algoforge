@@ -260,6 +260,21 @@ class M30BBDeepReturnOptimized(BaseStrategy):
                 short_detail.append(f"COOLDOWN({int(remaining)}s)")
                 short_score = 0
 
+        # ── BB扩张 + MFI方向一致拦截 ──
+        _bwr = self.get_indicator("bb_width_ratio")
+        _bwd = self.get_indicator("bb_width_direction")
+        _mfi = self.get_indicator("mfi")
+        _mfi_dir = self.get_indicator("mfi_direction")
+        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir:
+            if close > bb["mid"] and _mfi_dir in ("up", "flat"):
+                short_score = 0
+                short_detail.append("BBW-MFI-UP↑")
+                logger.info(f"[{self.name}] BB扩张+价格>中轴+MFI上升({_mfi:.0f})，禁做空")
+            if close < bb["mid"] and _mfi_dir in ("down", "flat"):
+                long_score = 0
+                long_detail.append("BBW-MFI-DN↓")
+                logger.info(f"[{self.name}] BB扩张+价格<中轴+MFI下降({_mfi:.0f})，禁做多")
+
         # ── Decision ──
         signal = None
         signal_str = "无信号"

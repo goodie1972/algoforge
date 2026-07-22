@@ -63,24 +63,23 @@ class M30MFIBBUpgraded(BaseStrategy):
         if bb is None:
             return False, False, None
 
-        # ── BB扩张检查（DataFactory 预计算，零等待） ──
-        bb_width_ratio = self.get_indicator("bb_width_ratio") or 1.0
-        width_expanded = bb_width_ratio > 1.0 + _BB_EXPAND_THRESHOLD
+        # ── BB扩张 + MFI方向一致拦截 ──
+        _bwr = self.get_indicator("bb_width_ratio")
+        _bwd = self.get_indicator("bb_width_direction")
+        _mfi = self.get_indicator("mfi")
+        _mfi_dir = self.get_indicator("mfi_direction")
+        _block_short = False
+        _block_long = False
+        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir and bb:
+            if close > bb["mid"] and _mfi_dir in ("up", "flat"):
+                _block_short = True
+                logger.info(f"[{self.name}] BB扩张+价格>中轴+MFI上升({_mfi:.0f})，禁做空")
+            if close < bb["mid"] and _mfi_dir in ("down", "flat"):
+                _block_long = True
+                logger.info(f"[{self.name}] BB扩张+价格<中轴+MFI下降({_mfi:.0f})，禁做多")
 
-        if width_expanded:
-            logger.info(f"[{self.name}] BB开口扩张 {bb_width_ratio:.2f}x，禁用同向入场（防接飞刀）")
-
-        buy_signal = close < bb["lower"]
-        sell_signal = close > bb["upper"]
-
-        # BB扩张保护
-        if width_expanded:
-            if sell_signal:
-                logger.info(f"[{self.name}] BB扩张中，禁止做空")
-                sell_signal = False
-            if buy_signal:
-                logger.info(f"[{self.name}] BB扩张中，禁止做多")
-                buy_signal = False
+        buy_signal = close < bb["lower"] and not _block_long
+        sell_signal = close > bb["upper"] and not _block_short
 
         iv = {
             "close": round(close, 2),
