@@ -53,9 +53,7 @@ class SanQingH1Upgraded(BaseStrategy):
         self.p_profit_chop = 2.5        # 震荡: 小目标落袋
         self.p_profit_normal = 4.0      # 中等: 正常止盈
         self.p_profit_trend = 6.0       # 强趋势: 大目标让利润跑
-        self.p_hard_chop = 3.0          # 震荡: 硬止损宽于追踪
-        self.p_hard_normal = 5.0        # 中等: 硬止损宽于追踪
-        self.p_hard_trend = 7.0         # 强趋势: 硬止损宽于追踪
+        self.p_hard_atr = 1.5           # 硬止损: 固定 1.5 ATR，不随 ADX 变化（最后防线）
 
         # EMA 交叉检测：记录上一次的值（来自 DataFactory）
         self._prev_ema9: float = 0.0
@@ -237,14 +235,14 @@ class SanQingH1Upgraded(BaseStrategy):
 
     # ─────────────── SL/TP ───────────────
 
-    def _get_adx_multipliers(self) -> tuple[float, float, float]:
-        """ADX 自适应：返回 (trail_atr, profit_atr, hard_atr)"""
+    def _get_adx_multipliers(self) -> tuple[float, float]:
+        """ADX 自适应：返回 (trail_atr, profit_atr)"""
         adx = self.get_indicator("adx")
         if adx is None or adx <= 25:
-            return self.p_trail_chop, self.p_profit_chop, self.p_hard_chop
+            return self.p_trail_chop, self.p_profit_chop
         if adx > 35:
-            return self.p_trail_trend, self.p_profit_trend, self.p_hard_trend
-        return self.p_trail_normal, self.p_profit_normal, self.p_hard_normal
+            return self.p_trail_trend, self.p_profit_trend
+        return self.p_trail_normal, self.p_profit_normal
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
         atr_val = self.get_indicator("atr")
@@ -252,8 +250,7 @@ class SanQingH1Upgraded(BaseStrategy):
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
         is_buy = direction == OrderType.BUY
-        _, _, hard_mult = self._get_adx_multipliers()
-        sl_mult = hard_mult
+        sl_mult = self.p_hard_atr
         sl_dist = atr_val * sl_mult
         tp_dist = atr_val * tp_mult
         if is_buy:
@@ -285,7 +282,7 @@ class SanQingH1Upgraded(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return False
 
-        trail_mult, tp_mult, hard_mult = self._get_adx_multipliers()
+        trail_mult, tp_mult = self._get_adx_multipliers()
         pnl_pts = (bid - td["entry"]) if is_buy else (td["entry"] - ask)
         loss_pts = (td["entry"] - bid) if is_buy else (ask - td["entry"])
 
@@ -324,8 +321,8 @@ class SanQingH1Upgraded(BaseStrategy):
             return True
 
         # (3) Hard stop
-        if loss_pts > atr_val * hard_mult:
-            logger.info(f"[{self.name}] {side} HardStop ticket={ticket} loss={loss_pts:.2f} m={hard_mult:.1f}")
+        if loss_pts > atr_val * self.p_hard_atr:
+            logger.info(f"[{self.name}] {side} HardStop ticket={ticket} loss={loss_pts:.2f}")
             del self._trail_data[ticket]
             return True
 

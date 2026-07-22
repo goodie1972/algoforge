@@ -50,10 +50,8 @@ class BakomeBackupOptimized(BaseStrategy):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
 
-        # Exit params (ADX 自适应，在 check_ema20_exit 中计算)
-        self.p_hard_chop = 2.0      # 震荡: 硬止损宽于追踪
-        self.p_hard_normal = 3.5    # 中等: 硬止损宽于追踪
-        self.p_hard_trend = 5.0     # 强趋势: 硬止损宽于追踪
+        # Exit params (ADX 自适应追踪/止盈，硬止损固定不变)
+        self.p_hard_atr = 1.5       # 硬止损: 固定 1.5 ATR，不随 ADX 变化（最后防线）
         self.p_trail_chop = 1.0     # 震荡: 窄追踪
         self.p_trail_normal = 2.0   # 中等: 正常追踪
         self.p_trail_trend = 3.0    # 强趋势: 宽追踪让利润跑
@@ -187,10 +185,10 @@ class BakomeBackupOptimized(BaseStrategy):
         """ADX 自适应：返回 (trail_atr, profit_atr, hard_atr)"""
         adx = self.get_indicator("adx")
         if adx is None or adx <= 25:
-            return self.p_trail_chop, self.p_profit_chop, self.p_hard_chop
+            return self.p_trail_chop, self.p_profit_chop
         if adx > 35:
-            return self.p_trail_trend, self.p_profit_trend, self.p_hard_trend
-        return self.p_trail_normal, self.p_profit_normal, self.p_hard_normal
+            return self.p_trail_trend, self.p_profit_trend
+        return self.p_trail_normal, self.p_profit_normal
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
         ticket = position.ticket
@@ -209,7 +207,7 @@ class BakomeBackupOptimized(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return False
 
-        trail_mult, profit_mult, hard_mult = self._get_adx_multipliers()
+        trail_mult, profit_mult = self._get_adx_multipliers()
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
@@ -228,9 +226,9 @@ class BakomeBackupOptimized(BaseStrategy):
                 logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} mult={trail_mult:.1f}")
                 del self._trail_data[ticket]
                 return True
-            # 硬止损（最后防线，始终宽于追踪）
-            if loss > atr_val * hard_mult:
-                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} mult={hard_mult:.1f}")
+            # 硬止损（固定 1.5 ATR，不随 ADX 变化）
+            if loss > atr_val * self.p_hard_atr:
+                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f}")
                 del self._trail_data[ticket]
                 return True
         else:
@@ -250,9 +248,9 @@ class BakomeBackupOptimized(BaseStrategy):
                 logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} mult={trail_mult:.1f}")
                 del self._trail_data[ticket]
                 return True
-            # 硬止损（最后防线，始终宽于追踪）
-            if loss > atr_val * hard_mult:
-                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} mult={hard_mult:.1f}")
+            # 硬止损（固定 1.5 ATR，不随 ADX 变化）
+            if loss > atr_val * self.p_hard_atr:
+                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f}")
                 del self._trail_data[ticket]
                 return True
 
