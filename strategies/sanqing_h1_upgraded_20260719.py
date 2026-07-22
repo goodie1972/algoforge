@@ -268,6 +268,9 @@ class SanQingH1Upgraded(BaseStrategy):
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
+        # 确保指标缓存已更新（_run_exits 在 _run_strategy 之前调用）
+        self.refresh_data()
+
         if ticket not in self._trail_data:
             self._trail_data[ticket] = {
                 "entry": position.open_price,
