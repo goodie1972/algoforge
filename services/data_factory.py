@@ -285,8 +285,8 @@ class DataFactory:
             for tf in ["M15", "M30", "H1", "H4"]:
                 self._sync_tf(tf, self._bridge)
             self._sync_tick(self._bridge)
-            # 每 60 秒做一次数据校验
-            if time.time() - _last_validation > 60:
+            # 每 5 分钟做一次数据校验（与数据库更新频率对齐）
+            if time.time() - _last_validation > 300:
                 _last_validation = time.time()
                 self._validate_data()
             time.sleep(0.3)
