@@ -13,7 +13,7 @@
 | `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
 | `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
 | `bb{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
-| `bb_width` | BB带宽(up-lo) | `bb_width_ratio` | 当前/上根宽度比 |
+| `bb_width` / `bb_width_direction` | BB带宽/方向 | `bb_width_ratio` | 当前/14根均值比 |
 | `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
 | `macd{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch |
 | `volume_sma_20` | VolSMA(20) | | |
@@ -51,6 +51,7 @@ dt_local(ts)
 - ✅ 所有公共指标 → `self.get_indicator(key)` 从 DataFactory 读取
 - ✅ 多周期数据 → `from services.data_factory import get_cache` → `get_cache("H4")`
 - ✅ 自定义逻辑（K线实体、评分体系等）可使用 `self.candles` 自行计算，但标准指标不得自算
+- ⚡ **优先使用 TA-Lib**：任何涉及数组计算的地方（平均值、滚动窗口、标准差等），必须使用 TA-Lib 函数（SMA、STDDEV 等），禁止手动 for 循环或列表推导。如果 TA-Lib 确实无法实现，必须提前说明原因。
 
 **DataFactory TA-Lib 可用指标表：**
 
@@ -59,8 +60,8 @@ dt_local(ts)
 | `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
 | `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
 | `bb` = `{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
-| `bb_width` / `bb_width_ratio` | BB带宽/上根宽度比 | `price_position` | 20周期位置 0~1 |
-| `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
+| `bb_width` / `bb_width_ratio` / `bb_width_direction` | BB带宽/14根均值比/方向 | `price_position` | 20周期位置 0~1 |
+| `mfi` / `mfi_direction` | MFI(14)/方向 | `adx`/`pdi`/`ndi` | ADX/DI(14) |
 | `macd` = `{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch(14,3,3)/(21,5,3) |
 | `volume_sma_20` | VolSMA(20) | `close` | 最新收盘价 |
 | `atr_list` | ATR 历史序列 | | |
