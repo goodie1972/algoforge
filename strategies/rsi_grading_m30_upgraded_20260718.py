@@ -203,6 +203,20 @@ class RSIGradingM30Upgraded(BaseStrategy):
             short_score += 1
             short_factors.append("RSI-反转↓")
 
+        # ── BB扩张 + MFI方向拦截（防趋势加速接飞刀） ──
+        _bwr = self.get_indicator("bb_width_ratio")
+        _mfi = self.get_indicator("mfi")
+        _mfi_dir = self.get_indicator("mfi_direction")
+        if _bwr and _bwr > 1.2 and _mfi is not None and _mfi_dir:
+            if _mfi_dir in ("up", "flat"):
+                short_score = 0
+                short_factors.append("BBW-MFI-UP↑")
+                logger.info(f"[{self.name}] BB扩张+MFI上升({_mfi:.0f})，禁做空")
+            if _mfi_dir in ("down", "flat"):
+                long_score = 0
+                long_factors.append("BBW-MFI-DN↓")
+                logger.info(f"[{self.name}] BB扩张+MFI下降({_mfi:.0f})，禁做多")
+
         # ADX>28 趋势门禁 — 纸笔测试期间临时注释(2026-07-21)
         # 恢复后 gate_side 决定 can_long/can_short 方向拦截
         gate_side = None

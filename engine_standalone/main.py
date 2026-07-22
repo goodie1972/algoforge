@@ -1458,21 +1458,6 @@ class TradingEngine:
 
         signal_dir = "BUY" if "BUY" in signal else "SELL"
 
-        # ── BB扩张 + MFI方向拦截（纸面测试用） ──
-        try:
-            _bwr = strategy.get_indicator("bb_width_ratio")
-            _mfi = strategy.get_indicator("mfi")
-            _mfi_dir = strategy.get_indicator("mfi_direction")
-            if _bwr and _bwr > 1.2 and _mfi is not None and _mfi_dir:
-                if signal_dir == "SELL" and _mfi_dir in ("up", "flat"):
-                    logger.info(f"[{strategy.name}] BB扩张+MFI上升({_mfi:.0f})，禁做空")
-                    return
-                if signal_dir == "BUY" and _mfi_dir in ("down", "flat"):
-                    logger.info(f"[{strategy.name}] BB扩张+MFI下降({_mfi:.0f})，禁做多")
-                    return
-        except Exception:
-            pass
-
         # ── 门禁拦截（使用顶部已计算的门禁数据） ──
         gate = gate_sell if signal_dir == "SELL" else gate_buy
         if gate["blocked"]:
