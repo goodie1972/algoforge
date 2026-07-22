@@ -125,10 +125,16 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         result["bb"] = {
             "upper": float(upper[-1]), "mid": float(mid[-1]), "lower": float(lower[-1])
         }
-        # BB 宽度（绝对值）
+        # BB 宽度
         bb_width = float(upper[-1] - lower[-1])
         result["bb_width"] = bb_width
-        # BB 宽度比率：当前 / 14根前（判断中期扩张，约7小时M30）
+        # BB 宽度方向：当前 vs 上一根
+        if len(upper) > 2:
+            _prev = float(upper[-2] - lower[-2])
+            result["bb_width_direction"] = "up" if bb_width > _prev else ("down" if bb_width < _prev else "flat")
+        else:
+            result["bb_width_direction"] = "flat"
+        # BB 宽度比率：当前 / 14根前
         if len(upper) > 15:
             old_width = float(upper[-15] - lower[-15])
             result["bb_width_ratio"] = round(bb_width / old_width, 3) if old_width > 0 else 1.0

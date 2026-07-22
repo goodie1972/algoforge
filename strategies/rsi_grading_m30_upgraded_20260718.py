@@ -205,10 +205,11 @@ class RSIGradingM30Upgraded(BaseStrategy):
 
         # ── BB扩张 + MFI方向一致拦截（防趋势加速接飞刀） ──
         _bwr = self.get_indicator("bb_width_ratio")
+        _bwd = self.get_indicator("bb_width_direction")
         _mfi = self.get_indicator("mfi")
         _mfi_dir = self.get_indicator("mfi_direction")
         _bb = self.get_indicator("bb")
-        if _bwr and _bwr > 1.2 and _mfi is not None and _mfi_dir and _bb:
+        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir and _bb:
             _price_above_mid = close > _bb["mid"]
             if _price_above_mid and _mfi_dir in ("up", "flat"):
                 short_score = 0
