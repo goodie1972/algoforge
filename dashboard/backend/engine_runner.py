@@ -372,45 +372,6 @@ class EngineRunner:
             if not health.get("bridging", False):
                 self.logger.error("[数据工厂监控] 桥接未连接！")
 
-            # ── 数据校验：对比 DF 与数据库的已闭合 K 线 ──
-            from services.data_factory import get_cache
-            from data.database import get_conn
-            _db_conn = get_conn()
-            for tf in ["M15", "M30", "H1", "H4"]:
-                _df_cache = get_cache(tf)
-                if not _df_cache or "candles" not in _df_cache:
-                    continue
-                _df_candles = _df_cache["candles"]
-                if len(_df_candles) < 5:
-                    continue
-                # 跳过最新2根（可能未闭合），取第3~第7根
-                _check_ts = []
-                for _c in _df_candles[-7:-2]:
-                    _ts = _c.time
-                    if isinstance(_ts, (int, float)):
-                        _check_ts.append(int(_ts))
-                if not _check_ts:
-                    continue
-                _placeholders = ",".join("?" for _ in _check_ts)
-                _db_rows = _db_conn.execute(
-                    f"SELECT timestamp, close FROM ohlcv WHERE timeframe=? AND timestamp IN ({_placeholders})",
-                    (tf, *_check_ts)
-                ).fetchall()
-                _db_map = {r["timestamp"]: r["close"] for r in _db_rows}
-                _diff_sum = 0.0
-                _count = 0
-                for _ts in _check_ts:
-                    if _ts in _db_map:
-                        _df_c = next((c.close for c in _df_candles if int(c.time) == _ts), None)
-                        if _df_c is not None:
-                            _diff_sum += abs(_df_c - _db_map[_ts])
-                            _count += 1
-                if _count >= 3:
-                    _avg_diff = _diff_sum / _count
-                    if _avg_diff > 5.0:
-                        self.logger.warning(f"[数据工厂监控] {tf} 数据偏差 {_avg_diff:.1f} 点（>5点），可能数据异常")
-            _db_conn.close()
-
             errs = health.get("sync_errors", [])
             if errs:
                 last = errs[-1]
