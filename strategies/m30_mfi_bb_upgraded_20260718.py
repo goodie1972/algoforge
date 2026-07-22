@@ -89,7 +89,7 @@ class M30MFIBBUpgraded(BaseStrategy):
             "bb_lower": bb["lower"],
             "bb": bb,
             "bb_width": round(bb["upper"] - bb["lower"], 2),
-            "bb_width_ratio": bb_width_ratio,
+            "bb_width_ratio": _bwr,
         }
         return buy_signal, sell_signal, iv
 
