@@ -280,10 +280,15 @@ class DataFactory:
         else:
             logger.warning("[数据工厂] 首次加载10次重试后仍有缺失，继续增量循环")
         logger.info("[数据工厂] 首次加载完成，进入增量循环")
+        _last_validation = 0
         while self._running:
             for tf in ["M15", "M30", "H1", "H4"]:
                 self._sync_tf(tf, self._bridge)
             self._sync_tick(self._bridge)
+            # 每 60 秒做一次数据校验
+            if time.time() - _last_validation > 60:
+                _last_validation = time.time()
+                self._validate_data()
             time.sleep(0.3)
 
     def _initial_load(self) -> bool:
@@ -356,6 +361,47 @@ class DataFactory:
             if full:
                 logger.warning(f"[数据工厂] 加载 {tf} 失败: {e}")
             return False
+
+    def _validate_data(self):
+        """校验 DataFactory 缓存与数据库的已闭合 K 线是否一致"""
+        try:
+            from data.database import get_conn
+            conn = get_conn()
+            for tf in ["M15", "M30", "H1", "H4"]:
+                with _CACHE_LOCK:
+                    cache = _DATA_CACHE.get(tf, {})
+                    candles = cache.get("candles", [])
+                if len(candles) < 7:
+                    continue
+                # 跳过最新2根（可能未闭合），取第3~7根
+                check_ts = []
+                for c in candles[-7:-2]:
+                    ts = c.time
+                    if isinstance(ts, (int, float)):
+                        check_ts.append(int(ts))
+                if not check_ts:
+                    continue
+                ph = ",".join("?" for _ in check_ts)
+                rows = conn.execute(
+                    f"SELECT timestamp, close FROM ohlcv WHERE timeframe=? AND timestamp IN ({ph})",
+                    (tf, *check_ts)
+                ).fetchall()
+                db_map = {r["timestamp"]: r["close"] for r in rows}
+                diff_sum = 0.0
+                count = 0
+                for ts in check_ts:
+                    if ts in db_map:
+                        df_c = next((c.close for c in candles if int(c.time) == ts), None)
+                        if df_c is not None:
+                            diff_sum += abs(df_c - db_map[ts])
+                            count += 1
+                if count >= 3:
+                    avg_diff = diff_sum / count
+                    if avg_diff > 5.0:
+                        logger.warning(f"[数据工厂] {tf} 数据偏差 {avg_diff:.1f} 点（>5点），可能数据异常")
+            conn.close()
+        except Exception as e:
+            logger.warning(f"[数据工厂] 数据校验失败: {e}")
 
     def _sync_tick(self, bridge):
         global _TICK_COUNTER
