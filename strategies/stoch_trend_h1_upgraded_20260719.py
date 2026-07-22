@@ -349,17 +349,21 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         if direction == "BUY":
             if stoch_k < 20:
-                return True   # 极端金叉，直接入场
+                return True   # 极端超卖，直接入场
             if pdi <= ndi:
                 return False
-            if 20 <= stoch_k <= 40:
-                return stoch_k <= 35
-            return False
+            if stoch_k <= 40:
+                return True   # 超卖区，允许
+            if stoch_k > 80:
+                return False  # 超买区，不做多
+            return True       # 40~80 正常范围，允许
         else:
             if stoch_k > 80:
-                return True   # 极端死叉，直接入场（不检查DI）
+                return True   # 极端超买，直接入场（不检查DI）
             if ndi <= pdi:
                 return False
-            if 60 <= stoch_k <= 80:
-                return stoch_k >= 65
-            return False
+            if stoch_k >= 60:
+                return True   # 超买区，允许
+            if stoch_k < 20:
+                return False  # 超卖区，不做空
+            return True       # 20~60 正常范围，允许

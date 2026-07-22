@@ -64,23 +64,24 @@ class PaperBridge(MT4BridgeBase):
         self._ticket_day_key = f"{yy}{mm}{dd}"
         max_seq = -1
 
-        # 从 CSV 扫描当天
+        # 从 CSV 扫描当天（兼容 8 位旧格式和 9 位新格式）
         if CSV_TRADES.exists():
             try:
                 with open(str(CSV_TRADES), 'r') as f:
                     for line in f:
                         if line.strip():
                             tid = line.split(',')[0].strip()
-                            if len(tid) == 8 and tid[:6] == self._ticket_day_key:
+                            _len = len(tid)
+                            if (_len in (8, 9)) and tid[:6] == self._ticket_day_key:
                                 try:
-                                    s = int(tid[6:8])
+                                    s = int(tid[6:])
                                     if s > max_seq:
                                         max_seq = s
                                 except ValueError:
                                     pass
             except Exception:
                 pass
-        # 从 DB 扫描当天
+        # 从 DB 扫描当天（兼容 8 位旧格式和 9 位新格式）
         try:
             from data.database import get_conn
             conn = get_conn()
@@ -91,9 +92,10 @@ class PaperBridge(MT4BridgeBase):
             conn.close()
             for row in rows:
                 tid = str(row[0])
-                if len(tid) == 8 and tid[:6] == self._ticket_day_key:
+                _len = len(tid)
+                if (_len in (8, 9)) and tid[:6] == self._ticket_day_key:
                     try:
-                        s = int(tid[6:8])
+                        s = int(tid[6:])
                         if s > max_seq:
                             max_seq = s
                     except ValueError:
@@ -171,7 +173,7 @@ class PaperBridge(MT4BridgeBase):
             logger.warning(f"[PaperBridge] 恢复持仓失败: {e}")
 
     def _generate_ticket(self) -> str:
-        """生成 8 位纯数字票号: YYMMDDSEQ (26072000)，每天重置"""
+        """生成 9 位纯数字票号: YYMMDDSEQ (260720000)，每天重置，每天最多 1000 张"""
         from datetime import datetime
         now = datetime.now(tz=LOCAL_TZ)
         yy = str(now.year)[-2:]
@@ -185,11 +187,11 @@ class PaperBridge(MT4BridgeBase):
             self._ticket_seq_next = 0
 
         seq = self._ticket_seq_next
-        if seq > 99:
-            seq = 0  # wrap，一天 100 张几乎不可能
+        if seq > 999:
+            seq = 0  # wrap，一天 1000 张几乎不可能
         self._ticket_seq_next = seq + 1
 
-        return f"{key}{seq:02d}"
+        return f"{key}{seq:03d}"
 
     # ═══════════════ 连接管理 ═══════════════
 
