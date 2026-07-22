@@ -142,11 +142,6 @@ class StochTrendH1Upgraded(BaseStrategy):
         h4_trend = self._get_h4_trend()
         h4_tag = f"H4:{h4_trend}" if h4_trend else "H4:NODATA"
 
-        # ── M15 Stoch（DataFactory 缓存） ──
-        m15 = get_cache("M15")
-        m15_stoch = m15.get("stoch_5_3_3") if m15 else None
-        m15_k = m15_stoch["k"] if m15_stoch else None
-
         # ── 评分系统 ──
         long_score, short_score = 0, 0
         long_factors, short_factors = [], []
@@ -192,13 +187,7 @@ class StochTrendH1Upgraded(BaseStrategy):
             short_score += 1
             short_factors.append("H4Trend")
 
-        # M15 Stoch 对齐
-        if m15_k is not None and m15_k < 30:
-            long_score += 1
-            long_factors.append("M15Align")
-        if m15_k is not None and m15_k > 70:
-            short_score += 1
-            short_factors.append("M15Align")
+        # M15 Stoch 对齐（已移除，5,3,3足够灵敏）
 
         signal = None
         if long_score >= self.score_threshold:
