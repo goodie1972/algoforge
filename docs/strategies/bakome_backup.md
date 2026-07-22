@@ -29,7 +29,17 @@ desc: ICT FVG + Order Block + Silver Bullet 时段交易（原版）
 | ① | ATR追踪止损(trail) | 2.5 ATR 回撤 |
 | ② | ATR硬止损(hard) | 1.5 ATR |
 
+## BB扩张 + MFI方向拦截
+
+BB扩张期间，价格位置与MFI方向一致时禁止同向开仓，防趋势加速接飞刀。
+
+| 条件 | 拦截 |
+|:----|:----|
+| BB扩张(ratio>1.2) + 正在扩张 + 价格>中轴 + MFI上升 | 禁做空 |
+| BB扩张(ratio>1.2) + 正在扩张 + 价格<中轴 + MFI下降 | 禁做多 |
+
 ## 特别规则
 
 - 非Silver Bullet时段不出信号
+- **BB扩张+MFI方向拦截**：防止在强趋势中接飞刀
 - 数据源: 全部指标从 DataFactory TA-Lib 读取

@@ -153,7 +153,22 @@ class BAKOMEBackupStrategy(BaseStrategy):
         if atr_val is None or atr_val <= 0:
             return (None, 0, 0, [], [], {})
 
-        # 3. Check FVG
+        # 3. BB扩张 + MFI方向一致拦截（防趋势加速接飞刀）
+        _bwr = self.get_indicator("bb_width_ratio")
+        _bwd = self.get_indicator("bb_width_direction")
+        _mfi = self.get_indicator("mfi")
+        _mfi_dir = self.get_indicator("mfi_direction")
+        _bb = self.get_indicator("bb")
+        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir and _bb:
+            _close = candles[-1].close
+            if _close > _bb["mid"] and _mfi_dir in ("up", "flat"):
+                logger.info(f"[{self.name}] BB扩张+价格>中轴+MFI上升({_mfi:.0f})，禁做空，跳过FVG/OB")
+                return (None, 0, 0, [], [], {})
+            if _close < _bb["mid"] and _mfi_dir in ("down", "flat"):
+                logger.info(f"[{self.name}] BB扩张+价格<中轴+MFI下降({_mfi:.0f})，禁做多，跳过FVG/OB")
+                return (None, 0, 0, [], [], {})
+
+        # 4. Check FVG
         indicator_values = {"close": round(self.candles[-1].close, 2), "atr": round(atr_val, 2)}
         fvg_sig = self._detect_fvg()
         if fvg_sig is not None:
