@@ -134,10 +134,11 @@ def _talib_indicators(candles: list, tf: str) -> dict:
             result["bb_width_direction"] = "up" if bb_width > _prev else ("down" if bb_width < _prev else "flat")
         else:
             result["bb_width_direction"] = "flat"
-        # BB 宽度比率：当前 / 14根前
+        # BB 宽度比率：当前 / 过去14根均值（TA-Lib SMA）
         if len(upper) > 15:
-            old_width = float(upper[-15] - lower[-15])
-            result["bb_width_ratio"] = round(bb_width / old_width, 3) if old_width > 0 else 1.0
+            _widths_arr = upper - lower  # numpy 数组，全部 BB 宽度
+            _avg14 = float(talib.SMA(_widths_arr, timeperiod=14)[-1])
+            result["bb_width_ratio"] = round(bb_width / _avg14, 3) if _avg14 > 0 else 1.0
         else:
             result["bb_width_ratio"] = 1.0
     except Exception:
