@@ -16,7 +16,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v4_upgraded"
+STRATEGY_VERSION = "v5_upgraded"
 STRATEGY_MAGIC = 660904
 STRATEGY_LEGACY_MAGICS: list[int] = [660902, 660903]
 STRATEGY_CHANGELOG = [
@@ -333,7 +333,7 @@ class RSIGradingM30Upgraded(BaseStrategy):
         pdd = self.profit_drawdown_pct
         _ax_adx = self.get_indicator("adx")
         if _ax_adx and _ax_adx > 25:
-            pdd = max(pdd, 0.5)
+            pdd = max(pdd, 0.5) if reg == "顺" else min(pdd, 0.15)
 
         if is_buy:
             td["highest"] = max(td["highest"], bid)
