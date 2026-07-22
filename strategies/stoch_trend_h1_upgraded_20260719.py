@@ -150,13 +150,13 @@ class StochTrendH1Upgraded(BaseStrategy):
         has_extreme_buy = k_curr < 20
         has_extreme_sell = k_curr > 80
 
-        if cross_up_now:
+        if cross_up_now and k_curr < 40:
             long_score += 2
             long_factors.append("StochCross")
             if has_extreme_buy:
                 long_score += 1
                 long_factors.append("StochExtreme")
-        if cross_down_now:
+        if cross_down_now and k_curr > 60:
             short_score += 2
             short_factors.append("StochCross")
             if has_extreme_sell:
