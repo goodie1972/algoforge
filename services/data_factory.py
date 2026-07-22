@@ -301,7 +301,7 @@ class DataFactory:
             with _CACHE_LOCK:
                 has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles") and "rsi" in _DATA_CACHE[tf]
             needs_full = full or not has_data
-            count = 350 if needs_full else 2
+            count = 350 if needs_full else 2  # 首次全量，之后增量（dict去重防合并bug）
             raw = bridge.get_candles("XAUUSD", tf, count)
             new_candles = list(reversed(raw)) if raw else []
 
@@ -331,14 +331,12 @@ class DataFactory:
                 return False
 
             with _CACHE_LOCK:
-                if needs_full:
-                    # 全量加载：直接替换整个缓存
-                    merged = new_candles[-350:]
-                else:
-                    # 增量加载：只更新最新的2根（替换尾部，防止重复累积）
-                    old = _DATA_CACHE.get(tf, {}).get("candles", [])
-                    merged = old[:-2] + new_candles[-2:] if len(old) >= 2 else new_candles
-                    merged = merged[-350:]
+                # 跟数据库 INSERT OR REPLACE 一样，按时间戳去重
+                _old = _DATA_CACHE.get(tf, {}).get("candles", [])
+                _candles_dict = {c.time: c for c in _old}
+                for c in new_candles:
+                    _candles_dict[c.time] = c  # 同时间戳直接覆盖
+                merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-350:]
                 ta = _talib_indicators(merged, tf)
                 _DATA_CACHE[tf] = {"candles": merged, **ta}
                 # 更新健康状态
