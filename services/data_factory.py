@@ -107,10 +107,15 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         except Exception:
             pass
 
-    # MFI(14)
+    # MFI(14) + 方向
     try:
         m = talib.MFI(highs, lows, closes, vols, timeperiod=14)
         result["mfi"] = float(m[-1]) if m[-1] == m[-1] else 50.0
+        if len(m) > 2:
+            _prev = float(m[-2]) if m[-2] == m[-2] else 50.0
+            result["mfi_direction"] = "up" if result["mfi"] > _prev else ("down" if result["mfi"] < _prev else "flat")
+        else:
+            result["mfi_direction"] = "flat"
     except Exception:
         pass
 
@@ -123,10 +128,10 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         # BB 宽度（绝对值）
         bb_width = float(upper[-1] - lower[-1])
         result["bb_width"] = bb_width
-        # BB 宽度比率：当前 / 上一根（判断突然扩张，1根K线即响应）
-        if len(upper) > 2:
-            prev_width = float(upper[-2] - lower[-2])
-            result["bb_width_ratio"] = round(bb_width / prev_width, 3) if prev_width > 0 else 1.0
+        # BB 宽度比率：当前 / 14根前（判断中期扩张，约7小时M30）
+        if len(upper) > 15:
+            old_width = float(upper[-15] - lower[-15])
+            result["bb_width_ratio"] = round(bb_width / old_width, 3) if old_width > 0 else 1.0
         else:
             result["bb_width_ratio"] = 1.0
     except Exception:
