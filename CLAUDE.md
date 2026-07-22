@@ -62,7 +62,7 @@ dt_local(ts)
 | `bb` = `{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
 | `bb_width` / `bb_width_ratio` / `bb_width_direction` | BB带宽/14根均值比/方向 | `price_position` | 20周期位置 0~1 |
 | `mfi` / `mfi_direction` | MFI(14)/方向 | `adx`/`pdi`/`ndi` | ADX/DI(14) |
-| `macd` = `{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch(14,3,3)/(21,5,3) |
+| `macd` = `{macd,signal}` | MACD(12,26,9) | `stoch_5_3_3` | Stoch(5,3,3) |
 | `volume_sma_20` | VolSMA(20) | `close` | 最新收盘价 |
 | `atr_list` | ATR 历史序列 | | |
 

@@ -189,17 +189,10 @@ def _talib_indicators(candles: list, tf: str) -> dict:
     except Exception:
         pass
 
-    # Stoch(14,3,3)
+    # Stoch(5,3,3)
     try:
-        sk, sd = talib.STOCH(highs, lows, closes, fastk_period=14, slowk_period=3, slowd_period=3)
-        result["stoch_14_3_3"] = {"k": float(sk[-1]), "d": float(sd[-1])}
-    except Exception:
-        pass
-
-    # Stoch(21,5,3)
-    try:
-        sk2, sd2 = talib.STOCH(highs, lows, closes, fastk_period=21, slowk_period=5, slowd_period=3)
-        result["stoch_21_5_3"] = {"k": float(sk2[-1]), "d": float(sd2[-1])}
+        sk, sd = talib.STOCH(highs, lows, closes, fastk_period=5, slowk_period=3, slowd_period=3)
+        result["stoch_5_3_3"] = {"k": float(sk[-1]), "d": float(sd[-1])}
     except Exception:
         pass
 

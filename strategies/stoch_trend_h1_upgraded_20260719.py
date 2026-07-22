@@ -106,7 +106,7 @@ class StochTrendH1Upgraded(BaseStrategy):
         close = closes[-1]
 
         # ── 全部从 DataFactory 读取 ──
-        stoch = self.get_indicator("stoch_14_3_3")
+        stoch = self.get_indicator("stoch_5_3_3")
         if stoch is None:
             return None
 
@@ -144,7 +144,7 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         # ── M15 Stoch（DataFactory 缓存） ──
         m15 = get_cache("M15")
-        m15_stoch = m15.get("stoch_14_3_3") if m15 else None
+        m15_stoch = m15.get("stoch_5_3_3") if m15 else None
         m15_k = m15_stoch["k"] if m15_stoch else None
 
         # ── 评分系统 ──
@@ -308,7 +308,7 @@ class StochTrendH1Upgraded(BaseStrategy):
             return True
 
         # ⑤ 趋势走完：Stoch 反向交叉确认（从 DataFactory 读取）
-        stoch = self.get_indicator("stoch_14_3_3")
+        stoch = self.get_indicator("stoch_5_3_3")
         if stoch:
             curr_k = stoch["k"]
             curr_d = stoch["d"]
@@ -341,7 +341,7 @@ class StochTrendH1Upgraded(BaseStrategy):
         direction = signal.get("direction", "BUY")
         adx = latest.get("adx", 20)
         pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
-        stoch = latest.get("stoch_14_3_3") or {}
+        stoch = latest.get("stoch_5_3_3") or {}
         stoch_k = stoch.get("k", 50)
 
         if adx < 25:
@@ -349,21 +349,17 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         if direction == "BUY":
             if stoch_k < 20:
-                return True   # 极端超卖，直接入场
+                return True   # 极端金叉，直接入场
             if pdi <= ndi:
                 return False
-            if stoch_k <= 40:
-                return True   # 超卖区，允许
-            if stoch_k > 80:
-                return False  # 超买区，不做多
-            return True       # 40~80 正常范围，允许
+            if 20 <= stoch_k <= 40:
+                return stoch_k <= 35
+            return False
         else:
             if stoch_k > 80:
-                return True   # 极端超买，直接入场（不检查DI）
+                return True   # 极端死叉，直接入场（不检查DI）
             if ndi <= pdi:
                 return False
-            if stoch_k >= 60:
-                return True   # 超买区，允许
-            if stoch_k < 20:
-                return False  # 超卖区，不做空
-            return True       # 20~60 正常范围，允许
+            if 60 <= stoch_k <= 80:
+                return stoch_k >= 65
+            return False
