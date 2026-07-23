@@ -213,6 +213,62 @@ class FreeMT4Bridge(MT4BridgeBase):
                 ))
         return candles
 
+    def get_indicators(self, symbol: str, timeframe: str) -> dict:
+        """从MT4直接获取指标值（F043命令），与图表完全一致"""
+        tf = TF_MAP.get(timeframe, TF_MAP["H1"])
+        data = self._send_cmd(f"F043#3#{symbol}#{tf}#")
+        if not data:
+            return {}
+        # F043返回一整个字符串，用$分隔
+        all_fields = "$".join(data).split("$")
+        # 去掉空尾部
+        all_fields = [f for f in all_fields if f != ""]
+        if len(all_fields) < 20:
+            return {}
+        try:
+            idx = 0
+            return {
+                # K线数据
+                "time": int(all_fields[idx]),
+                "open": float(all_fields[idx+1]),
+                "high": float(all_fields[idx+2]),
+                "low": float(all_fields[idx+3]),
+                "close": float(all_fields[idx+4]),
+                "volume": float(all_fields[idx+5]),
+                # 指标
+                "rsi": float(all_fields[idx+6]),
+                "rsi_5": float(all_fields[idx+7]),
+                "rsi_10": float(all_fields[idx+8]),
+                "mfi": float(all_fields[idx+9]),
+                "bb": {
+                    "upper": float(all_fields[idx+10]),
+                    "mid": float(all_fields[idx+11]),
+                    "lower": float(all_fields[idx+12]),
+                },
+                "ema_9": float(all_fields[idx+13]),
+                "ema_21": float(all_fields[idx+14]),
+                "sma_14": float(all_fields[idx+15]),
+                "sma_20": float(all_fields[idx+16]),
+                "sma_50": float(all_fields[idx+17]),
+                "atr": float(all_fields[idx+18]),
+                "atr_20": float(all_fields[idx+19]),
+                "adx": float(all_fields[idx+20]),
+                "pdi": float(all_fields[idx+21]),
+                "ndi": float(all_fields[idx+22]),
+                "macd": {
+                    "macd": float(all_fields[idx+23]),
+                    "signal": float(all_fields[idx+24]),
+                },
+                "stoch_5_3_3": {
+                    "k": float(all_fields[idx+25]),
+                    "d": float(all_fields[idx+26]),
+                },
+                "volume_sma_20": float(all_fields[idx+27]),
+            }
+        except (ValueError, IndexError) as e:
+            logger.warning(f"[FreeMT4] F043解析失败: {e}, fields={len(all_fields)}")
+            return {}
+
     # ======================== 持仓管理 ========================
 
     def get_positions(self, symbol: str = None) -> list[Position]:

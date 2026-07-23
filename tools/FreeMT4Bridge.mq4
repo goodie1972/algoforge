@@ -229,6 +229,69 @@ void ProcessCommand(string cmd, int sock)
       resp += "#";
       SendResponse(resp, sock);
    }
+   else if(fcode == "F043") {
+      // 获取最新K线 + MT4内置指标值（跟图表完全一致）
+      if(n < 4) { SendResponse("F043#ERROR#bad params#", sock); return; }
+      string sym = parts[2];
+      int tf = (int)StringToInteger(parts[3]);
+
+      // 最新K线数据（shift=0）
+      string resp = "F043#OK#";
+      resp += StringFormat("%d$%.5f$%.5f$%.5f$%.5f$%d$",
+         (int)iTime(sym, tf, 0),
+         iOpen(sym, tf, 0),
+         iHigh(sym, tf, 0),
+         iLow(sym, tf, 0),
+         iClose(sym, tf, 0),
+         (int)iVolume(sym, tf, 0));
+
+      // RSI(14)
+      resp += StringFormat("%.2f$", iRSI(sym, tf, 14, PRICE_CLOSE, 0));
+      // RSI(5)
+      resp += StringFormat("%.2f$", iRSI(sym, tf, 5, PRICE_CLOSE, 0));
+      // RSI(10)
+      resp += StringFormat("%.2f$", iRSI(sym, tf, 10, PRICE_CLOSE, 0));
+      // MFI(14)
+      resp += StringFormat("%.2f$", iMFI(sym, tf, 14, 0));
+      // BB upper/mid/lower (20,2)
+      resp += StringFormat("%.5f$%.5f$%.5f$",
+         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_UPPER, 0),
+         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_MAIN, 0),
+         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_LOWER, 0));
+      // EMA9 / EMA21
+      resp += StringFormat("%.5f$%.5f$",
+         iMA(sym, tf, 9, 0, MODE_EMA, PRICE_CLOSE, 0),
+         iMA(sym, tf, 21, 0, MODE_EMA, PRICE_CLOSE, 0));
+      // SMA14 / SMA20 / SMA50
+      resp += StringFormat("%.5f$%.5f$%.5f$",
+         iMA(sym, tf, 14, 0, MODE_SMA, PRICE_CLOSE, 0),
+         iMA(sym, tf, 20, 0, MODE_SMA, PRICE_CLOSE, 0),
+         iMA(sym, tf, 50, 0, MODE_SMA, PRICE_CLOSE, 0));
+      // ATR(14) / ATR(20)
+      resp += StringFormat("%.5f$%.5f$",
+         iATR(sym, tf, 14, 0),
+         iATR(sym, tf, 20, 0));
+      // ADX(14) / +DI / -DI
+      resp += StringFormat("%.2f$%.2f$%.2f$",
+         iADX(sym, tf, 14, PRICE_CLOSE, MODE_MAIN, 0),
+         iADX(sym, tf, 14, PRICE_CLOSE, MODE_PLUSDI, 0),
+         iADX(sym, tf, 14, PRICE_CLOSE, MODE_MINUSDI, 0));
+      // MACD(12,26,9) main / signal
+      resp += StringFormat("%.5f$%.5f$",
+         iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, 0),
+         iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_SIGNAL, 0));
+      // Stoch(5,3,3) K / D
+      resp += StringFormat("%.2f$%.2f$",
+         iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_MAIN, 0),
+         iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_SIGNAL, 0));
+      // Volume SMA(20)
+      double volSum = 0;
+      for(int vi = 0; vi < 20; vi++) volSum += iVolume(sym, tf, vi);
+      resp += StringFormat("%.0f$", volSum / 20.0);
+
+      resp += "#";
+      SendResponse(resp, sock);
+   }
    else if(fcode == "F061") {
       string resp = "F061#OK#";
       int total = OrdersTotal();

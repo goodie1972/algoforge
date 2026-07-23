@@ -16,7 +16,8 @@
       "Bash(nohup python *)",
       "Bash(echo \"PID: $!\")",
       "Bash(PYTHONIOENCODING=utf-8 python backtest/m30_rsi_v8_bt.py)",
-      "Bash(git commit -m 'fix: 数据库K线存储改为INSERT OR REPLACE *)"
+      "Bash(git commit -m 'fix: 数据库K线存储改为INSERT OR REPLACE *)",
+      "Bash(git commit -m 'feat: EA新增F043命令直接返回MT4指标值 *)"
     ]
   }
 }
