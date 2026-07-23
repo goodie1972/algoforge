@@ -260,10 +260,14 @@ class StochTrendH1Upgraded(BaseStrategy):
         entry_price = td["entry_price"]
         pnl_pts = (bid - entry_price) if is_buy else (entry_price - ask)
 
-        # ① 硬止损: 1.5 ATR
-        if pnl_pts < -atr_val * self.sl_atr:
-            logger.info(f"[{self.name}] HardStop 1.5ATR ticket={ticket}")
-            self._last_exit_detail = {"exit_type": "hard_stop", "atr_mult": self.sl_atr}
+        # ① 趋势感知硬止损（同向1.5ATR / 反向1.0ATR）
+        _ema9 = self.get_indicator("ema_9")
+        _ema21 = self.get_indicator("ema_21")
+        _trend_up = _ema9 is not None and _ema21 is not None and _ema9 > _ema21
+        _with_trend = (is_buy and _trend_up) or (not is_buy and not _trend_up)
+        _sl_atr = self.sl_atr if _with_trend else 1.0
+        if pnl_pts < -atr_val * _sl_atr:
+            logger.info(f"[{self.name}] {'顺' if _with_trend else '逆'}势HardStop {_sl_atr}ATR ticket={ticket}")
             del self._pos_data[ticket]
             return True
 
@@ -307,26 +311,26 @@ class StochTrendH1Upgraded(BaseStrategy):
             entry_k = td.get("entry_k", 50)
 
             if is_buy:
-                # BUY入场：极限位(K<20)→等死叉+K>75；正常位→等死叉或K>75
+                # BUY出场：极限位(K<20)→等死叉+K>75；正常→死叉即出
                 if entry_k < 20:
                     if death_cross and curr_k > 75:
                         logger.info(f"[{self.name}] BUY极限出场(死叉K={curr_k:.1f}) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
                 else:
-                    if death_cross or curr_k > 75:
+                    if death_cross:
                         logger.info(f"[{self.name}] BUY出场(死叉K={curr_k:.1f}) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
             else:
-                # SELL入场：极限位(K>80)→等金叉+K<25；正常位→等金叉或K<25
+                # SELL出场：极限位(K>80)→等金叉+K<25；正常→金叉即出
                 if entry_k > 80:
                     if golden_cross and curr_k < 25:
                         logger.info(f"[{self.name}] SELL极限出场(金叉K={curr_k:.1f}) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
                 else:
-                    if golden_cross or curr_k < 25:
+                    if golden_cross:
                         logger.info(f"[{self.name}] SELL出场(金叉K={curr_k:.1f}) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
