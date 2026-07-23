@@ -192,10 +192,10 @@ class StochTrendH1Upgraded(BaseStrategy):
         signal = None
         if long_score >= self.score_threshold:
             signal = OrderType.BUY
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_buy, "pdi": pdi, "ndi": ndi}
+            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_buy, "pdi": pdi, "ndi": ndi, "k": k_curr}
         elif short_score >= self.score_threshold:
             signal = OrderType.SELL
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_sell, "pdi": pdi, "ndi": ndi}
+            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_sell, "pdi": pdi, "ndi": ndi, "k": k_curr}
 
         iv = {
             "close": round(close, 2), "atr": round(atr_val, 2),
@@ -244,6 +244,7 @@ class StochTrendH1Upgraded(BaseStrategy):
                 "entry_adx": self._pending_entry_info.get("adx", 0),
                 "entry_pdi": self._pending_entry_info.get("pdi", 0),
                 "entry_ndi": self._pending_entry_info.get("ndi", 0),
+                "entry_k": self._pending_entry_info.get("k", 50),
                 "stoch_cross_done": False,
             }
 
@@ -296,28 +297,39 @@ class StochTrendH1Upgraded(BaseStrategy):
             del self._pos_data[ticket]
             return True
 
-        # ⑤ 趋势走完：Stoch 反向交叉确认（从 DataFactory 读取）
+        # ⑤ 趋势走完：Stoch 反向交叉出场（根据入场K值水平决定）
         stoch = self.get_indicator("stoch_5_3_3")
         if stoch:
             curr_k = stoch["k"]
             curr_d = stoch["d"]
             golden_cross = (curr_k > curr_d)
             death_cross = (curr_k < curr_d)
+            entry_k = td.get("entry_k", 50)
 
             if is_buy:
-                # BUY金叉入场 → 等死叉 + K>65
-                if death_cross or curr_k > 80:
-                    logger.info(f"[{self.name}] BUY趋势走完(死叉K={curr_k:.1f}) ticket={ticket}")
-                    self._last_exit_detail = {"exit_type": "stoch_reversal", "k": round(curr_k, 1)}
-                    del self._pos_data[ticket]
-                    return True
+                # BUY入场：极限位(K<20)→等死叉+K>75；正常位→等死叉或K>75
+                if entry_k < 20:
+                    if death_cross and curr_k > 75:
+                        logger.info(f"[{self.name}] BUY极限出场(死叉K={curr_k:.1f}) ticket={ticket}")
+                        del self._pos_data[ticket]
+                        return True
+                else:
+                    if death_cross or curr_k > 75:
+                        logger.info(f"[{self.name}] BUY出场(死叉K={curr_k:.1f}) ticket={ticket}")
+                        del self._pos_data[ticket]
+                        return True
             else:
-                # SELL死叉入场 → 等金叉 + K<35
-                if golden_cross or curr_k < 20:
-                    logger.info(f"[{self.name}] SELL趋势走完(金叉K={curr_k:.1f}) ticket={ticket}")
-                    self._last_exit_detail = {"exit_type": "stoch_reversal", "k": round(curr_k, 1)}
-                    del self._pos_data[ticket]
-                    return True
+                # SELL入场：极限位(K>80)→等金叉+K<25；正常位→等金叉或K<25
+                if entry_k > 80:
+                    if golden_cross and curr_k < 25:
+                        logger.info(f"[{self.name}] SELL极限出场(金叉K={curr_k:.1f}) ticket={ticket}")
+                        del self._pos_data[ticket]
+                        return True
+                else:
+                    if golden_cross or curr_k < 25:
+                        logger.info(f"[{self.name}] SELL出场(金叉K={curr_k:.1f}) ticket={ticket}")
+                        del self._pos_data[ticket]
+                        return True
 
         self._last_exit_detail = None
         return False
