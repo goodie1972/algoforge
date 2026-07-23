@@ -278,6 +278,7 @@ class DataFactory:
             for tf in ["M15", "M30", "H1", "H4"]:
                 self._sync_tf(tf, self._bridge)
             self._sync_tick(self._bridge)
+            self._sync_indicators(self._bridge)
             # 每 5 分钟做一次数据校验（与数据库更新频率对齐）
             if time.time() - _last_validation > 300:
                 _last_validation = time.time()
@@ -407,3 +408,58 @@ class DataFactory:
                 _HEALTH["tick_count"] = _TICK_COUNTER
         except Exception:
             pass
+
+    def _sync_indicators(self, bridge):
+        """从MT4直接获取指标值（F043），覆盖TA-Lib计算结果"""
+        for tf in ["M15", "M30", "H1", "H4"]:
+            try:
+                mt4_ind = bridge.get_indicators("XAUUSD", tf)
+                if not mt4_ind:
+                    continue
+                with _CACHE_LOCK:
+                    if tf not in _DATA_CACHE:
+                        _DATA_CACHE[tf] = {"candles": []}
+                    cache = _DATA_CACHE[tf]
+                    # 用MT4指标值覆盖TA-Lib计算结果
+                    cache["rsi"] = mt4_ind["rsi"]
+                    cache["rsi_5"] = mt4_ind["rsi_5"]
+                    cache["rsi_10"] = mt4_ind["rsi_10"]
+                    cache["mfi"] = mt4_ind["mfi"]
+                    cache["bb"] = mt4_ind["bb"]
+                    cache["bb_width"] = round(mt4_ind["bb"]["upper"] - mt4_ind["bb"]["lower"], 2)
+                    cache["ema_9"] = mt4_ind["ema_9"]
+                    cache["ema_21"] = mt4_ind["ema_21"]
+                    cache["sma_14"] = mt4_ind["sma_14"]
+                    cache["sma_20"] = mt4_ind["sma_20"]
+                    cache["sma_50"] = mt4_ind["sma_50"]
+                    cache["atr"] = mt4_ind["atr"]
+                    cache["atr_20"] = mt4_ind["atr_20"]
+                    cache["adx"] = mt4_ind["adx"]
+                    cache["pdi"] = mt4_ind["pdi"]
+                    cache["ndi"] = mt4_ind["ndi"]
+                    cache["macd"] = mt4_ind["macd"]
+                    cache["stoch_5_3_3"] = mt4_ind["stoch_5_3_3"]
+                    cache["volume_sma_20"] = mt4_ind["volume_sma_20"]
+                    cache["close"] = mt4_ind["close"]
+                    cache["trend"] = "UP" if mt4_ind["close"] > mt4_ind["sma_14"] else "DOWN"
+                    # MFI方向（跟上一根比较）
+                    _prev_mfi = cache.get("_prev_mfi", mt4_ind["mfi"])
+                    cache["mfi_direction"] = "up" if mt4_ind["mfi"] > _prev_mfi else ("down" if mt4_ind["mfi"] < _prev_mfi else "flat")
+                    cache["_prev_mfi"] = mt4_ind["mfi"]
+                    # BB宽度方向
+                    _prev_bw = cache.get("_prev_bb_width", cache["bb_width"])
+                    cache["bb_width_direction"] = "up" if cache["bb_width"] > _prev_bw else ("down" if cache["bb_width"] < _prev_bw else "flat")
+                    cache["_prev_bb_width"] = cache["bb_width"]
+                    # BB宽度比率（vs 14根均值，用TA-Lib历史数据算）
+                    _hist_widths = cache.get("_hist_widths", [])
+                    _hist_widths.append(cache["bb_width"])
+                    if len(_hist_widths) > 14:
+                        _hist_widths = _hist_widths[-14:]
+                    if len(_hist_widths) >= 2:
+                        _avg = sum(_hist_widths) / len(_hist_widths)
+                        cache["bb_width_ratio"] = round(cache["bb_width"] / _avg, 3) if _avg > 0 else 1.0
+                    else:
+                        cache["bb_width_ratio"] = 1.0
+                    cache["_hist_widths"] = _hist_widths
+            except Exception:
+                pass
