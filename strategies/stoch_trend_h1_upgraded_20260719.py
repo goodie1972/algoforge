@@ -140,8 +140,6 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         # ── H4 趋势（DataFactory 缓存） ──
         h4_trend = self._get_h4_trend()
-        h4_tag = f"H4:{h4_trend}" if h4_trend else "H4:NODATA"
-
         # ── 评分系统 ──
         long_score, short_score = 0, 0
         long_factors, short_factors = [], []
@@ -204,13 +202,12 @@ class StochTrendH1Upgraded(BaseStrategy):
             "k": round(k_curr, 1), "d": round(d_curr, 1),
             "ema21": round(ma_val, 2),
             "h4_trend": h4_trend or "NODATA",
-            "m15_k": round(m15_k, 1) if m15_k is not None else None,
             "long_score": long_score, "short_score": short_score,
         }
 
         logger.info(
             f"[{self.name}] K={k_curr:.1f} D={d_curr:.1f} ADX={adx:.1f} "
-            f"H4={h4_trend or 'N/A'} M15K={f'{m15_k:.0f}' if m15_k is not None else 'N/A'} "
+            f"H4={h4_trend or 'N/A'} "
             f"得分:多={long_score} 空={short_score} "
             f"{'BUY' if signal == OrderType.BUY else 'SELL' if signal == OrderType.SELL else '无'}"
         )
