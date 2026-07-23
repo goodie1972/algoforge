@@ -336,6 +336,11 @@ class SanQingH1Upgraded(BaseStrategy):
                 if time.time() - td.get("entry_ts", 0) < self._drawdown_min_hold:
                     logger.info(f"[{self.name}] {side} dd skip: hold < {self._drawdown_min_hold//60}min")
                 elif di_aligned and adx is not None and adx > 20:
+                    # DI对齐时跳过，但回撤超过50%时强制出场
+                    if ratio < 0.5:
+                        logger.info(f"[{self.name}] {side} 强制ProfitStop(回撤>50%) t={ticket} p=${pnl_pts:.2f} peak=${td["peak_profit"]:.2f}")
+                        del self._trail_data[ticket]
+                        return True
                     logger.info(f"[{self.name}] {side} dd skip: DI aligned ADX={adx:.1f}")
                 else:
                     logger.info(f"[{self.name}] {side} ProfitStop t={ticket} p=${pnl_pts:.2f} peak=${td["peak_profit"]:.2f}")
