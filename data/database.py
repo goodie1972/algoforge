@@ -436,7 +436,7 @@ def insert_candles(timeframe: str, candles: list) -> int:
             ts = int(c.time)
             try:
                 conn.execute(
-                    """INSERT OR IGNORE INTO ohlcv
+                    """INSERT OR REPLACE INTO ohlcv
                        (timeframe, timestamp, open, high, low, close, volume)
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (timeframe, ts, c.open, c.high, c.low, c.close, c.volume),
