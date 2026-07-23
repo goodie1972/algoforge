@@ -241,21 +241,13 @@ class StochTrendH1Upgraded(BaseStrategy):
             self._pos_data[ticket] = {
                 "entry_price": position.open_price,
                 "peak": position.open_price,
-                "entry_adx": self._pending_entry_info.get("adx", 0),
-                "entry_pdi": self._pending_entry_info.get("pdi", 0),
-                "entry_ndi": self._pending_entry_info.get("ndi", 0),
                 "entry_k": self._pending_entry_info.get("k", 50),
-                "stoch_cross_done": False,
             }
 
         td = self._pos_data[ticket]
         atr_val = self.get_indicator("atr_20")
         if atr_val is None or atr_val <= 0:
             return False
-
-        adx = self.get_indicator("adx")
-        pdi = self.get_indicator("pdi")
-        ndi = self.get_indicator("ndi")
 
         entry_price = td["entry_price"]
         pnl_pts = (bid - entry_price) if is_buy else (entry_price - ask)
@@ -278,30 +270,7 @@ class StochTrendH1Upgraded(BaseStrategy):
             del self._pos_data[ticket]
             return True
 
-        # ③ DI反转（与入场时的DI方向比较，不是绝对大小）
-        if adx is not None and pdi is not None and ndi is not None:
-            entry_pdi = td.get("entry_pdi", 0)
-            entry_ndi = td.get("entry_ndi", 0)
-            if entry_pdi > entry_ndi and ndi > pdi:
-                # 入场时PDI>NDI(多头)，现在NDI>PDI(空头)→真正翻转
-                logger.info(f"[{self.name}] DI反转平{'BUY' if is_buy else 'SELL'} ticket={ticket} entry=({entry_pdi:.0f}/{entry_ndi:.0f}) now=({pdi:.0f}/{ndi:.0f})")
-                self._last_exit_detail = {"exit_type": "di_flip"}
-                del self._pos_data[ticket]
-                return True
-            elif entry_ndi > entry_pdi and pdi > ndi:
-                logger.info(f"[{self.name}] DI反转平{'BUY' if is_buy else 'SELL'} ticket={ticket} entry=({entry_pdi:.0f}/{entry_ndi:.0f}) now=({pdi:.0f}/{ndi:.0f})")
-                self._last_exit_detail = {"exit_type": "di_flip"}
-                del self._pos_data[ticket]
-                return True
-
-        # ④ ADX < 20 趋势衰竭
-        if adx is not None and adx < 20:
-            logger.info(f"[{self.name}] ADX衰竭(<20) ticket={ticket}")
-            self._last_exit_detail = {"exit_type": "adx_fade"}
-            del self._pos_data[ticket]
-            return True
-
-        # ⑤ 趋势走完：Stoch 反向交叉出场（根据入场K值水平决定）
+        # ③ 趋势走完：Stoch 反向交叉出场（根据入场K值水平决定）
         stoch = self.get_indicator("stoch_5_3_3")
         if stoch:
             curr_k = stoch["k"]
