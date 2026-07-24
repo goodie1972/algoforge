@@ -1,28 +1,30 @@
 """
-Stoch 回调顺势策略 (v8_upgraded)
-==================================
-大师理论: ADX>25 趋势确认 + Stoch 超买超卖回调入场
-XAUUSD 专用参数: Stoch(14,3,3) 更快信号响应
+Stoch 回调顺势策略 (v9_trend_zone)
+====================================
+大师理论: ADX>25 趋势确认 + Stoch 趋势中段回调入场
+XAUUSD 专用参数: Stoch(5,3,3) 更快信号响应
 
-核心变化 vs v7:
-  - ADX 阈值从 20 提到 25，只在较强趋势中交易
-  - Stoch 极端不再独立给分，有金叉/死叉时额外 +1
-  - 金叉/死叉本身 +2 分不变
+核心变化 vs v8:
+  - 金叉区间从 K<40 改为 K>=65（趋势中段，非超卖区博弈）
+  - 死叉区间从 K>60 改为 K<=35（趋势中段回调）
+  - 极端金叉: K>80（极强趋势延续）
+  - 极端死叉: K<20（极弱趋势延续）
+  - 金叉/死叉本身 +2 分不变，极端额外 +1
 
 运动员验证:
-  SELL: K>80(极端)→直接入场; K=60~80→需>=65
   BUY:  K<20(极端)→直接入场; K=20~40→需<=35
+  SELL: K>80(极端)→直接入场; K=60~80→需>=65
 
 出场:
   - 硬止损: 1.5 ATR
   - 止盈: 3.0 ATR (止损×2)
-  - DI反转: 趋势方向变化
-  - ADX<20: 趋势衰竭
   - 趋势走完: Stoch 反向交叉确认
-    - SELL死叉入场 → 金叉 或 K回到超卖区(<20) → 平
-    - BUY金叉入场  → 死叉 或 K回到超买区(>80) → 平
+    - BUY金叉入场(K>80极端)→死叉+K<25 → 平
+    - BUY金叉入场(K 65~80)→死叉 → 平
+    - SELL死叉入场(K<20极端)→金叉+K>75 → 平
+    - SELL死叉入场(K 20~35)→金叉 → 平
 
-数据源: 全部指标从 DataFactory TA-Lib 读取
+数据源: 全部指标从 DataFactory 读取
 """
 import logging
 from typing import Optional
@@ -33,17 +35,19 @@ from services.data_factory import get_cache
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v8_upgraded"
-STRATEGY_MAGIC = 661203
-STRATEGY_LEGACY_MAGICS: list[int] = [661201, 661202]
+STRATEGY_VERSION = "v9_trend_zone"
+STRATEGY_MAGIC = 661204
+STRATEGY_LEGACY_MAGICS: list[int] = [661201, 661202, 661203]
 STRATEGY_CHANGELOG = [
+    {"version": "v9_trend_zone", "magic": 661204, "date": "2026-07-24",
+     "desc": "趋势中段: 金叉K>=65(原<40), 死叉K<=35(原>60); 极端金叉K>80, 极端死叉K<20"},
     {"version": "v8_upgraded", "magic": 661203, "date": "2026-07-19",
      "desc": "升级版: ADX>25; 极端不独立给分; 1.5ATR止损3.0ATR止盈; Stoch交叉趋势走完出场"},
 ]
 
 
 class StochTrendH1Upgraded(BaseStrategy):
-    """Stoch 多周期回调顺势策略 — v8_upgraded"""
+    """Stoch 多周期回调顺势策略 — v9_trend_zone"""
 
     name = "stoch_trend_h1_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -144,17 +148,18 @@ class StochTrendH1Upgraded(BaseStrategy):
         long_score, short_score = 0, 0
         long_factors, short_factors = [], []
 
-        # v8: 极端不独立给分，只在有交叉时额外 +1
-        has_extreme_buy = k_curr < 20
-        has_extreme_sell = k_curr > 80
+        # v9: 金叉在趋势中段(K>=65), 死叉在趋势中段(K<=35)
+        # 极端: 金叉 K>80, 死叉 K<20
+        has_extreme_buy = k_curr > 80
+        has_extreme_sell = k_curr < 20
 
-        if cross_up_now and k_curr < 40:
+        if cross_up_now and k_curr >= 65:
             long_score += 2
             long_factors.append("StochCross")
             if has_extreme_buy:
                 long_score += 1
                 long_factors.append("StochExtreme")
-        if cross_down_now and k_curr > 60:
+        if cross_down_now and k_curr <= 35:
             short_score += 2
             short_factors.append("StochCross")
             if has_extreme_sell:
@@ -277,9 +282,9 @@ class StochTrendH1Upgraded(BaseStrategy):
             entry_k = td.get("entry_k", 50)
 
             if is_buy:
-                # BUY出场：极限位(K<20)→等死叉+K>75；正常→死叉即出
-                if entry_k < 20:
-                    if death_cross and curr_k > 75:
+                # BUY出场：极端入场(K>80)→等死叉+K<25；正常→死叉即出
+                if entry_k > 80:
+                    if death_cross and curr_k < 25:
                         logger.info(f"[{self.name}] BUY极限出场(死叉K={curr_k:.1f}) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
@@ -289,9 +294,9 @@ class StochTrendH1Upgraded(BaseStrategy):
                         del self._pos_data[ticket]
                         return True
             else:
-                # SELL出场：极限位(K>80)→等金叉+K<25；正常→金叉即出
-                if entry_k > 80:
-                    if golden_cross and curr_k < 25:
+                # SELL出场：极端入场(K<20)→等金叉+K>75；正常→金叉即出
+                if entry_k < 20:
+                    if golden_cross and curr_k > 75:
                         logger.info(f"[{self.name}] SELL极限出场(金叉K={curr_k:.1f}) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True

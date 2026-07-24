@@ -6,17 +6,62 @@
 - **轨2: 策略员** — 主引擎循环，`get_indicator(key)` 读缓存指标，评分达标出门票（候选信号）
 - **轨3: 运动员** — `engine_standalone/athlete.py` tick验证层，调用 `_verify_entry` 实时重算入场条件，10秒过期作废
 
-## 通用指标缓存 (DataFactory TA-Lib)
+## 通用指标缓存 (DataFactory)
 
-| key | 说明 | key | 说明 |
+> 详见 `docs/data_factory.md`
+
+DataFactory 是**所有策略指标的唯一数据来源**。两层数据源：
+1. **F043 命令**：从 MT4 EA 直接获取指标值（优先，与 MT4 图表一致）
+2. **TA-Lib 本地计算**：`_talib_indicators()` 回退计算（首次加载 / F043 失败时）
+
+### 策略读取指标的方式
+
+```python
+# 本周期指标
+rsi = self.get_indicator("rsi")           # → float
+ema = self.get_indicator("ema_21")        # → float
+stoch = self.get_indicator("stoch_5_3_3") # → {"k": float, "d": float}
+bb = self.get_indicator("bb")             # → {"upper": f, "mid": f, "lower": f}
+macd = self.get_indicator("macd")         # → {"macd": f, "signal": f}
+
+# 跨周期数据
+from services.data_factory import get_cache
+h4 = get_cache("H4")          # → dict，含 candles + 全部 26 个指标
+m30 = get_cache("M30")        # M30 周期
+h4_ema = h4.get("ema_21")     # H4 的 EMA21
+h4_candles = h4.get("candles", [])
+```
+
+### 完整指标表（26 个）
+
+| key | 类型 | 参数 | 说明 |
 |:----|:----|:----|:----|
-| `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
-| `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
-| `bb{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
-| `bb_width` / `bb_width_direction` | BB带宽/方向 | `bb_width_ratio` | 当前/14根均值比 |
-| `adx`/`pdi`/`ndi` | ADX/DI(14) | `trend` | close vs SMA(14) |
-| `macd{macd,signal}` | MACD(12,26,9) | `stoch_14_3_3`/`stoch_21_5_3` | Stoch |
-| `volume_sma_20` | VolSMA(20) | | |
+| `close` | float | — | 最新收盘价 |
+| `trend` | str | SMA14 | `"UP"` / `"DOWN"` |
+| `rsi` | float | 14 | RSI |
+| `rsi_5` | float | 5 | 快速 RSI |
+| `rsi_10` | float | 10 | 中速 RSI |
+| `mfi` | float | 14 | 资金流量指数 |
+| `mfi_direction` | str | — | `"up"` / `"down"` / `"flat"` |
+| `bb` | dict | 20,2,2 | `{"upper": f, "mid": f, "lower": f}` |
+| `bb_width` | float | — | BB 带宽 = upper − lower |
+| `bb_width_direction` | str | — | 带宽方向 |
+| `bb_width_ratio` | float | SMA3 | 当前带宽 / 近 3 根均值 |
+| `ema_9` | float | 9 | 指数移动平均 |
+| `ema_21` | float | 21 | 指数移动平均 |
+| `sma_14` | float | 14 | 简单移动平均 |
+| `sma_20` | float | 20 | 简单移动平均 |
+| `sma_50` | float | 50 | 简单移动平均 |
+| `atr` | float | 14 | 平均真实波幅 |
+| `atr_20` | float | 20 | 平均真实波幅 |
+| `atr_list` | list[float] | 14 | ATR 历史序列 |
+| `adx` | float | 14 | 趋势强度 |
+| `pdi` | float | 14 | +DI 多头方向 |
+| `ndi` | float | 14 | −DI 空头方向 |
+| `macd` | dict | 12,26,9 | `{"macd": f, "signal": f}` |
+| `stoch_5_3_3` | dict | 5,3,3 | `{"k": f, "d": f}` |
+| `volume_sma_20` | float | 20 | 成交量 SMA |
+| `price_position` | float | 20 周期 | 价格在 20 周期高低区间的位置 0~1 |
 
 ## 时区规则 (CRITICAL)
 
@@ -49,22 +94,12 @@ dt_local(ts)
 
 **策略编写规范：**
 - ✅ 所有公共指标 → `self.get_indicator(key)` 从 DataFactory 读取
-- ✅ 多周期数据 → `from services.data_factory import get_cache` → `get_cache("H4")`
+- ✅ 跨周期数据 → `from services.data_factory import get_cache` → `get_cache("H4")`
 - ✅ 自定义逻辑（K线实体、评分体系等）可使用 `self.candles` 自行计算，但标准指标不得自算
 - ⚡ **优先使用 TA-Lib**：任何涉及数组计算的地方（平均值、滚动窗口、标准差等），必须使用 TA-Lib 函数（SMA、STDDEV 等），禁止手动 for 循环或列表推导。如果 TA-Lib 确实无法实现，必须提前说明原因。
-
-**DataFactory TA-Lib 可用指标表：**
-
-| key | 说明 | key | 说明 |
-|:----|:----|:----|:----|
-| `rsi`/`rsi_5`/`rsi_10` | RSI(14/5/10) | `ema_9`/`ema_21` | EMA(9/21) |
-| `mfi` | MFI(14) | `sma_14`/`sma_20`/`sma_50` | SMA |
-| `bb` = `{upper,mid,lower}` | BBANDS(20,2,2) | `atr`/`atr_20` | ATR(14/20) |
-| `bb_width` / `bb_width_ratio` / `bb_width_direction` | BB带宽/14根均值比/方向 | `price_position` | 20周期位置 0~1 |
-| `mfi` / `mfi_direction` | MFI(14)/方向 | `adx`/`pdi`/`ndi` | ADX/DI(14) |
-| `macd` = `{macd,signal}` | MACD(12,26,9) | `stoch_5_3_3` | Stoch(5,3,3) |
-| `volume_sma_20` | VolSMA(20) | `close` | 最新收盘价 |
-| `atr_list` | ATR 历史序列 | | |
+- 📖 指标完整列表及类型 → 见上方「通用指标缓存 (DataFactory)」表格，或 `docs/data_factory.md`
+- ⚠️ **指标可能为 None**：策略必须对 `get_indicator()` 返回值做空值检查
+- 🔄 **数据来源优先级**：F043 MT4 值 > TA-Lib 本地计算，策略无需关心来源，统一用 `get_indicator()` 读取
 
 **策略文件文档标准：**
 - 第 1 行：`策略显示名 — 简短描述`（用作系统 UI 的 display 字段）
