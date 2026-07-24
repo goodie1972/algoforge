@@ -355,9 +355,14 @@ class PaperBridge(MT4BridgeBase):
 
     def close_order(self, ticket: int | str, volume: float = 0) -> bool:
         """用当前价格模拟平仓"""
+        # 票号兼容 str/int 类型
         if ticket not in self._positions:
-            logger.warning(f"[PaperBridge] 平仓失败：Ticket={ticket} 不存在")
-            return False
+            _ticket = str(ticket) if not isinstance(ticket, str) else int(ticket)
+            if _ticket in self._positions:
+                ticket = _ticket
+            else:
+                logger.warning(f"[PaperBridge] 平仓失败：Ticket={ticket} 不存在")
+                return False
 
         pos = self._positions.pop(ticket)
         bid, ask = self.get_tick_price(pos.symbol)
@@ -423,12 +428,16 @@ class PaperBridge(MT4BridgeBase):
 
     def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
         """本地更新 SL/TP"""
-        if ticket in self._positions:
-            self._positions[ticket].stop_loss = sl
-            self._positions[ticket].take_profit = tp
-            logger.info(f"[PaperBridge] 修改 Ticket={ticket} SL={sl:.2f} TP={tp:.2f}")
-            return True
-        return False
+        if ticket not in self._positions:
+            _ticket = str(ticket) if not isinstance(ticket, str) else int(ticket)
+            if _ticket in self._positions:
+                ticket = _ticket
+            else:
+                return False
+        self._positions[ticket].stop_loss = sl
+        self._positions[ticket].take_profit = tp
+        logger.info(f"[PaperBridge] 修改 Ticket={ticket} SL={sl:.2f} TP={tp:.2f}")
+        return True
 
     def takeover_existing_positions(self, symbol: str = None, magic: int = 0) -> list[Position]:
         """纸面模式无真实持仓需要接管，返回空"""
