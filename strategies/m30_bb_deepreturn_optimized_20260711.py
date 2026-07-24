@@ -88,34 +88,15 @@ class M30BBDeepReturnOptimized(BaseStrategy):
     def refresh_data(self, count: int = 350):
         super().refresh_data(count)
 
-    def _calc_mfi_from(self, closes: list) -> Optional[float]:
-        """用给定收盘价之前的 K 线算 MFI（DataFactory TA-Lib 一致）。"""
-        n = len(closes)
-        if n < self.mfi_period + 1:
-            return None
-        try:
-            import talib
-            import numpy as np
-            candles = self.candles[:n]
-            if len(candles) < self.mfi_period + 1:
-                return None
-            highs = np.array([c.high for c in candles], dtype=float)
-            lows = np.array([c.low for c in candles], dtype=float)
-            close_a = np.array(closes, dtype=float)
-            vols = np.array([c.volume for c in candles], dtype=float)
-            m = talib.MFI(highs, lows, close_a, vols, timeperiod=self.mfi_period)
-            return float(m[-1]) if not np.isnan(m[-1]) else None
-        except Exception:
-            return None
-
     # ─────────────── BB 方向检测 ───────────────
 
     def _check_bb_aligned(self, is_buy: bool) -> bool:
-        """检测 BB 开口方向是否与 K 线同向（用于出场分支）"""
+        """检测 BB 开口方向是否与 K 线同向（用于出场分支）。
+        使用 DataFactory 的 mfi_direction 判断 MFI 方向。"""
         closes = self.get_close_prices()
         bb_now = self.get_indicator("bb")
-        mfi_now = self.get_indicator("mfi")
-        if not bb_now or mfi_now is None or len(closes) < 10:
+        mfi_dir = self.get_indicator("mfi_direction")
+        if not bb_now or mfi_dir is None or len(closes) < 10:
             return False
 
         # 比较当前位置 vs 5 根前的 BB 内位置
@@ -123,23 +104,14 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         if bb_range <= 0:
             return False
         curr_pos = (closes[-1] - bb_now["lower"]) / bb_range
-        prev_closes = closes[:-5]
-        if len(prev_closes) < self.bb_period + 1:
-            return False
-        prev_bb_lower = sum(sorted(prev_closes[-self.bb_period:])[:self.bb_period//2]) / (self.bb_period//2) if self.bb_period//2 > 0 else bb_now["lower"]
-        # 简化: 用5根前的价格位置
         prev_pos = (closes[-5] - bb_now["lower"]) / bb_range
 
         price_dir = curr_pos > prev_pos  # 价格在 BB 内向上移动
-        mfi_prev = self._calc_mfi_from(prev_closes)
-        if mfi_prev is None:
-            return False
-        mfi_dir = mfi_now > mfi_prev
 
         if is_buy:
-            return price_dir and mfi_dir
+            return price_dir and mfi_dir == "up"
         else:
-            return (not price_dir) and (not mfi_dir)
+            return (not price_dir) and mfi_dir == "down"
 
     # ─────────────── Entry scoring ───────────────
 
@@ -224,16 +196,15 @@ class M30BBDeepReturnOptimized(BaseStrategy):
             short_score += 1
             short_detail.append("MA20-DN")
 
-        # ⑤ MFI 方向（确认拐头）
-        if len(closes) >= self.mfi_period + 5:
-            mfi_prev = self._calc_mfi_from(closes[:-2])
-            if mfi_prev is not None:
-                if at_lower and mfi_val > mfi_prev:
-                    long_score += 1
-                    long_detail.append("MFI-UP")
-                elif at_upper and mfi_val < mfi_prev:
-                    short_score += 1
-                    short_detail.append("MFI-DN")
+        # ⑤ MFI 方向（确认拐头，从 DataFactory 读取）
+        mfi_dir = self.get_indicator("mfi_direction")
+        if mfi_dir:
+            if at_lower and mfi_dir == "up":
+                long_score += 1
+                long_detail.append("MFI-UP")
+            elif at_upper and mfi_dir == "down":
+                short_score += 1
+                short_detail.append("MFI-DN")
 
         # ⑥ ATR 波动率加分：高波动增强均值回归信号
         if atr_val > 0 and close > 0:

@@ -41,7 +41,7 @@ STRATEGY_CHANGELOG = [
 
 
 class BakomeBackupOptimized(BaseStrategy):
-    """BAKOME GoldScalper — ICT FVG + OB + Silver Bullet (v2_optimized)"""
+    """BAKOME GoldScalper — ICT FVG + OB + Silver Bullet (v3_optimized)"""
 
     name = "bakome_backup_optimized"
     legacy_magics = STRATEGY_LEGACY_MAGICS

@@ -18,6 +18,13 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
+STRATEGY_VERSION = "v1"
+STRATEGY_MAGIC = 777004
+STRATEGY_CHANGELOG = [
+    {"version": "v1", "magic": 777004, "date": "2026-06-01",
+     "desc": "初始: FVG+OB, Silver Bullet 6h (London 8-10, NY 13-15 MT4时间)"},
+]
+
 
 class BAKOMEBackupStrategy(BaseStrategy):
     """BAKOME GoldScalper — ICT FVG + OB + Silver Bullet"""
@@ -27,44 +34,13 @@ class BAKOMEBackupStrategy(BaseStrategy):
     def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
         super().__init__(bridge, magic, timeframe)
         self._trail_data: dict[int, dict] = {}
-        self._cached_atr_values: Optional[list[float]] = None
-        self._cached_atr_key: int = 0
 
         # Exit params
         self.p_trailing_atr = 2.5
         self.p_hard_atr = 1.5
 
     def refresh_data(self, count: int = 200):
-        self._cached_atr_key = 0
-        self._cached_atr_values = None
         super().refresh_data(count)
-
-    # ─────────────── Indicator helpers ───────────────
-
-    def _calc_atr_values(self, period: int = 14) -> Optional[list[float]]:
-        cache_key = len(self.candles)
-        if self._cached_atr_key == cache_key and self._cached_atr_values is not None:
-            return self._cached_atr_values
-
-        candles = self.candles
-        if len(candles) < period + 2:
-            return None
-        tr_values = []
-        for i in range(1, len(candles)):
-            h, l, pc = candles[i].high, candles[i].low, candles[i - 1].close
-            tr_values.append(max(h - l, abs(h - pc), abs(l - pc)))
-        if len(tr_values) < period:
-            return None
-        atr_list = [sum(tr_values[:period]) / period]
-        for i in range(period, len(tr_values)):
-            atr_list.append((atr_list[-1] * (period - 1) + tr_values[i]) / period)
-        self._cached_atr_values = atr_list
-        self._cached_atr_key = cache_key
-        return atr_list
-
-    def _calc_atr(self, period: int = 14) -> Optional[float]:
-        vals = self._calc_atr_values(period)
-        return vals[-1] if vals else None
 
     # ─────────────── ICT Detection ───────────────
 

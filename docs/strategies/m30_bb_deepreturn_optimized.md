@@ -1,7 +1,7 @@
 ---
 name: m30_bb_deepreturn_optimized
 magic: 661102
-version: v2_optimized
+version: v3_optimized
 display: M30 BB DeepReturn 优化版
 desc: BB均值回归 + MFI确认 + 方向感知动态阈值
 ---
@@ -14,7 +14,7 @@ desc: BB均值回归 + MFI确认 + 方向感知动态阈值
 | 1 | BB下轨 | +1 | close ≤ BB下轨（超卖）|
 | 2 | MFI超卖 | +1 | MFI ≤ 30 |
 | 3 | BB+MFI共振 | +1 | ①和②同时满足 |
-| 4 | MA20趋势 | +1 | MA20方向向上 |
+| 4 | SMA14趋势 | +1 | close > SMA14（上升趋势） |
 | 5 | MFI拐头 | +1 | 在下轨附近MFI从低转高 |
 | 6 | ATR高波动 | +1 | ATR/价格 > 0.25%（高波动增强信号）|
 
@@ -24,7 +24,7 @@ desc: BB均值回归 + MFI确认 + 方向感知动态阈值
 | 1 | BB上轨 | +1 | close ≥ BB上轨（超买）|
 | 2 | MFI超买 | +1 | MFI ≥ 70 |
 | 3 | BB+MFI共振 | +1 | ①和②同时满足 |
-| 4 | MA20趋势 | +1 | MA20方向向下 |
+| 4 | SMA14趋势 | +1 | close < SMA14（下降趋势） |
 | 5 | MFI拐头 | +1 | 在上轨附近MFI从高转低 |
 | 6 | ATR高波动 | +1 | ATR/价格 > 0.25% |
 
