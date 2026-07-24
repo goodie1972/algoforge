@@ -252,6 +252,7 @@ class SanQingH1Upgraded(BaseStrategy):
         is_buy = direction == OrderType.BUY
         sl_mult = self.p_hard_atr
         sl_dist = atr_val * sl_mult
+        _, tp_mult = self._get_adx_multipliers()
         tp_dist = atr_val * tp_mult
         if is_buy:
             return round(entry_price - sl_dist, 2), round(entry_price + tp_dist, 2)
