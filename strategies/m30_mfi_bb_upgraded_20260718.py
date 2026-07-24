@@ -49,8 +49,8 @@ class M30MFIBBUpgraded(BaseStrategy):
 
     # ─────────────── 开仓 ───────────────
 
-    def _check_3bar_condition(self) -> tuple[bool, bool, Optional[dict]]:
-        """检查最近 price_position 内收盘是否出轨道。
+    def _check_bb_breakout(self) -> tuple[bool, bool, Optional[dict]]:
+        """检查当前收盘是否出 BB 轨道。
         所有指标从 DataFactory 读取。
         加入 BB 开口扩张保护：bb_width_ratio > 1.05 时禁用同向入场。
         """
@@ -73,7 +73,7 @@ class M30MFIBBUpgraded(BaseStrategy):
         if _bwr is not None and _bwd is not None and _mfi is not None and _mfi_dir is not None:
             # 3选2：ratio>1.05 + 方向扩张 + MFI方向一致
             _score = 0
-            if _bwr > 1.05: _score += 1
+            if _bwr > 1 + _BB_EXPAND_THRESHOLD: _score += 1
             if _bwd == "up": _score += 1
             if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"): _score += 1
             if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"): _score += 1
@@ -105,7 +105,7 @@ class M30MFIBBUpgraded(BaseStrategy):
         if len(candles) < 100:
             return (None, 0, 0, [], [], {})
 
-        buy_signal, sell_signal, iv = self._check_3bar_condition()
+        buy_signal, sell_signal, iv = self._check_bb_breakout()
 
         factors_long: list[str] = []
         factors_short: list[str] = []

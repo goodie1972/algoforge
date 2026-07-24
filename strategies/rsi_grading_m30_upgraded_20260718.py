@@ -1,11 +1,11 @@
 """
-M30 RSI分级评分升级版 v4_upgraded — RSI+MA14+BB升级
+M30 RSI分级评分升级版 v5_upgraded — RSI+MA14+BB升级
 ===================================
 基于 rsi_grading_m30_optimized 升级:
   - RSI 阈值重定义: <20=+2, 20~35=+1, 35~65=0, 65~80=+1, >80=+2
   - 阈值锁定 3 分（极端 RSI 自带 2 分→只需 1 个其他因子；正常 RSI 需 3 个因子对齐）
   - 其他逻辑不变: ADX>28 趋势门禁 + EMA9/21 趋势感知出场
-数据源: 全部指标从 DataFactory TA-Lib 读取
+数据源: 全部指标从 DataFactory 读取
 """
 import logging
 import time
@@ -20,7 +20,7 @@ STRATEGY_VERSION = "v5_upgraded"
 STRATEGY_MAGIC = 660904
 STRATEGY_LEGACY_MAGICS: list[int] = [660902, 660903]
 STRATEGY_CHANGELOG = [
-    {"version": "v4_upgraded", "magic": 660904, "date": "2026-07-18",
+    {"version": "v5_upgraded", "magic": 660904, "date": "2026-07-18",
      "desc": "升级版: RSI<20/+2, 20~35/+1, 35~65/0, 65~80/+1, >80/+2; 固定阈值3分"},
 ]
 
@@ -87,33 +87,18 @@ class RSIGradingM30Upgraded(BaseStrategy):
 
     # ─────────────── RSI 方向反转检测 ───────────────
 
-    def _get_rsi_direction(self, closes: list[float]) -> tuple[bool, bool]:
-        """RSI 方向反转检测"""
-        period = self.rsi_period
-        if len(closes) < period + 4:
+    def _get_rsi_direction(self) -> tuple[bool, bool]:
+        """RSI 方向反转检测（从 DataFactory 读取 RSI 序列比较）"""
+        rsi_curr = self.get_indicator("rsi")
+        rsi_5 = self.get_indicator("rsi_5")
+        rsi_10 = self.get_indicator("rsi_10")
+        if rsi_curr is None or rsi_5 is None or rsi_10 is None:
             return (False, False)
 
-        def _rsi_sma(prices: list[float]) -> float:
-            gains = 0.0
-            losses = 0.0
-            for i in range(1, len(prices)):
-                chg = prices[i] - prices[i - 1]
-                if chg > 0:
-                    gains += chg
-                else:
-                    losses -= chg
-            ag = gains / period
-            al = losses / period
-            if al == 0:
-                return 100.0
-            return 100.0 - 100.0 / (1.0 + ag / al)
-
-        rsi_t = _rsi_sma(closes[-(period + 1):])
-        rsi_t1 = _rsi_sma(closes[-(period + 2):-1])
-        rsi_t2 = _rsi_sma(closes[-(period + 3):-2])
-
-        long_boost = rsi_t1 < rsi_t2 and rsi_t > rsi_t1
-        short_boost = rsi_t1 > rsi_t2 and rsi_t < rsi_t1
+        # rsi_5 比 rsi_10 快，rsi_curr 比 rsi_5 快
+        # 反转: 短周期从低于长周期变为高于长周期（或反之）
+        long_boost = rsi_5 > rsi_10 and rsi_curr > rsi_5
+        short_boost = rsi_5 < rsi_10 and rsi_curr < rsi_5
         return (long_boost, short_boost)
 
     # ─────────────── 新版 RSI 评分 ───────────────
@@ -162,7 +147,7 @@ class RSIGradingM30Upgraded(BaseStrategy):
         adx = self.get_indicator("adx")
         ma14_trend = self._get_ma14_trend()
 
-        rsi_long_boost, rsi_short_boost = self._get_rsi_direction(closes)
+        rsi_long_boost, rsi_short_boost = self._get_rsi_direction()
 
         # ── Scoring — 阈值固定 3 分 ──
         long_score = 0
