@@ -59,6 +59,8 @@ async def close_position(ticket: int, req: CloseRequest = None):
         ok = await run_bridge(engine_runner.bridge.close_order, ticket, volume)
         if not ok:
             raise HTTPException(404, f"平仓失败，订单 {ticket} 可能已不存在")
+        # 立即刷新缓存，UI 下次查询就是最新数据
+        engine_runner._update_positions_cache()
         return {"message": f"订单 {ticket} 已平仓", "ticket": ticket}
     except HTTPException:
         raise
@@ -77,6 +79,7 @@ async def modify_position(ticket: int, req: ModifyRequest):
         ok = await run_bridge(engine_runner.bridge.modify_order, ticket, sl, tp)
         if not ok:
             raise HTTPException(404, f"修改失败，订单 {ticket} 可能已不存在")
+        engine_runner._update_positions_cache()
         return {"message": f"订单 {ticket} 已修改", "ticket": ticket, "sl": sl, "tp": tp}
     except HTTPException:
         raise
