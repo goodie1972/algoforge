@@ -30,7 +30,7 @@ const columns = [
     }
   },
   {
-    title: '策略', key: 'strategy', width: 110,
+    title: '策略', key: 'strategy', width: 180,
     render(row: any) {
       const name = row.comment || row._strategy_name || ''
       const magic = row.magic || ''
@@ -72,7 +72,7 @@ const columns = [
     }
   },
   {
-    title: '操作', key: 'actions', width: 120,
+    title: '操作', key: 'actions', width: 140,
     render(row: any) {
       return h(NSpace, { size: 'small' }, {
         default: () => [
