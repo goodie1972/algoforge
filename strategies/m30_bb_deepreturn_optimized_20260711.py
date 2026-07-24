@@ -265,7 +265,7 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         _bwd = self.get_indicator("bb_width_direction")
         _mfi = self.get_indicator("mfi")
         _mfi_dir = self.get_indicator("mfi_direction")
-        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir:
+        if _bwr and _bwr > 1.05 and _bwd == "up" and _mfi is not None and _mfi_dir:
             if close > bb["mid"] and _mfi_dir in ("up", "flat"):
                 short_score = 0
                 short_detail.append("BBW-MFI-UP↑")

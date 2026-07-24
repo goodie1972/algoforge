@@ -17,7 +17,12 @@
       "Bash(echo \"PID: $!\")",
       "Bash(PYTHONIOENCODING=utf-8 python backtest/m30_rsi_v8_bt.py)",
       "Bash(git commit -m 'fix: 数据库K线存储改为INSERT OR REPLACE *)",
-      "Bash(git commit -m 'feat: EA新增F043命令直接返回MT4指标值 *)"
+      "Bash(git commit -m 'feat: EA新增F043命令直接返回MT4指标值 *)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs grep -a \"F043\\\\|MT4指标\\\\|sync_indicators\\\\|数据工厂.*启动\")",
+      "Bash(xargs grep -a \"mfi_bb.*升级版\\\\|rsi_grading.*评分\\\\|stoch.*K=\\\\|sanqing.*评分\")",
+      "Bash(xargs grep -a \"BB扩张\\\\|BBW-MFI\\\\|禁做\")"
     ]
   }
 }

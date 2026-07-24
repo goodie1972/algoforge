@@ -209,7 +209,7 @@ class RSIGradingM30Upgraded(BaseStrategy):
         _mfi = self.get_indicator("mfi")
         _mfi_dir = self.get_indicator("mfi_direction")
         _bb = self.get_indicator("bb")
-        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir and _bb:
+        if _bwr and _bwr > 1.05 and _bwd == "up" and _mfi is not None and _mfi_dir and _bb:
             _price_above_mid = close > _bb["mid"]
             if _price_above_mid and _mfi_dir in ("up", "flat"):
                 short_score = 0

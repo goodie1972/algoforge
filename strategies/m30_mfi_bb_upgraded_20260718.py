@@ -3,7 +3,7 @@ M30 MFI + BB Upgraded v8 — 超跌反弹升级版
 =============================================
 入场:
   - 收盘价超过BB轨道 (close > bb_upper / close < bb_lower)
-  - BB开口扩张>20%时禁用同向入场（防趋势加速接飞刀）
+  - BB开口扩张>5%时禁用同向入场（防趋势加速接飞刀）
   - 不看MFI
   - 运动员跟踪下一根K线回抽入场
 
@@ -29,9 +29,9 @@ STRATEGY_CHANGELOG = [
     {"version": "v7_upgraded", "magic": 661003, "date": "2026-07-18",
      "desc": "升级版: 进场不看MFI只看出轨; 运动员回抽入场; 顺势平改穿轨回抽+MFI50线"},
     {"version": "v8_upgraded", "magic": 661003, "date": "2026-07-21",
-     "desc": "BB开口扩张保护：bb_width_ratio>1.2时禁用同向入场(数据工厂预计算)"},
+     "desc": "BB开口扩张保护：bb_width_ratio > 1.05时禁用同向入场(数据工厂预计算)"},
 ]
-_BB_EXPAND_THRESHOLD = 0.20  # 开口扩张 >20% 时禁用同向入场
+_BB_EXPAND_THRESHOLD = 0.05  # 开口扩张 >5% 时禁用同向入场
 
 
 class M30MFIBBUpgraded(BaseStrategy):
@@ -52,7 +52,7 @@ class M30MFIBBUpgraded(BaseStrategy):
     def _check_3bar_condition(self) -> tuple[bool, bool, Optional[dict]]:
         """检查最近 price_position 内收盘是否出轨道。
         所有指标从 DataFactory 读取。
-        加入 BB 开口扩张保护：bb_width_ratio > 1.2 时禁用同向入场。
+        加入 BB 开口扩张保护：bb_width_ratio > 1.05 时禁用同向入场。
         """
         closes = self.get_close_prices()
         if len(closes) < 2:
@@ -70,13 +70,20 @@ class M30MFIBBUpgraded(BaseStrategy):
         _mfi_dir = self.get_indicator("mfi_direction")
         _block_short = False
         _block_long = False
-        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir and bb:
-            if close > bb["mid"] and _mfi_dir in ("up", "flat"):
-                _block_short = True
-                logger.info(f"[{self.name}] BB扩张+价格>中轴+MFI上升({_mfi:.0f})，禁做空")
-            if close < bb["mid"] and _mfi_dir in ("down", "flat"):
-                _block_long = True
-                logger.info(f"[{self.name}] BB扩张+价格<中轴+MFI下降({_mfi:.0f})，禁做多")
+        if _bwr is not None and _bwd is not None and _mfi is not None and _mfi_dir is not None:
+            # 3选2：ratio>1.05 + 方向扩张 + MFI方向一致
+            _score = 0
+            if _bwr > 1.05: _score += 1
+            if _bwd == "up": _score += 1
+            if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"): _score += 1
+            if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"): _score += 1
+            if _score >= 2:
+                if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"):
+                    _block_short = True
+                    logger.info(f"[{self.name}] BB扩张(2/3)+价格>中轴+MFI上升({_mfi:.0f})，禁做空")
+                if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"):
+                    _block_long = True
+                    logger.info(f"[{self.name}] BB扩张(2/3)+价格<中轴+MFI下降({_mfi:.0f})，禁做多")
 
         buy_signal = close < bb["lower"] and not _block_long
         sell_signal = close > bb["upper"] and not _block_short

@@ -156,14 +156,20 @@ class BakomeBackupOptimized(BaseStrategy):
         _mfi = self.get_indicator("mfi")
         _mfi_dir = self.get_indicator("mfi_direction")
         _bb = self.get_indicator("bb")
-        if _bwr and _bwr > 1.2 and _bwd == "up" and _mfi is not None and _mfi_dir and _bb:
+        if _bwr is not None and _bwd is not None and _mfi is not None and _mfi_dir and _bb:
             _close = candles[-1].close
-            if _close > _bb["mid"] and _mfi_dir in ("up", "flat"):
-                logger.info(f"[{self.name}] BB扩张+价格>中轴+MFI上升({_mfi:.0f})，禁做空，跳过FVG/OB")
-                return (None, 0, 0, [], [], {})
-            if _close < _bb["mid"] and _mfi_dir in ("down", "flat"):
-                logger.info(f"[{self.name}] BB扩张+价格<中轴+MFI下降({_mfi:.0f})，禁做多，跳过FVG/OB")
-                return (None, 0, 0, [], [], {})
+            _score = 0
+            if _bwr > 1.05: _score += 1
+            if _bwd == "up": _score += 1
+            if _close > _bb["mid"] and _mfi_dir in ("up", "flat"): _score += 1
+            if _close < _bb["mid"] and _mfi_dir in ("down", "flat"): _score += 1
+            if _score >= 2:
+                if _close > _bb["mid"] and _mfi_dir in ("up", "flat"):
+                    logger.info(f"[{self.name}] BB扩张(2/3)+价格>中轴+MFI上升({_mfi:.0f})，禁做空，跳过FVG/OB")
+                    return (None, 0, 0, [], [], {})
+                if _close < _bb["mid"] and _mfi_dir in ("down", "flat"):
+                    logger.info(f"[{self.name}] BB扩张(2/3)+价格<中轴+MFI下降({_mfi:.0f})，禁做多，跳过FVG/OB")
+                    return (None, 0, 0, [], [], {})
 
         # 4. Check FVG
         indicator_values = {"close": round(self.candles[-1].close, 2), "atr": round(atr_val, 2)}
