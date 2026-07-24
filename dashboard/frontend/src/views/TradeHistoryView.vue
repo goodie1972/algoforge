@@ -108,6 +108,13 @@ function renderAnalysis(row: any) {
   ])
 }
 
+const exitReasonLabels: Record<string, string> = {
+  'strategy_exit': '策略出场',
+  'mt4_history': 'MT4历史',
+  'stop_loss': '止损',
+  'take_profit': '止盈',
+}
+
 const columns = [
   {
     type: 'expand' as const,
@@ -166,8 +173,10 @@ const columns = [
   },
   { title: '出场原因', key: 'exit_reason', width: 100,
     render(row: any) {
-      const reason = row.exit_reason || '-'
-      return h(NTag, { size: 'small', type: 'default' }, { default: () => reason })
+      const reason = row.exit_reason || ''
+      const label = exitReasonLabels[reason] || reason || '-'
+      const type = reason === 'stop_loss' ? 'error' : reason === 'take_profit' ? 'success' : 'default'
+      return h(NTag, { size: 'small', type }, { default: () => label })
     }
   },
   { title: '开仓时间', key: 'open_time', width: 150 },
