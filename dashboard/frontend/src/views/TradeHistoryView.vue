@@ -111,11 +111,11 @@ function renderAnalysis(row: any) {
 const columns = [
   {
     type: 'expand' as const,
-    width: 40,
+    width: 30,
     renderExpand: (row: any) => renderAnalysis(row),
   },
   { title: 'Ticket', key: 'ticket', width: 80, sortable: true, sorter: (a: any, b: any) => a.ticket - b.ticket },
-  { title: '策略', key: 'strategy', width: 100, sortable: true,
+  { title: '策略', key: 'strategy', width: 160, sortable: true,
     render(row: any) {
       return h(NTag, { size: 'small', type: row.strategy?.includes('stoch') ? 'info' : 'warning' },
         { default: () => row.strategy }
@@ -123,15 +123,15 @@ const columns = [
     }
   },
   {
-    title: '方向', key: 'order_type', width: 70, sortable: true,
+    title: '方向', key: 'order_type', width: 40, sortable: true,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
-      return h(NTag, { type: isBuy ? 'success' : 'error', size: 'small' },
+      return h(NTag, { type: isBuy ? 'success' : 'error', size: 'tiny' },
         { default: () => isBuy ? '多头' : '空头' }
       )
     }
   },
-  { title: '手数', key: 'volume', width: 60, sortable: true },
+  { title: '手数', key: 'volume', width: 40, sortable: true },
   { title: '开仓价', key: 'entry_price', width: 100, sortable: true,
     render(row: any) { return row.entry_price?.toFixed(2) }
   },
