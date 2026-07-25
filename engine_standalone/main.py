@@ -185,6 +185,21 @@ class TradingEngine:
         except Exception:
             return dict(settings.COORDINATOR_CONFIG)
 
+    def _get_paper_config(self):
+        """获取纸面交易配置，RuntimeConfig 覆盖优先，回退 settings.PAPER_MODE"""
+        try:
+            from core.runtime_config import RuntimeConfig
+            pc = RuntimeConfig().get_paper_config()
+            if isinstance(pc, dict):
+                return pc
+        except Exception:
+            pass
+        return {
+            "enabled": getattr(settings, "PAPER_MODE", False),
+            "max_positions": 10,
+            "ignore_gates": True,
+        }
+
     def _calibrate_mt4_time(self):
         """启动时校准 MT4 服务器时间 vs 本机 UTC 时间"""
         try:
@@ -951,7 +966,8 @@ class TradingEngine:
                     pass
 
         # ---- 阻断检查（纸面模式全量测试，跳过所有风控） ----
-        if not settings.PAPER_MODE:
+        _pc = self._get_paper_config()
+        if not _pc.get("enabled", False):
             global_blocked = self._check_global_loss()
 
             news_blocked = False
@@ -980,7 +996,7 @@ class TradingEngine:
 
         # ---- 开仓：逐策略判断 ----
         for strategy in snapshot:
-            if not settings.PAPER_MODE:
+            if not _pc.get("enabled", False) and not _pc.get("ignore_gates", False):
                 block_reason = self._is_strategy_blocked(strategy.magic)
                 if block_reason:
                     logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
@@ -1398,16 +1414,18 @@ class TradingEngine:
             pass
         return False
 
-    # 纸面交易单策略最大持仓（防止单策略耗尽所有额度）
-    _PAPER_MAX_POSITIONS = 10
-
     def _run_strategy(self, strategy):
         """单个策略的一次 tick — 信号生成 + 开仓"""
         # ── 纸面交易单策略持仓上限检查 ──
-        if settings.PAPER_MODE and self._PAPER_MAX_POSITIONS > 0:
+        _pc = self._get_paper_config()
+        _paper_enabled = _pc.get("enabled", False)
+        _paper_ignore = _pc.get("ignore_gates", False)
+        _paper_max = _pc.get("max_positions", 10)
+
+        if _paper_enabled and not _paper_ignore and _paper_max > 0:
             _my_positions = [p for p in self.bridge.get_positions(settings.SYMBOL)
                              if p.magic in self._strategy_magics(strategy)]
-            if len(_my_positions) >= self._PAPER_MAX_POSITIONS:
+            if len(_my_positions) >= _paper_max:
                 return
 
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
@@ -1443,7 +1461,8 @@ class TradingEngine:
             logger.warning(f"[{strategy.name}] 持仓不一致: 桥接={n_bridge} 本地={n_local}，取较大值={n_total}")
 
         # 纸面交易不限仓，有多少信号开多少
-        if not settings.PAPER_MODE:
+        _skip_limits = _paper_enabled or _paper_ignore
+        if not _skip_limits:
             if n_total >= strategy.max_positions:
                 return  # 已达上限
 

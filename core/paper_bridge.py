@@ -54,6 +54,20 @@ class PaperBridge(MT4BridgeBase):
         self._tick_time: float = 0
         self._equity: float = 0.0
 
+    def reset_all(self) -> dict:
+        """重置所有纸面交易数据 — 清空持仓、历史、余额归零"""
+        closed_count = len(self._closed)
+        positions_count = len(self._positions)
+        self._positions.clear()
+        self._closed.clear()
+        self._balance = self._start_balance
+        # 清空 CSV 文件内容（仅保留表头）
+        with open(str(CSV_TRADES), "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(CSV_HEADERS)
+        logger.info(f"[PaperBridge] 已重置: 清除 {closed_count} 笔历史, {positions_count} 张持仓")
+        return {"closed": closed_count, "positions": positions_count}
+
     def _init_ticket_seq(self):
         """扫描已有 ticket，初始化当天的 seq 计数器"""
         from datetime import datetime
@@ -233,7 +247,7 @@ class PaperBridge(MT4BridgeBase):
     def get_candles(self, symbol: str, timeframe: str, count: int, offset: int = 0) -> list[Candle]:
         return self._real.get_candles(symbol, timeframe, count, offset)
 
-    def get_account_info(self) -> Optional[AccountInfo]:
+    def get_account_info(self) -> AccountInfo:
         """返回模拟余额 + 浮动盈亏"""
         info = self._real.get_account_info()
         if info is None:

@@ -75,6 +75,20 @@ export async function updateCoordinator(cfg: Record<string, any>): Promise<void>
   await http.post('/config/coordinator', { config: cfg })
 }
 
+// === 纸面交易配置 ===
+export async function getPaperConfig(): Promise<any> {
+  const { data } = await http.get('/config/paper')
+  return data
+}
+
+export async function updatePaperConfig(cfg: Record<string, any>): Promise<void> {
+  await http.post('/config/paper', { config: cfg })
+}
+
+export async function resetPaperData(): Promise<void> {
+  await http.post('/paper-trading/reset')
+}
+
 // === 行情 ===
 export async function getPrice(): Promise<TickPrice> {
   const { data } = await http.get('/market/price')

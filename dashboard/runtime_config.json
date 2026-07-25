@@ -193,5 +193,11 @@
       "max_positions": 0,
       "double_first": false
     }
+  },
+  "paper_trading": {
+    "enabled": true,
+    "max_positions": 10,
+    "ignore_gates": true,
+    "initial_balance": 5000
   }
 }

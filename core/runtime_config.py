@@ -37,6 +37,14 @@ _STRATEGY_KEYS = {
 }
 
 
+_PAPER_KEYS = {
+    "paper_trading_enabled",
+    "paper_max_positions",
+    "paper_ignore_gates",
+    "paper_initial_balance",
+}
+
+
 class RuntimeConfig:
     """运行时配置单例 - 线程安全"""
 
@@ -116,6 +124,7 @@ class RuntimeConfig:
             "max_consecutive_losses": "MAX_CONSECUTIVE_LOSSES",
             "consecutive_loss_cooldown_hours": "CONSECUTIVE_LOSS_COOLDOWN_HOURS",
             "profit_exit_cooldown_hours": "PROFIT_EXIT_COOLDOWN_HOURS",
+            "paper_trading_enabled": "PAPER_TRADING_ENABLED",
         }
         attr = key_map.get(key)
         if attr and hasattr(settings, attr):
@@ -137,6 +146,7 @@ class RuntimeConfig:
             result[key] = self.get(key)
         result["strategy_pool"] = self.get_strategy_pool()
         result["coordinator"] = self.get_coordinator_config()
+        result["paper_trading"] = self.get_paper_config()
         result["symbol"] = getattr(settings, 'SYMBOL', 'XAUUSD')
         return result
 
@@ -170,6 +180,34 @@ class RuntimeConfig:
             self._save()
         return self.get_coordinator_config()
 
+    def get_paper_config(self) -> dict:
+        """获取纸面交易配置（覆盖优先）"""
+        defaults = {
+            "enabled": False,
+            "max_positions": 10,
+            "ignore_gates": True,
+            "initial_balance": 0,
+        }
+        with self._data_lock:
+            if "paper_trading" in self._overrides:
+                merged = dict(defaults)
+                merged.update(self._overrides["paper_trading"])
+                return merged
+        # 从 settings.py 读取 paper_trading_enabled 作为 enabled 兜底
+        enabled = self._get_default("paper_trading_enabled")
+        if enabled is not None:
+            defaults["enabled"] = bool(enabled)
+        return dict(defaults)
+
+    def set_paper_config(self, cfg: dict) -> dict:
+        """设置纸面交易配置（合并方式，仅更新传入的字段）"""
+        with self._data_lock:
+            existing = self._overrides.get("paper_trading", {})
+            existing.update(cfg)
+            self._overrides["paper_trading"] = existing
+            self._save()
+        return self.get_paper_config()
+
     def update(self, updates: dict[str, Any]) -> dict[str, Any]:
         """批量更新配置项"""
         updated = {}
@@ -192,6 +230,7 @@ class RuntimeConfig:
             result[key] = self.get(key)
         result['strategy_pool'] = self.get('strategy_pool') or {}
         result['coordinator'] = self.get_coordinator_config()
+        result['paper_trading'] = self.get_paper_config()
         return result
 
     def reset(self, key: str | None = None):
