@@ -15,7 +15,6 @@ import { usePatrolStore } from '@/stores/patrol'
 import { wsClient } from '@/api/websocket'
 import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog, getRemoteChangelog, updateVersion } from '@/api/client'
 import { useMessage, useDialog } from 'naive-ui'
-import '@/components/input-number-icons.css'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
 import NewsBiasPopup from '@/components/NewsBiasPopup.vue'
 

@@ -180,10 +180,10 @@ async function handleModify() {
       <n-drawer-content :title="`修改 SL/TP - #${editingTicket}`" closable @close="editingTicket = null">
         <n-space vertical size="large">
           <n-form-item label="止损 (SL)">
-            <n-input-number v-model:value="editSl" :step="0.01" style="width:100%;" />
+            <app-input-number v-model:value="editSl" :step="0.01" style="width:100%;" />
           </n-form-item>
           <n-form-item label="止盈 (TP)">
-            <n-input-number v-model:value="editTp" :step="0.01" style="width:100%;" />
+            <app-input-number v-model:value="editTp" :step="0.01" style="width:100%;" />
           </n-form-item>
           <n-button type="primary" :loading="loadingModify" @click="handleModify" block>
             确认修改

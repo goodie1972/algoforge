@@ -94,14 +94,14 @@ const impactOptions = [
         <n-divider title-position="left">禁售时间窗口</n-divider>
 
         <n-form-item label="发布前 (分钟)">
-          <n-input-number :value="local.news_before_minutes" :min="0" :max="999"
+          <app-input-number :value="local.news_before_minutes" :min="0" :max="999"
             @update:value="(v: any) => v !== null && (local.news_before_minutes = v)"
             style="width:100%;" />
           <template #feedback>数据发布前 N 分钟停止开新仓</template>
         </n-form-item>
 
         <n-form-item label="发布后 (分钟)">
-          <n-input-number :value="local.news_after_minutes" :min="0" :max="999"
+          <app-input-number :value="local.news_after_minutes" :min="0" :max="999"
             @update:value="(v: any) => v !== null && (local.news_after_minutes = v)"
             style="width:100%;" />
           <template #feedback>数据发布后 N 分钟恢复交易</template>
@@ -141,7 +141,7 @@ const impactOptions = [
         </n-form-item>
 
         <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" label="DI差值门限">
-          <n-input-number :value="local.news_bias_di_gap"
+          <app-input-number :value="local.news_bias_di_gap"
             @update:value="(v: number) => local.news_bias_di_gap = v"
             :min="0" :max="30" :step="1" style="width: 110px;" />
           <template #feedback>M30 |+DI - -DI| &lt; 此值时绕过方向阻塞（0=关闭绕过，默认8）</template>

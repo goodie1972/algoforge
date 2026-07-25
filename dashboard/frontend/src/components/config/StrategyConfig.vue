@@ -130,7 +130,7 @@ async function savePool() {
               <n-grid :cols="2" :x-gap="12" :y-gap="8">
                 <n-grid-item>
                   <n-form-item label="Magic Number" :label-placement="'top'" size="small">
-                    <n-input-number v-model:value="pool[meta.id].magic" :min="100000" :max="999999"
+                    <app-input-number v-model:value="pool[meta.id].magic" :min="100000" :max="999999"
                       style="width:100%;" size="small" />
                   </n-form-item>
                 </n-grid-item>
@@ -142,7 +142,7 @@ async function savePool() {
                 </n-grid-item>
                 <n-grid-item>
                   <n-form-item label="最大持仓" :label-placement="'top'" size="small">
-                    <n-input-number v-model:value="pool[meta.id].max_positions" :min="1" :max="5"
+                    <app-input-number v-model:value="pool[meta.id].max_positions" :min="1" :max="5"
                       style="width:100%;" size="small" />
                   </n-form-item>
                 </n-grid-item>

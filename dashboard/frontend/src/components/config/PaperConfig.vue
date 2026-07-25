@@ -61,14 +61,14 @@ function confirmReset() {
 
         <n-divider title-position="left">持仓限制</n-divider>
         <n-form-item label="最大同时持仓数">
-          <n-input-number :value="local.max_positions" :min="1" :max="50"
+          <app-input-number :value="local.max_positions" :min="1" :max="50"
             @update:value="(v: any) => v != null && (local.max_positions = v)" style="width:100%;" />
           <template #feedback>纸面模式下单策略最大同时持仓数</template>
         </n-form-item>
 
         <n-divider title-position="left">虚拟余额</n-divider>
         <n-form-item label="初始虚拟余额 ($)">
-          <n-input-number :value="local.initial_balance" :min="0" :max="100000"
+          <app-input-number :value="local.initial_balance" :min="0" :max="100000"
             @update:value="(v: any) => v != null && (local.initial_balance = v)" style="width:100%;" />
           <template #feedback>0=从真实桥接获取余额，&gt;0=使用指定虚拟余额</template>
         </n-form-item>
