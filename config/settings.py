@@ -78,6 +78,8 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # ============================================================
 # 纸面交易模式 — True=模拟交易（不真实发单，策略进出场逻辑原样运行）
 PAPER_MODE = True
+# 纸面交易配置开关（RuntimeConfig 覆盖用，settings.py 仅作为兜底 fallback）
+PAPER_TRADING_ENABLED = False
 
 STRATEGY_POOL = {
     "M30_rsi_bb": {

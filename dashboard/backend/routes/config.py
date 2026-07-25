@@ -22,6 +22,10 @@ class CoordinatorUpdate(BaseModel):
     config: dict
 
 
+class PaperConfigUpdate(BaseModel):
+    config: dict
+
+
 @router.get("/strategy-pool")
 async def get_strategy_pool():
     """获取策略池配置（在 /{key} 之前注册，避免被捕获）"""
@@ -56,6 +60,26 @@ async def get_config():
     if not config_service:
         raise HTTPException(500, "配置服务未初始化")
     return config_service.get_all()
+
+
+@router.get("/paper")
+async def get_paper_config():
+    """获取纸面交易配置"""
+    if not config_service:
+        raise HTTPException(500, "配置服务未初始化")
+    return config_service.get_paper_config()
+
+
+@router.post("/paper")
+async def update_paper_config(req: PaperConfigUpdate):
+    """更新纸面交易配置"""
+    if not config_service:
+        raise HTTPException(500, "配置服务未初始化")
+    try:
+        updated = config_service.set_paper_config(req.config)
+        return {"message": "纸面配置已更新", "config": updated}
+    except Exception as e:
+        raise HTTPException(422, f"纸面配置更新失败: {e}")
 
 
 @router.get("/{key}")

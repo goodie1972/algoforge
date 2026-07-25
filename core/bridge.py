@@ -26,7 +26,7 @@ class OrderType(Enum):
 @dataclass
 class Position:
     """持仓信息"""
-    ticket: int | str
+    ticket: int
     symbol: str
     order_type: str  # OP_BUY / OP_SELL
     volume: float
@@ -104,17 +104,17 @@ class MT4BridgeBase(abc.ABC):
     @abc.abstractmethod
     def open_order(self, symbol: str, order_type: OrderType, volume: float,
                    price: float = 0, sl: float = 0, tp: float = 0,
-                   comment: str = "", magic: int = 0) -> int | str | None:
+                   comment: str = "", magic: int = 0) -> Optional[int]:
         """下单，返回 ticket"""
         ...
 
     @abc.abstractmethod
-    def close_order(self, ticket: int | str, volume: float = 0) -> bool:
+    def close_order(self, ticket: int, volume: float = 0) -> bool:
         """平仓"""
         ...
 
     @abc.abstractmethod
-    def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
+    def modify_order(self, ticket: int, sl: float = 0, tp: float = 0) -> bool:
         """修改止损止盈"""
         ...
 
@@ -147,8 +147,10 @@ def create_bridge() -> MT4BridgeBase:
         from core.freemt4_bridge import FreeMT4Bridge
         bridge = FreeMT4Bridge()
         try:
-            from config.settings import PAPER_MODE
-            if PAPER_MODE:
+            from core.runtime_config import RuntimeConfig
+            rc = RuntimeConfig()
+            paper_cfg = rc.get_paper_config()
+            if paper_cfg.get("enabled", False):
                 from core.paper_bridge import PaperBridge
                 bridge = PaperBridge(bridge)
                 logger.info("[桥接] 纸面模式：PaperBridge 包装单桥接")
@@ -165,15 +167,17 @@ def create_bridge() -> MT4BridgeBase:
 def create_bridge_pair():
     """创建双桥接：data_bridge(推流) + exec_bridge(下单)
 
-    纸面模式 (settings.PAPER_MODE=True) 时 exec_bridge 使用 PaperBridge 包装，
+    纸面模式 (RuntimeConfig paper_trading.enabled=True) 时 exec_bridge 使用 PaperBridge 包装，
     数据委托给真实桥接，交易操作本地模拟。
     """
     from core.freemt4_bridge import FreeMT4Bridge
     real_exec = FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="exec")
     # 纸面模式：用 PaperBridge 包装执行桥接
     try:
-        from config.settings import PAPER_MODE
-        if PAPER_MODE:
+        from core.runtime_config import RuntimeConfig
+        rc = RuntimeConfig()
+        paper_cfg = rc.get_paper_config()
+        if paper_cfg.get("enabled", False):
             from core.paper_bridge import PaperBridge
             exec_bridge = PaperBridge(real_exec)
             logger.info("[桥接] 纸面模式：PaperBridge 包装执行桥接")

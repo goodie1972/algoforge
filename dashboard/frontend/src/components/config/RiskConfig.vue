@@ -44,7 +44,7 @@ async function save() {
 
 <template>
   <n-grid :cols="2" :x-gap="24" :y-gap="12">
-    <!-- 左列：仓位 + 止损止盈 -->
+    <!-- 左列：仓位管理 + 止损止盈 + 账户级硬止损 + 安全锁 -->
     <n-grid-item>
       <n-space vertical size="medium">
         <n-divider title-position="left">仓位管理</n-divider>
@@ -75,12 +75,7 @@ async function save() {
             @update:value="(v: any) => v !== null && (local.profit_exit_cooldown_hours = v)" style="width:100%;" />
           <template #feedback>盈利平仓后 N 小时内不再开同向单，0 为不限制</template>
         </n-form-item>
-      </n-space>
-    </n-grid-item>
 
-    <!-- 右列：风控限制 -->
-    <n-grid-item>
-      <n-space vertical size="medium">
         <n-divider title-position="left">账户级硬止损</n-divider>
         <n-form-item label="全局已实现亏损上限 (%)">
           <n-input-number :value="local.max_daily_loss_pct" :min="1" :max="100" :step="0.5"
@@ -88,6 +83,18 @@ async function save() {
           <template #feedback>超过此比例后所有策略暂停开仓</template>
         </n-form-item>
 
+        <n-divider title-position="left">安全锁</n-divider>
+        <n-form-item label="锁自动过期 (分钟)">
+          <n-input-number :value="local.safety_lock_timeout_minutes" :min="10" :max="1440" :step="5"
+            @update:value="(v: any) => v != null && (local.safety_lock_timeout_minutes = v)" style="width:100%;" />
+          <template #feedback>可疑场景触发安全锁后，超过此时长自动清除</template>
+        </n-form-item>
+      </n-space>
+    </n-grid-item>
+
+    <!-- 右列：浮动亏损 + 已实现亏损 + 快速出场 + 连续亏损 -->
+    <n-grid-item>
+      <n-space vertical size="medium">
         <n-divider title-position="left">浮动亏损 (单策略)</n-divider>
         <n-form-item label="警告线 (%)">
           <n-input-number :value="local.floating_loss_warn_pct" :min="1" :max="50" :step="0.5"
@@ -111,6 +118,11 @@ async function save() {
             @update:value="(v: any) => v != null && (local.per_strategy_loss_block_hours = v)" style="width:100%;" />
           <template #feedback>阻断到期后自动恢复，不影响其他策略</template>
         </n-form-item>
+        <n-form-item label="绝对亏损上限 ($)">
+          <n-input-number :value="local.per_strategy_realized_loss_amount" :min="5" :max="500" :step="5"
+            @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width:100%;" />
+          <template #feedback>单策略累计已实现亏损 ≥${{ local.per_strategy_realized_loss_amount }} 触发冷却</template>
+        </n-form-item>
 
         <n-divider title-position="left">快速出场检测 (单策略)</n-divider>
         <n-form-item label="窗口内最大出场次数">
@@ -128,13 +140,6 @@ async function save() {
           <template #feedback>触发后 {{ Math.round(local.rapid_exit_cooldown_seconds / 60) }} 分钟不能开单</template>
         </n-form-item>
 
-        <n-divider title-position="left">单策略绝对亏损冷却</n-divider>
-        <n-form-item label="已实现亏损上限 ($)">
-          <n-input-number :value="local.per_strategy_realized_loss_amount" :min="5" :max="500" :step="5"
-            @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width:100%;" />
-          <template #feedback>单策略累计已实现亏损 ≥${{ local.per_strategy_realized_loss_amount }} 触发冷却</template>
-        </n-form-item>
-
         <n-divider title-position="left">连续亏损冷却</n-divider>
         <n-form-item label="连续亏损上限 (次)">
           <n-input-number :value="local.max_consecutive_losses" :min="1" :max="20"
@@ -145,13 +150,6 @@ async function save() {
           <n-input-number :value="local.consecutive_loss_cooldown_hours" :min="1" :max="72"
             @update:value="(v: any) => v != null && (local.consecutive_loss_cooldown_hours = v)" style="width:100%;" />
           <template #feedback>冷却到期后自动恢复</template>
-        </n-form-item>
-
-        <n-divider title-position="left">安全锁</n-divider>
-        <n-form-item label="锁自动过期 (分钟)">
-          <n-input-number :value="local.safety_lock_timeout_minutes" :min="10" :max="1440" :step="5"
-            @update:value="(v: any) => v != null && (local.safety_lock_timeout_minutes = v)" style="width:100%;" />
-          <template #feedback>可疑场景触发安全锁后，超过此时长自动清除</template>
         </n-form-item>
       </n-space>
     </n-grid-item>
