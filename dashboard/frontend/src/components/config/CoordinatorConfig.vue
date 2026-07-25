@@ -120,28 +120,28 @@ async function save() {
               </template>
               <template v-if="local.position_gate_enabled">
                 <n-form-item label="M30 区间周期" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.position_gate_m30_lookback"
+                  <app-input-number :value="local.position_gate_m30_lookback"
                     @update:value="(v: number) => local.position_gate_m30_lookback = v"
                     :min="10" :max="200" style="width: 110px;" />
                 </n-form-item>
                 <n-grid :cols="2" :x-gap="8">
                   <n-grid-item>
                     <n-form-item label="底部阈值" label-placement="left" :label-width="80">
-                      <n-input-number :value="local.position_gate_bottom"
+                      <app-input-number :value="local.position_gate_bottom"
                         @update:value="(v: number) => local.position_gate_bottom = v"
                         :min="0.01" :max="0.50" :step="0.01" style="width: 90px;" />
                     </n-form-item>
                   </n-grid-item>
                   <n-grid-item>
                     <n-form-item label="顶部阈值" label-placement="left" :label-width="80">
-                      <n-input-number :value="local.position_gate_top"
+                      <app-input-number :value="local.position_gate_top"
                         @update:value="(v: number) => local.position_gate_top = v"
                         :min="0.50" :max="0.99" :step="0.01" style="width: 90px;" />
                     </n-form-item>
                   </n-grid-item>
                 </n-grid>
                 <n-form-item label="DI差值跳过" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.di_gate_skip_threshold"
+                  <app-input-number :value="local.di_gate_skip_threshold"
                     @update:value="(v: number) => local.di_gate_skip_threshold = v"
                     :min="5" :max="100" style="width: 110px;" />
                   <template #feedback>|+DI - -DI| 大于此值时跳过位置门禁（默认20，趋势市有效）</template>
@@ -160,17 +160,17 @@ async function save() {
               </template>
               <template v-if="local.rally_drop_enabled">
                 <n-form-item label="检测周期（K线）" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.rally_drop_lookback"
+                  <app-input-number :value="local.rally_drop_lookback"
                     @update:value="(v: number) => local.rally_drop_lookback = v"
                     :min="5" :max="100" style="width: 110px;" />
                 </n-form-item>
                 <n-form-item label="阈值（%）" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.rally_drop_threshold"
+                  <app-input-number :value="local.rally_drop_threshold"
                     @update:value="(v: number) => local.rally_drop_threshold = v"
                     :min="0.1" :max="5.0" :step="0.1" style="width: 110px;" />
                 </n-form-item>
                 <n-form-item label="ADX跳过" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.rally_drop_adx_skip"
+                  <app-input-number :value="local.rally_drop_adx_skip"
                     @update:value="(v: number) => local.rally_drop_adx_skip = v"
                     :min="10" :max="60" style="width: 110px;" />
                   <template #feedback>ADX 大于此值时跳过急跌惩罚（默认25，趋势市不惩罚正常波动）</template>
@@ -189,12 +189,12 @@ async function save() {
               </template>
               <template v-if="local.profit_drawdown_enabled">
                 <n-form-item label="回撤比例" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.profit_drawdown_pct"
+                  <app-input-number :value="local.profit_drawdown_pct"
                     @update:value="(v: number) => local.profit_drawdown_pct = v"
                     :min="0.05" :max="1.0" :step="0.05" style="width: 110px;" />
                 </n-form-item>
                 <n-form-item label="峰值门槛(ATR)" label-placement="left" :label-width="110">
-                  <n-input-number :value="local.profit_drawdown_min_peak_atr"
+                  <app-input-number :value="local.profit_drawdown_min_peak_atr"
                     @update:value="(v: number) => local.profit_drawdown_min_peak_atr = v"
                     :min="0.0" :max="5.0" :step="0.1" style="width: 110px;" />
                 </n-form-item>

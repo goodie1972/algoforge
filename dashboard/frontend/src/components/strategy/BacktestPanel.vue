@@ -78,7 +78,7 @@ async function run() {
           </n-gi>
           <n-gi>
             <n-form-item label="初始资金">
-              <n-input-number v-model:value="form.initial_cash" :min="100" :step="1000" size="small" style="width: 100%;" />
+              <app-input-number v-model:value="form.initial_cash" :min="100" :step="1000" size="small" style="width: 100%;" />
             </n-form-item>
           </n-gi>
         </n-grid>
@@ -96,7 +96,7 @@ async function run() {
           </n-gi>
           <n-gi>
             <n-form-item label="手续费/张">
-              <n-input-number v-model:value="form.commission" :min="0" :step="0.1" size="small" style="width: 100%;" />
+              <app-input-number v-model:value="form.commission" :min="0" :step="0.1" size="small" style="width: 100%;" />
             </n-form-item>
           </n-gi>
         </n-grid>
