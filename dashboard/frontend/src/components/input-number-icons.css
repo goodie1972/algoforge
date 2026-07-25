@@ -1,0 +1,53 @@
+/* ============================================
+   n-input-number ± 按钮 → Tabler chevron 图标
+   "n" 是 Naive UI 的默认 mergedClsPrefix
+   ============================================ */
+
+/* 按钮容器：n-input-number 的按钮组 */
+.n-input-number .n-input .n-input__suffix {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 0 4px 4px 0;
+  overflow: hidden;
+}
+
+/* 每个按钮 */
+.n-input-number .n-input .n-input__suffix .n-button {
+  min-width: 24px !important;
+  min-height: 14px !important;
+  height: 14px !important;
+  border-radius: 0 !important;
+  font-size: 0 !important;       /* 隐藏文字 */
+  position: relative;
+}
+
+/* 隐藏按钮内部文字 "+" 和 "-" */
+.n-input-number .n-input .n-input__suffix .n-button .n-button__content {
+  font-size: 0 !important;
+}
+
+/* 按钮 hover 和 active 状态 */
+.n-input-number .n-input .n-input__suffix .n-button:hover {
+  background-color: rgba(240, 185, 11, 0.1) !important;
+}
+
+/* 加按钮 (+) → 向上 Chevron */
+.n-input-number .n-input .n-input__suffix .n-button:last-child::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 15l6 -6l6 6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 15l6 -6l6 6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+  background-color: currentColor;
+}
+
+/* 减按钮 (-) → 向下 Chevron */
+.n-input-number .n-input .n-input__suffix .n-button:first-child::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6l6 -6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6l6 -6' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+  background-color: currentColor;
+}
