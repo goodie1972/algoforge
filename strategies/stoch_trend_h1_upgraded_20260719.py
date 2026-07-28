@@ -1,28 +1,20 @@
 """
-Stoch 回调顺势策略 (v9_trend_zone)
-====================================
-大师理论: ADX>25 趋势确认 + Stoch 趋势中段回调入场
-XAUUSD 专用参数: Stoch(5,3,3) 更快信号响应
+Stoch KDJ 周期策略 (v12)
+=================================
+3 道闸门入场 + 抓完整 KDJ 周期出场
 
-核心变化 vs v8:
-  - 金叉区间从 K<40 改为 K>=65（趋势中段，非超卖区博弈）
-  - 死叉区间从 K>60 改为 K<=35（趋势中段回调）
-  - 极端金叉: K>80（极强趋势延续）
-  - 极端死叉: K<20（极弱趋势延续）
-  - 金叉/死叉本身 +2 分不变，极端额外 +1
+入场 (generate_signal):
+  1. ADX > 25 (震荡市不做)
+  2. KDJ 金叉/死叉
+  3. K 在极值区: K<20 (金叉做多) / K>80 (死叉做空)
+  4. close vs BBI 方向确认: 金叉+close>BBI / 死叉+close<BBI
+  → 4 道闸门全过才出票, 运动员直接入场
 
-运动员验证:
-  BUY:  K<20(极端)→直接入场; K=20~40→需<=35
-  SELL: K>80(极端)→直接入场; K=60~80→需>=65
-
-出场:
-  - 硬止损: 1.5 ATR
-  - 止盈: 3.0 ATR (止损×2)
-  - 趋势走完: Stoch 反向交叉确认
-    - BUY金叉入场(K>80极端)→死叉+K<25 → 平
-    - BUY金叉入场(K 65~80)→死叉 → 平
-    - SELL死叉入场(K<20极端)→金叉+K>75 → 平
-    - SELL死叉入场(K 20~35)→金叉 → 平
+出场 (check_ema20_exit):
+  - 入场 BUY 在 K<20: 等 K 和 D 都到 >80, 然后 KDJ 死叉 → 平
+  - 入场 SELL 在 K>80: 等 K 和 D 都到 <20, 然后 KDJ 金叉 → 平
+  - 不考虑 BBI 反转
+  - 不要硬止损
 
 数据源: 全部指标从 DataFactory 读取
 """
@@ -35,7 +27,7 @@ from services.data_factory import get_cache
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v9_trend_zone"
+STRATEGY_VERSION = "v12_kdj_cycle"
 STRATEGY_MAGIC = 661204
 STRATEGY_LEGACY_MAGICS: list[int] = [661201, 661202, 661203]
 STRATEGY_CHANGELOG = [
@@ -43,11 +35,15 @@ STRATEGY_CHANGELOG = [
      "desc": "趋势中段: 金叉K>=65(原<40), 死叉K<=35(原>60); 极端金叉K>80, 极端死叉K<20"},
     {"version": "v8_upgraded", "magic": 661203, "date": "2026-07-19",
      "desc": "升级版: ADX>25; 极端不独立给分; 1.5ATR止损3.0ATR止盈; Stoch交叉趋势走完出场"},
+    {"version": "v10_counter_trend", "magic": 661204, "date": "2026-07-28",
+     "desc": "真正逆势: K<=35金叉做多 (超卖反弹), K>=65死叉做空 (超买回调)"},
+    {"version": "v12_kdj_cycle", "magic": 661204, "date": "2026-07-28",
+     "desc": "KDJ 周期策略: 入场 4 闸门(ADX>25+KDJ交叉+K极值+BBI方向); 出场等 K/D 到反向极值再 KDJ 反向交叉; 不要硬止损, 不要 BBI 反转出场"},
 ]
 
 
 class StochTrendH1Upgraded(BaseStrategy):
-    """Stoch 多周期回调顺势策略 — v9_trend_zone"""
+    """Stoch KDJ 周期策略 — v12"""
 
     name = "stoch_trend_h1_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -56,286 +52,177 @@ class StochTrendH1Upgraded(BaseStrategy):
         super().__init__(bridge, magic, timeframe)
 
         # 参数
-        self.adx_threshold = 25          # 从 20 提到 25
-        self.sl_atr = 1.5                # 硬止损 1.5 ATR
-        self.tp_atr = 3.0                # 止盈 3.0 ATR（2×止损）
-
-        # 评分系统参数
-        self.score_threshold = 4         # 满分 8 分，4 分及格
+        self.adx_threshold = 25
+        self.bbi_periods = (3, 6, 12, 24)  # BBI = (MA3+MA6+MA12+MA24)/4
+        self.k_extreme_buy = 20   # K<20 视为超卖
+        self.k_extreme_sell = 80  # K>80 视为超买
 
         # 持仓跟踪
         self._pos_data: dict[int, dict] = {}
         self._pending_entry_info: dict = {}
         self._last_exit_detail: Optional[dict] = None
 
-        # Stoch 交叉检测：记录上一次的值（来自 DataFactory）
+        # Stoch 交叉检测
         self._prev_stoch_k: float = 50.0
         self._prev_stoch_d: float = 50.0
 
     def refresh_data(self, count: int = 350):
         super().refresh_data(count)
-        # 多周期数据全部从 DataFactory 缓存读取，无需额外加载
 
-    def get_adx_data(self) -> Optional[dict]:
-        adx = self.get_indicator("adx")
-        pdi = self.get_indicator("pdi")
-        ndi = self.get_indicator("ndi")
-        if adx is None:
-            return None
-        return {"adx": adx, "pdi": pdi, "ndi": ndi}
+    # ─────────────── 指标计算 ───────────────
 
-    def _get_h4_trend(self) -> Optional[str]:
-        """从 DataFactory 缓存读取 H4 EMA21 判断趋势"""
+    def _get_bbi(self) -> Optional[float]:
+        """BBI = (MA3 + MA6 + MA12 + MA24) / 4"""
         try:
-            h4 = get_cache("H4")
-            if not h4:
+            closes = self.get_close_prices()
+            if len(closes) < 24:
                 return None
-            ema21 = h4.get("ema_21")
-            candles = h4.get("candles", [])
-            if ema21 is None or not candles:
-                return None
-            close = candles[-1].close
-            return 'UP' if close > ema21 else 'DOWN' if close < ema21 else None
+            ma = {}
+            for p in self.bbi_periods:
+                ma[p] = sum(closes[-p:]) / p
+            return sum(ma.values()) / len(ma)
         except Exception:
             return None
 
-    # ─────────────── Signal generation ───────────────
-
-    def generate_signal(self) -> Optional[tuple]:
-        candles = self.candles
-        if len(candles) < 100:
-            return None
-
-        closes = self.get_close_prices()
-        close = closes[-1]
-
-        # ── 全部从 DataFactory 读取 ──
+    def _get_kdj(self) -> Optional[dict]:
+        """返回 K, D, K_prev, D_prev"""
         stoch = self.get_indicator("stoch_5_3_3")
         if stoch is None:
             return None
-
-        atr_val = self.get_indicator("atr_20")
-        if atr_val is None or atr_val <= 0:
-            return None
-
-        adx = self.get_indicator("adx")
-        pdi = self.get_indicator("pdi")
-        ndi = self.get_indicator("ndi")
-        if adx is None:
-            return None
-
-        ma_val = self.get_indicator("ema_21")
-        if ma_val is None:
-            return None
-
         k_curr = stoch["k"]
         d_curr = stoch["d"]
         k_prev = self._prev_stoch_k
         d_prev = self._prev_stoch_d
         self._prev_stoch_k = k_curr
         self._prev_stoch_d = d_curr
+        return {
+            "k": k_curr,
+            "d": d_curr,
+            "k_prev": k_prev,
+            "d_prev": d_prev,
+            "cross_up": (k_curr > d_curr) and (k_prev <= d_prev),
+            "cross_down": (k_curr < d_curr) and (k_prev >= d_prev),
+        }
 
-        cross_up_now = (k_curr > d_curr) and (k_prev <= d_prev)
-        cross_down_now = (k_curr < d_curr) and (k_prev >= d_prev)
+    # ─────────────── 入场 ───────────────
 
-        # ADX <= 25 不交易
-        if adx <= self.adx_threshold:
+    def generate_signal(self) -> Optional[tuple]:
+        """4 道闸门: ADX>25 + KDJ交叉 + K极值 + BBI 方向"""
+        if len(self.candles) < 100:
             return None
 
-        # ── H4 趋势（DataFactory 缓存） ──
-        h4_trend = self._get_h4_trend()
-        # ── 评分系统 ──
-        long_score, short_score = 0, 0
-        long_factors, short_factors = [], []
+        # 1. ADX > 25
+        adx = self.get_indicator("adx")
+        if adx is None or adx <= self.adx_threshold:
+            return None
 
-        # v9: 金叉在趋势中段(K>=65), 死叉在趋势中段(K<=35)
-        # 极端: 金叉 K>80, 死叉 K<20
-        has_extreme_buy = k_curr > 80
-        has_extreme_sell = k_curr < 20
+        # 2 & 3. KDJ 交叉 + K 极值
+        kdj = self._get_kdj()
+        if kdj is None:
+            return None
 
-        if cross_up_now and k_curr >= 65:
-            long_score += 2
-            long_factors.append("StochCross")
-            if has_extreme_buy:
-                long_score += 1
-                long_factors.append("StochExtreme")
-        if cross_down_now and k_curr <= 35:
-            short_score += 2
-            short_factors.append("StochCross")
-            if has_extreme_sell:
-                short_score += 1
-                short_factors.append("StochExtreme")
+        bbi = self._get_bbi()
+        if bbi is None:
+            return None
 
-        # EMA21 方向
-        if close > ma_val:
-            long_score += 1
-            long_factors.append("EMA21Dir")
-        if close < ma_val:
-            short_score += 1
-            short_factors.append("EMA21Dir")
-
-        # DI 方向
-        if pdi > ndi:
-            long_score += 1
-            long_factors.append("DIDir")
-        if ndi > pdi:
-            short_score += 1
-            short_factors.append("DIDir")
-
-        # H4 趋势
-        if h4_trend == 'UP':
-            long_score += 1
-            long_factors.append("H4Trend")
-        if h4_trend == 'DOWN':
-            short_score += 1
-            short_factors.append("H4Trend")
-
-        # M15 Stoch 对齐（已移除，5,3,3足够灵敏）
+        close = self.get_close_prices()[-1]
 
         signal = None
-        if long_score >= self.score_threshold:
-            signal = OrderType.BUY
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_buy, "pdi": pdi, "ndi": ndi, "k": k_curr}
-        elif short_score >= self.score_threshold:
-            signal = OrderType.SELL
-            self._pending_entry_info = {"regime": "trend", "adx": adx, "atr": atr_val, "extreme": has_extreme_sell, "pdi": pdi, "ndi": ndi, "k": k_curr}
+        extreme_zone = False
 
-        iv = {
-            "close": round(close, 2), "atr": round(atr_val, 2),
-            "adx": round(adx, 1), "pdi": round(pdi, 1),
-            "ndi": round(ndi, 1),
-            "k": round(k_curr, 1), "d": round(d_curr, 1),
-            "ema21": round(ma_val, 2),
-            "h4_trend": h4_trend or "NODATA",
-            "long_score": long_score, "short_score": short_score,
+        # BUY: 金叉 + K<20 + close>BBI
+        if kdj["cross_up"] and kdj["k"] < self.k_extreme_buy and close > bbi:
+            signal = OrderType.BUY
+            extreme_zone = True
+        # SELL: 死叉 + K>80 + close<BBI
+        elif kdj["cross_down"] and kdj["k"] > self.k_extreme_sell and close < bbi:
+            signal = OrderType.SELL
+            extreme_zone = True
+
+        if signal is None:
+            self._pending_entry_info = {}
+            return None
+
+        self._pending_entry_info = {
+            "direction": "BUY" if signal == OrderType.BUY else "SELL",
+            "k_at_entry": kdj["k"],
+            "d_at_entry": kdj["d"],
+            "extreme": extreme_zone,
         }
 
         logger.info(
-            f"[{self.name}] K={k_curr:.1f} D={d_curr:.1f} ADX={adx:.1f} "
-            f"H4={h4_trend or 'N/A'} "
-            f"得分:多={long_score} 空={short_score} "
-            f"{'BUY' if signal == OrderType.BUY else 'SELL' if signal == OrderType.SELL else '无'}"
+            f"[{self.name}] {signal.value} K={kdj['k']:.1f} D={kdj['d']:.1f} ADX={adx:.1f} BBI={bbi:.1f}"
         )
 
-        return (signal, long_score, short_score, long_factors, short_factors, iv)
+        iv = {
+            "close": round(close, 2),
+            "k": round(kdj["k"], 1),
+            "d": round(kdj["d"], 1),
+            "adx": round(adx, 1),
+            "bbi": round(bbi, 2),
+        }
+        return (signal, 1, 1, [], [], iv)
 
-    # ─────────────── SL/TP ───────────────
+    # ─────────────── SL/TP (给极宽止损, 不做硬止损) ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        atr_val = self.get_indicator("atr_20")
-        if atr_val is None or atr_val <= 0:
-            return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
-
-        sl_dist = atr_val * self.sl_atr
-        tp_dist = atr_val * self.tp_atr  # 3.0 ATR = 1.5 ATR × 2
+        """不给硬止损, 给极宽兜底, 实际靠 check_ema20_exit"""
         if direction == OrderType.BUY:
-            return round(entry_price - sl_dist, 2), round(entry_price + tp_dist, 2)
+            return round(entry_price * 0.50, 2), round(entry_price * 10, 2)
         else:
-            return round(entry_price + sl_dist, 2), max(round(entry_price - tp_dist, 2), 0)
+            return round(entry_price * 1.50, 2), round(entry_price * 0.01, 2)
 
     # ─────────────── 出场 ───────────────
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
+        """出场: 等 K/D 到反向极值, 然后 KDJ 反向穿越
+        BUY 入场在 K<20 → 等 K>80 且 D>80 → KDJ 死叉
+        SELL 入场在 K>80 → 等 K<20 且 D<20 → KDJ 金叉
+        """
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
+        # 记录入场 K/D
         if ticket not in self._pos_data:
             self._pos_data[ticket] = {
-                "entry_price": position.open_price,
-                "peak": position.open_price,
-                "entry_k": self._pending_entry_info.get("k", 50),
+                "entry_k": self._pending_entry_info.get("k_at_entry", 50),
+                "entry_d": self._pending_entry_info.get("d_at_entry", 50),
             }
 
         td = self._pos_data[ticket]
-        atr_val = self.get_indicator("atr_20")
-        if atr_val is None or atr_val <= 0:
+        entry_k = td.get("entry_k", 50)
+
+        kdj = self._get_kdj()
+        if kdj is None:
             return False
 
-        entry_price = td["entry_price"]
-        pnl_pts = (bid - entry_price) if is_buy else (entry_price - ask)
+        curr_k = kdj["k"]
+        curr_d = kdj["d"]
+        cross_down = kdj["cross_down"]   # K 下穿 D
+        cross_up = kdj["cross_up"]       # K 上穿 D
 
-        # ① 趋势感知硬止损（同向1.5ATR / 反向1.0ATR）
-        _ema9 = self.get_indicator("ema_9")
-        _ema21 = self.get_indicator("ema_21")
-        _trend_up = _ema9 is not None and _ema21 is not None and _ema9 > _ema21
-        _with_trend = (is_buy and _trend_up) or (not is_buy and not _trend_up)
-        _sl_atr = self.sl_atr if _with_trend else 1.0
-        if pnl_pts < -atr_val * _sl_atr:
-            logger.info(f"[{self.name}] {'顺' if _with_trend else '逆'}势HardStop {_sl_atr}ATR ticket={ticket}")
-            del self._pos_data[ticket]
-            return True
-
-        # ② 止盈: 3.0 ATR
-        if pnl_pts > atr_val * self.tp_atr:
-            logger.info(f"[{self.name}] TakeProfit 3.0ATR ticket={ticket}")
-            self._last_exit_detail = {"exit_type": "take_profit", "atr_mult": self.tp_atr}
-            del self._pos_data[ticket]
-            return True
-
-        # ③ 趋势走完：Stoch 反向交叉出场（根据入场K值水平决定）
-        stoch = self.get_indicator("stoch_5_3_3")
-        if stoch:
-            curr_k = stoch["k"]
-            curr_d = stoch["d"]
-            golden_cross = (curr_k > curr_d)
-            death_cross = (curr_k < curr_d)
-            entry_k = td.get("entry_k", 50)
-
-            if is_buy:
-                # BUY出场：极端入场(K>80)→等死叉+K<25；正常→死叉即出
-                if entry_k > 80:
-                    if death_cross and curr_k < 25:
-                        logger.info(f"[{self.name}] BUY极限出场(死叉K={curr_k:.1f}) ticket={ticket}")
+        if is_buy:
+            # BUY 入场在 K<20: 等 K>80 且 D>80 → KDJ 死叉
+            if entry_k < self.k_extreme_buy:
+                if curr_k > self.k_extreme_sell and curr_d > self.k_extreme_sell:
+                    if cross_down:
+                        logger.info(f"[{self.name}] BUY极值出场(K={curr_k:.1f}/D={curr_d:.1f} 均>80) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
-                else:
-                    if death_cross:
-                        logger.info(f"[{self.name}] BUY出场(死叉K={curr_k:.1f}) ticket={ticket}")
-                        del self._pos_data[ticket]
-                        return True
-            else:
-                # SELL出场：极端入场(K<20)→等金叉+K>75；正常→金叉即出
-                if entry_k < 20:
-                    if golden_cross and curr_k > 75:
-                        logger.info(f"[{self.name}] SELL极限出场(金叉K={curr_k:.1f}) ticket={ticket}")
-                        del self._pos_data[ticket]
-                        return True
-                else:
-                    if golden_cross:
-                        logger.info(f"[{self.name}] SELL出场(金叉K={curr_k:.1f}) ticket={ticket}")
+        else:
+            # SELL 入场在 K>80: 等 K<20 且 D<20 → KDJ 金叉
+            if entry_k > self.k_extreme_sell:
+                if curr_k < self.k_extreme_buy and curr_d < self.k_extreme_buy:
+                    if cross_up:
+                        logger.info(f"[{self.name}] SELL极值出场(K={curr_k:.1f}/D={curr_d:.1f} 均<20) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
 
-        self._last_exit_detail = None
         return False
 
     # ─────────────── 验票 ───────────────
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-        """v9 验票: 极端Stoch条件优先，DI仅过滤非极端情况"""
-        direction = signal.get("direction", "BUY")
-        adx = latest.get("adx", 20)
-        pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
-        stoch = latest.get("stoch_5_3_3") or {}
-        stoch_k = stoch.get("k", 50)
-
-        if adx < 25:
-            return False
-
-        if direction == "BUY":
-            if stoch_k < 20:
-                return True   # 极端金叉，直接入场
-            if pdi <= ndi:
-                return False
-            if 20 <= stoch_k <= 40:
-                return stoch_k <= 35
-            return False
-        else:
-            if stoch_k > 80:
-                return True   # 极端死叉，直接入场（不检查DI）
-            if ndi <= pdi:
-                return False
-            if 60 <= stoch_k <= 80:
-                return stoch_k >= 65
-            return False
+        """v12 验票: 默认通过, 让引擎直接入场"""
+        return True

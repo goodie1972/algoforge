@@ -22,7 +22,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v12_upgraded"
+STRATEGY_VERSION = "v15_upgraded"
 STRATEGY_MAGIC = 661003
 STRATEGY_LEGACY_MAGICS: list[int] = [661001, 661002]
 STRATEGY_CHANGELOG = [
@@ -37,10 +37,16 @@ STRATEGY_CHANGELOG = [
     {"version": "v11_upgraded", "magic": 661003, "date": "2026-07-28",
      "desc": "加回 BB扩张同向保护; 硬止损统一 2×ATR (回测实亏$248, 撤销)"},
     {"version": "v12_upgraded", "magic": 661003, "date": "2026-07-28",
-     "desc": "回归 v8 BB扩张 3选2 保护; 加 1.5×ATR 硬止损 (回测预期打平或微赚)"},
+     "desc": "回归 v8 BB扩张 3选2 保护; 加 1.5×ATR 硬止损 (回测 -$194, 仍亏)"},
+    {"version": "v13_upgraded", "magic": 661003, "date": "2026-07-28",
+     "desc": "BB扩张保护 3选2→严格同向 + 1.5×ATR 硬止损 (H1 笔数 292 笔, 撤销)"},
+    {"version": "v14_upgraded", "magic": 661003, "date": "2026-07-28",
+     "desc": "去掉 1.5×ATR 硬止损; SL 给极宽; 让 check_ema20_exit 自然出场 (M30 笔数 142 / H1 笔数 292)"},
+    {"version": "v15_upgraded", "magic": 661003, "date": "2026-07-28",
+     "desc": "v14 BB扩张同向+加回价格位置过滤 (BB扩+方向+价同侧+MFI同向 4 条件全满足才禁同向)"},
 ]
 class M30MFIBBUpgraded(BaseStrategy):
-    """M30 MFI+BB 升级版 v12 — 收盘穿轨入场 + BB扩张3选2保护 + 1.5×ATR硬止损 + 回抽验证 + 顺势穿轨离场"""
+    """M30 MFI+BB 升级版 v15 — 收盘穿轨入场 + BB扩张严格对称保护 (4条件) + BB中轴/顺势穿轨自然出场 + 无硬止损"""
 
     name = "mfi_bb_m30_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -68,29 +74,29 @@ class M30MFIBBUpgraded(BaseStrategy):
         if bb is None:
             return False, False, None
 
-        # ── BB 扩张 3选2 保护（v8 风格，回归最简最稳的规则）──
-        # 3 个条件: BB扩(>1.05) + BB方向("up") + 价格同侧
-        # 任意 2 个满足即禁做同向单
+        # ── BB 扩张同向趋势拦截（防接飞刀，严格对称版 v15）──
+        # 4 条件全满足 → 禁做同向单:
+        #   1. BB 宽度扩张 (>1.05)
+        #   2. BB 方向与价格方向一致
+        #   3. MFI 方向与价格方向一致
+        #   4. 价格在中轴同侧
+        #   - 强上涨: BB扩+BB上开+价格>中轴+MFI不向下 → 禁做空
+        #   - 强下跌: BB扩+BB下开+价格<中轴+MFI不向上 → 禁做多
+        # 矛盾时（BB up 但 MFI down）→ 可能是反转初期，不拦
         _bwr = self.get_indicator("bb_width_ratio")
         _bwd = self.get_indicator("bb_width_direction")
         _mfi = self.get_indicator("mfi")
         _mfi_dir = self.get_indicator("mfi_direction")
         _block_short = False
         _block_long = False
-        if _bwr is not None and _bwd is not None and _mfi is not None and _mfi_dir is not None:
-            # 3选2：ratio>1.05 + 方向扩张 + MFI方向一致
-            _score = 0
-            if _bwr > 1.05: _score += 1
-            if _bwd == "up": _score += 1
-            if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"): _score += 1
-            if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"): _score += 1
-            if _score >= 2:
-                if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"):
-                    _block_short = True
-                    logger.info(f"[{self.name}] BB扩张(2/3)+价格>中轴+MFI上升({_mfi:.0f})，禁做空")
-                if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"):
-                    _block_long = True
-                    logger.info(f"[{self.name}] BB扩张(2/3)+价格<中轴+MFI下降({_mfi:.0f})，禁做多")
+        _bbm = bb.get("mid", 0)
+        if _bwr is not None and _bwr > 1.05 and _bwd is not None and _mfi_dir is not None and _bbm > 0:
+            if _bwd == "up" and close > _bbm and _mfi_dir in ("up", "flat"):
+                _block_short = True
+                logger.info(f"[{self.name}] BB扩+上开+价>中轴+MFI不向下({_mfi:.0f})，强上涨，禁做空")
+            elif _bwd == "down" and close < _bbm and _mfi_dir in ("down", "flat"):
+                _block_long = True
+                logger.info(f"[{self.name}] BB扩+下开+价<中轴+MFI不向上({_mfi:.0f})，强下跌，禁做多")
 
         buy_signal = close < bb["lower"] and not _block_long
         sell_signal = close > bb["upper"] and not _block_short
@@ -155,18 +161,13 @@ class M30MFIBBUpgraded(BaseStrategy):
     # ─────────────── SL/TP ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        """统一 1.5×ATR 硬止损（v8 风格拦截 + 紧止损 = 反弹+控回撤）"""
-        atr_val = self.get_indicator("atr")
-        if atr_val is None or atr_val <= 0:
-            # 指标缺失时给极宽止损兜底（防爆仓）
-            if direction == OrderType.BUY:
-                return round(entry_price * 0.95, 2), round(entry_price * 10, 2)
-            else:
-                return round(entry_price * 1.05, 2), round(entry_price * 0.01, 2)
+        """v14: 不设硬止损，让 check_ema20_exit 用 BB中轴/半宽/顺势穿轨 自然出场
+        SL 给极宽（50% 兜底防爆仓），实际靠 check_ema20_exit 的中轴出场
+        """
         if direction == OrderType.BUY:
-            return round(entry_price - 1.5 * atr_val, 2), round(entry_price * 10, 2)
+            return round(entry_price * 0.50, 2), round(entry_price * 10, 2)
         else:
-            return round(entry_price + 1.5 * atr_val, 2), round(entry_price * 0.01, 2)
+            return round(entry_price * 1.50, 2), round(entry_price * 0.01, 2)
 
     # ─────────────── 平仓 ───────────────
 

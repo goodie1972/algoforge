@@ -10,7 +10,7 @@ import talib
 from datetime import datetime
 
 DB = r'D:\backup\BaoBao\PythonProgram\xauusd\data\market_data.db'
-TF = 'M30'
+TF = 'H1'
 LOT = 0.01
 CONTRACT = 100
 COMM = 0.50
@@ -64,28 +64,12 @@ def v14_block_check(cl, bbm, bwr, bwd, mfdir):
     return block_l, block_s
 
 
-def v15_block_check(cl, bbm, bwr, bwd, mfdir):
-    """v15: v14 + 加回价格位置过滤（4 条件严格对称）
-    强上涨: BB扩+上开+价>中轴+MFI不向下 → 禁做空
-    强下跌: BB扩+下开+价<中轴+MFI不向上 → 禁做多
-    """
-    block_l, block_s = False, False
-    if bwr is not None and bwr > BB_EXPAND and bwd is not None and mfdir is not None and bbm > 0:
-        if bwd == 1 and cl > bbm and mfdir in (1, 0):  # BB上开 + 价>中轴 + MFI不向下
-            block_s = True
-        elif bwd == -1 and cl < bbm and mfdir in (-1, 0):  # BB下开 + 价<中轴 + MFI不向上
-            block_l = True
-    return block_l, block_s
-
-
 def make_block_check(version):
     """工厂函数: 根据版本返回对应的 block_check"""
     if version == "v8":
         return v8_block_check
     elif version == "v14":
         return v14_block_check
-    elif version == "v15":
-        return v15_block_check
     return v8_block_check
 
 
@@ -213,13 +197,10 @@ def main():
 
     trades_v8, _ = run_sim(df, use_hard_sl=False, version="v8")
     trades_v14, _ = run_sim(df, use_hard_sl=False, version="v14")
-    trades_v15, _ = run_sim(df, use_hard_sl=False, version="v15")
 
-    print(stats(trades_v8, "v8 (BB扩张 3选2)"))
+    print(stats(trades_v8, "v8 (无硬止损 + BB扩张 3选2)"))
     print()
-    print(stats(trades_v14, "v14 (BB扩张严格同向 3 条件)"))
-    print()
-    print(stats(trades_v15, "v15 (BB扩张严格对称 4 条件 + 加回价格位置)"))
+    print(stats(trades_v14, "v14 (无硬止损 + BB扩张严格同向)"))
     print()
 
     # 月度对比
@@ -233,32 +214,28 @@ def main():
 
     m8 = by_month(trades_v8)
     m14 = by_month(trades_v14)
-    m15 = by_month(trades_v15)
-    months = sorted(set(m8.keys()) | set(m14.keys()) | set(m15.keys()))
+    months = sorted(set(m8.keys()) | set(m14.keys()))
     print("  [月度盈亏对比]")
-    print(f"  {'月份':<10} {'v8 笔数':>8} {'v8 盈亏':>12} {'v14 笔数':>10} {'v14 盈亏':>12} {'v15 笔数':>10} {'v15 盈亏':>12} {'v15-v8':>10}")
+    print(f"  {'月份':<10} {'v8 笔数':>8} {'v8 盈亏':>12} {'v14 笔数':>10} {'v14 盈亏':>12} {'v14-v8':>10}")
     for mo in months:
         v8_n, v8_p = len(m8.get(mo, [])), sum(m8.get(mo, []))
         v14_n, v14_p = len(m14.get(mo, [])), sum(m14.get(mo, []))
-        v15_n, v15_p = len(m15.get(mo, [])), sum(m15.get(mo, []))
-        diff = v15_p - v8_p
-        print(f"  {mo:<10} {v8_n:>8} {v8_p:>+12.2f} {v14_n:>10} {v14_p:>+12.2f} {v15_n:>10} {v15_p:>+12.2f} {diff:>+10.2f}")
+        diff = v14_p - v8_p
+        print(f"  {mo:<10} {v8_n:>8} {v8_p:>+12.2f} {v14_n:>10} {v14_p:>+12.2f} {diff:>+10.2f}")
 
     print()
     total_v8 = sum(t['pnl'] for t in trades_v8)
     total_v14 = sum(t['pnl'] for t in trades_v14)
-    total_v15 = sum(t['pnl'] for t in trades_v15)
     print(f"  [结论]")
-    print(f"  v8  总盈亏: ${total_v8:+.2f}  (笔数 {len(trades_v8)})")
-    print(f"  v14 总盈亏: ${total_v14:+.2f}  (笔数 {len(trades_v14)})")
-    print(f"  v15 总盈亏: ${total_v15:+.2f}  (笔数 {len(trades_v15)})")
-    print(f"  v15 vs v8: {total_v15 - total_v8:+.2f}  ({(total_v15 - total_v8)/abs(total_v8)*100 if total_v8 else 0:+.1f}%)")
-    if total_v15 > 0:
-        print(f"  ✅ v15 扭亏为盈! 相比 v8 多赚 ${total_v15 - total_v8:.2f}")
-    elif total_v15 > total_v8:
-        print(f"  ✓ v15 改善, 相比 v8 少亏 ${total_v8 - total_v15:.2f}")
+    print(f"  v8  4 月总盈亏: ${total_v8:+.2f}  (笔数 {len(trades_v8)})")
+    print(f"  v14 4 月总盈亏: ${total_v14:+.2f}  (笔数 {len(trades_v14)})")
+    print(f"  v14 vs v8: {total_v14 - total_v8:+.2f}  ({(total_v14 - total_v8)/abs(total_v8)*100 if total_v8 else 0:+.1f}%)")
+    if total_v14 > 0:
+        print(f"  ✅ v14 扭亏为盈! 相比 v8 多赚 ${total_v14 - total_v8:.2f}")
+    elif total_v14 > total_v8:
+        print(f"  ✓ v14 改善, 相比 v8 少亏 ${total_v8 - total_v14:.2f}")
     else:
-        print(f"  ✗ v15 仍亏, 相比 v8 多亏 ${total_v15 - total_v8:.2f}")
+        print(f"  ✗ v14 仍亏, 相比 v8 多亏 ${total_v14 - total_v8:.2f}")
 
 
 if __name__ == "__main__":

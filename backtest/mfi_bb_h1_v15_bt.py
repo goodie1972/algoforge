@@ -1,7 +1,7 @@
 """
-mfi_bb_m30_upgraded v8 vs v14 对比回测
+mfi_bb_m30_upgraded H1 周期 v8 vs v15 对比回测
   v8:  BB扩张 3选2 保护 + 无硬止损
-  v14: BB扩张严格同向保护 + 无硬止损 (靠中轴/半宽/顺势穿轨自然出场)
+  v15: BB扩张严格对称 4 条件保护 (BB扩+方向+价同侧+MFI同向) + 无硬止损
 """
 import sqlite3
 import numpy as np
@@ -10,7 +10,7 @@ import talib
 from datetime import datetime
 
 DB = r'D:\backup\BaoBao\PythonProgram\xauusd\data\market_data.db'
-TF = 'M30'
+TF = 'H1'
 LOT = 0.01
 CONTRACT = 100
 COMM = 0.50
@@ -205,7 +205,7 @@ def stats(trades, label):
 def main():
     print("=" * 80)
     print("  mfi_bb_m30_upgraded  v8 vs v13 对比回测")
-    print("  v8 = BB扩张3选2 (无止损), v13 = BB扩张严格同向 + 1.5×ATR 硬止损")
+    print("  v8=v15 同 M30 数据, 用 H1 数据重新跑")
     print("=" * 80)
 
     df = load_data()
