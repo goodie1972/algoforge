@@ -89,10 +89,10 @@
       "double_first": false
     },
     "mfi_bb_m30_upgraded": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661003,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "M30_rsi_bb": {
