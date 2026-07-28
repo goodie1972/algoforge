@@ -1,0 +1,28 @@
+{
+  "s": {
+    "n": 90,
+    "pnl": 77.04,
+    "wr": 50.0,
+    "pf": 1.06,
+    "aw": 28.57,
+    "al": -26.86,
+    "longs": 48,
+    "shorts": 42,
+    "long_pnl": 216.75,
+    "short_pnl": -139.71,
+    "max_loss": -108.38,
+    "max_win": 76.99,
+    "avg_bars": 7.4,
+    "win_n": 45,
+    "loss_n": 45
+  },
+  "mdd": 212.91,
+  "block_stats": {
+    "bb_buy": 554,
+    "bb_sell": 470
+  },
+  "hard_sl_count": 44,
+  "hard_sl_pnl": -1204.62,
+  "max_consec_win": 6,
+  "max_consec_loss": 5
+}
