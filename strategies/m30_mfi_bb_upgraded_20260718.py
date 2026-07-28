@@ -30,12 +30,11 @@ STRATEGY_CHANGELOG = [
      "desc": "升级版: 进场不看MFI只看出轨; 运动员回抽入场; 顺势平改穿轨回抽+MFI50线"},
     {"version": "v8_upgraded", "magic": 661003, "date": "2026-07-21",
      "desc": "BB开口扩张保护：bb_width_ratio > 1.05时禁用同向入场(数据工厂预计算)"},
+    {"version": "v9_upgraded", "magic": 661003, "date": "2026-07-28",
+     "desc": "2/3 模糊规则改为 ADX>30 同向趋势拦截 (回测4个月亏-$154, 修改后预计少亏$50+)"},
 ]
-_BB_EXPAND_THRESHOLD = 0.05  # 开口扩张 >5% 时禁用同向入场
-
-
 class M30MFIBBUpgraded(BaseStrategy):
-    """M30 MFI+BB 升级版 v8 — 收盘穿轨入场 + BB扩张保护 + 回抽验证 + 顺势穿轨离场"""
+    """M30 MFI+BB 升级版 v9 — 收盘穿轨入场 + ADX趋势过滤 + 回抽验证 + 顺势穿轨离场"""
 
     name = "mfi_bb_m30_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -63,27 +62,21 @@ class M30MFIBBUpgraded(BaseStrategy):
         if bb is None:
             return False, False, None
 
-        # ── BB扩张 + MFI方向一致拦截 ──
-        _bwr = self.get_indicator("bb_width_ratio")
-        _bwd = self.get_indicator("bb_width_direction")
-        _mfi = self.get_indicator("mfi")
+        # ── ADX 同向趋势拦截（防趋势加速接飞刀）──
+        # 强趋势（ADX>30）且 方向一致 时禁做反向单
+        _adx = self.get_indicator("adx")
         _mfi_dir = self.get_indicator("mfi_direction")
         _block_short = False
         _block_long = False
-        if _bwr is not None and _bwd is not None and _mfi is not None and _mfi_dir is not None:
-            # 3选2：ratio>1.05 + 方向扩张 + MFI方向一致
-            _score = 0
-            if _bwr > 1 + _BB_EXPAND_THRESHOLD: _score += 1
-            if _bwd == "up": _score += 1
-            if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"): _score += 1
-            if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"): _score += 1
-            if _score >= 2:
-                if close > bb.get("mid", 0) and _mfi_dir in ("up", "flat"):
-                    _block_short = True
-                    logger.info(f"[{self.name}] BB扩张(2/3)+价格>中轴+MFI上升({_mfi:.0f})，禁做空")
-                if close < bb.get("mid", 0) and _mfi_dir in ("down", "flat"):
-                    _block_long = True
-                    logger.info(f"[{self.name}] BB扩张(2/3)+价格<中轴+MFI下降({_mfi:.0f})，禁做多")
+        if _adx is not None and _adx > 30 and _mfi_dir is not None:
+            if close < bb.get("mid", 0) and _mfi_dir == "down":
+                # 强下跌趋势（ADX>30 + MFI 向下）→ 禁做多
+                _block_long = True
+                logger.info(f"[{self.name}] ADX={_adx:.0f} 强下跌趋势+价格<中轴+MFI下降，禁做多")
+            elif close > bb.get("mid", 0) and _mfi_dir == "up":
+                # 强上涨趋势（ADX>30 + MFI 向上）→ 禁做空
+                _block_short = True
+                logger.info(f"[{self.name}] ADX={_adx:.0f} 强上涨趋势+价格>中轴+MFI上升，禁做空")
 
         buy_signal = close < bb["lower"] and not _block_long
         sell_signal = close > bb["upper"] and not _block_short
