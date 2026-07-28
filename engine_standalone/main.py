@@ -216,9 +216,18 @@ class TradingEngine:
             logger.warning(f"[时间校准] 失败: {e}")
 
     def _mt4_to_local(self, mt4_ts: int):
-        """将 MT4 时间戳转为本地 datetime（UTC+5）"""
+        """将 MT4 时间戳转为本地 datetime（UTC+8）
+
+        纸面模式 (PaperBridge) 下，时间戳已经是本地时间，不应用 MT4 偏移。
+        实盘模式下，才做 MT4 → 本地时间转换。
+        """
         from datetime import datetime
         from config.settings import LOCAL_TZ
+        from core.paper_bridge import PaperBridge
+        # 纸面模式：时间戳已为本地时间，直接返回
+        if isinstance(self.bridge, PaperBridge):
+            return datetime.fromtimestamp(mt4_ts, tz=LOCAL_TZ)
+        # 实盘模式：减去 MT4 偏移，转换为本地时间
         corrected = mt4_ts - self._mt4_offset
         return datetime.fromtimestamp(corrected, tz=LOCAL_TZ)
 
@@ -1460,12 +1469,14 @@ class TradingEngine:
         if n_bridge != n_local:
             logger.warning(f"[{strategy.name}] 持仓不一致: 桥接={n_bridge} 本地={n_local}，取较大值={n_total}")
 
-        # 纸面交易不限仓，有多少信号开多少
-        _skip_limits = _paper_enabled or _paper_ignore
-        if not _skip_limits:
+        # 纸面模式：使用 paper_max_positions 作为单策略上限（ignore_gates 只跳过门禁，不跳过 max_positions）
+        # 真实模式：使用 strategy.max_positions，且已有持仓则不加仓
+        if _paper_enabled and _paper_max > 0:
+            if n_total >= _paper_max:
+                return  # 达到纸面模式单策略上限
+        else:
             if n_total >= strategy.max_positions:
                 return  # 已达上限
-
             # 已有持仓则不加仓
             if n_total > 0:
                 return
