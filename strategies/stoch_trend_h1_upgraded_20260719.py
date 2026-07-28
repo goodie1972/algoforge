@@ -1,19 +1,16 @@
 """
 Stoch KDJ 周期策略 (v12)
 =================================
-3 道闸门入场 + 抓完整 KDJ 周期出场
-
-入场 (generate_signal):
-  1. ADX > 25 (震荡市不做)
+入场 (4 道闸门必过):
+  1. ADX > 25
   2. KDJ 金叉/死叉
-  3. K 在极值区: K<20 (金叉做多) / K>80 (死叉做空)
-  4. close vs BBI 方向确认: 金叉+close>BBI / 死叉+close<BBI
-  → 4 道闸门全过才出票, 运动员直接入场
+  3. K 极值半区: BUY K<50, SELL K>50
+  4. BBI 方向: 金叉+close>BBI, 死叉+close<BBI
+  → 运动员直接入场
 
-出场 (check_ema20_exit):
-  - 入场 BUY 在 K<20: 等 K 和 D 都到 >80, 然后 KDJ 死叉 → 平
-  - 入场 SELL 在 K>80: 等 K 和 D 都到 <20, 然后 KDJ 金叉 → 平
-  - 不考虑 BBI 反转
+出场 (按入场 K 极值分情况):
+  - 极值入场 (K<20 BUY / K>80 SELL): 等 K/D 到反向极值 + KDJ 反向
+  - 非极值入场 (20≤K<50 BUY / 50<K≤80 SELL): BBI 反转 或 KDJ 反向
   - 不要硬止损
 
 数据源: 全部指标从 DataFactory 读取
@@ -38,7 +35,7 @@ STRATEGY_CHANGELOG = [
     {"version": "v10_counter_trend", "magic": 661204, "date": "2026-07-28",
      "desc": "真正逆势: K<=35金叉做多 (超卖反弹), K>=65死叉做空 (超买回调)"},
     {"version": "v12_kdj_cycle", "magic": 661204, "date": "2026-07-28",
-     "desc": "KDJ 周期策略: 入场 4 闸门(ADX>25+KDJ交叉+K极值+BBI方向); 出场等 K/D 到反向极值再 KDJ 反向交叉; 不要硬止损, 不要 BBI 反转出场"},
+     "desc": "KDJ 周期: 入场 K<50 金叉+close>BBI / K>50 死叉+close<BBI; 出场按入场 K 极值分情况 (K<20 等 K>80+KDJ 反向, 20≤K<50 用 BBI 反转或 KDJ 反向)"},
 ]
 
 
@@ -53,9 +50,10 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         # 参数
         self.adx_threshold = 25
-        self.bbi_periods = (3, 6, 12, 24)  # BBI = (MA3+MA6+MA12+MA24)/4
-        self.k_extreme_buy = 20   # K<20 视为超卖
-        self.k_extreme_sell = 80  # K>80 视为超买
+        self.bbi_periods = (3, 6, 12, 24)
+        self.k_midline = 50             # K<50 金叉, K>50 死叉
+        self.k_extreme_buy = 20         # K<20 视为超卖
+        self.k_extreme_sell = 80        # K>80 视为超买
 
         # 持仓跟踪
         self._pos_data: dict[int, dict] = {}
@@ -85,7 +83,7 @@ class StochTrendH1Upgraded(BaseStrategy):
             return None
 
     def _get_kdj(self) -> Optional[dict]:
-        """返回 K, D, K_prev, D_prev"""
+        """返回 K, D, K_prev, D_prev, cross_up, cross_down"""
         stoch = self.get_indicator("stoch_5_3_3")
         if stoch is None:
             return None
@@ -107,7 +105,12 @@ class StochTrendH1Upgraded(BaseStrategy):
     # ─────────────── 入场 ───────────────
 
     def generate_signal(self) -> Optional[tuple]:
-        """4 道闸门: ADX>25 + KDJ交叉 + K极值 + BBI 方向"""
+        """4 道闸门:
+        1. ADX > 25
+        2. KDJ 交叉
+        3. K 极值半区: BUY K<50, SELL K>50
+        4. BBI 方向
+        """
         if len(self.candles) < 100:
             return None
 
@@ -116,7 +119,7 @@ class StochTrendH1Upgraded(BaseStrategy):
         if adx is None or adx <= self.adx_threshold:
             return None
 
-        # 2 & 3. KDJ 交叉 + K 极值
+        # 2 & 3. KDJ 交叉 + K 极值半区
         kdj = self._get_kdj()
         if kdj is None:
             return None
@@ -126,18 +129,19 @@ class StochTrendH1Upgraded(BaseStrategy):
             return None
 
         close = self.get_close_prices()[-1]
+        k = kdj["k"]
 
         signal = None
-        extreme_zone = False
+        is_extreme = False
 
-        # BUY: 金叉 + K<20 + close>BBI
-        if kdj["cross_up"] and kdj["k"] < self.k_extreme_buy and close > bbi:
+        # BUY: 金叉 + K<50 + close>BBI
+        if kdj["cross_up"] and k < self.k_midline and close > bbi:
             signal = OrderType.BUY
-            extreme_zone = True
-        # SELL: 死叉 + K>80 + close<BBI
-        elif kdj["cross_down"] and kdj["k"] > self.k_extreme_sell and close < bbi:
+            is_extreme = k < self.k_extreme_buy
+        # SELL: 死叉 + K>50 + close<BBI
+        elif kdj["cross_down"] and k > self.k_midline and close < bbi:
             signal = OrderType.SELL
-            extreme_zone = True
+            is_extreme = k > self.k_extreme_sell
 
         if signal is None:
             self._pending_entry_info = {}
@@ -145,18 +149,18 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         self._pending_entry_info = {
             "direction": "BUY" if signal == OrderType.BUY else "SELL",
-            "k_at_entry": kdj["k"],
+            "k_at_entry": k,
             "d_at_entry": kdj["d"],
-            "extreme": extreme_zone,
+            "is_extreme": is_extreme,
         }
 
         logger.info(
-            f"[{self.name}] {signal.value} K={kdj['k']:.1f} D={kdj['d']:.1f} ADX={adx:.1f} BBI={bbi:.1f}"
+            f"[{self.name}] {signal.value} K={k:.1f} D={kdj['d']:.1f} ADX={adx:.1f} BBI={bbi:.1f} extreme={is_extreme}"
         )
 
         iv = {
             "close": round(close, 2),
-            "k": round(kdj["k"], 1),
+            "k": round(k, 1),
             "d": round(kdj["d"], 1),
             "adx": round(adx, 1),
             "bbi": round(bbi, 2),
@@ -175,22 +179,24 @@ class StochTrendH1Upgraded(BaseStrategy):
     # ─────────────── 出场 ───────────────
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """出场: 等 K/D 到反向极值, 然后 KDJ 反向穿越
-        BUY 入场在 K<20 → 等 K>80 且 D>80 → KDJ 死叉
-        SELL 入场在 K>80 → 等 K<20 且 D<20 → KDJ 金叉
+        """出场: 按入场 K 极值分情况
+        极值入场 (K<20 BUY / K>80 SELL): 等 K/D 到反向极值 + KDJ 反向
+        非极值入场: BBI 反转 OR KDJ 反向交叉
         """
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
 
-        # 记录入场 K/D
+        # 记录入场 K/D 和极值标记
         if ticket not in self._pos_data:
             self._pos_data[ticket] = {
                 "entry_k": self._pending_entry_info.get("k_at_entry", 50),
                 "entry_d": self._pending_entry_info.get("d_at_entry", 50),
+                "is_extreme": self._pending_entry_info.get("is_extreme", False),
             }
 
         td = self._pos_data[ticket]
         entry_k = td.get("entry_k", 50)
+        is_extreme = td.get("is_extreme", False)
 
         kdj = self._get_kdj()
         if kdj is None:
@@ -198,25 +204,47 @@ class StochTrendH1Upgraded(BaseStrategy):
 
         curr_k = kdj["k"]
         curr_d = kdj["d"]
-        cross_down = kdj["cross_down"]   # K 下穿 D
-        cross_up = kdj["cross_up"]       # K 上穿 D
+        cross_down = kdj["cross_down"]
+        cross_up = kdj["cross_up"]
+
+        bbi = self._get_bbi()
+        cl = self.get_close_prices()[-1]
 
         if is_buy:
-            # BUY 入场在 K<20: 等 K>80 且 D>80 → KDJ 死叉
-            if entry_k < self.k_extreme_buy:
-                if curr_k > self.k_extreme_sell and curr_d > self.k_extreme_sell:
-                    if cross_down:
-                        logger.info(f"[{self.name}] BUY极值出场(K={curr_k:.1f}/D={curr_d:.1f} 均>80) ticket={ticket}")
+            # KDJ 反向交叉 (死叉)
+            if cross_down:
+                if is_extreme:
+                    # 极值入场: 等 K 和 D 都 >80
+                    if curr_k > self.k_extreme_sell and curr_d > self.k_extreme_sell:
+                        logger.info(f"[{self.name}] BUY 极值出场 (K/D 均>80) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
-        else:
-            # SELL 入场在 K>80: 等 K<20 且 D<20 → KDJ 金叉
-            if entry_k > self.k_extreme_sell:
-                if curr_k < self.k_extreme_buy and curr_d < self.k_extreme_buy:
-                    if cross_up:
-                        logger.info(f"[{self.name}] SELL极值出场(K={curr_k:.1f}/D={curr_d:.1f} 均<20) ticket={ticket}")
+                else:
+                    # 非极值入场: KDJ 反向即出
+                    logger.info(f"[{self.name}] BUY KDJ反向出场 (K={curr_k:.1f}) ticket={ticket}")
+                    del self._pos_data[ticket]
+                    return True
+            # 非极值入场: BBI 反转也出场
+            if not is_extreme and bbi is not None and cl < bbi:
+                logger.info(f"[{self.name}] BUY BBI反转出场 ticket={ticket}")
+                del self._pos_data[ticket]
+                return True
+        else:  # SELL
+            if cross_up:
+                if is_extreme:
+                    # 极值入场: 等 K 和 D 都 <20
+                    if curr_k < self.k_extreme_buy and curr_d < self.k_extreme_buy:
+                        logger.info(f"[{self.name}] SELL 极值出场 (K/D 均<20) ticket={ticket}")
                         del self._pos_data[ticket]
                         return True
+                else:
+                    logger.info(f"[{self.name}] SELL KDJ反向出场 (K={curr_k:.1f}) ticket={ticket}")
+                    del self._pos_data[ticket]
+                    return True
+            if not is_extreme and bbi is not None and cl > bbi:
+                logger.info(f"[{self.name}] SELL BBI反转出场 ticket={ticket}")
+                del self._pos_data[ticket]
+                return True
 
         return False
 
@@ -224,5 +252,5 @@ class StochTrendH1Upgraded(BaseStrategy):
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:
-        """v12 验票: 默认通过, 让引擎直接入场"""
+        """v12 验票: 默认通过, 运动员直接入场"""
         return True

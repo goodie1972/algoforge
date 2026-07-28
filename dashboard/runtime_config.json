@@ -174,7 +174,7 @@
     },
     "stoch_trend_h1_upgraded": {
       "enabled": true,
-      "magic": 661203,
+      "magic": 661204,
       "timeframe": "H1",
       "max_positions": 1,
       "double_first": false
