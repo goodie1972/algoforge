@@ -22,7 +22,7 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v10_upgraded"
+STRATEGY_VERSION = "v11_upgraded"
 STRATEGY_MAGIC = 661003
 STRATEGY_LEGACY_MAGICS: list[int] = [661001, 661002]
 STRATEGY_CHANGELOG = [
@@ -33,10 +33,12 @@ STRATEGY_CHANGELOG = [
     {"version": "v9_upgraded", "magic": 661003, "date": "2026-07-28",
      "desc": "2/3 模糊规则改为 ADX>30 同向趋势拦截 (回测实亏$497, 撤销)"},
     {"version": "v10_upgraded", "magic": 661003, "date": "2026-07-28",
-     "desc": "ADX阈值 30→25; 加 ATR 硬止损: MFI/BB中轴同向 2×ATR, 否则 1×ATR (回测预期扭亏)"},
+     "desc": "ADX>25 同向 + ATR 硬止损(同向2×反向1×) (回测实亏$771, 撤销)"},
+    {"version": "v11_upgraded", "magic": 661003, "date": "2026-07-28",
+     "desc": "加回 BB扩张同向保护; 硬止损统一 2×ATR (回测待验证, 预期回到 v8 水平或更佳)"},
 ]
 class M30MFIBBUpgraded(BaseStrategy):
-    """M30 MFI+BB 升级版 v10 — 收盘穿轨入场 + ADX>25趋势过滤 + ATR硬止损 + 回抽验证 + 顺势穿轨离场"""
+    """M30 MFI+BB 升级版 v11 — 收盘穿轨入场 + BB扩张保护 + ADX>25趋势过滤 + 2×ATR硬止损 + 回抽验证 + 顺势穿轨离场"""
 
     name = "mfi_bb_m30_upgraded"
     legacy_magics = STRATEGY_LEGACY_MAGICS
@@ -79,6 +81,20 @@ class M30MFIBBUpgraded(BaseStrategy):
                 # 强上涨趋势（ADX>25 + MFI 向上）→ 禁做空
                 _block_short = True
                 logger.info(f"[{self.name}] ADX={_adx:.0f} 强上涨+价格>中轴+MFI上升，禁做空")
+
+        # ── BB 扩张保护（防趋势加速接飞刀）──
+        # BB 宽度 > 1.05 + 方向扩张 + 价格同侧 = 同向强趋势, 禁做同向
+        _bwr = self.get_indicator("bb_width_ratio")
+        _bwd = self.get_indicator("bb_width_direction")
+        if _bwr is not None and _bwd is not None and _bwr > 1.05:
+            if _bwd == "up" and close > bb.get("mid", 0) and mfi_dir == "up":
+                # 强上涨（BB扩+上开+价格>中轴+MFI上）→ 禁做空
+                _block_short = True
+                logger.info(f"[{self.name}] BB扩+上开+价>中轴+MFI上，禁做空")
+            elif _bwd == "down" and close < bb.get("mid", 0) and mfi_dir == "down":
+                # 强下跌（BB扩+下开+价格<中轴+MFI下）→ 禁做多
+                _block_long = True
+                logger.info(f"[{self.name}] BB扩+下开+价<中轴+MFI下，禁做多")
 
         buy_signal = close < bb["lower"] and not _block_long
         sell_signal = close > bb["upper"] and not _block_short
@@ -143,28 +159,18 @@ class M30MFIBBUpgraded(BaseStrategy):
     # ─────────────── SL/TP ───────────────
 
     def get_dynamic_sl_tp(self, direction: OrderType, entry_price: float) -> tuple[float, float]:
-        """ATR 硬止损
-        - MFI 与 BB 中轴同向（信号被 MFI 确认）→ 2×ATR 止损
-        - 否则（信号逆 MFI/BB 中轴）→ 1×ATR 止损
-        """
+        """统一 2×ATR 硬止损（不再分同向/反向，给反弹留足空间）"""
         atr_val = self.get_indicator("atr")
-        mfi_dir = self.get_indicator("mfi_direction")
-        bb_mid = self.get_indicator("bb", {}).get("mid") if self.get_indicator("bb") else None
-        if atr_val is None or atr_val <= 0 or bb_mid is None or mfi_dir is None:
+        if atr_val is None or atr_val <= 0:
             # 指标缺失时给极宽止损兜底（防爆仓）
             if direction == OrderType.BUY:
                 return round(entry_price * 0.95, 2), round(entry_price * 10, 2)
             else:
                 return round(entry_price * 1.05, 2), round(entry_price * 0.01, 2)
-        # 判断 MFI 与 BB 中轴是否同向
         if direction == OrderType.BUY:
-            aligned = (mfi_dir == "up" and entry_price > bb_mid)
-            sl_dist = 2.0 * atr_val if aligned else 1.0 * atr_val
-            return round(entry_price - sl_dist, 2), round(entry_price * 10, 2)
+            return round(entry_price - 2.0 * atr_val, 2), round(entry_price * 10, 2)
         else:
-            aligned = (mfi_dir == "down" and entry_price < bb_mid)
-            sl_dist = 2.0 * atr_val if aligned else 1.0 * atr_val
-            return round(entry_price + sl_dist, 2), round(entry_price * 0.01, 2)
+            return round(entry_price + 2.0 * atr_val, 2), round(entry_price * 0.01, 2)
 
     # ─────────────── 平仓 ───────────────
 
