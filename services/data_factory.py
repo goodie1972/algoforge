@@ -76,19 +76,19 @@ def _merge_candles(old: list, new: list, max_len=350) -> list:
     return merged[-max_len:]
 
 
-def _talib_indicators(candles: list, tf: str) -> dict:
-    """用 TA-Lib 一次算完所有公共指标。
-    返回 dict: rsi, rsi_5, rsi_10, mfi, mfi_direction, bb{upper,mid,lower},
-               bb_width, bb_width_direction, bb_width_ratio,
-               ema_9, ema_21, sma_14, sma_20, sma_50,
-               atr, atr_20, atr_list, adx, pdi, ndi,
-               macd{macd,signal}, stoch_5_3_3{k,d},
-               volume_sma_20, close, trend, price_position
+def _ta_only_indicators(candles: list, tf: str) -> dict:
+    """兜底所有指标：EA 拿不到时用 TA-Lib 算。
+
+    策略：能拿 EA 就用 EA（_sync_indicators 会先写 EA 值），这个函数只算
+    EA 没提供的（bb_width_direction / bb_width_ratio / mfi_direction /
+    mfi_dir_50 / trend / price_position）。
+
+    注：stoch/rsi/mfi/bb/ema/sma/atr/macd 也由这个函数算兜底，
+    但 _sync_indicators 会先用 EA 值覆盖，TA-Lib 只是后备。
     """
     try:
         import talib
     except ImportError:
-        logger.warning("[数据工厂] talib 未安装，部分指标跳过")
         return {}
 
     closes = np.array([c.close for c in candles], dtype=float)
@@ -97,11 +97,11 @@ def _talib_indicators(candles: list, tf: str) -> dict:
     vols = np.array([c.volume for c in candles], dtype=float)
 
     if len(closes) < 30:
-        return {}  # 数据不足
+        return {}
 
     result = {}
 
-    # RSI(5/10/14)
+    # RSI
     for p in [5, 10, 14]:
         try:
             r = talib.RSI(closes, timeperiod=p)
@@ -110,24 +110,21 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         except Exception:
             pass
 
-    # MFI(14) + 方向
+    # MFI + 方向
     try:
         m = talib.MFI(highs, lows, closes, vols, timeperiod=14)
-        result["mfi"] = float(m[-1]) if m[-1] == m[-1] else 50.0
-        if len(m) > 2:
-            _prev = float(m[-2]) if m[-2] == m[-2] else 50.0
-            result["mfi_direction"] = "up" if result["mfi"] > _prev else ("down" if result["mfi"] < _prev else "flat")
-        else:
-            result["mfi_direction"] = "flat"
+        mfi_now = float(m[-1]) if m[-1] == m[-1] else 50.0
+        result["mfi"] = mfi_now
+        mfi_prev = float(m[-2]) if len(m) > 1 and m[-2] == m[-2] else mfi_now
+        result["mfi_direction"] = "up" if mfi_now > mfi_prev else ("down" if mfi_now < mfi_prev else "flat")
+        result["mfi_dir_50"] = 1 if mfi_now >= 50 else -1
     except Exception:
         pass
 
-    # BB(20,2) + 带宽
+    # BB
     try:
         upper, mid, lower = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2)
-        result["bb"] = {
-            "upper": float(upper[-1]), "mid": float(mid[-1]), "lower": float(lower[-1])
-        }
+        result["bb"] = {"upper": float(upper[-1]), "mid": float(mid[-1]), "lower": float(lower[-1])}
         bb_width = float(upper[-1] - lower[-1])
         result["bb_width"] = bb_width
         if len(upper) > 2:
@@ -135,7 +132,6 @@ def _talib_indicators(candles: list, tf: str) -> dict:
             result["bb_width_direction"] = "up" if bb_width > _prev else ("down" if bb_width < _prev else "flat")
         else:
             result["bb_width_direction"] = "flat"
-        # BB 宽度比率：当前 / 过去3根均值（SMA3，更快响应扩张）
         if len(upper) > 4:
             _widths_arr = upper - lower
             _avg3 = float(talib.SMA(_widths_arr, timeperiod=3)[-1])
@@ -174,7 +170,7 @@ def _talib_indicators(candles: list, tf: str) -> dict:
     except Exception:
         pass
 
-    # ADX(14)
+    # ADX
     try:
         adx_v = talib.ADX(highs, lows, closes, timeperiod=14)
         result["adx"] = float(adx_v[-1]) if adx_v[-1] == adx_v[-1] else 20.0
@@ -183,9 +179,9 @@ def _talib_indicators(candles: list, tf: str) -> dict:
     except Exception:
         pass
 
-    # MACD(12,26,9)
+    # MACD
     try:
-        macd, sig, hist = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
+        macd, sig, _ = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
         result["macd"] = {"macd": float(macd[-1]), "signal": float(sig[-1])}
     except Exception:
         pass
@@ -204,9 +200,14 @@ def _talib_indicators(candles: list, tf: str) -> dict:
         pass
 
     result["close"] = float(closes[-1])
-    result["trend"] = "UP" if closes[-1] > result.get("sma_14", closes[-1]) else "DOWN"
 
-    # 价格位置（20周期）
+    # 趋势
+    if len(closes) >= 14:
+        result["trend"] = "UP" if closes[-1] > closes[-14] else "DOWN"
+    else:
+        result["trend"] = "DOWN"
+
+    # 价格位置
     try:
         hi20 = max(highs[-20:])
         lo20 = min(lows[-20:])
@@ -325,7 +326,7 @@ class DataFactory:
                 for c in new_candles:
                     _candles_dict[c.time] = c
                 merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-350:]
-                ta = _talib_indicators(merged, tf)
+                ta = _ta_only_indicators(merged, tf)
                 _DATA_CACHE[tf] = {"candles": merged, **ta}
                 _HEALTH["tfs"][tf] = {
                     "last_sync": time.time(),
@@ -398,55 +399,30 @@ class DataFactory:
             pass
 
     def _sync_indicators(self, bridge):
-        """从MT4直接获取指标值（F043），覆盖TA-Lib计算结果"""
+        """从 MT4 直接获取指标值 (F043)。
+
+        原则：EA 提供的字段用 EA 值（与图表完全一致）。
+        兜底：如果 EA 拿不到（None 或空 dict），所有字段让 _ta_only_indicators 用 TA-Lib 算。
+        EA 没提供的字段（bb_width / bb_width_direction / bb_width_ratio / mfi_direction /
+        mfi_dir_50 / trend / price_position）一律由 _ta_only_indicators 算。
+        """
         for tf in ["M15", "M30", "H1", "H4"]:
             try:
-                mt4_ind = bridge.get_indicators("XAUUSD", tf)
-                if not mt4_ind:
-                    continue
+                mt4_ind = bridge.get_indicators("XAUUSD", tf) if hasattr(bridge, "has_capability") and bridge.has_capability("indicators") else {}
                 with _CACHE_LOCK:
                     if tf not in _DATA_CACHE:
                         _DATA_CACHE[tf] = {"candles": []}
                     cache = _DATA_CACHE[tf]
-                    cache["rsi"] = mt4_ind["rsi"]
-                    cache["rsi_5"] = mt4_ind["rsi_5"]
-                    cache["rsi_10"] = mt4_ind["rsi_10"]
-                    cache["mfi"] = mt4_ind["mfi"]
-                    cache["bb"] = mt4_ind["bb"]
-                    cache["bb_width"] = round(mt4_ind["bb"]["upper"] - mt4_ind["bb"]["lower"], 2)
-                    cache["ema_9"] = mt4_ind["ema_9"]
-                    cache["ema_21"] = mt4_ind["ema_21"]
-                    cache["sma_14"] = mt4_ind["sma_14"]
-                    cache["sma_20"] = mt4_ind["sma_20"]
-                    cache["sma_50"] = mt4_ind["sma_50"]
-                    cache["atr"] = mt4_ind["atr"]
-                    cache["atr_20"] = mt4_ind["atr_20"]
-                    cache["adx"] = mt4_ind["adx"]
-                    cache["pdi"] = mt4_ind["pdi"]
-                    cache["ndi"] = mt4_ind["ndi"]
-                    cache["macd"] = mt4_ind["macd"]
-                    cache["stoch_5_3_3"] = mt4_ind["stoch_5_3_3"]
-                    cache["volume_sma_20"] = mt4_ind["volume_sma_20"]
-                    cache["close"] = mt4_ind["close"]
-                    cache["trend"] = "UP" if mt4_ind["close"] > mt4_ind["sma_14"] else "DOWN"
-                    # MFI 方向
-                    _prev_mfi = cache.get("_prev_mfi", mt4_ind["mfi"])
-                    cache["mfi_direction"] = "up" if mt4_ind["mfi"] > _prev_mfi else ("down" if mt4_ind["mfi"] < _prev_mfi else "flat")
-                    cache["_prev_mfi"] = mt4_ind["mfi"]
-                    # BB 宽度方向
-                    _prev_bw = cache.get("_prev_bb_width", cache["bb_width"])
-                    cache["bb_width_direction"] = "up" if cache["bb_width"] > _prev_bw else ("down" if cache["bb_width"] < _prev_bw else "flat")
-                    cache["_prev_bb_width"] = cache["bb_width"]
-                    # BB 宽度比率（滚动14根均值）
-                    _hist_widths = cache.get("_hist_widths", [])
-                    _hist_widths.append(cache["bb_width"])
-                    if len(_hist_widths) > 14:
-                        _hist_widths = _hist_widths[-14:]
-                    if len(_hist_widths) >= 2:
-                        _avg = sum(_hist_widths) / len(_hist_widths)
-                        cache["bb_width_ratio"] = round(cache["bb_width"] / _avg, 3) if _avg > 0 else 1.0
-                    else:
-                        cache["bb_width_ratio"] = 1.0
-                    cache["_hist_widths"] = _hist_widths
+                    if mt4_ind:
+                        for k in ("rsi", "rsi_5", "rsi_10", "mfi", "bb",
+                                  "ema_9", "ema_21", "sma_14", "sma_20", "sma_50",
+                                  "atr", "atr_20", "adx", "pdi", "ndi",
+                                  "macd", "stoch_5_3_3", "volume_sma_20", "close"):
+                            if k in mt4_ind and mt4_ind[k] is not None:
+                                cache[k] = mt4_ind[k]
+                        if "bb" in mt4_ind and mt4_ind["bb"]:
+                            bb = mt4_ind["bb"]
+                            cache["bb_width"] = round(bb["upper"] - bb["lower"], 2)
+                    # EA 没提供 或 None 的字段都让 _ta_only_indicators 兜底（下一行 _sync_tf 调）
             except Exception:
                 pass
