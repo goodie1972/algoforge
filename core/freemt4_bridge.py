@@ -100,11 +100,15 @@ class FreeMT4Bridge(MT4BridgeBase):
             if text.endswith("!"):
                 return text[:-1]
 
-    def _send_cmd(self, cmd: str) -> Optional[list]:
-        """共享持久连接发送命令，断连时最多重连一次重试"""
+    def _send_cmd(self, cmd: str, timeout: float = 10.0, retries: int = 2) -> Optional[list]:
+        """共享持久连接发送命令，断连时最多重试 retries 次。
+
+        默认 timeout 10 秒（比 socket 默认 5 秒宽松，适配 EA 计算 30+ 指标耗时）。
+        F043 指标请求单独用 timeout=20。
+        """
         fcode = cmd.split("#")[0] if "#" in cmd else cmd
 
-        for attempt in range(2):
+        for attempt in range(retries):
             if not self._connected or not self._sock:
                 if attempt == 0:
                     self._try_reconnect()
@@ -113,8 +117,14 @@ class FreeMT4Bridge(MT4BridgeBase):
 
             try:
                 with self._lock:
-                    self._sock.sendall((cmd + "!").encode("utf-8"))
-                    response = self._recv_raw()
+                    # 临时调整 socket 超时
+                    old_to = self._sock.gettimeout()
+                    self._sock.settimeout(timeout)
+                    try:
+                        self._sock.sendall((cmd + "!").encode("utf-8"))
+                        response = self._recv_raw()
+                    finally:
+                        self._sock.settimeout(old_to)
 
                 parts = response.split("#")
 
