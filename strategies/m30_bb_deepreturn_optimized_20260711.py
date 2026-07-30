@@ -74,6 +74,8 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         # 盈利平仓冷却（缩短至 900s）
         self._last_profit_exit_time: dict[str, float] = {"BUY": 0.0, "SELL": 0.0}
         self._exit_cooldown_seconds: int = 900
+        # 保本延迟：M30 两个周期内不激活保本，让硬止损兜底
+        self.breakeven_delay_seconds = 3600
 
     # ─────────────── Indicator helpers ───────────────
 
@@ -356,6 +358,7 @@ class M30BBDeepReturnOptimized(BaseStrategy):
                 "highest": position.open_price if is_buy else 0,
                 "lowest": position.open_price if not is_buy else float("inf"),
                 "entry": position.open_price,
+                "entry_time": time.time(),
                 "peak_profit": 0.0,
             }
             if ticket in self._extreme_entry_data:

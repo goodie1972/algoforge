@@ -4,6 +4,7 @@
 
 import abc
 import logging
+import time
 from typing import Optional
 
 from core.bridge import MT4BridgeBase, Candle, Position, OrderType
@@ -58,6 +59,10 @@ class BaseStrategy(abc.ABC):
         # News-Bias 阻塞开关（从 RuntimeConfig 读取，支持热加载）
         self.block_long_when_bias_bearish: bool = _RuntimeConfig().get('block_long_when_bias_bearish') or False
         self.block_short_when_bias_bullish: bool = _RuntimeConfig().get('block_short_when_bias_bullish') or False
+
+        # 保本出场延迟（秒）：入场后 N 秒内不激活保本，让硬止损兜底
+        # 子类可在 __init__ 中覆盖此值，例如 M30 两个周期 = 3600
+        self.breakeven_delay_seconds: int = 0
 
     @property
     def all_magics(self) -> set[int]:
@@ -468,9 +473,16 @@ class BaseStrategy(abc.ABC):
     def _check_breakeven_exit(self, td: dict, current_profit: float, atr_val: float,
                                entry: float, is_buy: bool) -> bool:
         """保本出场：价格走过 ≥0.3×ATR 盈利后回到成本附近时平仓，防盈利变亏损。
-        子类在 check_ema20_exit 中 peak_profit 更新后调用。"""
+        子类在 check_ema20_exit 中 peak_profit 更新后调用。
+        支持延迟激活：breakeven_delay_seconds > 0 时，入场后该时间内不触发保本。"""
         if atr_val <= 0 or entry <= 0:
             return False
+        # 时间门禁：入场后 breakeven_delay_seconds 秒内不激活保本
+        entry_time = td.get("entry_time", 0)
+        if self.breakeven_delay_seconds > 0 and entry_time > 0:
+            elapsed = time.time() - entry_time
+            if elapsed < self.breakeven_delay_seconds:
+                return False
         # 最大有利偏移（MFE）
         mfe = (td.get("highest", entry) - entry) if is_buy else (entry - td.get("lowest", entry))
         if mfe < atr_val * 0.3:
