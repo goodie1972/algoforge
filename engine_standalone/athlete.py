@@ -107,14 +107,21 @@ class Athlete:
         price = tick["ask"] if direction == "BUY" else tick["bid"]
         strategy = signal.get("strategy", "unknown")
         magic = signal.get("magic", 0)
+        # 兜底 SL/TP：如果信号没传，用 ATR 硬止损
+        _sl = signal.get("sl")
+        _tp = signal.get("tp")
+        if not _sl or not _tp:
+            _atr = signal.get("indicator_values", {}).get("atr", 15)
+            _sl = price - _atr * 2 if direction == "BUY" else price + _atr * 2
+            _tp = price + _atr * 4 if direction == "BUY" else price - _atr * 4
         try:
             ticket = self._bridge.open_order(
                 symbol="XAUUSD",
                 order_type=order_type,
                 volume=signal.get("lot_size", 0.01),
                 price=price,
-                sl=signal.get("sl", 0),
-                tp=signal.get("tp", 0),
+                sl=_sl,
+                tp=_tp,
                 magic=magic,
                 comment=f"{strategy}_{direction}",
             )

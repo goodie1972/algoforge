@@ -1018,7 +1018,7 @@ class TradingEngine:
             self._handle_athlete_opened()
 
     def _handle_athlete_opened(self):
-        """处理运动员开仓成功队列，回调策略的 mark_extreme_entry"""
+        """处理运动员开仓成功队列，回调策略的 mark_extreme_entry + 更新本地持仓计数"""
         if not self._athlete._recently_opened:
             return
         opened = self._athlete._recently_opened
@@ -1027,11 +1027,14 @@ class TradingEngine:
         strat_map = {s.name: s for s in self.strategies}
         for ticket, strategy_name in opened:
             strategy = strat_map.get(strategy_name)
-            if strategy and hasattr(strategy, "mark_extreme_entry"):
-                try:
-                    strategy.mark_extreme_entry(ticket)
-                except Exception as e:
-                    logger.warning(f"[运动员回调] {strategy_name}.mark_extreme_entry({ticket}) 失败: {e}")
+            if strategy:
+                # 更新本地持仓计数，防止桥接延迟导致 max_positions 失效
+                self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
+                if hasattr(strategy, "mark_extreme_entry"):
+                    try:
+                        strategy.mark_extreme_entry(ticket)
+                    except Exception as e:
+                        logger.warning(f"[运动员回调] {strategy_name}.mark_extreme_entry({ticket}) 失败: {e}")
 
     def _coordinated_exits(self, snapshot: list):
         """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""
@@ -1564,7 +1567,7 @@ class TradingEngine:
                     "factors_long": last_sig.get("factors_long", []),
                     "factors_short": last_sig.get("factors_short", []),
                     "entry_price": 0, "lot_size": self._rt('lot_size') or 0.01,
-                    "sl": 0, "tp": 0,
+                    "sl": None, "tp": None,
                 }
                 # 计算 SL/TP
                 bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
