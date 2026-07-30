@@ -40,6 +40,14 @@ _HEALTH: dict = {
 # 限制 sync_errors 长度，防止无限增长
 _SYNC_ERRORS_MAX = 20
 
+# EA(F043) 可提供的指标字段：_sync_indicators 用 EA 值覆盖这些；_sync_tf 重建缓存时保留 EA 值不被 TA-Lib 覆盖
+_EA_CACHE_KEYS = frozenset({
+    "rsi", "rsi_5", "rsi_10", "mfi", "bb", "bb_width",
+    "ema_9", "ema_21", "sma_14", "sma_20", "sma_50",
+    "atr", "atr_20", "adx", "pdi", "ndi",
+    "macd", "stoch_5_3_3", "volume_sma_20", "close",
+})
+
 def get_health() -> dict:
     """获取 DataFactory 健康状态快照（供外部监控/API 调用）"""
     with _CACHE_LOCK:
@@ -244,6 +252,7 @@ class DataFactory:
         self._bridge = bridge
         self._running = False
         self._thread = None
+        self._last_db_ts: dict = {}  # 各周期已写 DB 的最大 K 线 ts，增量写用
 
     def connect(self) -> bool:
         """连接数据桥接"""
@@ -285,6 +294,7 @@ class DataFactory:
                     continue
                 # rows 已按时间戳升序，取最新一根的指标展开顶层
                 _DATA_CACHE[tf].update(rows[-1]["indicators"])
+                self._last_db_ts[tf] = int(rows[-1]["timestamp"])
                 _HEALTH["db_health"]["reads_at_startup"] += len(rows)
         logger.info("[数据工厂] 启动从 DB 恢复指标完成（EA 还没出 F043 时策略能跑）")
 
@@ -368,25 +378,42 @@ class DataFactory:
                 for c in new_candles:
                     _candles_dict[c.time] = c
                 merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-350:]
-                ta = _ta_only_indicators(merged, tf)
-                # 缓存用扁平结构：最新一根的指标展开到顶层（策略 get_indicator 读这里）
-                latest_ind = ta.get(merged[-1].time, {}) if merged else {}
-                _DATA_CACHE[tf] = {"candles": merged, **latest_ind}
-                # 每根 K 线的指标持久化到 DB（EA 死也不丢）
-                from data.database import upsert_indicators
-                write_ok, write_fail, write_count = 0, 0, 0
-                for c in merged:
-                    ind = ta.get(c.time)
-                    if isinstance(ind, dict) and ind:
-                        if upsert_indicators(tf, c.time, ind):
-                            write_count += 1
-                        else:
-                            write_fail += 1
-                with _CACHE_LOCK:
-                    _HEALTH["db_health"]["writes_total"] += write_count
-                    _HEALTH["db_health"]["writes_failed"] += write_fail
-                    _HEALTH["db_health"]["last_write_time"] = time.time()
-                    _HEALTH["db_health"]["ok"] = write_fail == 0
+            # TA-Lib 计算 + DB 写在锁外（慢操作不持锁，避免阻塞 get_cache 读）
+            ta = _ta_only_indicators(merged, tf)
+            latest_ind = ta.get(merged[-1].time, {}) if merged else {}
+            # 缓存扁平：最新一根 TA-Lib 展开顶层，保留 _sync_indicators 已覆盖的 EA 字段
+            with _CACHE_LOCK:
+                old_cache = _DATA_CACHE.get(tf, {})
+                new_cache = {"candles": merged}
+                for k, v in latest_ind.items():
+                    new_cache[k] = old_cache[k] if (k in _EA_CACHE_KEYS and k in old_cache) else v
+                _DATA_CACHE[tf] = new_cache
+            # DB 增量写：新 K 线 + 最新一根(未闭合更新)，历史已闭合跳过(1400->2根/轮)
+            from data.database import upsert_indicators
+            last_ts = self._last_db_ts.get(tf, 0)
+            latest_time = merged[-1].time if merged else None
+            write_ok, write_fail, write_count = 0, 0, 0
+            for c in merged:
+                try:
+                    ct_i = int(c.time)
+                except (ValueError, TypeError):
+                    ct_i = 0
+                if not (ct_i > last_ts or c.time == latest_time):
+                    continue
+                ind = ta.get(c.time)
+                if isinstance(ind, dict) and ind:
+                    if upsert_indicators(tf, c.time, ind):
+                        write_count += 1
+                        if ct_i > last_ts:
+                            last_ts = ct_i
+                            self._last_db_ts[tf] = ct_i
+                    else:
+                        write_fail += 1
+            with _CACHE_LOCK:
+                _HEALTH["db_health"]["writes_total"] += write_count
+                _HEALTH["db_health"]["writes_failed"] += write_fail
+                _HEALTH["db_health"]["last_write_time"] = time.time()
+                _HEALTH["db_health"]["ok"] = write_fail == 0
                 _HEALTH["tfs"][tf] = {
                     "last_sync": time.time(),
                     "candles": len(merged),
