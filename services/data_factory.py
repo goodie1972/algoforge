@@ -400,7 +400,12 @@ class DataFactory:
                     ct_i = 0
                 if not (ct_i > last_ts or c.time == latest_time):
                     continue
-                ind = ta.get(c.time)
+                # 最新一根用缓存值(含EA字段), 历史新K线用TA-Lib(兜底)
+                if c.time == latest_time:
+                    _c = _DATA_CACHE.get(tf, {})
+                    ind = {k: v for k, v in _c.items() if k != "candles"}
+                else:
+                    ind = ta.get(c.time)
                 if isinstance(ind, dict) and ind:
                     if upsert_indicators(tf, c.time, ind):
                         write_count += 1
