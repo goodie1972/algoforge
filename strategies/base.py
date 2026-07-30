@@ -81,8 +81,10 @@ class BaseStrategy(abc.ABC):
         self.candles = list(reversed(raw)) if raw else []
         if self.candles:
             try:
-                from services.data_factory import _talib_indicators
-                self._cached_indicators = _talib_indicators(self.candles, self.timeframe)
+                from services.data_factory import _ta_only_indicators
+                _ta = _ta_only_indicators(self.candles, self.timeframe)
+                # _ta_only_indicators 返回 {c.time: {indicators}}，取最新一根展开（扁平）
+                self._cached_indicators = _ta.get(self.candles[-1].time, {}) if _ta else {}
             except Exception:
                 self._cached_indicators = {}
 
