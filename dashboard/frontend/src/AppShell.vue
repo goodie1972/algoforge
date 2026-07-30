@@ -206,8 +206,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <n-layout position="absolute" style="height: 100vh;">
-    <n-layout has-sider position="absolute" style="height: 100vh;">
+  <n-layout position="absolute" style="height: 100vh; width: 100%; left: 0;">
+    <n-layout has-sider position="absolute" style="height: 100vh; width: 100%; left: 0;">
       <!-- 侧边栏 -->
       <n-layout-sider bordered collapse-mode="width" :collapsed-width="64" :width="220"
         :collapsed="collapsed" @collapse="collapsed = true" @expand="collapsed = false"
