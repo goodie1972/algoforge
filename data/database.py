@@ -428,6 +428,69 @@ def get_latest_timestamp(timeframe: str) -> Optional[int]:
         conn.close()
 
 
+def upsert_indicators(timeframe: str, timestamp, indicators: dict) -> bool:
+    """持久化指标到 DB（同步写，原子 upsert）。timestamp 接受 int/str，统一转 int。"""
+    import json
+    try:
+        ts = int(timestamp)
+    except (ValueError, TypeError):
+        return False
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO indicator_snapshots (timeframe, timestamp, indicators) "
+            "VALUES (?, ?, ?)",
+            (timeframe, ts, json.dumps(indicators, ensure_ascii=False, default=float)),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.warning(f"[DB] 写指标失败 tf={timeframe} ts={timestamp}: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_recent_indicators(timeframe: str, limit: int = 350) -> list[dict]:
+    """启动恢复用：从 DB 读最近 N 根 K 线的指标。"""
+    import json
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT timestamp, indicators FROM indicator_snapshots "
+            "WHERE timeframe = ? ORDER BY timestamp DESC LIMIT ?",
+            (timeframe, limit),
+        ).fetchall()
+        result = []
+        for r in rows:
+            try:
+                result.append({"timestamp": r["timestamp"], "indicators": json.loads(r["indicators"])})
+            except Exception:
+                pass
+        result.reverse()
+        return result
+    finally:
+        conn.close()
+
+
+def upsert_tick(timestamp: int, bid: float, ask: float) -> bool:
+    """持久化 tick 报价到 DB。"""
+    conn = get_conn()
+    try:
+        spread = round(ask - bid, 5) if bid and ask else 0.0
+        conn.execute(
+            "INSERT OR REPLACE INTO tick_data (timestamp, bid, ask, spread) VALUES (?, ?, ?, ?)",
+            (timestamp, bid, ask, spread),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.warning(f"[DB] 写 tick 失败 ts={timestamp}: {e}")
+        return False
+    finally:
+        conn.close()
+
+
 def insert_candles(timeframe: str, candles: list) -> int:
     conn = get_conn()
     inserted = 0

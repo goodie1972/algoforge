@@ -28,6 +28,13 @@ _HEALTH: dict = {
     "sync_errors": [],           # 最近的同步错误 [{"time": ts, "tf": str, "err": str}]
     "last_tick_time": 0.0,       # 最近一次报价时间
     "tick_count": 0,             # 总报价次数
+    "db_health": {               # DB 监督：写入/读取状态
+        "last_write_time": 0.0,  # 最近一次 DB 写入时间戳
+        "writes_total": 0,        # 累计写入次数
+        "writes_failed": 0,       # 累计失败次数
+        "reads_at_startup": 0,    # 启动时从 DB 读回条数
+        "ok": True,               # 整体 DB 写入是否正常
+    },
 }
 
 # 限制 sync_errors 长度，防止无限增长
@@ -79,12 +86,8 @@ def _merge_candles(old: list, new: list, max_len=350) -> list:
 def _ta_only_indicators(candles: list, tf: str) -> dict:
     """兜底所有指标：EA 拿不到时用 TA-Lib 算。
 
-    策略：能拿 EA 就用 EA（_sync_indicators 会先写 EA 值），这个函数只算
-    EA 没提供的（bb_width_direction / bb_width_ratio / mfi_direction /
-    mfi_dir_50 / trend / price_position）。
-
-    注：stoch/rsi/mfi/bb/ema/sma/atr/macd 也由这个函数算兜底，
-    但 _sync_indicators 会先用 EA 值覆盖，TA-Lib 只是后备。
+    返回结构：{timestamp: indicators_dict}，每根 K 线一条。
+    _sync_indicators 会先用 EA 值覆盖到对应 timestamp，TA-Lib 是后备。
     """
     try:
         import talib
@@ -99,45 +102,47 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     if len(closes) < 30:
         return {}
 
-    result = {}
+    # 返回结构：{c.time: {indicator_name: value, ...}}，每根 K 线一个 dict
+    result = {c.time: {} for c in candles}
 
     # RSI
     for p in [5, 10, 14]:
         try:
             r = talib.RSI(closes, timeperiod=p)
             key = "rsi" if p == 14 else f"rsi_{p}"
-            result[key] = float(r[-1]) if r[-1] == r[-1] else 50.0
+            for i, c in enumerate(candles):
+                if r[i] == r[i]:
+                    result[c.time][key] = float(r[i])
         except Exception:
             pass
 
     # MFI + 方向
     try:
         m = talib.MFI(highs, lows, closes, vols, timeperiod=14)
-        mfi_now = float(m[-1]) if m[-1] == m[-1] else 50.0
-        result["mfi"] = mfi_now
-        mfi_prev = float(m[-2]) if len(m) > 1 and m[-2] == m[-2] else mfi_now
-        result["mfi_direction"] = "up" if mfi_now > mfi_prev else ("down" if mfi_now < mfi_prev else "flat")
-        result["mfi_dir_50"] = 1 if mfi_now >= 50 else -1
+        for i, c in enumerate(candles):
+            if m[i] == m[i]:
+                result[c.time]["mfi"] = float(m[i])
+                if i > 0 and m[i-1] == m[i-1]:
+                    cur, prv = float(m[i]), float(m[i-1])
+                    result[c.time]["mfi_direction"] = "up" if cur > prv else ("down" if cur < prv else "flat")
+                    result[c.time]["mfi_dir_50"] = 1 if cur >= 50 else -1
     except Exception:
         pass
 
     # BB
     try:
         upper, mid, lower = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2)
-        result["bb"] = {"upper": float(upper[-1]), "mid": float(mid[-1]), "lower": float(lower[-1])}
-        bb_width = float(upper[-1] - lower[-1])
-        result["bb_width"] = bb_width
-        if len(upper) > 2:
-            _prev = float(upper[-2] - lower[-2])
-            result["bb_width_direction"] = "up" if bb_width > _prev else ("down" if bb_width < _prev else "flat")
-        else:
-            result["bb_width_direction"] = "flat"
-        if len(upper) > 4:
-            _widths_arr = upper - lower
-            _avg3 = float(talib.SMA(_widths_arr, timeperiod=3)[-1])
-            result["bb_width_ratio"] = round(bb_width / _avg3, 3) if _avg3 > 0 else 1.0
-        else:
-            result["bb_width_ratio"] = 1.0
+        widths = upper - lower
+        for i, c in enumerate(candles):
+            if upper[i] == upper[i]:
+                result[c.time]["bb"] = {"upper": float(upper[i]), "mid": float(mid[i]), "lower": float(lower[i])}
+                result[c.time]["bb_width"] = float(widths[i])
+            if i > 0 and widths[i-1] == widths[i-1]:
+                cur, prv = widths[i], widths[i-1]
+                result[c.time]["bb_width_direction"] = "up" if cur > prv else ("down" if cur < prv else "flat")
+            if i >= 3:
+                _avg3 = float(talib.SMA(widths, timeperiod=3)[i])
+                result[c.time]["bb_width_ratio"] = round(widths[i] / _avg3, 3) if _avg3 > 0 else 1.0
     except Exception:
         pass
 
@@ -145,7 +150,9 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     for p in [9, 21]:
         try:
             e = talib.EMA(closes, timeperiod=p)
-            result[f"ema_{p}"] = float(e[-1]) if e[-1] == e[-1] else float(closes[-1])
+            for i, c in enumerate(candles):
+                if e[i] == e[i]:
+                    result[c.time][f"ema_{p}"] = float(e[i])
         except Exception:
             pass
 
@@ -153,67 +160,79 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     for p in [14, 20, 50]:
         try:
             s = talib.SMA(closes, timeperiod=p)
-            result[f"sma_{p}"] = float(s[-1]) if s[-1] == s[-1] else float(closes[-1])
+            for i, c in enumerate(candles):
+                if s[i] == s[i]:
+                    result[c.time][f"sma_{p}"] = float(s[i])
         except Exception:
             pass
 
     # ATR(14/20)
     try:
         a14 = talib.ATR(highs, lows, closes, timeperiod=14)
-        result["atr"] = float(a14[-1]) if a14[-1] == a14[-1] else 0.0
-        result["atr_list"] = [float(x) for x in a14.tolist()]
-    except Exception:
-        pass
-    try:
         a20 = talib.ATR(highs, lows, closes, timeperiod=20)
-        result["atr_20"] = float(a20[-1]) if a20[-1] == a20[-1] else 0.0
+        for i, c in enumerate(candles):
+            if a14[i] == a14[i]:
+                result[c.time]["atr"] = float(a14[i])
+            if a20[i] == a20[i]:
+                result[c.time]["atr_20"] = float(a20[i])
+        atr_list = [float(x) for x in a14.tolist()]
+        for i, c in enumerate(candles):
+            if a14[i] == a14[i]:
+                result[c.time]["atr_list_val"] = float(a14[i])  # 单值，DB 存单值
     except Exception:
         pass
 
     # ADX
     try:
         adx_v = talib.ADX(highs, lows, closes, timeperiod=14)
-        result["adx"] = float(adx_v[-1]) if adx_v[-1] == adx_v[-1] else 20.0
-        result["pdi"] = float(talib.PLUS_DI(highs, lows, closes, timeperiod=14)[-1])
-        result["ndi"] = float(talib.MINUS_DI(highs, lows, closes, timeperiod=14)[-1])
+        pdi = talib.PLUS_DI(highs, lows, closes, timeperiod=14)
+        ndi = talib.MINUS_DI(highs, lows, closes, timeperiod=14)
+        for i, c in enumerate(candles):
+            if adx_v[i] == adx_v[i]:
+                result[c.time]["adx"] = float(adx_v[i])
+                result[c.time]["pdi"] = float(pdi[i])
+                result[c.time]["ndi"] = float(ndi[i])
     except Exception:
         pass
 
     # MACD
     try:
         macd, sig, _ = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
-        result["macd"] = {"macd": float(macd[-1]), "signal": float(sig[-1])}
+        for i, c in enumerate(candles):
+            if macd[i] == macd[i]:
+                result[c.time]["macd"] = {"macd": float(macd[i]), "signal": float(sig[i])}
     except Exception:
         pass
 
     # Stoch(5,3,3)
     try:
         sk, sd = talib.STOCH(highs, lows, closes, fastk_period=5, slowk_period=3, slowd_period=3)
-        result["stoch_5_3_3"] = {"k": float(sk[-1]), "d": float(sd[-1])}
+        for i, c in enumerate(candles):
+            if sk[i] == sk[i]:
+                result[c.time]["stoch_5_3_3"] = {"k": float(sk[i]), "d": float(sd[i])}
     except Exception:
         pass
 
     # 成交量
     try:
-        result["volume_sma_20"] = float(talib.SMA(vols, timeperiod=20)[-1])
+        s20 = talib.SMA(vols, timeperiod=20)
+        for i, c in enumerate(candles):
+            if s20[i] == s20[i]:
+                result[c.time]["volume_sma_20"] = float(s20[i])
     except Exception:
         pass
 
-    result["close"] = float(closes[-1])
-
-    # 趋势
-    if len(closes) >= 14:
-        result["trend"] = "UP" if closes[-1] > closes[-14] else "DOWN"
-    else:
-        result["trend"] = "DOWN"
-
-    # 价格位置
-    try:
-        hi20 = max(highs[-20:])
-        lo20 = min(lows[-20:])
-        result["price_position"] = float((closes[-1] - lo20) / (hi20 - lo20)) if hi20 > lo20 else 0.5
-    except Exception:
-        pass
+    # close, trend, price_position（每根都算）
+    for i, c in enumerate(candles):
+        result[c.time]["close"] = float(closes[i])
+        if i >= 14:
+            result[c.time]["trend"] = "UP" if closes[i] > closes[i-14] else "DOWN"
+        else:
+            result[c.time]["trend"] = "DOWN"
+        if i >= 20:
+            hi20 = max(highs[max(0, i-19):i+1])
+            lo20 = min(lows[max(0, i-19):i+1])
+            result[c.time]["price_position"] = float((closes[i] - lo20) / (hi20 - lo20)) if hi20 > lo20 else 0.5
 
     return result
 
@@ -247,9 +266,27 @@ class DataFactory:
         self._running = True
         with _CACHE_LOCK:
             _HEALTH["started_at"] = time.time()
+        # 启动时从 DB 恢复指标（保证 EA 死 / 重启时数据不丢）
+        self._init_indicators_from_db()
         self._thread = threading.Thread(target=self._run, daemon=True, name="data-factory")
         self._thread.start()
         logger.info("[数据工厂] 已启动")
+
+    def _init_indicators_from_db(self):
+        """从 DB 读最近 350 根 K 线的指标填充内存缓存（启动恢复）。
+        取最新一根的指标展开到缓存顶层（扁平结构，策略 get_indicator 直接读）。
+        """
+        from data.database import get_recent_indicators
+        with _CACHE_LOCK:
+            for tf in ["M15", "M30", "H1", "H4"]:
+                _DATA_CACHE.setdefault(tf, {"candles": []})
+                rows = get_recent_indicators(tf, limit=350)
+                if not rows:
+                    continue
+                # rows 已按时间戳升序，取最新一根的指标展开顶层
+                _DATA_CACHE[tf].update(rows[-1]["indicators"])
+                _HEALTH["db_health"]["reads_at_startup"] += len(rows)
+        logger.info("[数据工厂] 启动从 DB 恢复指标完成（EA 还没出 F043 时策略能跑）")
 
     def stop(self):
         self._running = False
@@ -266,11 +303,16 @@ class DataFactory:
             logger.warning("[数据工厂] 首次加载10次重试后仍有缺失，继续增量循环")
         logger.info("[数据工厂] 首次加载完成，进入增量循环")
         _last_validation = 0
+        _last_tick_persist = 0.0
         while self._running:
             for tf in ["M15", "M30", "H1", "H4"]:
                 self._sync_tf(tf, self._bridge)
             self._sync_tick(self._bridge)
             self._sync_indicators(self._bridge)
+            # 每 60s 把最新 tick 持久化到 DB（时间序列存档）
+            if time.time() - _last_tick_persist > 60:
+                _last_tick_persist = time.time()
+                self._sync_tick_persist()
             # 每 5 分钟做一次数据校验
             if time.time() - _last_validation > 300:
                 _last_validation = time.time()
@@ -327,7 +369,24 @@ class DataFactory:
                     _candles_dict[c.time] = c
                 merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-350:]
                 ta = _ta_only_indicators(merged, tf)
-                _DATA_CACHE[tf] = {"candles": merged, **ta}
+                # 缓存用扁平结构：最新一根的指标展开到顶层（策略 get_indicator 读这里）
+                latest_ind = ta.get(merged[-1].time, {}) if merged else {}
+                _DATA_CACHE[tf] = {"candles": merged, **latest_ind}
+                # 每根 K 线的指标持久化到 DB（EA 死也不丢）
+                from data.database import upsert_indicators
+                write_ok, write_fail, write_count = 0, 0, 0
+                for c in merged:
+                    ind = ta.get(c.time)
+                    if isinstance(ind, dict) and ind:
+                        if upsert_indicators(tf, c.time, ind):
+                            write_count += 1
+                        else:
+                            write_fail += 1
+                with _CACHE_LOCK:
+                    _HEALTH["db_health"]["writes_total"] += write_count
+                    _HEALTH["db_health"]["writes_failed"] += write_fail
+                    _HEALTH["db_health"]["last_write_time"] = time.time()
+                    _HEALTH["db_health"]["ok"] = write_fail == 0
                 _HEALTH["tfs"][tf] = {
                     "last_sync": time.time(),
                     "candles": len(merged),
@@ -398,31 +457,60 @@ class DataFactory:
         except Exception:
             pass
 
-    def _sync_indicators(self, bridge):
-        """从 MT4 直接获取指标值 (F043)。
+    def _sync_tick_persist(self):
+        """每 60s 调一次（独立于 _sync_tick 的高频报价），把最新 tick 写 DB。
+        tick_data 表做时间序列存档，DB 唯一真理源保证持久性。
+        """
+        from data.database import upsert_tick
+        with _CACHE_LOCK:
+            tick = _DATA_CACHE.get("tick", {})
+        if not tick or "bid" not in tick:
+            return
+        try:
+            upsert_tick(int(tick.get("time", time.time())), tick.get("bid", 0), tick.get("ask", 0))
+        except Exception as e:
+            logger.warning(f"[数据工厂] tick 写 DB 失败: {e}")
 
-        原则：EA 提供的字段用 EA 值（与图表完全一致）。
-        兜底：如果 EA 拿不到（None 或空 dict），所有字段让 _ta_only_indicators 用 TA-Lib 算。
-        EA 没提供的字段（bb_width / bb_width_direction / bb_width_ratio / mfi_direction /
+    def _sync_indicators(self, bridge):
+        """从 MT4 EA 直接获取指标值 (F043)。
+
+        原则：EA 提供的字段用 EA 值（与图表完全一致），覆盖内存缓存顶层 + 持久化到 DB。
+        兜底：EA 拿不到（None 或空 dict），字段由 _ta_only_indicators（_sync_tf 调）算。
+        EA 没提供的字段（bb_width_direction / bb_width_ratio / mfi_direction /
         mfi_dir_50 / trend / price_position）一律由 _ta_only_indicators 算。
         """
+        from data.database import upsert_indicators
+        ea_keys = ("rsi", "rsi_5", "rsi_10", "mfi", "bb",
+                   "ema_9", "ema_21", "sma_14", "sma_20", "sma_50",
+                   "atr", "atr_20", "adx", "pdi", "ndi",
+                   "macd", "stoch_5_3_3", "volume_sma_20", "close")
         for tf in ["M15", "M30", "H1", "H4"]:
             try:
-                mt4_ind = bridge.get_indicators("XAUUSD", tf) if hasattr(bridge, "has_capability") and bridge.has_capability("indicators") else {}
+                mt4_ind = bridge.get_indicators("XAUUSD", tf) if hasattr(bridge, "get_indicators") else {}
+            except Exception as _e:
+                logger.warning(f"[数据工厂] F043 tf={tf} 异常: {_e}")
+                mt4_ind = {}
+            if not mt4_ind:
+                logger.warning(f"[数据工厂] F043 tf={tf} 返回空(hasattr={hasattr(bridge,'get_indicators')})")
+                continue
+            ea_ts = mt4_ind.get("time")
+            with _CACHE_LOCK:
+                cache = _DATA_CACHE.setdefault(tf, {"candles": []})
+                for k in ea_keys:
+                    if k in mt4_ind and mt4_ind[k] is not None:
+                        cache[k] = mt4_ind[k]
+                if mt4_ind.get("bb"):
+                    bb = mt4_ind["bb"]
+                    cache["bb_width"] = round(bb["upper"] - bb["lower"], 2)
+            # EA 值持久化到 DB：覆盖该 bar 的 TA-Lib 值，合并完整指标后写回（DB=EA 真理源）
+            if ea_ts:
                 with _CACHE_LOCK:
-                    if tf not in _DATA_CACHE:
-                        _DATA_CACHE[tf] = {"candles": []}
-                    cache = _DATA_CACHE[tf]
-                    if mt4_ind:
-                        for k in ("rsi", "rsi_5", "rsi_10", "mfi", "bb",
-                                  "ema_9", "ema_21", "sma_14", "sma_20", "sma_50",
-                                  "atr", "atr_20", "adx", "pdi", "ndi",
-                                  "macd", "stoch_5_3_3", "volume_sma_20", "close"):
-                            if k in mt4_ind and mt4_ind[k] is not None:
-                                cache[k] = mt4_ind[k]
-                        if "bb" in mt4_ind and mt4_ind["bb"]:
-                            bb = mt4_ind["bb"]
-                            cache["bb_width"] = round(bb["upper"] - bb["lower"], 2)
-                    # EA 没提供 或 None 的字段都让 _ta_only_indicators 兜底（下一行 _sync_tf 调）
-            except Exception:
-                pass
+                    full = {k: v for k, v in _DATA_CACHE.get(tf, {}).items() if k != "candles"}
+                if full:
+                    try:
+                        upsert_indicators(tf, ea_ts, full)
+                        with _CACHE_LOCK:
+                            _HEALTH["db_health"]["writes_total"] += 1
+                            _HEALTH["db_health"]["last_write_time"] = time.time()
+                    except Exception:
+                        pass
