@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { NTag, NDataTable, NEmpty, NText, NAlert } from 'naive-ui'
-import { getStrategyColor } from '@/utils/strategyColors'
+import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 
 const props = defineProps<{
   items: any[]
@@ -24,7 +24,8 @@ const columns = [
     render(row: any) {
       const name = row.strategy || row.comment || ''
       const color = getStrategyColor(name)
-      return h(NTag, { color: { color, textColor: '#fff' }, size: 'small' },
+      const txtColor = getStrategyTextColor(name)
+      return h(NTag, { color: { color, textColor: txtColor }, size: 'small' },
         { default: () => name || '-' }
       )
     }
