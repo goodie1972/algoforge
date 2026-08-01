@@ -1,2 +1,2 @@
 [permissions]
-allow = ["Edit"]
+allow = ["Edit", "Bash(curl -s http://127.0.0.1:1783/api/engine/status 2>&1)", "Bash(cd \"D:\\backup\\BaoBao\\PythonProgram\\xauusd\" && python -m py_compile strategies/base.py && echo \"✅ base OK\" && python -m py_compile strategies/h1_breakout_20260801.py && echo \"✅ h1_breakout OK\" && python -m py_compile strategies/m30_vol_return_20260801.py && echo \"✅ m30_vol_return OK\" && python -m py_compile strategies/stoch_trend_h1_upgraded_20260719.py && echo \"✅ stoch OK\" && python -m py_compile strategies/sanqing_h1_upgraded_20260719.py && echo \"✅ sanqing OK\" 2>&1)"]
