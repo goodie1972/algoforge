@@ -47,17 +47,24 @@
       "double_first": false
     },
     "entry_score_pro": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661501,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "gold_auto_research": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880306,
       "timeframe": "H1",
-      "max_positions": 0,
+      "max_positions": 1,
+      "double_first": false
+    },
+    "h1_breakout": {
+      "enabled": true,
+      "magic": 880301,
+      "timeframe": "H1",
+      "max_positions": 1,
       "double_first": false
     },
     "m30_bb_deepreturn": {
@@ -102,25 +109,32 @@
       "max_positions": 0,
       "double_first": false
     },
+    "m30_vol_return": {
+      "enabled": true,
+      "magic": 880302,
+      "timeframe": "M30",
+      "max_positions": 1,
+      "double_first": false
+    },
     "momentum_pulse_pro": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661301,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "multi_confluence_quant": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661601,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "rsi_grading_m30": {
-      "enabled": false,
+      "enabled": true,
       "magic": 660902,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "rsi_grading_m30_optimized": {
@@ -187,30 +201,16 @@
       "double_first": false
     },
     "xaubot_backup": {
-      "enabled": false,
+      "enabled": true,
       "magic": 777005,
       "timeframe": "H1",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "h1_breakout": {
-      "enabled": false,
-      "magic": 880301,
-      "timeframe": "H1",
-      "max_positions": 1,
-      "double_first": false
-    },
-    "m30_vol_return": {
-      "enabled": false,
-      "magic": 880302,
-      "timeframe": "M30",
       "max_positions": 1,
       "double_first": false
     }
   },
   "paper_trading": {
     "enabled": true,
-    "max_positions": 10,
+    "max_positions": 5,
     "ignore_gates": true,
     "initial_balance": 5000
   }
