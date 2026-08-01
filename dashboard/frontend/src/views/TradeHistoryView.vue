@@ -429,8 +429,8 @@ const statsColumns = [
 
 <template>
   <n-space vertical size="large">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <n-h2 style="margin:0;">历史成交</n-h2>
+    <div class="history-header">
+      <n-h2 class="history-title">历史成交</n-h2>
       <n-space size="small">
         <n-tag :bordered="false" type="info">共 {{ store.items.length }} 笔</n-tag>
         <n-button size="small" secondary :loading="refreshLoading" @click="refresh">
@@ -442,9 +442,9 @@ const statsColumns = [
     <n-tabs v-model:value="activeTab" type="line" animated>
     <!-- ═══ 成交明细 ═══ -->
       <n-tab-pane name="history" tab="成交明细">
-        <n-space style="margin-bottom: 12px;">
+        <n-space class="history-search-bar">
           <n-input v-model:value="searchQuery" placeholder="搜索: 策略名 / Magic / Ticket"
-                   clearable style="width: 360px;">
+                   clearable class="search-input">
             <template #prefix>
               <n-icon :component="SearchOutline" />
             </template>
@@ -467,13 +467,13 @@ const statsColumns = [
       <!-- ═══ 策略统计 ═══ -->
       <n-tab-pane name="stats" tab="策略统计">
         <!-- 筛选栏 -->
-        <n-card size="small" :bordered="true" style="margin-bottom: 12px;">
+        <n-card size="small" :bordered="true" class="stats-card">
           <n-space align="center" size="medium">
             <n-select v-if="strategyOptions.length"
               v-model:value="selectedStrategies" :options="strategyOptions"
-              multiple clearable placeholder="筛选策略" style="min-width: 240px;" />
+              multiple clearable placeholder="筛选策略" class="filter-select" />
             <n-date-picker v-model:value="dateRange" type="daterange" clearable
-              placeholder="选择日期范围" style="min-width: 220px;" />
+              placeholder="选择日期范围" class="filter-datepicker" />
             <n-button type="primary" size="small" @click="loadStats" :loading="statsLoading">
               查询
             </n-button>
@@ -485,7 +485,7 @@ const statsColumns = [
           <n-card size="small">
             <n-space vertical size="medium">
               <n-skeleton text :repeat="3" />
-              <n-skeleton text style="width: 60%;" />
+              <n-skeleton text class="skeleton-short" />
             </n-space>
           </n-card>
         </template>
@@ -509,7 +509,7 @@ const statsColumns = [
             @select-version="(v: string) => selectedVersion = v" />
 
           <!-- 汇总指标卡片 -->
-          <n-card size="small" :bordered="true" style="margin-bottom: 12px;">
+          <n-card size="small" :bordered="true" class="stats-card">
             <n-grid :cols="6" :x-gap="16" :y-gap="12">
               <n-gi v-for="card in summaryCards" :key="card.label">
                 <n-statistic :label="card.label" tabular-nums>
@@ -549,3 +549,32 @@ const statsColumns = [
     </n-tabs>
   </n-space>
 </template>
+
+<style scoped>
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.history-title {
+  margin: 0;
+}
+.history-search-bar {
+  margin-bottom: 12px;
+}
+.search-input {
+  width: 360px;
+}
+.stats-card {
+  margin-bottom: 12px;
+}
+.filter-select {
+  min-width: 240px;
+}
+.filter-datepicker {
+  min-width: 220px;
+}
+.skeleton-short {
+  width: 60%;
+}
+</style>

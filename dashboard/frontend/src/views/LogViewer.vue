@@ -40,8 +40,8 @@ function logStyle(level: string) {
 
 <template>
   <n-space vertical size="large">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <n-h2 style="margin:0;">系统日志</n-h2>
+    <div class="log-header">
+      <n-h2 class="log-title">系统日志</n-h2>
       <n-space size="small" align="center">
         <n-radio-group :value="store.filterLevel" @update:value="(v: any) => store.filterLevel = v">
           <n-radio-button v-for="opt in levelOptions" :key="opt.value || 'all'" :value="opt.value">
@@ -53,21 +53,67 @@ function logStyle(level: string) {
       </n-space>
     </div>
 
-    <n-card :bordered="true" size="small" style="padding: 0;">
+    <n-card :bordered="true" size="small" class="log-card">
       <!-- 空态 -->
-      <n-empty v-if="displayLogs.length === 0" description="暂无日志" style="padding: 40px 0;" />
+      <n-empty v-if="displayLogs.length === 0" description="暂无日志" class="log-empty" />
       <!-- 日志列表 -->
-      <div v-else ref="logContainer" style="height: calc(100vh - 220px); overflow-y: auto; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; line-height: 1.7;">
+      <div v-else ref="logContainer" class="log-list">
         <div v-for="(entry, i) in displayLogs" :key="i"
-             style="padding: 1px 12px; display: flex; gap: 8px; white-space: nowrap;"
+             class="log-entry"
              @mouseenter="($event.target as HTMLElement).style.background = '#2c3038'"
              @mouseleave="($event.target as HTMLElement).style.background = 'transparent'">
-          <span style="color: #8b8f97; flex-shrink: 0;">{{ entry.timestamp.slice(11, 23) }}</span>
+          <span class="log-time">{{ entry.timestamp.slice(11, 23) }}</span>
           <span :style="{ ...logStyle(entry.level), flexShrink: 0, width: 60, fontWeight: 600 }">{{ entry.level }}</span>
-          <span style="color: #8b8f97; flex-shrink: 0; max-width: 140px; overflow: hidden; text-overflow: ellipsis;">{{ entry.name }}</span>
-          <span style="color: #d4d7dd; overflow: hidden; text-overflow: ellipsis;">{{ entry.message }}</span>
+          <span class="log-name">{{ entry.name }}</span>
+          <span class="log-msg">{{ entry.message }}</span>
         </div>
       </div>
     </n-card>
   </n-space>
 </template>
+
+<style scoped>
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.log-title {
+  margin: 0;
+}
+.log-card {
+  padding: 0;
+}
+.log-empty {
+  padding: 40px 0;
+}
+.log-list {
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+.log-entry {
+  padding: 1px 12px;
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+.log-time {
+  color: #8b8f97;
+  flex-shrink: 0;
+}
+.log-name {
+  color: #8b8f97;
+  flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.log-msg {
+  color: #d4d7dd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

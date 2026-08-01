@@ -3,6 +3,15 @@ body {
   margin: 0;
   padding: 0;
   font-size: 15px;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 数字与代码使用等宽增强 */
+code, pre, .mono {
+  font-family: 'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
 }
 
 /* 自定义 scrollbar */
@@ -23,4 +32,125 @@ body {
 @keyframes flash-bg {
   0%   { background-color: rgba(240, 185, 11, 0.35); box-shadow: 0 0 6px 2px rgba(240, 185, 11, 0.25); }
   100% { background-color: transparent; box-shadow: none; }
+}
+
+/* 平滑滚动 */
+html { scroll-behavior: smooth; }
+
+/* 页面容器 */
+.page-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* 卡片 hover 提升 */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* 按钮点击反馈 */
+.btn-press:active {
+  transform: scale(0.98);
+}
+
+/* 文本平衡 */
+h1, h2, h3, h4 {
+  text-wrap: balance;
+}
+
+/* 逐项入场动画 */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in-item {
+  animation: fade-up 0.35s ease both;
+}
+.fade-in-item:nth-child(1) { animation-delay: 0s; }
+.fade-in-item:nth-child(2) { animation-delay: 0.05s; }
+.fade-in-item:nth-child(3) { animation-delay: 0.1s; }
+.fade-in-item:nth-child(4) { animation-delay: 0.15s; }
+.fade-in-item:nth-child(5) { animation-delay: 0.2s; }
+.fade-in-item:nth-child(6) { animation-delay: 0.25s; }
+.fade-in-item:nth-child(7) { animation-delay: 0.3s; }
+.fade-in-item:nth-child(8) { animation-delay: 0.35s; }
+
+/* ── 表面质感 ── */
+
+/* 噪点纹理 overlay */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* 卡片细微渐变增强 */
+.n-card {
+  background: linear-gradient(135deg, #161b22 0%, #1a1f2e 100%) !important;
+}
+
+/* 数据表格行交替渐变 */
+.n-data-table-tr--striped {
+  background: linear-gradient(90deg, rgba(240, 185, 11, 0.02) 0%, transparent 100%) !important;
+}
+
+/* 侧边栏活跃项金色指示条 */
+.n-menu-item--selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: #f0b90b;
+  border-radius: 0 3px 3px 0;
+}
+
+/* ── 交互增强 ── */
+
+/* 焦点可见指示 */
+*:focus-visible {
+  outline: 2px solid rgba(240, 185, 11, 0.5);
+  outline-offset: 2px;
+}
+
+/* 所有交互元素过渡 */
+.n-button, .n-tag, .n-card, .n-menu-item, .n-checkbox, .n-switch {
+  transition: all 0.2s ease !important;
+}
+
+/* 数据表格行 hover */
+.n-data-table-tr:hover {
+  background: rgba(240, 185, 11, 0.04) !important;
+}
+
+/* 侧边栏折叠过渡 */
+.n-layout-sider {
+  transition: width 0.25s ease !important;
+}
+
+/* 弹窗过渡 */
+.n-modal {
+  transition: opacity 0.25s ease, transform 0.25s ease !important;
+}
+
+/* 标签 hover 反馈 */
+.n-tag:hover {
+  filter: brightness(1.15);
+}
+
+/* 链接悬停 */
+a {
+  transition: color 0.15s ease;
 }
