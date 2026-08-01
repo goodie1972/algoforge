@@ -3,6 +3,7 @@ import { h, ref, watch } from 'vue'
 import { usePositionStore } from '@/stores/positions'
 import { NButton, NTag, NSpace, NDataTable, useDialog, useMessage } from 'naive-ui'
 import { closePosition } from '@/api/client'
+import { getStrategyColor, textColorForBg } from '@/utils/strategyColors'
 
 const store = usePositionStore()
 const dialog = useDialog()
@@ -43,8 +44,11 @@ const columns = [
         'bakome_backup': '#808080',
         'xaubot_backup': '#808080',
       }
-      const color = colors[name] || '#808080'
-      return h(NTag, { color: { color, textColor: '#fff' }, size: 'small' },
+      // 策略名可能带 _BUY/_SELL 后缀，先尽量匹配
+      const cleanName = name.replace(/_(BUY|SELL)$/, '')
+      const color = colors[name] || colors[cleanName] || getStrategyColor(cleanName) || '#808080'
+      const txtColor = textColorForBg(color)
+      return h(NTag, { color: { color, textColor: txtColor }, size: 'small' },
         { default: () => label }
       )
     }

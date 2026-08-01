@@ -214,10 +214,10 @@ onUnmounted(() => {
         :native-scrollbar="false" class="app-sider">
         <div class="sider-header">
           <n-h2 prefix="bar" class="sider-title">
-            <n-text v-if="!collapsed" class="sider-logo-text">XAUUSD</n-text>
-            <n-text v-else class="sider-logo-mini">X</n-text>
+            <n-text v-if="!collapsed" class="sider-logo-text">AlgoForge</n-text>
+            <n-text v-else class="sider-logo-mini">AF</n-text>
           </n-h2>
-          <n-text v-if="!collapsed" depth="3" class="sider-subtitle">量化交易仪表盘</n-text>
+          <n-text v-if="!collapsed" depth="3" class="sider-subtitle">AlgoForge · 量化引擎</n-text>
         </div>
 
         <n-menu :value="route.path" :options="menuOptions" :collapsed="collapsed"

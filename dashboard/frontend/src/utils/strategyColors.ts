@@ -62,6 +62,30 @@ export function getStrategyColor(name: string): string {
 }
 
 /**
+ * 根据背景色亮度自动选择文字色（白底黑字 / 黑底白字）
+ * @param hex 六进制颜色字符串
+ * @returns '#000' 或 '#fff'
+ */
+export function textColorForBg(hex: string): string {
+  // 解析 hex 为 RGB
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  // 相对亮度公式 (W3C WCAG)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.5 ? '#000' : '#fff'
+}
+
+/**
+ * 获取策略标签文字颜色（自动根据背景色亮度选择）
+ * @param name 策略名
+ * @returns '#000' 或 '#fff'
+ */
+export function getStrategyTextColor(name: string): string {
+  return textColorForBg(getStrategyColor(name))
+}
+
+/**
  * 预生成的策略颜色映射表（兼容旧代码的 Record 方式）
  */
 export function buildStrategyColors(strategies: string[]): Record<string, string> {

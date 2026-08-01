@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSignalStore } from '@/stores/signals'
 import { usePriceStore } from '@/stores/prices'
 import { useConfigStore } from '@/stores/config'
-import { getStrategyColor } from '@/utils/strategyColors'
+import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 
 const signalStore = useSignalStore()
 const priceStore = usePriceStore()
@@ -345,7 +345,7 @@ onUnmounted(() => {
                    marginBottom: '4px', borderRadius: '4px' }">
           <template #header>
             <n-space align="center" size="small">
-              <n-tag :color="{ color: getStrategyColor(s.name) }" size="tiny" text-color="#fff">
+              <n-tag :color="{ color: getStrategyColor(s.name) }" size="tiny" :text-color="getStrategyTextColor(s.name)">
                 {{ s.name }}
               </n-tag>
               <n-text depth="3" style="font-size: 11px;">TF:{{ s.timeframe }}</n-text>
