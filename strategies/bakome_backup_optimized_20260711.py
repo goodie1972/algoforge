@@ -171,22 +171,43 @@ class BakomeBackupOptimized(BaseStrategy):
                     logger.info(f"[{self.name}] BB扩张(2/3)+价格<中轴+MFI下降({_mfi:.0f})，禁做多，跳过FVG/OB")
                     return (None, 0, 0, [], [], {})
 
-        # 4. Check FVG
+        # 4. FVG check — NY session 禁FVG，其他session加ADX/MFI评分确认
         indicator_values = {"close": round(self.candles[-1].close, 2), "atr": round(atr_val, 2)}
         fvg_sig = self._detect_fvg()
         if fvg_sig is not None:
-            logger.info(f"[{self.name}] FVG {fvg_sig.value} in {session} session, ATR={atr_val:.2f}")
-            indicator_values["pattern"] = "FVG"
-            indicator_values["session"] = session
-            return (fvg_sig, 1, 0, [session, "FVG"], [], indicator_values)
+            # NY session FVG 胜率极低，直接禁用
+            if session == 'ny':
+                logger.info(f"[{self.name}] NY session 跳过FVG {fvg_sig.value}，NY时段FVG胜率过低")
+            else:
+                # London/Asia session 加趋势确认
+                _adx = self.get_indicator("adx")
+                _mfi = self.get_indicator("mfi")
+                _mfi_dir = self.get_indicator("mfi_direction")
+                fvg_score = 0
+                if _adx is not None and _adx > 20: fvg_score += 1
+                if _mfi is not None and _mfi_dir:
+                    if fvg_sig == OrderType.BUY and _mfi_dir in ("up", "flat"): fvg_score += 1
+                    if fvg_sig == OrderType.SELL and _mfi_dir in ("down", "flat"): fvg_score += 1
+                if fvg_score >= 1:
+                    logger.info(f"[{self.name}] FVG {fvg_sig.value} in {session} session, ADX={_adx:.0f} MFI={_mfi:.0f} score={fvg_score}/2")
+                    indicator_values["pattern"] = "FVG"
+                    indicator_values["session"] = session
+                    return (fvg_sig, 1, 0, [session, "FVG"], [], indicator_values)
+                else:
+                    logger.info(f"[{self.name}] FVG {fvg_sig.value} 评分不足({fvg_score}/2) ADX={_adx:.0f} MFI={_mfi:.0f}，跳过")
 
-        # 4. Check Order Block
+        # 5. Check Order Block
         ob_sig = self._detect_order_block()
         if ob_sig is not None:
-            logger.info(f"[{self.name}] OB {ob_sig.value} in {session} session, ATR={atr_val:.2f}")
-            indicator_values["pattern"] = "OB"
-            indicator_values["session"] = session
-            return (ob_sig, 1, 0, [session, "OB"], [], indicator_values)
+            # OB 也加ADX确认
+            _adx = self.get_indicator("adx")
+            if _adx is not None and _adx > 20:
+                logger.info(f"[{self.name}] OB {ob_sig.value} in {session} session, ADX={_adx:.0f}")
+                indicator_values["pattern"] = "OB"
+                indicator_values["session"] = session
+                return (ob_sig, 1, 0, [session, "OB"], [], indicator_values)
+            else:
+                logger.info(f"[{self.name}] OB {ob_sig.value} ADX不足({_adx:.0f})，跳过")
 
         return (None, 0, 0, [], [], indicator_values)
 

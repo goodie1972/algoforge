@@ -1,11 +1,10 @@
 """
 Stoch KDJ 周期策略 (v12)
 =================================
-入场 (4 道闸门必过):
+入场 (3 道闸门必过):
   1. ADX > 25
   2. KDJ 金叉/死叉
-  3. K 极值半区: BUY K<50, SELL K>50
-  4. BBI 方向: 金叉+close>BBI, 死叉+close<BBI
+  3. BBI 方向: 金叉+close>BBI, 死叉+close<BBI
   → 运动员直接入场
 
 出场 (按入场 K 极值分情况):
@@ -36,6 +35,8 @@ STRATEGY_CHANGELOG = [
      "desc": "真正逆势: K<=35金叉做多 (超卖反弹), K>=65死叉做空 (超买回调)"},
     {"version": "v12_kdj_cycle", "magic": 661204, "date": "2026-07-28",
      "desc": "KDJ 周期: 入场 K<50 金叉+close>BBI / K>50 死叉+close<BBI; 出场按入场 K 极值分情况 (K<20 等 K>80+KDJ 反向, 20≤K<50 用 BBI 反转或 KDJ 反向)"},
+    {"version": "v13_no_k_midline", "magic": 661204, "date": "2026-08-01",
+     "desc": "去掉K极值半区门禁(K<50/K>50)，仅保留ADX+KDJ交叉+BBI方向3道闸门，增加信号频率"},
 ]
 
 
@@ -105,11 +106,10 @@ class StochTrendH1Upgraded(BaseStrategy):
     # ─────────────── 入场 ───────────────
 
     def generate_signal(self) -> Optional[tuple]:
-        """4 道闸门:
+        """3 道闸门:
         1. ADX > 25
         2. KDJ 交叉
-        3. K 极值半区: BUY K<50, SELL K>50
-        4. BBI 方向
+        3. BBI 方向
         """
         if len(self.candles) < 100:
             return None
@@ -134,12 +134,12 @@ class StochTrendH1Upgraded(BaseStrategy):
         signal = None
         is_extreme = False
 
-        # BUY: 金叉 + K<50 + close>BBI
-        if kdj["cross_up"] and k < self.k_midline and close > bbi:
+        # BUY: 金叉 + close>BBI
+        if kdj["cross_up"] and close > bbi:
             signal = OrderType.BUY
             is_extreme = k < self.k_extreme_buy
-        # SELL: 死叉 + K>50 + close<BBI
-        elif kdj["cross_down"] and k > self.k_midline and close < bbi:
+        # SELL: 死叉 + close<BBI
+        elif kdj["cross_down"] and close < bbi:
             signal = OrderType.SELL
             is_extreme = k > self.k_extreme_sell
 

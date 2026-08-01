@@ -348,16 +348,23 @@ class SanQingH1Upgraded(BaseStrategy):
                     del self._trail_data[ticket]
                     return True
 
-        # (5) DI flip
+        # (5) DI flip — 加1根K线确认缓冲，防止频繁翻转
         if pdi is not None and ndi is not None and time.time() - td["entry_ts"] > 300:
-            if is_buy and ndi > pdi:
-                logger.info(f"[{self.name}] BUY DI flip ticket={ticket}")
-                del self._trail_data[ticket]
-                return True
-            elif not is_buy and pdi > ndi:
-                logger.info(f"[{self.name}] SELL DI flip ticket={ticket}")
-                del self._trail_data[ticket]
-                return True
+            di_flip_detected = (is_buy and ndi > pdi) or (not is_buy and pdi > ndi)
+            if di_flip_detected:
+                # 检查是否已在上一个tick检测到DI flip（使用当前candle计数）
+                current_candle = len(self.candles)
+                last_flip_candle = td.get("_di_flip_candle", 0)
+                if last_flip_candle == 0:
+                    # 第一次检测到DI flip，记录candle编号，等待确认
+                    td["_di_flip_candle"] = current_candle
+                    logger.info(f"[{self.name}] {side} DI flip 待确认 ticket={ticket} candle={current_candle}")
+                elif current_candle > last_flip_candle:
+                    # 下一根K线确认，真正出场
+                    logger.info(f"[{self.name}] {side} DI flip 确认出场 ticket={ticket}")
+                    del self._trail_data[ticket]
+                    return True
+                # 同一根K线内，继续等待
 
         return False
 

@@ -63,7 +63,7 @@ class M30BBDeepReturnOptimized(BaseStrategy):
         self.p_trailing_atr_bull = 1.5   # BB同向时 ATR 追踪乘数（宽一点）
         self.p_trailing_atr_bear = 1.0   # BB反向时 ATR 追踪乘数
         self.p_hard_atr = 2.0
-        self.profit_drawdown_pct = 0.30  # BB反向时 30% 利润回撤止盈
+        self.profit_drawdown_pct = 0.50  # BB反向时 50% 利润回撤止盈
 
         # Exit: BB同向时 MFI 反向阈值
         self.mfi_reversal_pct = 15.0
