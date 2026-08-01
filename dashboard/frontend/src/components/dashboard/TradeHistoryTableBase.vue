@@ -25,7 +25,7 @@ const columns = [
       const name = row.strategy || row.comment || ''
       const color = getStrategyColor(name)
       const txtColor = getStrategyTextColor(name)
-      return h(NTag, { color: { color, textColor: txtColor }, size: 'small' },
+      return h(NTag, { color: { color, textColor: txtColor }, size: 'small', style: 'font-weight: 600;' },
         { default: () => name || '-' }
       )
     }

@@ -217,7 +217,7 @@ onUnmounted(() => {
             <n-text v-if="!collapsed" class="sider-logo-text">AlgoForge</n-text>
             <n-text v-else class="sider-logo-mini">AF</n-text>
           </n-h2>
-          <n-text v-if="!collapsed" depth="3" class="sider-subtitle">AlgoForge · 量化引擎</n-text>
+          <n-text v-if="!collapsed" depth="3" class="sider-subtitle">XAUUSD 黄金量化交易系统</n-text>
         </div>
 
         <n-menu :value="route.path" :options="menuOptions" :collapsed="collapsed"
@@ -234,7 +234,7 @@ onUnmounted(() => {
             </template>
           </n-button>
           <n-breadcrumb>
-            <n-breadcrumb-item>XAUUSD 量化交易系统</n-breadcrumb-item>
+            <n-breadcrumb-item>AlgoForge - XAUUSD 黄金量化交易系统</n-breadcrumb-item>
             <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'strategies' ? '策略' : route.name === 'logs' ? '日志' : route.name === 'patrol' ? '监控' : '仪表板' }}</n-breadcrumb-item>
           </n-breadcrumb>
           <div class="header-spacer"></div>

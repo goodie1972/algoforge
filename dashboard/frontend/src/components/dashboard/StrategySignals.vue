@@ -345,7 +345,7 @@ onUnmounted(() => {
                    marginBottom: '4px', borderRadius: '4px' }">
           <template #header>
             <n-space align="center" size="small">
-              <n-tag :color="{ color: getStrategyColor(s.name) }" size="tiny" :text-color="getStrategyTextColor(s.name)">
+              <n-tag :color="{ color: getStrategyColor(s.name), textColor: getStrategyTextColor(s.name) }" size="tiny" style="font-weight: 600;">
                 {{ s.name }}
               </n-tag>
               <n-text depth="3" style="font-size: 11px;">TF:{{ s.timeframe }}</n-text>
