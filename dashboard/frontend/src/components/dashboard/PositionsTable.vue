@@ -48,7 +48,7 @@ const columns = [
       const cleanName = name.replace(/_(BUY|SELL)$/, '')
       const color = colors[name] || colors[cleanName] || getStrategyColor(cleanName) || '#808080'
       const txtColor = textColorForBg(color)
-      return h(NTag, { color: { color, textColor: txtColor }, size: 'small' },
+      return h(NTag, { color: { color, textColor: txtColor }, size: 'small', style: 'font-weight: 600;' },
         { default: () => label }
       )
     }
