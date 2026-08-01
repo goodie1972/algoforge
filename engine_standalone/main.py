@@ -1491,6 +1491,19 @@ class TradingEngine:
 
         signal_dir = "BUY" if "BUY" in signal else "SELL"
 
+        # ── 同向持仓盈亏门禁（纸面模式）：同向浮亏 > 0 时禁止加仓 ──
+        if _paper_enabled:
+            same_dir_positions = [p for p in my_positions if 
+                                  (signal_dir == "BUY" and p.order_type in ("OP_BUY", "BUY")) or
+                                  (signal_dir == "SELL" and p.order_type in ("OP_SELL", "SELL"))]
+            if same_dir_positions:
+                total_same_pnl = sum(p.profit for p in same_dir_positions if hasattr(p, 'profit') and p.profit is not None)
+                if total_same_pnl < -0.5:  # 浮亏超过 $0.5 即阻止加仓
+                    logger.info(f"[{strategy.name}] 同向盈亏门禁 {signal_dir}: 已有{len(same_dir_positions)}笔同向浮亏${total_same_pnl:.2f}，禁止加仓")
+                    return
+                elif total_same_pnl > 0:
+                    logger.info(f"[{strategy.name}] 同向盈亏门禁 {signal_dir}: 已有{len(same_dir_positions)}笔同向浮盈${total_same_pnl:.2f}，允许加仓")
+
         # ── 门禁拦截（使用顶部已计算的门禁数据） ──
         gate = gate_sell if signal_dir == "SELL" else gate_buy
         if gate["blocked"]:
