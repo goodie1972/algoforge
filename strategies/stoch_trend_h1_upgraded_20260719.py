@@ -147,6 +147,14 @@ class StochTrendH1Upgraded(BaseStrategy):
             self._pending_entry_info = {}
             return None
 
+        # 3. SteepMA 趋势过滤
+        steep_dir = self._steep_ma_direction(period=14, lookback=5)
+        if steep_dir != "NEUTRAL":
+            if (signal == OrderType.BUY and steep_dir == "DOWN") or \
+               (signal == OrderType.SELL and steep_dir == "UP"):
+                logger.info(f"[{self.name}] SteepMA 过滤: {steep_dir} 与 {signal.value} 方向冲突，拒绝")
+                return None
+
         self._pending_entry_info = {
             "direction": "BUY" if signal == OrderType.BUY else "SELL",
             "k_at_entry": k,

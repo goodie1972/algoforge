@@ -319,6 +319,31 @@ class BaseStrategy(abc.ABC):
         ma = sum(closes[-period:]) / period
         return 'UP' if closes[-1] > ma else 'DOWN'
 
+    def _steep_ma_direction(self, period: int = 14, lookback: int = 5) -> str:
+        """MA 陡峭度过滤：计算 EMA 斜率判断趋势强度
+        period: EMA 周期
+        lookback: 斜率计算跨度（K线数）
+        返回 'UP' / 'DOWN' / 'NEUTRAL'
+        """
+        closes = self.get_indicator("close_list")
+        if closes is None or len(closes) < period + lookback:
+            return 'NEUTRAL'
+        try:
+            import talib
+            import numpy as np
+            arr = np.array(closes, dtype=float)
+            ema = talib.EMA(arr, timeperiod=period)
+            if len(ema) < lookback + 1 or np.isnan(ema[-1]) or np.isnan(ema[-lookback-1]):
+                return 'NEUTRAL'
+            slope = (ema[-1] - ema[-lookback-1]) / ema[-lookback-1]
+            if slope > 0.002:  # 0.2% 斜率阈值
+                return 'UP'
+            elif slope < -0.002:
+                return 'DOWN'
+            return 'NEUTRAL'
+        except Exception:
+            return 'NEUTRAL'
+
     @staticmethod
     def calc_atr_wilder(candles: list, period: int = 14) -> Optional[float]:
         """标准 Wilder ATR。首根 SMA(TR,period)，后续 RMA 递推。

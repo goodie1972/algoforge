@@ -175,6 +175,16 @@ class SanQingH1Upgraded(BaseStrategy):
             sell_score += 2
 
         adx_str = f" ADX={adx:.1f}" if adx else ""
+
+        # ── SteepMA 趋势过滤 ──
+        steep_dir = self._steep_ma_direction(period=14, lookback=5)
+        if steep_dir == "UP":
+            buy_score += 1
+        elif steep_dir == "DOWN":
+            sell_score += 1
+        if steep_dir != "NEUTRAL":
+            logger.info(f"[{self.name}] SteepMA: {steep_dir}")
+
         logger.info(
             f"[{self.name}] 评分: BUY={buy_score} SELL={sell_score} "
             f"Price={close:.2f} EMA9={ema9:.2f} EMA21={ema21:.2f} ATR={atr_val:.2f}"
@@ -199,6 +209,8 @@ class SanQingH1Upgraded(BaseStrategy):
         if avg_vol > 0 and volume > avg_vol * 1.3: short_factors.append("HIGH-VOL")
         if body_median_ratio >= 1.5 and body / prev_body_max >= 1.5 and candle_range > 0 and body / candle_range >= 0.5:
             short_factors.append("ENGULF")
+        if steep_dir == "UP": long_factors.append("STEEP-UP")
+        elif steep_dir == "DOWN": short_factors.append("STEEP-DN")
 
         # 位置门禁（与 v7 一致）
         lookback = min(60, len(candles))
