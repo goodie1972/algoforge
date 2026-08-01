@@ -32,8 +32,8 @@ async function openFullHistory() {
   <n-space vertical size="large">
     <AccountPanel />
 
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <n-h2 style="margin:0;">持仓管理</n-h2>
+    <div class="positions-header">
+      <n-h2 class="positions-title">持仓管理</n-h2>
       <n-space size="small">
         <n-tag :bordered="false" type="success">多头 {{ store.longCount }}</n-tag>
         <n-tag :bordered="false" type="error">空头 {{ store.shortCount }}</n-tag>
@@ -51,7 +51,7 @@ async function openFullHistory() {
         <n-space size="small">
           <n-tag :bordered="false" type="info">共 {{ tradeStore.items.length }} 笔</n-tag>
           <n-button size="tiny" secondary circle type="primary" @click="openFullHistory">
-            <template #icon><span style="font-weight:bold;font-size:16px;">+</span></template>
+            <template #icon><span class="history-more-icon">+</span></template>
           </n-button>
         </n-space>
       </template>
@@ -65,3 +65,18 @@ async function openFullHistory() {
     </n-modal>
   </n-space>
 </template>
+
+<style scoped>
+.positions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.positions-title {
+  margin: 0;
+}
+.history-more-icon {
+  font-weight: bold;
+  font-size: 16px;
+}
+</style>

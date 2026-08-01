@@ -1,4 +1,74 @@
-# XAUUSD 量化交易系统 v2.0.0 — CLAUDE.md
+# XAUUSD 量化交易系统 v2.1.0 — CLAUDE.md
+
+## 项目
+
+XAUUSD 黄金自动化交易系统，基于 Python + MetaTrader 4。
+
+- **入口:** `start.py`（一键启动）或 `dashboard/backend/main.py`（仅后端）
+- **技术栈:** Python 3.10+ / FastAPI / Vue 3 + TypeScript + Vite + Naive UI / SQLite / lightweight-charts
+- **桥接:** FreeMT4Bridge EA (MQL4, TCP Socket :23232) 或 MetaApi 云端
+- **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals 表)
+- **版本:** 2.1.0 (VERSION)
+
+## Commands
+
+```bash
+# 一键启动（端口清理 + 后端 + 引擎）
+python start.py
+
+# 或直接启动后端（引擎在 lifespan 中自动启动）
+python dashboard/backend/main.py
+
+# 前端开发（独立启动）
+cd dashboard/frontend && npm run dev
+
+# 前端构建
+cd dashboard/frontend && npm run build
+
+# 环境检查
+python tools/check_setup.py
+
+# 回测
+python backtest/run_backtest.py
+
+# 纸面交易工具
+python tools/paper_trader.py
+
+# 信号分析
+python tools/signal_analysis_recorder.py
+
+# 状态监控
+python tools/status_monitor.py
+
+# 周分析报告
+python tools/weekly_analysis.py
+
+# 测试（少量现有）
+python -m pytest tests/
+```
+
+## 项目结构
+
+```
+xauusd/
+├── config/              # 配置 (settings.py, runtime_config.py)
+├── core/                # 桥接层 (bridge.py, freemt4_bridge.py, metaapi_bridge.py, paper_bridge.py)
+├── services/            # 服务层 (data_factory.py, news_filter.py, supervisor.py, mtf_coordinator.py)
+├── engine_standalone/   # 引擎主循环 (main.py, athlete.py, run.py)
+├── strategies/          # 策略文件 (base.py + 各策略实现)
+├── dashboard/           # Web 管理面板
+│   ├── backend/         #   FastAPI 后端 (main.py, routes/, engine_runner.py)
+│   └── frontend/        #   Vue 3 前端 (src/, vite.config.ts)
+├── data/                # 数据库 (market_data.db) + database.py
+├── tools/               # 独立工具 (监控/纸面/分析/信号记录)
+├── backtest/            # 回测脚本 (大量历史回测分析)
+├── docs/                # 文档 (data_factory.md, product_manual.md, strategies/)
+├── models/              # ML 模型 (xaubot)
+├── tests/               # 测试
+├── logs/                # 运行日志
+├── start.py             # 一键启动入口
+└── start.bat            # Windows 菜单启动
+```
 
 ## 三轨架构
 

@@ -25,7 +25,7 @@ async function resetAll() {
     <n-h2>系统配置</n-h2>
     <n-text depth="3">风控/连接/新闻/协调器修改后点击"保存"按钮提交，引擎将在下一个 tick 周期（约 60 秒内）自动生效；纸面交易配置变更即时生效</n-text>
 
-    <n-spin v-if="store.loading" style="padding: 40px;" />
+    <n-spin v-if="store.loading" class="config-loading" />
     <n-alert v-else-if="store.error" type="error" :title="store.error" closable />
     <template v-else>
       <n-tabs v-model:value="activeTab" type="line">
@@ -38,9 +38,6 @@ async function resetAll() {
         <n-tab-pane name="news" tab="新闻过滤">
           <NewsFilterConfig />
         </n-tab-pane>
-        <!-- <n-tab-pane name="coordinator" tab="协调器">
-          <CoordinatorConfig />
-        </n-tab-pane> -->
         <n-tab-pane name="paper" tab="纸面交易">
           <PaperConfig />
         </n-tab-pane>
@@ -52,3 +49,9 @@ async function resetAll() {
     </template>
   </n-space>
 </template>
+
+<style scoped>
+.config-loading {
+  padding: 40px;
+}
+</style>
