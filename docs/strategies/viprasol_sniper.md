@@ -1,10 +1,9 @@
----
-name: viprasol_sniper
+---name: viprasol_sniper
 magic: 661401
-version: v1
+
+type: 其他
 display: Viprasol Sniper — 7因子共识 + 多级RR出场
-desc: H1 7因子评分系统，多级RR出场（1R/2R/3R/4R/5R）
----
+desc: H1 7因子评分系统，多级RR出场（1R/2R/3R/4R/5R）---
 
 ## 评分因子
 

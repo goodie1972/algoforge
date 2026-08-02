@@ -1,10 +1,9 @@
----
-name: stoch_trend_h1
+---name: stoch_trend_h1
 magic: 661201
-version: v6
+
+type: 趋势
 display: Stoch 回调顺势策略 (v6)
-desc: H1 多周期 Stoch 回调顺势，H4→H1→M15 三层过滤
----
+desc: H1 多周期 Stoch 回调顺势，H4→H1→M15 三层过滤---
 
 ## 评分因子
 

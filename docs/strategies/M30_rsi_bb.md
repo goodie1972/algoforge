@@ -1,10 +1,9 @@
----
-name: M30_rsi_bb
+---name: M30_rsi_bb
 magic: 660707
-version: v13
+
+type: 反转
 display: M30 RSI + 布林带均值回归 — 7因子评分系统
-desc: M30 RSI+布林带均值回归，7因子评分系统，双重止盈出场
----
+desc: M30 RSI+布林带均值回归，7因子评分系统，双重止盈出场---
 
 ## 评分因子
 

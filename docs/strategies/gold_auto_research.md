@@ -1,10 +1,9 @@
----
-name: gold_auto_research
+---name: gold_auto_research
 magic: 880306
-version: v7
+
+type: ML
 display: Gold-AutoResearch — H1 实盘策略
-desc: H1 4因子共识投票策略，全部条件一致才触发信号
----
+desc: H1 4因子共识投票策略，全部条件一致才触发信号---
 
 ## 评分因子
 

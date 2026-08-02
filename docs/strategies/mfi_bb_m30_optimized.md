@@ -1,10 +1,9 @@
----
-name: mfi_bb_m30_optimized
+---name: mfi_bb_m30_optimized
 magic: 661002
-version: v6_optimized
+
+type: 反转
 display: M30 MFI + 布林带均值回归 (优化版)
-desc: MFI阈值收紧至85/15，容差降至2根K线，更高信号质量
----
+desc: MFI阈值收紧至85/15，容差降至2根K线，更高信号质量---
 
 ## 评分因子
 

@@ -1,10 +1,9 @@
----
-name: bakome_backup
+---name: bakome_backup
 magic: 777004
-version: v1
+
+type: 其他
 display: BAKOME GoldScalper 原版
-desc: ICT FVG + Order Block + Silver Bullet 时段交易（原版）
----
+desc: ICT FVG + Order Block + Silver Bullet 时段交易（原版）---
 
 ## 评分因子
 

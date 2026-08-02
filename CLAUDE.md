@@ -193,43 +193,11 @@ dt_local(ts)
 - 新增策略必须包含 `STRATEGY_VERSION`、`STRATEGY_MAGIC`、`STRATEGY_CHANGELOG`
 
 **策略说明书标准（系统展示用 — 必需遵守）：**
-- **文件名命名规则：** 必须为 `docs/strategies/{策略类名}.md`，即策略类的 `name` 属性值（如 `sanqing_h1_upgraded.md`），不能带版本号后缀
-- **每次新建/修改策略，必须同步更新此文件**，否则系统展示和 API 接口会缺失对应内容
-- **YAML frontmatter** 的 `name` 字段必须精确匹配策略类的 `name` 属性
-- **表格格式：** 入场因子表必须有且仅有 `# | 因子 | 得分 | 说明` 四列；出场逻辑表必须有且仅有 `# | 条件 | 说明` 三列
-- 文件模板：
-  ```markdown
-  ---
-  name: 策略类的 name 属性（必填，精确匹配）
-  magic: STRATEGY_MAGIC（必填）
-  version: STRATEGY_VERSION（必填）
-  display: 系统显示名
-  desc: 一句话描述（系统 UI 展示用）
-  ---
-  
-  ## 评分因子
-  
-  ### BUY（做多）
-  | # | 因子 | 得分 | 说明 |
-  |:-:|:----|:----:|:----|
-  | 1 | 因子名 | +N | 详细说明 |
-  
-  ### SELL（做空）
-  | # | 因子 | 得分 | 说明 |
-  |:-:|:----|:----:|:----|
-  | 1 | 因子名 | +N | 详细说明 |
-  
-  ## 出场逻辑
-  
-  | # | 条件 | 说明 |
-  |:-:|:----|:----|
-  | ① | 条件名 | 详细说明 |
-  
-  ## 特别规则
-  
-  - 特殊规则...
-  - 数据源: 全部指标从 DataFactory TA-Lib 读取
-  ```
+- 完整规范定义文件: `docs/strategy_doc_standard.md`，含评分型/条件型/组合型/移植策略模板
+- **文件名命名规则:** `docs/strategies/{策略类名}.md`，不能带版本号后缀
+- **YAML frontmatter** 的 `name` 字段必须精确匹配策略类的 `name` 属性，`type` 字段标记策略类型
+- **表格格式:** 入场因子表 `# | 因子 | 得分 | 说明` 四列；出场逻辑表 `# | 条件 | 说明` 三列
+- **末行必须为:** `数据源: 全部指标从 DataFactory TA-Lib 读取`
 - 系统 API `GET /api/strategies/{name}/logic` 从此文件读取并返回结构化 JSON 给前端展示
 - 新增策略三步曲：(1) 创建策略 `.py` 文件 (2) 创建 `docs/strategies/{name}.md` (3) 注册到配置
 

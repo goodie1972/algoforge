@@ -1,10 +1,9 @@
----
-name: rsi_grading_m30
+---name: rsi_grading_m30
 magic: 660902
-version: v5
+
+type: 反转
 display: M30 RSI分级评分 — MA14 + BB + ADX>28 趋势门禁
-desc: M30 RSI分级评分均值回归，ADX>28趋势门禁，EMA感知出场
----
+desc: M30 RSI分级评分均值回归，ADX>28趋势门禁，EMA感知出场---
 
 ## 评分因子
 

@@ -1,10 +1,9 @@
----
-name: bakome_backup_optimized
+---name: bakome_backup_optimized
 magic: 777006
-version: v3_optimized
+
+type: 其他
 display: BAKOME GoldScalper 优化版
-desc: ICT FVG + Order Block + Silver Bullet 时段交易 + ADX自适应出场
----
+desc: ICT FVG + Order Block + Silver Bullet 时段交易 + ADX自适应出场---
 
 ## 评分因子
 

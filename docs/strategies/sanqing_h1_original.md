@@ -1,10 +1,9 @@
----
-name: sanqing_h1_original
+---name: sanqing_h1_original
 magic: 880101
-version: v1_original
+
+type: 趋势
 display: H1 SanQing 原始版
-desc: 6因子评分(EMA/BB/RSI/ATR/成交量) + ATR追踪止损
----
+desc: 6因子评分(EMA/BB/RSI/ATR/成交量) + ATR追踪止损---
 
 ## 评分因子
 

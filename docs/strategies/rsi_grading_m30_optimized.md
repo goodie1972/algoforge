@@ -1,10 +1,9 @@
----
-name: rsi_grading_m30_optimized
+---name: rsi_grading_m30_optimized
 magic: 660903
-version: v3_optimized
+
+type: 反转
 display: M30 RSI分级评分优化版 v3_optimized — RSI+MA14+BB优化
-desc: M30 RSI分级评分优化版，恢复RSI方向反转因子，放宽阈值，ADX低阈值不提升
----
+desc: M30 RSI分级评分优化版，恢复RSI方向反转因子，放宽阈值，ADX低阈值不提升---
 
 ## 评分因子
 

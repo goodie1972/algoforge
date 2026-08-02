@@ -1,10 +1,9 @@
----
-name: mfi_bb_m30
+---name: mfi_bb_m30
 magic: 661001
-version: v5
+
+type: 反转
 display: M30 MFI + 布林带均值回归
-desc: MFI极端值+BB触轨均值回归，3根K线容差
----
+desc: MFI极端值+BB触轨均值回归，3根K线容差---
 
 ## 评分因子
 

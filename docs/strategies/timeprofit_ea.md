@@ -1,10 +1,9 @@
----
-name: timeprofit_ea
+---name: timeprofit_ea
 magic: 880202
-version: v1_original
+
+type: 趋势
 display: TimeProfit EA — H2趋势 + M5入场 + 整数关口箱体
-desc: 原始 TimeProfitEA 移植，H2趋势判断，100美金整数关口箱体交易，ATR风控
----
+desc: 原始 TimeProfitEA 移植，H2趋势判断，100美金整数关口箱体交易，ATR风控---
 
 ## 原始出处
 

@@ -1,10 +1,9 @@
----
-name: mfi_bb_m30_upgraded
+---name: mfi_bb_m30_upgraded
 magic: 661003
-version: v13_upgraded
+
+type: 反转
 display: M30 MFI + BB Upgraded v13
-desc: 超跌反弹升级版 — 收盘穿轨入场 + BB扩张同向保护 + 1.5×ATR硬止损 + 运动员回抽验证 + 顺势穿轨离场
----
+desc: 超跌反弹升级版 — 收盘穿轨入场 + BB扩张同向保护 + 1.5×ATR硬止损 + 运动员回抽验证 + 顺势穿轨离场---
 
 ## 评分因子
 

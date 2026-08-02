@@ -1,10 +1,9 @@
----
-name: sanqing_h1_upgraded
+---name: sanqing_h1_upgraded
 magic: 880108
-version: v9_upgraded
+
+type: 趋势
 display: H1 SanQing 升级版
-desc: EMA9/21趋势评分 + 运动员回抽EMA9入场 + ADX自适应出场
----
+desc: EMA9/21趋势评分 + 运动员回抽EMA9入场 + ADX自适应出场---
 
 ## 评分因子
 

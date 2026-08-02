@@ -1,10 +1,9 @@
----
-name: sanqing_original
+---name: sanqing_original
 magic: 880201
-version: v1_original
+
+type: 组合
 display: Sanqing Original — 三清 M5 4策略调度器
-desc: 原始 sanqing-ea 移植，M5 4策略优先级调度（ExpansionFollow > Pullback > TrendContinuation > PinbarReversal）
----
+desc: 原始 sanqing-ea 移植，M5 4策略优先级调度（ExpansionFollow > Pullback > TrendContinuation > PinbarReversal）---
 
 ## 原始出处
 

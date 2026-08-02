@@ -1,10 +1,9 @@
----
-name: xaubot_backup
+---name: xaubot_backup
 magic: 777005
-version: v1
+
+type: 其他
 display: xaubot-ai — XGBoost ML 后备策略
-desc: H1 XGBoost 二分类 ML 模型，80+ 技术特征，置信度阈值 0.52
----
+desc: H1 XGBoost 二分类 ML 模型，80+ 技术特征，置信度阈值 0.52---
 
 ## 评分因子
 

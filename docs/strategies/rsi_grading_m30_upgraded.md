@@ -1,10 +1,9 @@
----
-name: rsi_grading_m30_upgraded
+---name: rsi_grading_m30_upgraded
 magic: 660904
-version: v5_upgraded
+
+type: 反转
 display: M30 RSI分级评分升级版
-desc: RSI极端+2/边界+1/正常0, 固定阈值3分, BB扩张+MFI方向过滤
----
+desc: RSI极端+2/边界+1/正常0, 固定阈值3分, BB扩张+MFI方向过滤---
 
 ## 评分因子
 

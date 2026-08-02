@@ -1,10 +1,9 @@
----
-name: h1_breakout
+---name: h1_breakout
 magic: 880301
-version: v1.0
+
+type: 突破
 display: H1 突破趋势策略
-desc: H1 区间突破+ADX确认，EMA20追踪止损，6分制评分系统
----
+desc: H1 区间突破+ADX确认，EMA20追踪止损，6分制评分系统---
 
 ## 评分因子
 

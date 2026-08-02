@@ -1,10 +1,9 @@
----
-name: m30_bb_deepreturn_optimized
+---name: m30_bb_deepreturn_optimized
 magic: 661102
-version: v3_optimized
+
+type: 反转
 display: M30 BB DeepReturn 优化版
-desc: BB均值回归 + MFI确认 + 方向感知动态阈值
----
+desc: BB均值回归 + MFI确认 + 方向感知动态阈值---
 
 ## 评分因子
 

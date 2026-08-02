@@ -1,10 +1,9 @@
----
-name: sanqing_h1
+---name: sanqing_h1
 magic: 880107
-version: v7
+
+type: 趋势
 display: H1 SanQing 原版
-desc: EMA9/21趋势 + ATR14评分 + 双重止盈
----
+desc: EMA9/21趋势 + ATR14评分 + 双重止盈---
 
 ## 评分因子
 

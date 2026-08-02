@@ -1,10 +1,9 @@
----
-name: m30_vol_return
+---name: m30_vol_return
 magic: 880302
-version: v1.0
+
+type: 反转
 display: M30 波动率均值回归
-desc: M30 BB触及+ATR扩张+RSI背离，回归中轨止盈，有限 recovery
----
+desc: M30 BB触及+ATR扩张+RSI背离，回归中轨止盈，有限 recovery---
 
 ## 评分因子
 

@@ -1,10 +1,9 @@
----
-name: multi_confluence_quant
+---name: multi_confluence_quant
 magic: 661601
-version: v1
+
+type: 评分
 display: Multi-Confluence Quant — 14因子综合评分
-desc: H1 14个技术指标因子评分，≥10/14触发信号
----
+desc: H1 14个技术指标因子评分，≥10/14触发信号---
 
 ## 评分因子
 

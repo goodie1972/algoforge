@@ -1,10 +1,9 @@
----
-name: stoch_trend_h1_upgraded
+---name: stoch_trend_h1_upgraded
 magic: 661204
-version: v12_kdj_cycle
+
+type: 趋势
 display: H1 Stoch KDJ 周期策略
-desc: ADX>25 趋势过滤 + Stoch 极值反转入场 + BBI 方向确认 + 抓 KDJ 完整周期出场
----
+desc: ADX>25 趋势过滤 + Stoch 极值反转入场 + BBI 方向确认 + 抓 KDJ 完整周期出场---
 
 ## 入场（4 道闸门，必过）
 

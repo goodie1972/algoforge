@@ -1,10 +1,9 @@
----
-name: stoch_trend_h1_optimized
+---name: stoch_trend_h1_optimized
 magic: 661202
-version: v7_optimized
+
+type: 趋势
 display: Stoch 回调顺势策略 (v7_optimized)
-desc: H1 多周期 Stoch 评分系统，ADX>20，Stoch(14,3,3)
----
+desc: H1 多周期 Stoch 评分系统，ADX>20，Stoch(14,3,3)---
 
 ## 评分因子
 

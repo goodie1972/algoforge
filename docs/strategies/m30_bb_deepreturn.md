@@ -1,10 +1,9 @@
----
-name: m30_bb_deepreturn
+---name: m30_bb_deepreturn
 magic: 661101
-version: v2
+
+type: 反转
 display: M30 BB DeepReturn — 超跌反弹策略
-desc: M30 BB极值+MFI极值超跌反弹，分支出场
----
+desc: M30 BB极值+MFI极值超跌反弹，分支出场---
 
 ## 评分因子
 
