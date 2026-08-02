@@ -47,10 +47,10 @@
       "double_first": false
     },
     "entry_score_pro": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661501,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "gold_auto_research": {
@@ -201,10 +201,10 @@
       "double_first": false
     },
     "xaubot_backup": {
-      "enabled": true,
+      "enabled": false,
       "magic": 777005,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     }
   },
