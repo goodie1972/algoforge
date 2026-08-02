@@ -206,6 +206,20 @@
       "timeframe": "H1",
       "max_positions": 0,
       "double_first": false
+    },
+    "sanqing_original": {
+      "enabled": false,
+      "magic": 880201,
+      "timeframe": "M5",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "timeprofit_ea": {
+      "enabled": false,
+      "magic": 880202,
+      "timeframe": "M5",
+      "max_positions": 0,
+      "double_first": false
     }
   },
   "paper_trading": {
