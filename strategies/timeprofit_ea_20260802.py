@@ -33,6 +33,7 @@ class TimeProfitEAStrategy(BaseStrategy):
 
     name = "timeprofit_ea"
     default_timeframe = "M5"
+    TIMEFRAME = "M5"
     legacy_magics = STRATEGY_LEGACY_MAGICS
 
     # ── 趋势参数（H2 级别） ──

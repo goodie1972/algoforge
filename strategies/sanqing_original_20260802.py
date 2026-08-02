@@ -33,6 +33,7 @@ class SanqingOriginalStrategy(BaseStrategy):
 
     name = "sanqing_original"
     default_timeframe = "M5"
+    TIMEFRAME = "M5"
     legacy_magics = STRATEGY_LEGACY_MAGICS
 
     # ── 原始参数（与 caoruihua/sanqing-ea 一致） ──

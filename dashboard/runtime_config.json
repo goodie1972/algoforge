@@ -208,17 +208,17 @@
       "double_first": false
     },
     "sanqing_original": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880201,
       "timeframe": "M5",
-      "max_positions": 0,
+      "max_positions": 5,
       "double_first": false
     },
     "timeprofit_ea": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880202,
       "timeframe": "M5",
-      "max_positions": 0,
+      "max_positions": 5,
       "double_first": false
     }
   },
