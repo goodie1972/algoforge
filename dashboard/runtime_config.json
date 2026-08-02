@@ -33,17 +33,17 @@
   "max_positions": 7,
   "strategy_pool": {
     "bakome_backup": {
-      "enabled": true,
+      "enabled": false,
       "magic": 777004,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "bakome_backup_optimized": {
-      "enabled": true,
+      "enabled": false,
       "magic": 777006,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "entry_score_pro": {
@@ -54,45 +54,45 @@
       "double_first": false
     },
     "gold_auto_research": {
-      "enabled": true,
+      "enabled": false,
       "magic": 880306,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "h1_breakout": {
-      "enabled": true,
+      "enabled": false,
       "magic": 880301,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "m30_bb_deepreturn": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661101,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 5,
       "double_first": false
     },
     "m30_bb_deepreturn_optimized": {
       "enabled": true,
       "magic": 661102,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 5,
       "double_first": false
     },
     "mfi_bb_m30": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661001,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 5,
       "double_first": false
     },
     "mfi_bb_m30_optimized": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661002,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 5,
       "double_first": false
     },
     "mfi_bb_m30_upgraded": {
@@ -110,31 +110,31 @@
       "double_first": false
     },
     "m30_vol_return": {
-      "enabled": true,
+      "enabled": false,
       "magic": 880302,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "momentum_pulse_pro": {
       "enabled": true,
       "magic": 661301,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 5,
       "double_first": false
     },
     "multi_confluence_quant": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661601,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "rsi_grading_m30": {
       "enabled": true,
       "magic": 660902,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 5,
       "double_first": false
     },
     "rsi_grading_m30_optimized": {
@@ -148,7 +148,7 @@
       "enabled": true,
       "magic": 660904,
       "timeframe": "M30",
-      "max_positions": 1,
+      "max_positions": 5,
       "double_first": false
     },
     "sanqing_h1": {
@@ -159,17 +159,17 @@
       "double_first": false
     },
     "sanqing_h1_original": {
-      "enabled": true,
+      "enabled": false,
       "magic": 880101,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "sanqing_h1_upgraded": {
-      "enabled": true,
+      "enabled": false,
       "magic": 880108,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "stoch_trend_h1": {
@@ -187,10 +187,10 @@
       "double_first": false
     },
     "stoch_trend_h1_upgraded": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661204,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "viprasol_sniper": {
