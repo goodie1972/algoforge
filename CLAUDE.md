@@ -10,6 +10,16 @@ XAUUSD 黄金自动化交易系统，基于 Python + MetaTrader 4。
 - **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals 表)
 - **版本:** 2.2.0 (VERSION)
 
+## 回测系统
+
+- **脚本:** `scripts/backtest_6months.py` — 3~6个月全策略回测
+- **数据源:** 数据库 OHLCV（M15/M30/H1/H4），TA-Lib 预计算全部 26+ 指标
+- **模拟:** MockBridge（模拟 MT4 桥接），可 mock datetime.now / get_cache
+- **出场:** 通用逻辑（硬止损1.5×ATR + EMA21追踪 + BB中轨止盈 + 超时平仓）
+- **评分:** 6维度100分制（盈利30+风控25+信号质量15+效率10+稳定性10）
+- **报告:** `data/evaluation/backtest_report.json`
+- **分析文档:** `docs/strategy_analysis.md` — 策略分类+组合建议+收益率分析
+
 ## Commands
 
 ```bash
@@ -27,6 +37,12 @@ cd dashboard/frontend && npm run build
 
 # 环境检查
 python tools/check_setup.py
+
+# 全策略回测
+python scripts/backtest_6months.py --months=3
+
+# 查看回测报告
+python -c "import json; r=json.load(open('data/evaluation/backtest_report.json')); [print(f'{x[\"grade\"]} {x[\"name\"]:30} PnL=\${x[\"total_pnl\"]:>+7.2f} WR={x[\"win_rate\"]:>5.1f}% PF={x[\"profit_factor\"]:>.2f}') for x in r['results']]"
 
 # 回测
 python backtest/run_backtest.py
