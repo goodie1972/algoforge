@@ -163,6 +163,19 @@ STRATEGY_POOL = {
         "double_first": False,
         "max_positions": 1,
     },
+    # === 移植原始策略 (来自 GitHub caoruihua/sanqing-ea) ===
+    "sanqing_original": {
+        "magic": 880201,
+        "timeframe": "M5",
+        "double_first": False,
+        "max_positions": 5,
+    },
+    "timeprofit_ea": {
+        "magic": 880202,
+        "timeframe": "M5",
+        "double_first": False,
+        "max_positions": 5,
+    },
 }
 
 # 全局最大持仓 = 策略数量 × 1.5 四舍五入

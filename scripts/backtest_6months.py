@@ -62,7 +62,7 @@ class MockBridge(MT4BridgeBase):
 def load_data(start_ts, end_ts):
     conn = get_conn()
     data = {}
-    for tf in ["M15", "M30", "H1", "H4"]:
+    for tf in ["M5", "M15", "M30", "H1", "H4"]:
         rows = conn.execute(
             "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
             "WHERE timeframe=? AND timestamp>=? AND timestamp<=? ORDER BY timestamp",
@@ -87,6 +87,8 @@ def load_data(start_ts, end_ts):
         bbu, bbm, bbl = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2)
         ema9 = talib.EMA(closes, timeperiod=9)
         ema21 = talib.EMA(closes, timeperiod=21)
+        ema120 = talib.EMA(closes, timeperiod=120)
+        ema300 = talib.EMA(closes, timeperiod=300)
         sma14 = talib.SMA(closes, timeperiod=14)
         sma20 = talib.SMA(closes, timeperiod=20)
         sma50 = talib.SMA(closes, timeperiod=50)
@@ -117,6 +119,8 @@ def load_data(start_ts, end_ts):
                 "bb_width": float(bb_width[i]) if not np.isnan(bb_width[i]) else None,
                 "ema_9": float(ema9[i]) if not np.isnan(ema9[i]) else None,
                 "ema_21": float(ema21[i]) if not np.isnan(ema21[i]) else None,
+                "ema_120": float(ema120[i]) if not np.isnan(ema120[i]) else None,
+                "ema_300": float(ema300[i]) if not np.isnan(ema300[i]) else None,
                 "sma_14": float(sma14[i]) if not np.isnan(sma14[i]) else None,
                 "sma_20": float(sma20[i]) if not np.isnan(sma20[i]) else None,
                 "sma_50": float(sma50[i]) if not np.isnan(sma50[i]) else None,
@@ -225,7 +229,7 @@ def simulate_exit(trade, close, high, low, atr_val, ema21, bb_mid, current_time)
 def run_backtest(strategies, start_ts, end_ts):
     print(f"Loading data...")
     data = load_data(start_ts, end_ts)
-    for tf in ["M15", "M30", "H1", "H4"]:
+    for tf in ["M5", "M15", "M30", "H1", "H4"]:
         print(f"  {tf}: {len(data.get(tf, {}).get('candles', []))} bars")
 
     results = []
@@ -258,7 +262,7 @@ def run_backtest(strategies, start_ts, end_ts):
         n = len(candles)
 
         bridge = MockBridge()
-        for t in ["M15", "M30", "H1", "H4"]:
+        for t in ["M5", "M15", "M30", "H1", "H4"]:
             bridge.set_candles(t, data[t]["candles"])
 
         try:
