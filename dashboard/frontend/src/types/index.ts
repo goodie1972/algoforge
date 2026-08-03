@@ -47,6 +47,7 @@ export interface LogEntry {
   level: string
   name: string
   message: string
+  _id?: number
 }
 
 export interface EngineStatus {
