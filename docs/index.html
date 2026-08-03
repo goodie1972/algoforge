@@ -3,255 +3,624 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="AlgoForge — XAUUSD 黄金量化交易系统。基于 Python + MetaTrader 4 的多策略自动化交易平台。">
+  <meta name="description" content="AlgoForge — XAUUSD 黄金量化交易系统。多策略并行、三层风控、实时 Web 监控的专业黄金自动化交易平台。">
+  <meta name="keywords" content="XAUUSD,黄金,量化交易,自动化交易,算法交易,Python,MT4,外汇">
+  <meta property="og:title" content="AlgoForge — XAUUSD 黄金量化交易系统">
+  <meta property="og:description" content="多策略并行、三层风控、实时 Web 监控的专业黄金自动化交易平台">
+  <meta property="og:image" content="https://goodie1972.github.io/algoforge/assets/logo.svg">
+  <meta property="og:type" content="website">
   <title>AlgoForge — XAUUSD 黄金量化交易系统</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* ========== Reset & Base ========== */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
-      font-family: 'Outfit', -apple-system, sans-serif;
-      background: #0d1117;
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0d14;
       color: #e6edf3;
       line-height: 1.6;
+      overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
+    ::selection { background: rgba(240, 185, 11, 0.3); color: #fff; }
+
+    /* ========== Noise ========== */
     .noise {
-      position: fixed;
-      inset: 0;
-      opacity: 0.03;
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.025;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 0;
     }
-    .container { max-width: 960px; margin: 0 auto; padding: 60px 24px; position: relative; z-index: 1; }
 
-    /* Hero */
-    .hero { text-align: center; padding: 80px 0 60px; }
-    .hero-logo { width: 100px; height: 100px; margin-bottom: 24px; }
-    .hero h1 {
-      font-size: 48px; font-weight: 800;
+    /* ========== Grid BG ========== */
+    .grid-bg {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(240,185,11,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(240,185,11,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ========== Container ========== */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* ========== Nav ========== */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 0;
+      background: rgba(10, 13, 20, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(240,185,11,0.06);
+    }
+    nav .container { display: flex; align-items: center; justify-content: space-between; }
+    nav .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    nav .logo img { width: 32px; height: 32px; }
+    nav .logo span {
+      font-size: 18px; font-weight: 700;
       background: linear-gradient(135deg, #f0b90b, #d4a309);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-    .hero .subtitle { font-size: 20px; color: #8b949e; margin-top: 8px; font-weight: 300; }
-    .hero .tagline { font-size: 15px; color: #6e7681; margin-top: 16px; max-width: 600px; margin-left: auto; margin-right: auto; }
-
-    /* Badges */
-    .badges { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 24px; }
-    .badge {
+    nav .nav-links { display: flex; gap: 24px; align-items: center; }
+    nav .nav-links a {
+      color: #8b949e; text-decoration: none; font-size: 14px; font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav .nav-links a:hover { color: #f0b90b; }
+    .nav-gh-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 14px; border-radius: 20px;
+      padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      background: rgba(240,185,11,0.1); color: #f0b90b;
+      border: 1px solid rgba(240,185,11,0.2);
+      text-decoration: none; transition: all 0.2s;
+    }
+    .nav-gh-btn:hover { background: rgba(240,185,11,0.15); transform: translateY(-1px); }
+
+    /* ========== Hero ========== */
+    .hero {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 100px 0 60px;
+      position: relative;
+    }
+    .hero-glow {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle at center, rgba(240,185,11,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; }
+    .hero-logo {
+      width: 100px; height: 100px; margin-bottom: 24px;
+      animation: float 6s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .hero h1 {
+      font-size: 56px; font-weight: 900; line-height: 1.1;
+      background: linear-gradient(135deg, #f0b90b 0%, #d4a309 40%, #f0b90b 70%, #b8860b 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      animation: shimmer 4s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { background-position: 0% center; }
+      50% { background-position: 200% center; }
+    }
+    .hero .subtitle {
+      font-size: 22px; color: #8b949e; font-weight: 300; margin-top: 12px;
+    }
+    .hero .tagline {
+      font-size: 16px; color: #6e7681; margin-top: 20px; max-width: 600px; margin-left: auto; margin-right: auto;
+    }
+    .hero-badges { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 28px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 16px; border-radius: 20px;
       font-size: 13px; font-weight: 500;
-      background: rgba(240, 185, 11, 0.1); color: #f0b90b;
-      border: 1px solid rgba(240, 185, 11, 0.2);
+      background: rgba(240,185,11,0.08); color: #f0b90b;
+      border: 1px solid rgba(240,185,11,0.15);
+      transition: all 0.2s;
     }
+    .hero-badge:hover { background: rgba(240,185,11,0.12); transform: translateY(-1px); }
+    .hero-actions { margin-top: 36px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: 10px;
+      font-size: 15px; font-weight: 600;
+      background: linear-gradient(135deg, #f0b90b, #d4a309);
+      color: #0a0d14; text-decoration: none;
+      transition: all 0.2s; box-shadow: 0 4px 16px rgba(240,185,11,0.2);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(240,185,11,0.3); }
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: 10px;
+      font-size: 15px; font-weight: 600;
+      background: rgba(240,185,11,0.08); color: #f0b90b;
+      border: 1px solid rgba(240,185,11,0.2); text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(240,185,11,0.12); transform: translateY(-2px); }
 
-    /* Sections */
-    section { margin-top: 60px; }
+    .scroll-indicator {
+      position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 8px; color: #484f58;
+      font-size: 12px; animation: bounce 2s infinite;
+    }
+    .scroll-indicator .arrow { width: 20px; height: 20px; border-right: 2px solid #484f58; border-bottom: 2px solid #484f58; transform: rotate(45deg); }
+    @keyframes bounce { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(8px); } }
+
+    /* ========== Section Common ========== */
+    section { padding: 80px 0; }
+    .section-label {
+      font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+      color: #f0b90b; margin-bottom: 8px;
+    }
     section h2 {
-      font-size: 24px; font-weight: 700; color: #f0b90b;
-      margin-bottom: 24px; padding-bottom: 8px;
-      border-bottom: 1px solid rgba(240, 185, 11, 0.15);
+      font-size: 36px; font-weight: 800; color: #f0f6fc; margin-bottom: 16px;
     }
+    .section-desc { font-size: 16px; color: #8b949e; max-width: 600px; margin-bottom: 48px; }
 
-    /* Cards */
-    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-    .card {
+    /* ========== Features ========== */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .feature-card {
       background: linear-gradient(135deg, #161b22, #1c2333);
-      border: 1px solid rgba(240, 185, 11, 0.08);
-      border-radius: 12px; padding: 24px;
-      transition: transform 0.2s, box-shadow 0.2s;
+      border: 1px solid rgba(240,185,11,0.06);
+      border-radius: 16px; padding: 32px;
+      transition: all 0.3s; position: relative; overflow: hidden;
     }
-    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-    .card h3 { font-size: 16px; font-weight: 600; color: #f0b90b; margin-bottom: 8px; }
-    .card p { font-size: 14px; color: #8b949e; }
+    .feature-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #f0b90b, transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .feature-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.3); border-color: rgba(240,185,11,0.15); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; margin-bottom: 16px;
+      background: rgba(240,185,11,0.1);
+    }
+    .feature-card h3 { font-size: 18px; font-weight: 700; color: #f0f6fc; margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: #8b949e; line-height: 1.7; }
 
-    /* Arch */
-    .arch { background: #161b22; border: 1px solid rgba(240,185,11,0.08); border-radius: 12px; padding: 24px; overflow-x: auto; }
-    .arch pre { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #8b949e; line-height: 1.7; }
-    .arch .hl { color: #f0b90b; }
+    /* ========== Screenshots Carousel ========== */
+    .carousel-section { background: #0d1117; }
+    .carousel {
+      position: relative; border-radius: 16px; overflow: hidden;
+      border: 1px solid rgba(240,185,11,0.08);
+      background: #0a0d14;
+    }
+    .carousel-track {
+      display: flex; transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94); width: 100%;
+    }
+    .carousel-slide { min-width: 100%; position: relative; }
+    .carousel-slide img {
+      width: 100%; display: block; border-radius: 16px;
+    }
+    .carousel-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 20px 24px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.85));
+      color: #fff; font-size: 16px; font-weight: 600;
+    }
+    .carousel-label small { font-weight: 400; font-size: 13px; color: #8b949e; margin-left: 8px; }
+    .carousel-nav {
+      display: flex; justify-content: center; gap: 10px; margin-top: 20px;
+    }
+    .carousel-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #21262d; border: none; cursor: pointer;
+      transition: all 0.3s;
+    }
+    .carousel-dot.active { background: #f0b90b; width: 28px; border-radius: 5px; }
+    .carousel-btn {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(10,13,20,0.7); color: #fff;
+      border: 1px solid rgba(240,185,11,0.15);
+      cursor: pointer; font-size: 18px; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; backdrop-filter: blur(4px);
+    }
+    .carousel-btn:hover { background: rgba(240,185,11,0.15); }
+    .carousel-btn.prev { left: 12px; }
+    .carousel-btn.next { right: 12px; }
 
-    /* Table */
+    /* ========== Architecture ========== */
+    .arch-wrapper {
+      background: #161b22; border: 1px solid rgba(240,185,11,0.06);
+      border-radius: 16px; padding: 32px; overflow-x: auto;
+    }
+    .arch-wrapper pre {
+      font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.8;
+      color: #8b949e;
+    }
+    .arch-wrapper .hl { color: #f0b90b; font-weight: 600; }
+    .arch-wrapper .hl2 { color: #3fb950; }
+    .arch-wrapper .hl3 { color: #58a6ff; }
+
+    /* ========== Strategy Table ========== */
+    .table-wrapper {
+      background: #161b22; border: 1px solid rgba(240,185,11,0.06);
+      border-radius: 16px; overflow: hidden;
+    }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { text-align: left; padding: 10px 12px; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
-    td { padding: 10px 12px; border-bottom: 1px solid #21262d; }
-    .status-on { color: #3fb950; }
-    .status-off { color: #f85149; }
-
-    /* Footer */
-    footer { text-align: center; padding: 40px 0; color: #484f58; font-size: 13px; margin-top: 60px; border-top: 1px solid #21262d; }
-    footer a { color: #8b949e; text-decoration: none; }
-    footer a:hover { color: #f0b90b; }
-
-    @media (max-width: 640px) {
-      .hero h1 { font-size: 32px; }
-      .hero { padding: 40px 0; }
-      .container { padding: 32px 16px; }
+    th {
+      text-align: left; padding: 14px 16px; color: #8b949e; font-weight: 500;
+      border-bottom: 1px solid #21262d; background: rgba(240,185,11,0.03);
     }
+    td { padding: 12px 16px; border-bottom: 1px solid #21262d; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: rgba(240,185,11,0.02); }
+    .status-on { color: #3fb950; }
+    .tag {
+      display: inline-block; padding: 2px 10px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; background: rgba(240,185,11,0.1); color: #f0b90b;
+    }
+    .tag-reversal { background: rgba(63,185,80,0.1); color: #3fb950; }
+    .tag-trend { background: rgba(88,166,255,0.1); color: #58a6ff; }
+    .tag-score { background: rgba(240,185,11,0.1); color: #f0b90b; }
+
+    /* ========== Metrics ========== */
+    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .metric-card {
+      background: #161b22; border: 1px solid rgba(240,185,11,0.06);
+      border-radius: 12px; padding: 24px; text-align: center;
+    }
+    .metric-value { font-size: 36px; font-weight: 800; color: #f0b90b; }
+    .metric-label { font-size: 13px; color: #6e7681; margin-top: 4px; }
+
+    /* ========== CTA ========== */
+    .cta-section {
+      text-align: center; padding: 100px 0;
+      position: relative; overflow: hidden;
+    }
+    .cta-glow {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(240,185,11,0.1) 0%, transparent 70%);
+    }
+    .cta-section h2 { font-size: 40px; }
+    .cta-section p { color: #8b949e; font-size: 16px; margin: 16px 0 32px; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+    /* ========== Footer ========== */
+    footer {
+      text-align: center; padding: 40px 0; border-top: 1px solid #21262d;
+      position: relative; z-index: 1;
+    }
+    footer p { color: #484f58; font-size: 13px; }
+    footer a { color: #6e7681; text-decoration: none; transition: color 0.2s; }
+    footer a:hover { color: #f0b90b; }
+    footer .footer-links { display: flex; gap: 20px; justify-content: center; margin-top: 8px; }
+
+    /* ========== Responsive ========== */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 32px; }
+      .hero { min-height: auto; padding: 80px 0 40px; }
+      section { padding: 50px 0; }
+      section h2 { font-size: 26px; }
+      .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      .features-grid { grid-template-columns: 1fr; }
+      nav .nav-links a:not(.nav-gh-btn) { display: none; }
+      .carousel-btn { display: none; }
+      .metric-value { font-size: 28px; }
+    }
+
+    /* ========== Animations ========== */
+    .fade-in {
+      opacity: 0; transform: translateY(30px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+    .fade-in-delay-1 { transition-delay: 0.1s; }
+    .fade-in-delay-2 { transition-delay: 0.2s; }
+    .fade-in-delay-3 { transition-delay: 0.3s; }
+    .fade-in-delay-4 { transition-delay: 0.4s; }
   </style>
 </head>
 <body>
   <div class="noise"></div>
-  <div class="container">
+  <div class="grid-bg"></div>
 
-    <!-- Hero -->
-    <div class="hero">
-      <img src="assets/logo.svg" alt="AlgoForge" class="hero-logo">
-      <h1>AlgoForge</h1>
-      <div class="subtitle">XAUUSD 黄金量化交易系统</div>
-      <div class="tagline">Algorithmic + Forge = 算法锻造工坊 — 多策略并行、多层风控、实时 Web 监控的黄金自动化交易平台</div>
-      <div class="badges">
-        <span class="badge">Python 3.10+</span>
-        <span class="badge">FastAPI</span>
-        <span class="badge">Vue 3</span>
-        <span class="badge">MetaTrader 4</span>
-        <span class="badge">SQLite</span>
-        <span class="badge">v2.3.0</span>
+  <!-- ===== Nav ===== -->
+  <nav>
+    <div class="container">
+      <a href="#" class="logo">
+        <img src="assets/logo.svg" alt="AlgoForge">
+        <span>AlgoForge</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">特性</a>
+        <a href="#screenshots">界面</a>
+        <a href="#architecture">架构</a>
+        <a href="#strategies">策略</a>
+        <a href="https://github.com/goodie1972/algoforge" class="nav-gh-btn" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
       </div>
     </div>
+  </nav>
 
-    <!-- 核心特性 -->
-    <section>
-      <h2>⚡ 核心特性</h2>
-      <div class="card-grid">
-        <div class="card">
+  <!-- ===== Hero ===== -->
+  <section class="hero" id="top">
+    <div class="hero-glow"></div>
+    <div class="hero-content container">
+      <img src="assets/logo.svg" alt="AlgoForge" class="hero-logo">
+      <h1>AlgoForge</h1>
+      <p class="subtitle">XAUUSD 黄金量化交易系统</p>
+      <p class="tagline">Algorithmic + Forge = 算法锻造工坊 — 多策略并行、三层风控、实时 Web 监控<br>的黄金自动化交易平台</p>
+      <div class="hero-badges">
+        <span class="hero-badge">Python 3.10+</span>
+        <span class="hero-badge">FastAPI</span>
+        <span class="hero-badge">Vue 3</span>
+        <span class="hero-badge">MetaTrader 4</span>
+        <span class="hero-badge">SQLite</span>
+        <span class="hero-badge">v2.3.0</span>
+      </div>
+      <div class="hero-actions">
+        <a href="#screenshots" class="btn-primary">预览界面</a>
+        <a href="https://github.com/goodie1972/algoforge" class="btn-secondary" target="_blank">查看源码</a>
+      </div>
+    </div>
+    <div class="scroll-indicator">
+      <span>向下滚动</span>
+      <div class="arrow"></div>
+    </div>
+  </section>
+
+  <!-- ===== Metrics ===== -->
+  <section style="padding:0 0 60px">
+    <div class="container">
+      <div class="metrics-grid fade-in">
+        <div class="metric-card">
+          <div class="metric-value">25+</div>
+          <div class="metric-label">内置策略</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">7</div>
+          <div class="metric-label">在线运行</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">26</div>
+          <div class="metric-label">TA-Lib 指标</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">M5→H4</div>
+          <div class="metric-label">多周期覆盖</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Features ===== -->
+  <section id="features">
+    <div class="container">
+      <div class="section-label">Features</div>
+      <h2 class="fade-in">核心特性</h2>
+      <p class="section-desc fade-in">从数据采集到策略执行，从风控到监控，全链路覆盖</p>
+      <div class="features-grid">
+        <div class="feature-card fade-in fade-in-delay-1">
+          <div class="feature-icon">⚡</div>
           <h3>多策略并行</h3>
-          <p>25+ 个策略同时运行，独立 Magic Number 和风控状态。自动扫描发现新策略，零配置注册。</p>
+          <p>25+ 个策略同时运行，独立 Magic Number 和风控状态。自动扫描 <code>strategies/</code> 目录发现新策略，零配置注册。</p>
         </div>
-        <div class="card">
+        <div class="feature-card fade-in fade-in-delay-2">
+          <div class="feature-icon">🏗️</div>
           <h3>三轨架构</h3>
-          <p>DataFactory（数据）→ 策略员（信号）→ Athlete（开仓），三层分离，职责清晰。</p>
+          <p>DataFactory（数据采集+指标计算）→ 策略员（信号评分）→ Athlete（tick 验证开仓），三层分离，职责清晰。</p>
         </div>
-        <div class="card">
+        <div class="feature-card fade-in fade-in-delay-3">
+          <div class="feature-icon">🛡️</div>
           <h3>完整风控</h3>
-          <p>利润回撤止盈 + ATR 移动止盈 + ATR 硬止损。GateManager / RiskManager / TradeManager 多层防护。</p>
+          <p>利润回撤止盈 + ATR 移动止盈 + ATR 硬止损。GateManager / RiskManager / TradeManager 三层防护体系。</p>
         </div>
-        <div class="card">
+        <div class="feature-card fade-in fade-in-delay-1">
+          <div class="feature-icon">📊</div>
           <h3>数据驱动</h3>
-          <p>DataFactory 统一计算 26 个 TA-Lib 指标，F043 MT4 值优先，跨策略共享缓存。</p>
+          <p>DataFactory 统一计算 26 个 TA-Lib 指标，F043 MT4 值优先，跨策略共享缓存，零冗余计算。</p>
         </div>
-        <div class="card">
+        <div class="feature-card fade-in fade-in-delay-2">
+          <div class="feature-icon">📝</div>
           <h3>纸面测试</h3>
-          <p>信号全量模拟入场 + 出场，按策略规则模拟平仓，真实成交价计算盈亏。</p>
+          <p>信号全量模拟入场 + 出场，按策略规则模拟平仓，真实成交价计算盈亏，策略上线前充分验证。</p>
         </div>
-        <div class="card">
+        <div class="feature-card fade-in fade-in-delay-3">
+          <div class="feature-icon">🔄</div>
           <h3>自修复监控</h3>
-          <p>5 分钟自动检查引擎状态，崩溃 / 桥接断连自动重启，实时 Web 仪表盘。</p>
+          <p>5 分钟自动检查引擎状态，崩溃 / 桥接断连自动重启，实时 WebSocket 推送，日志全量追踪。</p>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 架构 -->
-    <section>
-      <h2>🏗️ 架构总览</h2>
-      <div class="arch">
+  <!-- ===== Screenshots ===== -->
+  <section id="screenshots" class="carousel-section">
+    <div class="container">
+      <div class="section-label">Screenshots</div>
+      <h2 class="fade-in">界面预览</h2>
+      <p class="section-desc fade-in">实时 Web 监控仪表盘，仓位管理、策略中心、历史成交一目了然</p>
+      <div class="carousel fade-in" id="carousel">
+        <div class="carousel-track" id="carouselTrack">
+          <div class="carousel-slide">
+            <img src="assets/screenshot_dashboard.png" alt="仪表盘">
+            <div class="carousel-label">仪表盘 <small>引擎状态、账户概览、实时信号</small></div>
+          </div>
+          <div class="carousel-slide">
+            <img src="assets/screenshot_strategy.png" alt="策略中心">
+            <div class="carousel-label">策略中心 <small>策略管理、开关控制、Magic 配置</small></div>
+          </div>
+          <div class="carousel-slide">
+            <img src="assets/screenshot_positions.png" alt="持仓管理">
+            <div class="carousel-label">持仓管理 <small>实时持仓、手动平仓、盈亏统计</small></div>
+          </div>
+          <div class="carousel-slide">
+            <img src="assets/screenshot_trades.png" alt="历史成交">
+            <div class="carousel-label">历史成交 <small>成交记录、盈亏分析、过滤搜索</small></div>
+          </div>
+          <div class="carousel-slide">
+            <img src="assets/screenshot_logs.png" alt="系统日志">
+            <div class="carousel-label">系统日志 <small>全链路日志追踪、实时过滤</small></div>
+          </div>
+        </div>
+        <button class="carousel-btn prev" id="carouselPrev">‹</button>
+        <button class="carousel-btn next" id="carouselNext">›</button>
+      </div>
+      <div class="carousel-nav" id="carouselNav">
+        <button class="carousel-dot active" data-index="0"></button>
+        <button class="carousel-dot" data-index="1"></button>
+        <button class="carousel-dot" data-index="2"></button>
+        <button class="carousel-dot" data-index="3"></button>
+        <button class="carousel-dot" data-index="4"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Architecture ===== -->
+  <section id="architecture">
+    <div class="container">
+      <div class="section-label">Architecture</div>
+      <h2 class="fade-in">系统架构</h2>
+      <p class="section-desc fade-in">MT4 + Python 引擎 + Vue 前端，三轨分离，职责清晰</p>
+      <div class="arch-wrapper fade-in">
 <pre>
-┌──────────────────────────────────────────────────┐
-│         MT4 + FreeMT4Bridge EA (:23232)           │
-└──────────────────────┬───────────────────────────┘
-                       │
-┌──────────────────────▼───────────────────────────┐
-│                core/bridge.py                      │
-│             桥接抽象层 (MT4 ⇄ Python)              │
-└──────────────────────┬───────────────────────────┘
-                       │
-┌──────────────────────▼───────────────────────────┐
-│           TradingEngine <span class="hl">三轨架构</span>                 │
-│  ┌────────────────────────────────────────────┐   │
-│  │ <span class="hl">轨1:</span> DataFactory (独立线程)              │   │
-│  │     → 增量拉取 K 线 → 26 个 TA-Lib 指标     │   │
-│  ├────────────────────────────────────────────┤   │
-│  │ <span class="hl">轨2:</span> 策略员 (主循环)                        │   │
-│  │     → get_indicator() 读缓存 → 评分出门票    │   │
-│  ├────────────────────────────────────────────┤   │
-│  │ <span class="hl">轨3:</span> Athlete (tick 验证层)                 │   │
-│  │     → _verify_entry 实时重算 → 10秒过期     │   │
-│  └────────────────────────────────────────────┘   │
-└──────────────────────┬───────────────────────────┘
-                       │
-┌──────────────────────▼───────────────────────────┐
-│           Dashboard (Web 监控)                     │
-│  ┌──────────────┐  ┌────────────────────────┐    │
-│  │ FastAPI :1783 │  │  Vue 3 + Naive UI     │    │
-│  │              │  │  lightweight-charts    │    │
-│  └──────────────┘  └────────────────────────┘    │
-└──────────────────────────────────────────────────┘</pre>
+┌──────────────────────────────────────────────────────────────────┐
+│              <span class="hl">MT4 + FreeMT4Bridge EA</span>  (TCP Socket :23232)           │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────────────┐
+│                     <span class="hl2">core/bridge.py</span>                                   │
+│                  桥接抽象层 (MT4 ⇄ Python)                        │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────────────┐
+│                    <span class="hl">TradingEngine (三轨架构)</span>                          │
+│  ┌───────────────────────────────────────────────────────────┐   │
+│  │ <span class="hl">轨1:</span> <span class="hl2">DataFactory</span> (独立线程)                              │   │
+│  │     → 增量拉取 K 线 → 26 个 TA-Lib 指标统一计算              │   │
+│  │     → F043 MT4 值优先，本地计算回退                          │   │
+│  ├───────────────────────────────────────────────────────────┤   │
+│  │ <span class="hl">轨2:</span> <span class="hl2">策略员</span> (主循环)                                      │   │
+│  │     → get_indicator() 读缓存 → 评分出门票                   │   │
+│  │     → 25+ 策略并行，独立风控状态                            │   │
+│  ├───────────────────────────────────────────────────────────┤   │
+│  │ <span class="hl">轨3:</span> <span class="hl2">Athlete</span> (tick 验证层)                               │   │
+│  │     → _verify_entry 实时重算入场条件 → 10 秒过期作废         │   │
+│  │     → 三层退出：利润回撤止盈 / ATR 移动止盈 / ATR 硬止损    │   │
+│  └───────────────────────────────────────────────────────────┘   │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────────────┐
+│                    <span class="hl3">Dashboard (Web 监控)</span>                             │
+│  ┌──────────────────────┐  ┌──────────────────────────────────┐  │
+│  │ <span class="hl3">FastAPI</span> :1783         │  │  <span class="hl3">Vue 3 + Naive UI</span>               │  │
+│  │ REST API + WebSocket  │  │  lightweight-charts 图表        │  │
+│  │ SQLite 数据库         │  │  实时信号 / 持仓 / 策略管理     │  │
+│  └──────────────────────┘  └──────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+
+           <span class="hl2">Data Flow:</span>  MT4 → Bridge → DataFactory → 策略员 → Athlete → 开仓</pre>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 在线策略 -->
-    <section>
-      <h2>📊 当前策略组合</h2>
-      <table>
-        <thead>
-          <tr><th>策略</th><th>类型</th><th>周期</th><th>Magic</th><th>状态</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>mfi_bb_m30_optimized</td><td>反转</td><td>M30</td><td>661002</td><td class="status-on">● 运行中</td></tr>
-          <tr><td>rsi_grading_m30_upgraded</td><td>评分</td><td>M30</td><td>660903</td><td class="status-on">● 运行中</td></tr>
-          <tr><td>m30_bb_deepreturn</td><td>反转</td><td>M30</td><td>661100</td><td class="status-on">● 运行中</td></tr>
-          <tr><td>mfi_bb_m30</td><td>反转</td><td>M30</td><td>661000</td><td class="status-on">● 运行中</td></tr>
-          <tr><td>m30_bb_deepreturn_optimized</td><td>反转</td><td>M30</td><td>661102</td><td class="status-on">● 运行中</td></tr>
-          <tr><td>momentum_pulse_pro</td><td>趋势</td><td>M30</td><td>880101</td><td class="status-on">● 运行中</td></tr>
-          <tr><td>rsi_grading_m30</td><td>评分</td><td>M30</td><td>660900</td><td class="status-on">● 运行中</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- 快速开始 -->
-    <section>
-      <h2>🚀 快速开始</h2>
-      <div class="card-grid">
-        <div class="card">
-          <h3>前置条件</h3>
-          <p>Python 3.10+ · MetaTrader 4（已登录 XAUUSD）· FreeMT4Bridge EA 加载到 M5 图表 · Node.js 18+</p>
-        </div>
-        <div class="card">
-          <h3>一键启动</h3>
-          <p><code style="background:#21262d;padding:2px 8px;border-radius:4px;color:#f0b90b;">python start.py</code></p>
-          <p style="margin-top:8px;">或 <code style="background:#21262d;padding:2px 8px;border-radius:4px;color:#f0b90b;">python dashboard/backend/main.py</code></p>
-        </div>
-        <div class="card">
-          <h3>访问监控</h3>
-          <p><a href="http://localhost:1783" style="color:#f0b90b;">http://localhost:1783</a></p>
-        </div>
+  <!-- ===== Strategies ===== -->
+  <section id="strategies">
+    <div class="container">
+      <div class="section-label">Strategies</div>
+      <h2 class="fade-in">当前策略组合</h2>
+      <p class="section-desc fade-in">基于回测数据筛选的 7 个盈利策略，覆盖趋势、反转、评分三种类型</p>
+      <div class="table-wrapper fade-in">
+        <table>
+          <thead>
+            <tr><th>策略</th><th>类型</th><th>周期</th><th>Magic</th><th>3月盈亏</th><th>胜率</th><th>状态</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>m30_bb_deepreturn</td><td><span class="tag tag-reversal">反转</span></td><td>M30</td><td>661100</td><td>+$213.95</td><td>54.6%</td><td class="status-on">● 运行中</td></tr>
+            <tr><td>mfi_bb_m30</td><td><span class="tag tag-reversal">反转</span></td><td>M30</td><td>661000</td><td>+$198.33</td><td>54.2%</td><td class="status-on">● 运行中</td></tr>
+            <tr><td>rsi_grading_m30_upgraded</td><td><span class="tag tag-score">评分</span></td><td>M30</td><td>660903</td><td>+$117.79</td><td>54.5%</td><td class="status-on">● 运行中</td></tr>
+            <tr><td>m30_bb_deepreturn_optimized</td><td><span class="tag tag-reversal">反转</span></td><td>M30</td><td>661102</td><td>+$92.80</td><td>51.0%</td><td class="status-on">● 运行中</td></tr>
+            <tr><td>rsi_grading_m30</td><td><span class="tag tag-score">评分</span></td><td>M30</td><td>660900</td><td>+$72.37</td><td>46.4%</td><td class="status-on">● 运行中</td></tr>
+            <tr><td>mfi_bb_m30_optimized</td><td><span class="tag tag-reversal">反转</span></td><td>M30</td><td>661002</td><td>+$66.60</td><td>57.6%</td><td class="status-on">● 运行中</td></tr>
+            <tr><td>momentum_pulse_pro</td><td><span class="tag tag-trend">趋势</span></td><td>M30</td><td>880101</td><td>+$63.83</td><td>53.9%</td><td class="status-on">● 运行中</td></tr>
+          </tbody>
+        </table>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 技术栈 -->
-    <section>
-      <h2>🔧 技术栈</h2>
-      <table>
-        <thead>
-          <tr><th>层级</th><th>技术</th><th>用途</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>桥接</td><td>FreeMT4Bridge EA (MQL4)</td><td>TCP Socket 通信</td></tr>
-          <tr><td>引擎</td><td>Python 3.10+</td><td>策略执行、风控、订单管理</td></tr>
-          <tr><td>后端</td><td>FastAPI + WebSocket</td><td>REST API、实时数据推送</td></tr>
-          <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>监控仪表盘</td></tr>
-          <tr><td>UI</td><td>Naive UI</td><td>组件库</td></tr>
-          <tr><td>图表</td><td>lightweight-charts</td><td>K 线展示</td></tr>
-          <tr><td>数据库</td><td>SQLite</td><td>行情、交易、信号存储</td></tr>
-        </tbody>
-      </table>
-    </section>
+  <!-- ===== CTA ===== -->
+  <section class="cta-section">
+    <div class="cta-glow"></div>
+    <div class="container">
+      <h2 class="fade-in">开始锻造你的算法</h2>
+      <p class="fade-in">AlgoForge 是开源的黄金量化交易系统，欢迎 Fork、Star、贡献代码</p>
+      <div class="hero-actions fade-in">
+        <a href="https://github.com/goodie1972/algoforge" class="btn-primary" target="_blank">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Star on GitHub
+        </a>
+        <a href="#top" class="btn-secondary">返回顶部</a>
+      </div>
+    </div>
+  </section>
 
-    <!-- Footer -->
-    <footer>
+  <!-- ===== Footer ===== -->
+  <footer>
+    <div class="container">
       <p>AlgoForge — XAUUSD 黄金量化交易系统</p>
-      <p style="margin-top:4px;">
+      <div class="footer-links">
         <a href="https://github.com/goodie1972/algoforge">GitHub</a>
-        · <a href="https://github.com/goodie1972/algoforge/issues">Issues</a>
-        · MIT License
-      </p>
-      <p style="margin-top:12px;font-size:12px;">Built with ❤️ for XAUUSD gold trading</p>
-    </footer>
+        <a href="https://github.com/goodie1972/algoforge/issues">Issues</a>
+        <a href="https://github.com/goodie1972/algoforge/blob/main/README.md">README</a>
+      </div>
+      <p style="margin-top:12px;font-size:12px;">Built with ❤️ for XAUUSD gold trading · MIT License</p>
+    </div>
+  </footer>
 
-  </div>
+  <script>
+    // ===== Scroll Fade In =====
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // ===== Carousel =====
+    const track = document.getElementById('carouselTrack');
+    const slides = track.querySelectorAll('.carousel-slide');
+    const dots = document.querySelectorAll('.carousel-dot');
+    const prevBtn = document.getElementById('carouselPrev');
+    const nextBtn = document.getElementById('carouselNext');
+    let current = 0;
+
+    function goTo(index) {
+      if (index < 0) index = slides.length - 1;
+      if (index >= slides.length) index = 0;
+      current = index;
+      track.style.transform = `translateX(-${current * 100}%)`;
+      dots.forEach((d, i) => d.classList.toggle('active', i === current));
+    }
+
+    if (nextBtn) nextBtn.addEventListener('click', () => goTo(current + 1));
+    if (prevBtn) prevBtn.addEventListener('click', () => goTo(current - 1));
+    dots.forEach(d => d.addEventListener('click', () => goTo(parseInt(d.dataset.index))));
+
+    // Auto advance
+    let autoSlide = setInterval(() => goTo(current + 1), 5000);
+    const carousel = document.getElementById('carousel');
+    if (carousel) {
+      carousel.addEventListener('mouseenter', () => clearInterval(autoSlide));
+      carousel.addEventListener('mouseleave', () => { autoSlide = setInterval(() => goTo(current + 1), 5000); });
+    }
+  </script>
 </body>
 </html>
