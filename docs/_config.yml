@@ -1,0 +1,7 @@
+# GitHub Pages config
+title: AlgoForge
+description: XAUUSD 黄金量化交易系统
+include:
+  - assets
+  - strategies
+  - README.md
