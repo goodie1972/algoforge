@@ -51,16 +51,14 @@ async def get_positions(symbol: Optional[str] = None):
 
 @router.post("/{ticket}/close")
 async def close_position(ticket: int, req: CloseRequest = None):
-    """平仓"""
+    """平仓（自动记录到数据库 + 更新引擎风险状态）"""
     if not engine_runner or not engine_runner.bridge:
         raise HTTPException(503, "桥接器未连接")
     try:
         volume = req.volume if req and req.volume else 0
-        ok = await run_bridge(engine_runner.bridge.close_order, ticket, volume)
+        ok = engine_runner.close_position(ticket, volume)
         if not ok:
             raise HTTPException(404, f"平仓失败，订单 {ticket} 可能已不存在")
-        # 立即刷新缓存，UI 下次查询就是最新数据
-        engine_runner._update_positions_cache()
         return {"message": f"订单 {ticket} 已平仓", "ticket": ticket}
     except HTTPException:
         raise

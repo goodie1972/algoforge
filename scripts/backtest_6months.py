@@ -87,6 +87,8 @@ def load_data(start_ts, end_ts):
         bbu, bbm, bbl = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2)
         ema9 = talib.EMA(closes, timeperiod=9)
         ema21 = talib.EMA(closes, timeperiod=21)
+        ema34 = talib.EMA(closes, timeperiod=34)
+        ema200 = talib.EMA(closes, timeperiod=200)
         ema120 = talib.EMA(closes, timeperiod=120)
         ema300 = talib.EMA(closes, timeperiod=300)
         sma14 = talib.SMA(closes, timeperiod=14)
@@ -119,6 +121,8 @@ def load_data(start_ts, end_ts):
                 "bb_width": float(bb_width[i]) if not np.isnan(bb_width[i]) else None,
                 "ema_9": float(ema9[i]) if not np.isnan(ema9[i]) else None,
                 "ema_21": float(ema21[i]) if not np.isnan(ema21[i]) else None,
+                "ema_34": float(ema34[i]) if not np.isnan(ema34[i]) else None,
+                "ema_200": float(ema200[i]) if not np.isnan(ema200[i]) else None,
                 "ema_120": float(ema120[i]) if not np.isnan(ema120[i]) else None,
                 "ema_300": float(ema300[i]) if not np.isnan(ema300[i]) else None,
                 "sma_14": float(sma14[i]) if not np.isnan(sma14[i]) else None,
@@ -287,6 +291,8 @@ def run_backtest(strategies, start_ts, end_ts):
             candle = candles[i]; ind = indicators[i]; bar_time = int(candle.time)
             strategy.candles = candles[max(0, i - 200):i + 1]
             strategy._cached_indicators = ind
+            from datetime import datetime, timezone, timedelta
+            strategy._backtest_time = datetime.fromtimestamp(bar_time, tz=timezone.utc) + timedelta(hours=3)
 
             if ind.get("rsi") is None or ind.get("atr") is None:
                 none_indicators += 1

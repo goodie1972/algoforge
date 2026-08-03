@@ -92,7 +92,88 @@ class EngineRunner:
             "bridge_connected": self.bridge is not None and hasattr(self.bridge, '_connected') and self.bridge._connected,
         }
 
-    def add_strategy(self, name: str, cfg: dict) -> bool:
+    def close_position(self, ticket: int | str, volume: float = 0) -> bool:
+        """平仓并记录到数据库 + 更新引擎风险状态"""
+        if not self._engine or not self.bridge:
+            return False
+
+        # 获取平仓前持仓信息（用于判断方向）
+        pos_info = None
+        try:
+            positions = self.bridge.get_positions("XAUUSD")
+            for p in positions:
+                if str(p.ticket) == str(ticket):
+                    pos_info = p
+                    break
+        except Exception:
+            pass
+
+        ok = self.bridge.close_order(ticket, volume)
+        if not ok:
+            return False
+
+        # 从 bridge 的已平仓列表（_closed 是 list）中查找刚平仓的记录
+        closed_list = getattr(self.bridge, '_closed', [])
+        closed_record = None
+        for rec in reversed(closed_list):
+            if str(rec.get("ticket", "")) == str(ticket):
+                closed_record = rec
+                break
+
+        if not closed_record and pos_info:
+            # 用持仓信息兜底构造记录
+            direction = "BUY" if pos_info.order_type in ("OP_BUY", "BUY") else "SELL"
+            closed_record = {
+                "pnl": 0,
+                "magic": pos_info.magic,
+                "direction": direction,
+                "symbol": pos_info.symbol,
+                "volume": pos_info.volume,
+                "entry_price": pos_info.open_price,
+                "exit_price": 0,
+                "stop_loss": pos_info.stop_loss,
+                "take_profit": pos_info.take_profit,
+                "strategy": pos_info.comment,
+                "commission": 0,
+            }
+
+        if closed_record and self._engine:
+            pnl = closed_record.get("pnl", 0)
+            magic = closed_record.get("magic", 0)
+            direction = closed_record.get("direction", "")
+
+            # 更新引擎风险状态（realized_pnl / 连续亏损 / 快速出场等）
+            self._engine._record_close(ticket, pnl, magic, direction)
+
+            # 写入 trades 表
+            try:
+                from data import database as db
+                record = {
+                    "ticket": ticket,
+                    "symbol": closed_record.get("symbol", "XAUUSD"),
+                    "order_type": "BUY" if direction == "BUY" else "SELL",
+                    "volume": closed_record.get("volume", 0.01),
+                    "entry_price": closed_record.get("entry_price", 0),
+                    "exit_price": closed_record.get("exit_price", 0),
+                    "pnl": round(pnl, 2),
+                    "stop_loss": closed_record.get("stop_loss", 0),
+                    "take_profit": closed_record.get("take_profit", 0),
+                    "swap": 0,
+                    "commission": closed_record.get("commission", 0),
+                    "magic": magic,
+                    "strategy": closed_record.get("strategy", ""),
+                    "open_time": "",
+                    "close_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "hold_seconds": 0,
+                    "exit_reason": "manual_close",
+                }
+                db.insert_trade(record)
+            except Exception as e:
+                self.logger.error(f"记录手动平仓失败 ticket={ticket}: {e}")
+
+        # 立即刷新缓存
+        self._update_positions_cache()
+        return True
         """动态添加策略"""
         if self._engine:
             return self._engine.add_strategy(name, cfg)
