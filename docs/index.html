@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AlgoForge — XAUUSD 黄金量化交易系统。基于 Python + MetaTrader 4 的多策略自动化交易平台。">
+  <title>AlgoForge — XAUUSD 黄金量化交易系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Outfit', -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .noise {
+      position: fixed;
+      inset: 0;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 60px 24px; position: relative; z-index: 1; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 80px 0 60px; }
+    .hero-logo { width: 100px; height: 100px; margin-bottom: 24px; }
+    .hero h1 {
+      font-size: 48px; font-weight: 800;
+      background: linear-gradient(135deg, #f0b90b, #d4a309);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero .subtitle { font-size: 20px; color: #8b949e; margin-top: 8px; font-weight: 300; }
+    .hero .tagline { font-size: 15px; color: #6e7681; margin-top: 16px; max-width: 600px; margin-left: auto; margin-right: auto; }
+
+    /* Badges */
+    .badges { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 24px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 500;
+      background: rgba(240, 185, 11, 0.1); color: #f0b90b;
+      border: 1px solid rgba(240, 185, 11, 0.2);
+    }
+
+    /* Sections */
+    section { margin-top: 60px; }
+    section h2 {
+      font-size: 24px; font-weight: 700; color: #f0b90b;
+      margin-bottom: 24px; padding-bottom: 8px;
+      border-bottom: 1px solid rgba(240, 185, 11, 0.15);
+    }
+
+    /* Cards */
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .card {
+      background: linear-gradient(135deg, #161b22, #1c2333);
+      border: 1px solid rgba(240, 185, 11, 0.08);
+      border-radius: 12px; padding: 24px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+    .card h3 { font-size: 16px; font-weight: 600; color: #f0b90b; margin-bottom: 8px; }
+    .card p { font-size: 14px; color: #8b949e; }
+
+    /* Arch */
+    .arch { background: #161b22; border: 1px solid rgba(240,185,11,0.08); border-radius: 12px; padding: 24px; overflow-x: auto; }
+    .arch pre { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #8b949e; line-height: 1.7; }
+    .arch .hl { color: #f0b90b; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
+    td { padding: 10px 12px; border-bottom: 1px solid #21262d; }
+    .status-on { color: #3fb950; }
+    .status-off { color: #f85149; }
+
+    /* Footer */
+    footer { text-align: center; padding: 40px 0; color: #484f58; font-size: 13px; margin-top: 60px; border-top: 1px solid #21262d; }
+    footer a { color: #8b949e; text-decoration: none; }
+    footer a:hover { color: #f0b90b; }
+
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 32px; }
+      .hero { padding: 40px 0; }
+      .container { padding: 32px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <div class="container">
+
+    <!-- Hero -->
+    <div class="hero">
+      <img src="assets/logo.svg" alt="AlgoForge" class="hero-logo">
+      <h1>AlgoForge</h1>
+      <div class="subtitle">XAUUSD 黄金量化交易系统</div>
+      <div class="tagline">Algorithmic + Forge = 算法锻造工坊 — 多策略并行、多层风控、实时 Web 监控的黄金自动化交易平台</div>
+      <div class="badges">
+        <span class="badge">Python 3.10+</span>
+        <span class="badge">FastAPI</span>
+        <span class="badge">Vue 3</span>
+        <span class="badge">MetaTrader 4</span>
+        <span class="badge">SQLite</span>
+        <span class="badge">v2.3.0</span>
+      </div>
+    </div>
+
+    <!-- 核心特性 -->
+    <section>
+      <h2>⚡ 核心特性</h2>
+      <div class="card-grid">
+        <div class="card">
+          <h3>多策略并行</h3>
+          <p>25+ 个策略同时运行，独立 Magic Number 和风控状态。自动扫描发现新策略，零配置注册。</p>
+        </div>
+        <div class="card">
+          <h3>三轨架构</h3>
+          <p>DataFactory（数据）→ 策略员（信号）→ Athlete（开仓），三层分离，职责清晰。</p>
+        </div>
+        <div class="card">
+          <h3>完整风控</h3>
+          <p>利润回撤止盈 + ATR 移动止盈 + ATR 硬止损。GateManager / RiskManager / TradeManager 多层防护。</p>
+        </div>
+        <div class="card">
+          <h3>数据驱动</h3>
+          <p>DataFactory 统一计算 26 个 TA-Lib 指标，F043 MT4 值优先，跨策略共享缓存。</p>
+        </div>
+        <div class="card">
+          <h3>纸面测试</h3>
+          <p>信号全量模拟入场 + 出场，按策略规则模拟平仓，真实成交价计算盈亏。</p>
+        </div>
+        <div class="card">
+          <h3>自修复监控</h3>
+          <p>5 分钟自动检查引擎状态，崩溃 / 桥接断连自动重启，实时 Web 仪表盘。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 架构 -->
+    <section>
+      <h2>🏗️ 架构总览</h2>
+      <div class="arch">
+<pre>
+┌──────────────────────────────────────────────────┐
+│         MT4 + FreeMT4Bridge EA (:23232)           │
+└──────────────────────┬───────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────┐
+│                core/bridge.py                      │
+│             桥接抽象层 (MT4 ⇄ Python)              │
+└──────────────────────┬───────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────┐
+│           TradingEngine <span class="hl">三轨架构</span>                 │
+│  ┌────────────────────────────────────────────┐   │
+│  │ <span class="hl">轨1:</span> DataFactory (独立线程)              │   │
+│  │     → 增量拉取 K 线 → 26 个 TA-Lib 指标     │   │
+│  ├────────────────────────────────────────────┤   │
+│  │ <span class="hl">轨2:</span> 策略员 (主循环)                        │   │
+│  │     → get_indicator() 读缓存 → 评分出门票    │   │
+│  ├────────────────────────────────────────────┤   │
+│  │ <span class="hl">轨3:</span> Athlete (tick 验证层)                 │   │
+│  │     → _verify_entry 实时重算 → 10秒过期     │   │
+│  └────────────────────────────────────────────┘   │
+└──────────────────────┬───────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────┐
+│           Dashboard (Web 监控)                     │
+│  ┌──────────────┐  ┌────────────────────────┐    │
+│  │ FastAPI :1783 │  │  Vue 3 + Naive UI     │    │
+│  │              │  │  lightweight-charts    │    │
+│  └──────────────┘  └────────────────────────┘    │
+└──────────────────────────────────────────────────┘</pre>
+      </div>
+    </section>
+
+    <!-- 在线策略 -->
+    <section>
+      <h2>📊 当前策略组合</h2>
+      <table>
+        <thead>
+          <tr><th>策略</th><th>类型</th><th>周期</th><th>Magic</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>mfi_bb_m30_optimized</td><td>反转</td><td>M30</td><td>661002</td><td class="status-on">● 运行中</td></tr>
+          <tr><td>rsi_grading_m30_upgraded</td><td>评分</td><td>M30</td><td>660903</td><td class="status-on">● 运行中</td></tr>
+          <tr><td>m30_bb_deepreturn</td><td>反转</td><td>M30</td><td>661100</td><td class="status-on">● 运行中</td></tr>
+          <tr><td>mfi_bb_m30</td><td>反转</td><td>M30</td><td>661000</td><td class="status-on">● 运行中</td></tr>
+          <tr><td>m30_bb_deepreturn_optimized</td><td>反转</td><td>M30</td><td>661102</td><td class="status-on">● 运行中</td></tr>
+          <tr><td>momentum_pulse_pro</td><td>趋势</td><td>M30</td><td>880101</td><td class="status-on">● 运行中</td></tr>
+          <tr><td>rsi_grading_m30</td><td>评分</td><td>M30</td><td>660900</td><td class="status-on">● 运行中</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 快速开始 -->
+    <section>
+      <h2>🚀 快速开始</h2>
+      <div class="card-grid">
+        <div class="card">
+          <h3>前置条件</h3>
+          <p>Python 3.10+ · MetaTrader 4（已登录 XAUUSD）· FreeMT4Bridge EA 加载到 M5 图表 · Node.js 18+</p>
+        </div>
+        <div class="card">
+          <h3>一键启动</h3>
+          <p><code style="background:#21262d;padding:2px 8px;border-radius:4px;color:#f0b90b;">python start.py</code></p>
+          <p style="margin-top:8px;">或 <code style="background:#21262d;padding:2px 8px;border-radius:4px;color:#f0b90b;">python dashboard/backend/main.py</code></p>
+        </div>
+        <div class="card">
+          <h3>访问监控</h3>
+          <p><a href="http://localhost:1783" style="color:#f0b90b;">http://localhost:1783</a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 技术栈 -->
+    <section>
+      <h2>🔧 技术栈</h2>
+      <table>
+        <thead>
+          <tr><th>层级</th><th>技术</th><th>用途</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>桥接</td><td>FreeMT4Bridge EA (MQL4)</td><td>TCP Socket 通信</td></tr>
+          <tr><td>引擎</td><td>Python 3.10+</td><td>策略执行、风控、订单管理</td></tr>
+          <tr><td>后端</td><td>FastAPI + WebSocket</td><td>REST API、实时数据推送</td></tr>
+          <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>监控仪表盘</td></tr>
+          <tr><td>UI</td><td>Naive UI</td><td>组件库</td></tr>
+          <tr><td>图表</td><td>lightweight-charts</td><td>K 线展示</td></tr>
+          <tr><td>数据库</td><td>SQLite</td><td>行情、交易、信号存储</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>AlgoForge — XAUUSD 黄金量化交易系统</p>
+      <p style="margin-top:4px;">
+        <a href="https://github.com/goodie1972/AlgoForge">GitHub</a>
+        · <a href="https://github.com/goodie1972/AlgoForge/issues">Issues</a>
+        · MIT License
+      </p>
+      <p style="margin-top:12px;font-size:12px;">Built with ❤️ for XAUUSD gold trading</p>
+    </footer>
+
+  </div>
+</body>
+</html>
