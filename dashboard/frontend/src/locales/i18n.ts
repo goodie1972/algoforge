@@ -11,7 +11,7 @@ const i18n = createI18n({
   locale: localStorage.getItem('algoforge-lang') || 'zh-CN',
   fallbackLocale: 'en-US',
   messages,
-  legacy: false,
+  legacy: true,
   globalInjection: true,
 })
 

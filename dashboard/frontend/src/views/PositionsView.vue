@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { usePositionStore } from '@/stores/positions'
 import { useAccountStore } from '@/stores/account'
 import { useTradeStore } from '@/stores/trades'
@@ -11,6 +12,7 @@ import TradeHistoryTableBase from '@/components/dashboard/TradeHistoryTableBase.
 const store = usePositionStore()
 const account = useAccountStore()
 const tradeStore = useTradeStore()
+const { t } = useI18n()
 const showHistoryModal = ref(false)
 const fullHistory = ref<any[]>([])
 const loadingFullHistory = ref(false)
@@ -33,12 +35,12 @@ async function openFullHistory() {
     <AccountPanel />
 
     <div class="positions-header">
-      <n-h2 class="positions-title">持仓管理</n-h2>
+      <n-h2 class="positions-title">{{ t('positions.title') }}</n-h2>
       <n-space size="small">
-        <n-tag :bordered="false" type="success">多头 {{ store.longCount }}</n-tag>
-        <n-tag :bordered="false" type="error">空头 {{ store.shortCount }}</n-tag>
+        <n-tag :bordered="false" type="success">{{ t('positions.long') }} {{ store.longCount }}</n-tag>
+        <n-tag :bordered="false" type="error">{{ t('positions.short') }} {{ store.shortCount }}</n-tag>
         <n-tag :bordered="false" :type="store.totalProfit >= 0 ? 'success' : 'error'">
-          汇总 ${{ store.totalProfit.toFixed(2) }}
+          {{ t('positions.summary') }} ${{ store.totalProfit.toFixed(2) }}
         </n-tag>
       </n-space>
     </div>
@@ -46,10 +48,10 @@ async function openFullHistory() {
     <PositionsTableBase />
 
     <!-- 最近成交 -->
-    <n-card title="最近成交" size="small">
+    <n-card :title="t('positions.recent_trades')" size="small">
       <template #header-extra>
         <n-space size="small">
-          <n-tag :bordered="false" type="info">共 {{ tradeStore.items.length }} 笔</n-tag>
+          <n-tag :bordered="false" type="info">{{ t('positions.total_trades', {count: tradeStore.items.length}) }}</n-tag>
           <n-button size="tiny" secondary circle type="primary" @click="openFullHistory">
             <template #icon><span class="history-more-icon">+</span></template>
           </n-button>
@@ -59,7 +61,7 @@ async function openFullHistory() {
     </n-card>
 
     <!-- 全部历史成交弹窗 -->
-    <n-modal v-model:show="showHistoryModal" preset="card" title="全部历史成交"
+    <n-modal v-model:show="showHistoryModal" preset="card" :title="t('positions.all_history')"
              :style="{ maxWidth: '95vw', maxHeight: '90vh' }" size="large" closable>
       <TradeHistoryTableBase :items="fullHistory" :loading="loadingFullHistory" :max-height="560" />
     </n-modal>

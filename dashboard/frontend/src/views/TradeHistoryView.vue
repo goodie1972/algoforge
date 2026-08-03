@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, ref, computed, onMounted, watch, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useTradeStore } from '@/stores/trades'
 import { getTradeStats, getTradeAnalysis } from '@/api/client'
 import type { TradeStats } from '@/types'
@@ -8,6 +9,7 @@ import { SearchOutline } from '@vicons/ionicons5'
 import StrategyRadar from '@/components/dashboard/StrategyRadar.vue'
 import { getSignals } from '@/api/client'
 
+const { t } = useI18n()
 const store = useTradeStore()
 const refreshLoading = ref(false)
 const activeTab = ref('history')
@@ -47,7 +49,7 @@ async function onExpand(ticket: number) {
     const result = await getTradeAnalysis(ticket)
     analysisCache[ticket] = result
   } catch (e: any) {
-    analysisCache[ticket] = { error: e?.message || '获取分析失败' }
+    analysisCache[ticket] = { error: e?.message || t('trades.analysis_fail') }
   } finally {
     analysisLoading[ticket] = false
   }
@@ -56,11 +58,11 @@ async function onExpand(ticket: number) {
 function renderAnalysis(row: any) {
   const ticket = row.ticket
   if (analysisLoading[ticket]) {
-    return h(NSpin, {}, { default: () => '加载分析中...' })
+    return h(NSpin, {}, { default: () => t('trades.analysis_loading') })
   }
   const data = analysisCache[ticket]
-  if (!data) return h('span', '点击展开分析')
-  if (data.error) return h('span', { style: { color: '#f6465d' } }, `分析失败: ${data.error}`)
+  if (!data) return h('span', t('trades.analysis_click'))
+  if (data.error) return h('span', { style: { color: '#f6465d' } }, t('trades.analysis_error', { error: data.error }))
 
   const sec = (s: number) => s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s/60)}m` : `${(s/3600).toFixed(1)}h`
 
@@ -68,11 +70,11 @@ function renderAnalysis(row: any) {
     h('div', { style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 16px;' }, [
       // 左列：开仓分析
       h('div', {}, [
-        h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #0ecb81;' }, '开仓逻辑'),
-        h('div', {}, `系统: ${data.entry_analysis?.system || '未知'}`),
+        h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #0ecb81;' }, t('trades.entry_logic')),
+        h('div', {}, `系统: ${data.entry_analysis?.system || t('trades.unknown')}`),
         data.entry_analysis?.likely_conditions?.length
           ? h('div', { style: 'margin-top: 4px;' }, [
-              h('span', { style: 'color: #888;' }, '触发条件: '),
+              h('span', { style: 'color: #888;' }, t('trades.trigger_condition')),
               ...data.entry_analysis.likely_conditions.map((c: string, i: number) =>
                 h('span', { style: 'background: #1a1a2e; padding: 1px 6px; border-radius: 3px; margin-right: 4px;' }, c)
               ),
@@ -80,7 +82,7 @@ function renderAnalysis(row: any) {
           : null,
         data.entry_analysis?.factors
           ? h('div', { style: 'margin-top: 8px;' }, [
-              h('div', { style: 'color: #888; margin-bottom: 4px;' }, '评分因子:'),
+              h('div', { style: 'color: #888; margin-bottom: 4px;' }, t('trades.score_factors')),
               ...data.entry_analysis.factors.map((f: any) =>
                 h('div', { style: 'font-size: 12px; padding: 2px 0;' }, `• ${f.name}: ${f.desc}`)
               ),
@@ -89,12 +91,12 @@ function renderAnalysis(row: any) {
       ]),
       // 右列：平仓分析
       h('div', {}, [
-        h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #f6465d;' }, '平仓逻辑'),
-        h('div', {}, `方式: ${data.exit_analysis?.label || '未知'}`),
-        h('div', { style: 'margin-top: 4px;' }, `逻辑: ${data.exit_analysis?.logic || '无'}`),
+        h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #f6465d;' }, t('trades.exit_logic')),
+        h('div', {}, `方式: ${data.exit_analysis?.label || t('trades.unknown')}`),
+        h('div', { style: 'margin-top: 4px;' }, `逻辑: ${data.exit_analysis?.logic || t('trades.exit_none')}`),
         data.exit_analysis?.is_loss
           ? h('div', { style: 'margin-top: 12px;' }, [
-              h('div', { style: 'font-weight: 700; color: #f0a020; margin-bottom: 6px;' }, '亏损分析 & 优化建议'),
+              h('div', { style: 'font-weight: 700; color: #f0a020; margin-bottom: 6px;' }, t('trades.loss_analysis')),
               ...(data.exit_analysis?.loss_analysis?.possible_reasons || []).map((r: string) =>
                 h('div', { style: 'font-size: 12px; padding: 2px 0;' }, `• ${r}`)
               ),
@@ -102,17 +104,17 @@ function renderAnalysis(row: any) {
                 h('div', { style: 'font-size: 12px; padding: 2px 0; color: #7cb8ff;' }, `→ ${s.replace(/\\n/g, ' ')}`)
               ),
             ])
-          : h('div', { style: 'margin-top: 8px; color: #0ecb81;' }, '✅ 盈利单'),
+          : h('div', { style: 'margin-top: 8px; color: #0ecb81;' }, t('trades.profit_trade')),
       ]),
     ]),
   ])
 }
 
 const exitReasonLabels: Record<string, string> = {
-  'strategy_exit': '策略出场',
-  'mt4_history': 'MT4历史',
-  'stop_loss': '止损',
-  'take_profit': '止盈',
+  'strategy_exit': t('trades.exit_strategy'),
+  'mt4_history': t('trades.exit_mt4'),
+  'stop_loss': t('trades.exit_stop'),
+  'take_profit': t('trades.exit_tp'),
 }
 
 const columns = [
@@ -122,7 +124,7 @@ const columns = [
     renderExpand: (row: any) => renderAnalysis(row),
   },
   { title: 'Ticket', key: 'ticket', width: 80, sortable: true, sorter: (a: any, b: any) => a.ticket - b.ticket },
-  { title: '策略', key: 'strategy', width: 160, sortable: true,
+  { title: t('trades.strategy'), key: 'strategy', width: 160, sortable: true,
     render(row: any) {
       return h(NTag, { size: 'small', type: row.strategy?.includes('stoch') ? 'info' : 'warning' },
         { default: () => row.strategy }
@@ -130,23 +132,23 @@ const columns = [
     }
   },
   {
-    title: '方向', key: 'order_type', width: 40, sortable: true,
+    title: t('trades.direction'), key: 'order_type', width: 40, sortable: true,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
       return h(NTag, { type: isBuy ? 'success' : 'error', size: 'tiny' },
-        { default: () => isBuy ? '多头' : '空头' }
+        { default: () => isBuy ? t('trades.long') : t('trades.short') }
       )
     }
   },
-  { title: '手数', key: 'volume', width: 40, sortable: true },
-  { title: '开仓价', key: 'entry_price', width: 100, sortable: true,
+  { title: t('trades.volume'), key: 'volume', width: 40, sortable: true },
+  { title: t('trades.open_price'), key: 'entry_price', width: 100, sortable: true,
     render(row: any) { return row.entry_price?.toFixed(2) }
   },
-  { title: '平仓价', key: 'exit_price', width: 100, sortable: true,
+  { title: t('trades.close_price'), key: 'exit_price', width: 100, sortable: true,
     render(row: any) { return row.exit_price?.toFixed(2) }
   },
   {
-    title: '盈亏', key: 'pnl', width: 100, sortable: true,
+    title: t('trades.profit'), key: 'pnl', width: 100, sortable: true,
     render(row: any) {
       const val = row.pnl ?? 0
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -155,7 +157,7 @@ const columns = [
     }
   },
   {
-    title: '盈亏+佣金', key: 'net_pnl', width: 100,
+    title: t('trades.profit_commission'), key: 'net_pnl', width: 100,
     render(row: any) {
       const val = (row.pnl ?? 0) + (row.swap ?? 0) + (row.commission ?? 0)
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -163,7 +165,7 @@ const columns = [
       )
     }
   },
-  { title: '持仓时长', key: 'hold_seconds', width: 90,
+  { title: t('trades.duration'), key: 'hold_seconds', width: 90,
     render(row: any) {
       const sec = row.hold_seconds ?? 0
       if (sec < 60) return `${sec}s`
@@ -171,7 +173,7 @@ const columns = [
       return `${(sec / 3600).toFixed(1)}h`
     }
   },
-  { title: '出场原因', key: 'exit_reason', width: 100,
+  { title: t('trades.exit_reason'), key: 'exit_reason', width: 100,
     render(row: any) {
       const reason = row.exit_reason || ''
       const label = exitReasonLabels[reason] || reason || '-'
@@ -179,8 +181,8 @@ const columns = [
       return h(NTag, { size: 'small', type }, { default: () => label })
     }
   },
-  { title: '开仓时间', key: 'open_time', width: 150 },
-  { title: '平仓时间', key: 'close_time', width: 150 },
+  { title: t('trades.open_time'), key: 'open_time', width: 150 },
+  { title: t('trades.close_time'), key: 'close_time', width: 150 },
 ]
 
 // ── 策略统计标签页 ──────────────────────────────────────
@@ -222,7 +224,7 @@ async function loadStats() {
       if (entries.length) selectedStrategy.value = entries[0][0]
     }
   } catch (e: any) {
-    statsError.value = e?.message || '获取统计失败'
+    statsError.value = e?.message || t('trades.stats_fail')
   } finally {
     statsLoading.value = false
   }
@@ -244,14 +246,14 @@ const voidedColumns = [
     return h('div', { style: 'padding: 8px 20px; font-size: 13px;' }, [
       h('div', { style: 'display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px;' }, [
         h('div', {}, [
-          h('div', { style: 'font-weight:700;color:#0ecb81;margin-bottom:2px;' }, '做多因子'),
-          h('div', { style: 'font-size:13px;' }, fl.length ? fl.join(' → ') : '无'),
-          h('div', { style: 'font-weight:700;color:#f6465d;margin:6px 0 2px;' }, '做空因子'),
-          h('div', { style: 'font-size:13px;' }, fs.length ? fs.join(' → ') : '无'),
-          h('div', { style: 'margin-top:6px;font-weight:700;' }, `多空评分: ${row.score_long}/${row.score_short}`),
+          h('div', { style: 'font-weight:700;color:#0ecb81;margin-bottom:2px;' }, t('trades.void_long_factors')),
+          h('div', { style: 'font-size:13px;' }, fl.length ? fl.join(' → ') : t('trades.exit_none')),
+          h('div', { style: 'font-weight:700;color:#f6465d;margin:6px 0 2px;' }, t('trades.void_short_factors')),
+          h('div', { style: 'font-size:13px;' }, fs.length ? fs.join(' → ') : t('trades.exit_none')),
+          h('div', { style: 'margin-top:6px;font-weight:700;' }, t('trades.void_score', { long: row.score_long, short: row.score_short })),
         ]),
         h('div', {}, [
-          h('div', { style: 'font-weight:700;margin-bottom:2px;' }, '指标快照'),
+          h('div', { style: 'font-weight:700;margin-bottom:2px;' }, t('trades.void_snapshot')),
           h('div', { style: 'display:grid; grid-template-columns:repeat(3,1fr); gap:3px;' },
             ivEntries.map(([k, v]) =>
               h('div', {
@@ -263,13 +265,13 @@ const voidedColumns = [
       ]),
     ])
   }},
-  { title: '信号ID', key: 'id', width: 70 },
-  { title: '策略', key: 'strategy', width: 100 },
-  { title: '方向', key: 'signal', width: 60,
+  { title: t('trades.void_signal_id'), key: 'id', width: 70 },
+  { title: t('trades.strategy'), key: 'strategy', width: 100 },
+  { title: t('trades.direction'), key: 'signal', width: 60,
     render(row: any) { return h('span', { style: { color: row.signal?.includes('BUY') ? '#0ecb81' : '#f6465d' } }, row.signal) }
   },
-  { title: '时间', key: 'timestamp', width: 150 },
-  { title: '废票原因', key: 'void_reason', width: 120 },
+  { title: t('trades.void_time'), key: 'timestamp', width: 150 },
+  { title: t('trades.void_reason'), key: 'void_reason', width: 120 },
 ]
 
 async function loadVoided() {
@@ -297,12 +299,12 @@ const summaryCards = computed(() => {
   const s = statsData.value?.summary
   if (!s) return []
   return [
-    { label: '总净盈亏', value: s.total_net_profit, fmt: (v: any) => `${v >= 0 ? '+' : ''}$${Number(v).toFixed(2)}`, color: s.total_net_profit >= 0 ? '#0ecb81' : '#f6465d' },
+    { label: t('trades.total_pnl'), value: s.total_net_profit, fmt: (v: any) => `${v >= 0 ? '+' : ''}$${Number(v).toFixed(2)}`, color: s.total_net_profit >= 0 ? '#0ecb81' : '#f6465d' },
     { label: 'Profit Factor', value: s.profit_factor, fmt: (v: any) => v, color: undefined },
-    { label: '总交易次数', value: s.total_trades, fmt: (v: any) => String(v), color: undefined },
-    { label: '胜率', value: s.win_rate, fmt: (v: any) => `${v}%`, color: s.win_rate >= 50 ? '#0ecb81' : '#f6465d' },
+    { label: t('trades.total_trades'), value: s.total_trades, fmt: (v: any) => String(v), color: undefined },
+    { label: t('trades.win_rate'), value: s.win_rate, fmt: (v: any) => `${v}%`, color: s.win_rate >= 50 ? '#0ecb81' : '#f6465d' },
     { label: 'Expected Payoff', value: s.expected_payoff, fmt: (v: any) => `${v >= 0 ? '+' : ''}$${Number(v).toFixed(2)}`, color: s.expected_payoff >= 0 ? '#0ecb81' : '#f6465d' },
-    { label: '最大连亏', value: s.max_consecutive_losses, fmt: (v: any) => `${v} 次`, color: undefined },
+    { label: t('trades.max_consec_loss'), value: s.max_consecutive_losses, fmt: (v: any) => `${v} ${t('trades.times')}`, color: undefined },
   ]
 })
 
@@ -310,20 +312,20 @@ const summaryCards = computed(() => {
 const statsExpandedRowKeys = ref<string[]>([])
 
 function renderStatsExpand(row: any) {
-  if (!row.versions?.length) return '无版本明细'
+  if (!row.versions?.length) return t('trades.no_version_detail')
   const cols = [
     { title: 'Magic', key: 'magic' },
-    { title: '版本', key: 'version' },
-    { title: '总盈亏', key: 'total_net_profit', render(r: any) {
+    { title: t('trades.version'), key: 'version' },
+    { title: t('trades.total_pnl'), key: 'total_net_profit', render(r: any) {
       const v = r.total_net_profit ?? 0
       return h('span', { style: { color: v >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
         `${v >= 0 ? '+' : ''}$${v.toFixed(2)}`)
     }},
-    { title: '交易次数', key: 'total_trades' },
-    { title: '胜率', key: 'win_rate', render(r: any) { return `${r.win_rate}%` }},
+    { title: t('trades.trade_count'), key: 'total_trades' },
+    { title: t('trades.win_rate'), key: 'win_rate', render(r: any) { return `${r.win_rate}%` }},
     { title: 'PF', key: 'profit_factor', render(r: any) { return r.profit_factor }},
-    { title: '平均盈利', key: 'avg_profit_trade', render(r: any) { return `$${r.avg_profit_trade?.toFixed(2)}` }},
-    { title: '平均亏损', key: 'avg_loss_trade', render(r: any) { return `$${r.avg_loss_trade?.toFixed(2)}` }},
+    { title: t('trades.avg_profit_label'), key: 'avg_profit_trade', render(r: any) { return `$${r.avg_profit_trade?.toFixed(2)}` }},
+    { title: t('trades.avg_loss_label'), key: 'avg_loss_trade', render(r: any) { return `$${r.avg_loss_trade?.toFixed(2)}` }},
   ]
   return h('div', { style: 'padding: 8px 24px;' }, [
     h(NDataTable, {
@@ -355,14 +357,14 @@ const statsColumns = [
   },
   { title: 'Magic', key: 'magic', width: 70, fixed: 'left' as const },
   {
-    title: '策略', key: 'strategy', width: 130,
+    title: t('trades.strategy'), key: 'strategy', width: 130,
     render(row: any) {
       return h(NTag, { size: 'small', type: row.strategy?.includes('stoch') ? 'info' : 'warning' },
         { default: () => row.strategy }
       )
     }
   },
-  { title: '总盈亏', key: 'total_net_profit', width: 100, sortable: true,
+  { title: t('trades.total_pnl'), key: 'total_net_profit', width: 100, sortable: true,
     render(row: any) {
       const v = row.total_net_profit ?? 0
       return h('span', { style: { color: v >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -370,45 +372,45 @@ const statsColumns = [
       )
     }
   },
-  { title: '毛利', key: 'gross_profit', width: 90,
+  { title: t('trades.gross_profit'), key: 'gross_profit', width: 90,
     render(row: any) { return h('span', { style: { color: '#0ecb81' } }, `$${row.gross_profit?.toFixed(2)}`) }
   },
-  { title: '毛损', key: 'gross_loss', width: 90,
+  { title: t('trades.gross_loss'), key: 'gross_loss', width: 90,
     render(row: any) { return h('span', { style: { color: '#f6465d' } }, `$${row.gross_loss?.toFixed(2)}`) }
   },
   { title: 'PF', key: 'profit_factor', width: 70,
     render(row: any) { return row.profit_factor }
   },
-  { title: '总交易', key: 'total_trades', width: 70, sortable: true },
+  { title: t('trades.total_trades'), key: 'total_trades', width: 70, sortable: true },
   {
-    title: '多(胜率)', key: 'long_won_pct', width: 90,
+    title: t('trades.long_win_rate'), key: 'long_won_pct', width: 90,
     render(row: any) { return `${row.long_trades} (${row.long_won_pct}%)` }
   },
   {
-    title: '空(胜率)', key: 'short_won_pct', width: 90,
+    title: t('trades.short_win_rate'), key: 'short_won_pct', width: 90,
     render(row: any) { return `${row.short_trades} (${row.short_won_pct}%)` }
   },
-  { title: '总胜率', key: 'win_rate', width: 70,
+  { title: t('trades.total_win_rate'), key: 'win_rate', width: 70,
     render(row: any) { return `${row.win_rate}%` }
   },
   {
-    title: '平均盈利', key: 'avg_profit_trade', width: 90,
+    title: t('trades.avg_profit_label'), key: 'avg_profit_trade', width: 90,
     render(row: any) { return `$${row.avg_profit_trade?.toFixed(2)}` }
   },
   {
-    title: '平均亏损', key: 'avg_loss_trade', width: 90,
+    title: t('trades.avg_loss_label'), key: 'avg_loss_trade', width: 90,
     render(row: any) { return `$${row.avg_loss_trade?.toFixed(2)}` }
   },
-  { title: '盈利/亏损比', key: 'ratio_avg_profit_loss', width: 90 },
+  { title: t('trades.profit_loss_ratio'), key: 'ratio_avg_profit_loss', width: 90 },
   {
-    title: '最大盈利', key: 'largest_profit_trade', width: 90,
+    title: t('trades.max_profit'), key: 'largest_profit_trade', width: 90,
     render(row: any) { return `$${row.largest_profit_trade?.toFixed(2)}` }
   },
   {
-    title: '最大亏损', key: 'largest_loss_trade', width: 90,
+    title: t('trades.max_loss'), key: 'largest_loss_trade', width: 90,
     render(row: any) { return `$${row.largest_loss_trade?.toFixed(2)}` }
   },
-  { title: '平均持仓', key: 'avg_hold_seconds', width: 80,
+  { title: t('trades.avg_duration'), key: 'avg_hold_seconds', width: 80,
     render(row: any) {
       const sec = row.avg_hold_seconds ?? 0
       if (sec < 60) return `${sec}s`
@@ -416,12 +418,12 @@ const statsColumns = [
       return `${(sec / 3600).toFixed(1)}h`
     }
   },
-  { title: '连盈(次)', key: 'max_consecutive_wins', width: 80 },
-  { title: '连亏(次)', key: 'max_consecutive_losses', width: 80 },
-  { title: '连盈($)', key: 'max_consecutive_wins_pnl', width: 80,
+  { title: t('trades.consec_win'), key: 'max_consecutive_wins', width: 80 },
+  { title: t('trades.consec_loss'), key: 'max_consecutive_losses', width: 80 },
+  { title: t('trades.consec_win_money'), key: 'max_consecutive_wins_pnl', width: 80,
     render(row: any) { return `$${row.max_consecutive_wins_pnl?.toFixed(2)}` }
   },
-  { title: '连亏($)', key: 'max_consecutive_losses_pnl', width: 80,
+  { title: t('trades.consec_loss_money'), key: 'max_consecutive_losses_pnl', width: 80,
     render(row: any) { return `$${row.max_consecutive_losses_pnl?.toFixed(2)}` }
   },
 ]
@@ -430,31 +432,31 @@ const statsColumns = [
 <template>
   <n-space vertical size="large">
     <div class="history-header">
-      <n-h2 class="history-title">历史成交</n-h2>
+      <n-h2 class="history-title">{{ t('trades.title') }}</n-h2>
       <n-space size="small">
-        <n-tag :bordered="false" type="info">共 {{ store.items.length }} 笔</n-tag>
+        <n-tag :bordered="false" type="info">{{ t('trades.total_count', { count: store.items.length }) }}</n-tag>
         <n-button size="small" secondary :loading="refreshLoading" @click="refresh">
-          刷新
+          {{ t('trades.refresh') }}
         </n-button>
       </n-space>
     </div>
 
     <n-tabs v-model:value="activeTab" type="line" animated>
     <!-- ═══ 成交明细 ═══ -->
-      <n-tab-pane name="history" tab="成交明细">
+      <n-tab-pane name="history" :tab="t('trades.detail_tab')">
         <n-space class="history-search-bar">
-          <n-input v-model:value="searchQuery" placeholder="搜索: 策略名 / Magic / Ticket"
+          <n-input v-model:value="searchQuery" :placeholder="t('trades.search')"
                    clearable class="search-input">
             <template #prefix>
               <n-icon :component="SearchOutline" />
             </template>
           </n-input>
-          <n-tag :bordered="false" type="info">共 {{ filteredData.length }} 笔</n-tag>
+          <n-tag :bordered="false" type="info">{{ t('trades.filtered_count', { count: filteredData.length }) }}</n-tag>
         </n-space>
         <n-data-table v-if="store.loading" :columns="columns" :data="[]" :loading="true" :bordered="true" :max-height="600" />
-        <n-empty v-else-if="store.items.length === 0" description="暂无历史成交">
+        <n-empty v-else-if="store.items.length === 0" :description="t('trades.empty')">
           <template #extra>
-            <n-text depth="3">启动引擎后自动记录已平仓订单</n-text>
+            <n-text depth="3">{{ t('trades.empty_hint') }}</n-text>
           </template>
         </n-empty>
         <n-alert v-else-if="store.error" type="error" :title="store.error" closable />
@@ -465,17 +467,17 @@ const statsColumns = [
       </n-tab-pane>
 
       <!-- ═══ 策略统计 ═══ -->
-      <n-tab-pane name="stats" tab="策略统计">
+      <n-tab-pane name="stats" :tab="t('trades.stats_tab')">
         <!-- 筛选栏 -->
         <n-card size="small" :bordered="true" class="stats-card">
           <n-space align="center" size="medium">
             <n-select v-if="strategyOptions.length"
               v-model:value="selectedStrategies" :options="strategyOptions"
-              multiple clearable placeholder="筛选策略" class="filter-select" />
+              multiple clearable :placeholder="t('trades.filter_strategy')" class="filter-select" />
             <n-date-picker v-model:value="dateRange" type="daterange" clearable
-              placeholder="选择日期范围" class="filter-datepicker" />
+              :placeholder="t('trades.date_range')" class="filter-datepicker" />
             <n-button type="primary" size="small" @click="loadStats" :loading="statsLoading">
-              查询
+              {{ t('trades.query') }}
             </n-button>
           </n-space>
         </n-card>
@@ -491,9 +493,9 @@ const statsColumns = [
         </template>
 
         <!-- 空态 -->
-        <n-empty v-else-if="!statsData || statsData.summary.total_trades === 0" description="暂无已平仓记录">
+        <n-empty v-else-if="!statsData || statsData.summary.total_trades === 0" :description="t('trades.stats_empty')">
           <template #extra>
-            <n-text depth="3">引擎运行并产生平仓后自动统计</n-text>
+            <n-text depth="3">{{ t('trades.stats_hint') }}</n-text>
           </template>
         </n-empty>
 
@@ -534,12 +536,12 @@ const statsColumns = [
       </n-tab-pane>
 
       <!-- 废票 -->
-      <n-tab-pane name="voided" tab="废票">
+      <n-tab-pane name="voided" :tab="t('trades.voided_tab')">
         <n-space vertical size="small">
-          <n-tag :bordered="false" type="warning">共 {{ voidedSignals.length }} 条</n-tag>
+          <n-tag :bordered="false" type="warning">{{ t('trades.voided_count', { count: voidedSignals.length }) }}</n-tag>
           <n-data-table v-if="voidedLoading"
             :columns="voidedColumns" :data="[]" :loading="true" :bordered="true" :max-height="500" />
-          <n-empty v-else-if="voidedSignals.length === 0" description="暂无废票记录" />
+          <n-empty v-else-if="voidedSignals.length === 0" :description="t('trades.voided_empty')" />
           <n-data-table v-else :columns="voidedColumns" :data="voidedSignals" :bordered="true"
             :max-height="500" striped :single-line="false"
             v-model:expanded-row-keys="voidedExpandedKeys"
