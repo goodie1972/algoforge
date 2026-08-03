@@ -1,4 +1,4 @@
-# XAUUSD 量化交易系统 v2.2.0 — CLAUDE.md
+# XAUUSD 量化交易系统 v2.3.0 — CLAUDE.md
 
 ## 项目
 

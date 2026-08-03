@@ -40,9 +40,23 @@
       "double_first": false
     },
     "bakome_backup_optimized": {
-      "enabled": false,
+      "enabled": true,
       "magic": 777006,
       "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "bakome_gold_scalper_original": {
+      "enabled": false,
+      "magic": 880303,
+      "timeframe": "M5",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "bakome_trinity_ea_original": {
+      "enabled": false,
+      "magic": 880304,
+      "timeframe": "M5",
       "max_positions": 0,
       "double_first": false
     },
@@ -54,17 +68,17 @@
       "double_first": false
     },
     "gold_auto_research": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880306,
       "timeframe": "H1",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "h1_breakout": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880301,
       "timeframe": "H1",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "m30_bb_deepreturn": {
@@ -166,9 +180,16 @@
       "double_first": false
     },
     "sanqing_h1_upgraded": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880108,
       "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "sanqing_original": {
+      "enabled": false,
+      "magic": 880201,
+      "timeframe": "M5",
       "max_positions": 0,
       "double_first": false
     },
@@ -193,6 +214,13 @@
       "max_positions": 0,
       "double_first": false
     },
+    "timeprofit_ea": {
+      "enabled": false,
+      "magic": 880202,
+      "timeframe": "M5",
+      "max_positions": 0,
+      "double_first": false
+    },
     "viprasol_sniper": {
       "enabled": false,
       "magic": 661401,
@@ -205,20 +233,6 @@
       "magic": 777005,
       "timeframe": "H1",
       "max_positions": 0,
-      "double_first": false
-    },
-    "sanqing_original": {
-      "enabled": true,
-      "magic": 880201,
-      "timeframe": "M5",
-      "max_positions": 5,
-      "double_first": false
-    },
-    "timeprofit_ea": {
-      "enabled": true,
-      "magic": 880202,
-      "timeframe": "M5",
-      "max_positions": 5,
       "double_first": false
     }
   },
