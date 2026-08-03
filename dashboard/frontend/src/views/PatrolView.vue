@@ -27,7 +27,7 @@ const levelIcons: Record<string, any> = {
 
 <template>
   <div>
-    <n-page-header subtitle="监控告警">
+    <n-page-header :subtitle="$t('patrol.subtitle')">
       <template #title>
         <n-space align="center" size="small">
           <n-icon :color="levelColors[patrol.health]" size="28">
@@ -35,30 +35,30 @@ const levelIcons: Record<string, any> = {
             <WarningOutline v-else-if="patrol.health === 'warning'" />
             <ShieldCheckmarkOutline v-else />
           </n-icon>
-          <span>巡检状态</span>
-          <n-tag v-if="patrol.health === 'normal'" type="success" size="small" :bordered="false">一切正常</n-tag>
+          <span>{{ $t('patrol.status') }}</span>
+          <n-tag v-if="patrol.health === 'normal'" type="success" size="small" :bordered="false">{{ $t('patrol.all_ok') }}</n-tag>
           <n-tag v-else-if="patrol.health === 'warning'" type="warning" size="small" :bordered="false">
-            {{ patrol.warningCount }} 条告警
+            {{ $t('patrol.warning_count', { count: patrol.warningCount }) }}
           </n-tag>
           <n-tag v-else type="error" size="small" :bordered="false">
-            {{ patrol.criticalCount }} 条严重
+            {{ $t('patrol.critical_count', { count: patrol.criticalCount }) }}
           </n-tag>
         </n-space>
       </template>
       <template #extra>
         <n-space>
-          <n-button size="small" @click="patrol.runPatrol()">立即巡检</n-button>
-          <n-button size="small" @click="patrol.clearAlerts()">清除告警</n-button>
+          <n-button size="small" @click="patrol.runPatrol()">{{ $t('patrol.run_now') }}</n-button>
+          <n-button size="small" @click="patrol.clearAlerts()">{{ $t('patrol.clear_alerts') }}</n-button>
         </n-space>
       </template>
     </n-page-header>
 
     <n-p v-if="patrol.lastCheckTime" depth="3" style="font-size: 12px;">
-      上次巡检: {{ patrol.lastCheckTime }}
+              {{ $t('patrol.last_check') }}: {{ patrol.lastCheckTime }}
     </n-p>
 
     <!-- 空状态 -->
-    <n-empty v-if="patrol.alerts.length === 0" description="无告警，一切正常" style="margin-top: 40px;">
+    <n-empty v-if="patrol.alerts.length === 0" :description="$t('patrol.empty')" style="margin-top: 40px;">
       <template #icon>
         <n-icon :color="'#22c55e'" size="48">
           <ShieldCheckmarkOutline />
@@ -81,7 +81,7 @@ const levelIcons: Record<string, any> = {
             <n-space align="center" size="small">
               <n-tag :type="a.level === 'critical' ? 'error' : a.level === 'warning' ? 'warning' : 'success'"
                 size="tiny" :bordered="false">
-                {{ a.level === 'critical' ? '严重' : a.level === 'warning' ? '告警' : '信息' }}
+                {{ a.level === 'critical' ? $t('patrol.level_critical') : a.level === 'warning' ? $t('patrol.level_warning') : $t('patrol.level_info') }}
               </n-tag>
               <span>{{ a.time }}</span>
             </n-space>

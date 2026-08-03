@@ -127,14 +127,14 @@ const summaryRows = () => {
 </script>
 
 <template>
-  <n-card title="当前持仓" size="small">
+  <n-card :title="$t('positions.current')" size="small">
     <template #header-extra>
       <n-space size="small">
-        <n-tag :bordered="false" type="success" size="small">多头 {{ store.longCount }}</n-tag>
-        <n-tag :bordered="false" type="error" size="small">空头 {{ store.shortCount }}</n-tag>
+        <n-tag :bordered="false" type="success" size="small">{{ $t('positions.long_tag') }} {{ store.longCount }}</n-tag>
+        <n-tag :bordered="false" type="error" size="small">{{ $t('positions.short_tag') }} {{ store.shortCount }}</n-tag>
         <n-tag :bordered="false" :type="store.totalProfit >= 0 ? 'success' : 'error'" size="small"
           :class="{ 'flash-num': totalPnLFlash }">
-          总计 ${{ store.totalProfit.toFixed(2) }}
+          {{ $t('positions.summary') }} ${{ store.totalProfit.toFixed(2) }}
         </n-tag>
       </n-space>
     </template>
@@ -142,7 +142,7 @@ const summaryRows = () => {
     <!-- 加载态 -->
     <n-data-table v-if="store.loading" :columns="columns" :data="[]" :loading="true" :bordered="false" :max-height="400" />
     <!-- 空态 -->
-    <n-empty v-else-if="store.items.length === 0" description="暂无持仓" style="padding: 40px 0;" />
+    <n-empty v-else-if="store.items.length === 0" :description="$t('positions.empty')" style="padding: 40px 0;" />
     <!-- 错误态 -->
     <n-alert v-else-if="store.error" type="error" :title="store.error" closable style="margin-bottom:12px;" />
     <!-- 数据态 -->

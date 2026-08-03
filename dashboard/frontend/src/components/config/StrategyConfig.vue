@@ -99,11 +99,11 @@ async function savePool() {
 <template>
   <n-space vertical size="large">
     <n-alert type="info" :bordered="false">
-      策略池：左侧开关控制是否启用该策略，展开可设置各策略的独立参数（Magic/周期/最大持仓/双倍首单）。保存后重启引擎生效。共 {{ allStrategies.length }} 个策略，已启用 {{ enabledCount }} 个。
+      {{ $t('strategy.config_pool_desc', { total: allStrategies.length, enabled: enabledCount }) }}
     </n-alert>
 
     <n-spin :show="loading">
-      <n-empty v-if="!loading && !allStrategies.length" description="未发现可交易策略" />
+      <n-empty v-if="!loading && !allStrategies.length" :description="$t('strategy.no_strategies')" />
 
       <n-grid :cols="2" :x-gap="12" :y-gap="12">
         <n-grid-item v-for="meta in allStrategies" :key="meta.id">
@@ -118,10 +118,10 @@ async function savePool() {
                 {{ meta.display }}
                 <n-text depth="3" style="font-size: 11px; margin-left: 6px;">{{ meta.name }}</n-text>
               </span>
-              <n-tag v-if="pool[meta.id]?.enabled" type="success" size="small">已启用</n-tag>
-              <n-tag v-else type="default" size="small">未启用</n-tag>
+              <n-tag v-if="pool[meta.id]?.enabled" type="success" size="small">{{ $t('strategy.enabled') }}</n-tag>
+              <n-tag v-else type="default" size="small">{{ $t('strategy.disabled') }}</n-tag>
               <n-button text size="tiny" style="margin-left: 8px;" @click.stop="toggleExpand(meta.id)">
-                {{ expanded.has(meta.id) ? '收起' : '展开' }}
+                {{ expanded.has(meta.id) ? $t('strategy.collapse') : $t('strategy.expand') }}
               </n-button>
             </div>
 
@@ -129,25 +129,25 @@ async function savePool() {
               style="padding: 12px 16px; border-top: 1px solid var(--n-border-color);">
               <n-grid :cols="2" :x-gap="12" :y-gap="8">
                 <n-grid-item>
-                  <n-form-item label="Magic Number" :label-placement="'top'" size="small">
+                  <n-form-item :label="$t('strategy.magic')" :label-placement="'top'" size="small">
                     <app-input-number v-model:value="pool[meta.id].magic" :min="100000" :max="999999"
                       style="width:100%;" size="small" />
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
-                  <n-form-item label="时间周期" :label-placement="'top'" size="small">
+                  <n-form-item :label="$t('strategy.timeframe')" :label-placement="'top'" size="small">
                     <n-select v-model:value="pool[meta.id].timeframe"
                       :options="timeframes.map(t => ({ label: t, value: t }))" size="small" />
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
-                  <n-form-item label="最大持仓" :label-placement="'top'" size="small">
+                  <n-form-item :label="$t('strategy.max_positions')" :label-placement="'top'" size="small">
                     <app-input-number v-model:value="pool[meta.id].max_positions" :min="1" :max="5"
                       style="width:100%;" size="small" />
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
-                  <n-form-item label="双倍首单" :label-placement="'top'" size="small">
+                  <n-form-item :label="$t('strategy.double_first')" :label-placement="'top'" size="small">
                     <n-switch v-model:value="pool[meta.id].double_first" size="small" />
                   </n-form-item>
                 </n-grid-item>
@@ -158,7 +158,7 @@ async function savePool() {
       </n-grid>
 
       <n-button type="primary" :loading="saving" @click="savePool" block size="large" :disabled="loading">
-        保存策略池配置
+        {{ $t('strategy.save_config') }}
       </n-button>
     </n-spin>
   </n-space>

@@ -52,25 +52,25 @@ function confirmReset() {
     <!-- 左列 -->
     <n-grid-item>
       <n-space vertical size="medium">
-        <n-divider title-position="left">纸面模式开关</n-divider>
-        <n-form-item label="纸面模式">
+        <n-divider title-position="left">{{ $t('config.paper.switch_title') }}</n-divider>
+        <n-form-item :label="$t('config.paper.paper_mode')">
           <n-switch :value="local.enabled"
             @update:value="(v: any) => v != null && (local.enabled = v)" />
-          <template #feedback>开启后所有交易通过 PaperBridge 本地模拟，不影响真实 MT4 账户</template>
+          <template #feedback>{{ $t('config.paper.paper_mode_feedback') }}</template>
         </n-form-item>
 
-        <n-divider title-position="left">持仓限制</n-divider>
-        <n-form-item label="最大同时持仓数">
+        <n-divider title-position="left">{{ $t('config.paper.position_limit') }}</n-divider>
+        <n-form-item :label="$t('config.paper.max_positions')">
           <app-input-number :value="local.max_positions" :min="1" :max="50"
             @update:value="(v: any) => v != null && (local.max_positions = v)" style="width:100%;" />
-          <template #feedback>纸面模式下单策略最大同时持仓数</template>
+          <template #feedback>{{ $t('config.paper.max_positions_feedback') }}</template>
         </n-form-item>
 
-        <n-divider title-position="left">虚拟余额</n-divider>
-        <n-form-item label="初始虚拟余额 ($)">
+        <n-divider title-position="left">{{ $t('config.paper.virtual_balance') }}</n-divider>
+        <n-form-item :label="$t('config.paper.initial_balance')">
           <app-input-number :value="local.initial_balance" :min="0" :max="100000"
             @update:value="(v: any) => v != null && (local.initial_balance = v)" style="width:100%;" />
-          <template #feedback>0=从真实桥接获取余额，&gt;0=使用指定虚拟余额</template>
+          <template #feedback>{{ $t('config.paper.initial_balance_feedback') }}</template>
         </n-form-item>
       </n-space>
     </n-grid-item>
@@ -78,24 +78,24 @@ function confirmReset() {
     <!-- 右列 -->
     <n-grid-item>
       <n-space vertical size="medium">
-        <n-divider title-position="left">门禁控制</n-divider>
-        <n-form-item label="忽略门禁">
+        <n-divider title-position="left">{{ $t('config.paper.gate_control') }}</n-divider>
+        <n-form-item :label="$t('config.paper.ignore_gates')">
           <n-switch :value="local.ignore_gates"
             @update:value="(v: any) => v != null && (local.ignore_gates = v)" />
-          <template #feedback>开启后忽略所有门禁（位置门禁、急跌急涨、利润回撤保护等），仅在纸面模式生效</template>
+          <template #feedback>{{ $t('config.paper.ignore_gates_feedback') }}</template>
         </n-form-item>
 
-        <n-divider title-position="left">风险提示</n-divider>
+        <n-divider title-position="left">{{ $t('config.paper.risk_warning') }}</n-divider>
         <n-alert type="warning">
-          纸面模式仅供策略验证使用。切换为实盘前请关闭纸面模式并重启引擎。
+          {{ $t('config.paper.risk_warning_content') }}
         </n-alert>
 
-        <n-divider title-position="left">重置纸面数据</n-divider>
+        <n-divider title-position="left">{{ $t('config.paper.reset_title') }}</n-divider>
         <n-button type="warning" secondary block @click="confirmReset">
-          清空纸面成交记录
+          {{ $t('config.paper.reset_button') }}
         </n-button>
         <n-text depth="3" style="font-size: 12px;">
-          清空 papertest_bridge.csv 和本地模拟持仓，不可恢复
+          {{ $t('config.paper.reset_desc') }}
         </n-text>
       </n-space>
     </n-grid-item>
@@ -103,7 +103,7 @@ function confirmReset() {
 
   <div style="margin-top: 16px;">
     <n-button type="primary" :disabled="!changed" @click="save" block>
-      保存纸面配置
+      {{ $t('config.paper.save') }}
     </n-button>
   </div>
 </template>

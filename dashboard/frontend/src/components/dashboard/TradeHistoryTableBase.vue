@@ -96,8 +96,8 @@ const columns = [
 
 <template>
   <n-data-table v-if="loading" :columns="columns" :data="[]" :loading="true" :bordered="true" :max-height="maxHeight || 240" />
-  <n-empty v-else-if="items.length === 0" description="暂无历史成交">
-    <template #extra><n-text depth="3">启动引擎后自动记录已平仓订单</n-text></template>
+  <n-empty v-else-if="items.length === 0" :description="$t('trades.empty')">
+    <template #extra><n-text depth="3">{{ $t('trades.empty_desc') }}</n-text></template>
   </n-empty>
   <n-alert v-else-if="error" type="error" :title="error" closable />
   <n-data-table v-else :columns="columns" :data="items" :bordered="true"

@@ -166,9 +166,9 @@ async function handleModify() {
     <!-- 加载态 -->
     <n-data-table v-if="store.loading" :columns="columns" :data="[]" :loading="true" :bordered="true" :max-height="600" />
     <!-- 空态 -->
-    <n-empty v-else-if="store.items.length === 0" description="暂无持仓">
+    <n-empty v-else-if="store.items.length === 0" :description="$t('positions.empty')">
       <template #extra>
-        <n-text depth="3">启动引擎后自动获取持仓数据</n-text>
+        <n-text depth="3">{{ $t('positions.empty_desc') }}</n-text>
       </template>
     </n-empty>
     <!-- 错误态 -->
@@ -181,16 +181,16 @@ async function handleModify() {
 
     <!-- 修改 SL/TP 抽屉 -->
     <n-drawer v-model:show="showDrawer" :width="360" placement="right">
-      <n-drawer-content :title="`修改 SL/TP - #${editingTicket}`" closable @close="editingTicket = null">
+      <n-drawer-content :title="`${$t('positions.modify_sltp')} - #${editingTicket}`" closable @close="editingTicket = null">
         <n-space vertical size="large">
-          <n-form-item label="止损 (SL)">
+          <n-form-item :label="$t('positions.sl')">
             <app-input-number v-model:value="editSl" :step="0.01" style="width:100%;" />
           </n-form-item>
-          <n-form-item label="止盈 (TP)">
+          <n-form-item :label="$t('positions.tp')">
             <app-input-number v-model:value="editTp" :step="0.01" style="width:100%;" />
           </n-form-item>
           <n-button type="primary" :loading="loadingModify" @click="handleModify" block>
-            确认修改
+            {{ $t('positions.confirm_modify') }}
           </n-button>
         </n-space>
       </n-drawer-content>
