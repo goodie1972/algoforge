@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { darkTheme } from 'naive-ui'
+import { useAppStore } from './stores/app'
+import { computed } from 'vue'
 import AppShell from './AppShell.vue'
 
-const themeOverrides = {
+const appStore = useAppStore()
+
+const themeOverrides = computed(() => ({
   common: {
     primaryColor: '#f0b90b',
     primaryColorHover: '#f5c532',
@@ -13,28 +16,28 @@ const themeOverrides = {
     fontSizeTiny: '12px',
     fontFamily: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     fontFamilyMono: "'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace",
-    bodyColor: '#0d1117',
-    cardColor: '#161b22',
-    modalColor: '#161b22',
-    popoverColor: '#1c2333',
-    tableColor: '#161b22',
-    inputColor: '#0d1117',
-    actionColor: '#1c2333',
+    bodyColor: appStore.isDark ? '#0d1117' : '#f5f7fa',
+    cardColor: appStore.isDark ? '#161b22' : '#ffffff',
+    modalColor: appStore.isDark ? '#161b22' : '#ffffff',
+    popoverColor: appStore.isDark ? '#1c2333' : '#ffffff',
+    tableColor: appStore.isDark ? '#161b22' : '#ffffff',
+    inputColor: appStore.isDark ? '#0d1117' : '#f5f7fa',
+    actionColor: appStore.isDark ? '#1c2333' : '#f0f2f5',
     borderRadius: '10px',
     borderRadiusSmall: '6px',
-    borderColor: '#2d3139',
-    dividerColor: '#2d3139',
-    hoverColor: '#1c2333',
-    textColor1: '#f0f6fc',
-    textColor2: '#e6edf3',
-    textColor3: '#8b949e',
-    clearColor: '#0d1117',
-    progressRailColor: '#2d3139',
+    borderColor: appStore.isDark ? '#2d3139' : '#e0e4e8',
+    dividerColor: appStore.isDark ? '#2d3139' : '#e0e4e8',
+    hoverColor: appStore.isDark ? '#1c2333' : '#f0f2f5',
+    textColor1: appStore.isDark ? '#f0f6fc' : '#1a1a2e',
+    textColor2: appStore.isDark ? '#e6edf3' : '#2d2d44',
+    textColor3: appStore.isDark ? '#8b949e' : '#6e7681',
+    clearColor: appStore.isDark ? '#0d1117' : '#f5f7fa',
+    progressRailColor: appStore.isDark ? '#2d3139' : '#e0e4e8',
   },
   Card: {
     borderRadius: '12px',
-    borderColor: '#2d3139',
-    color: '#161b22',
+    borderColor: appStore.isDark ? '#2d3139' : '#e0e4e8',
+    color: appStore.isDark ? '#161b22' : '#ffffff',
     paddingMedium: '16px 20px',
     paddingSmall: '12px 16px',
   },
@@ -43,7 +46,7 @@ const themeOverrides = {
     borderRadiusSmall: '6px',
     borderPrimary: '1px solid #f0b90b',
     colorHoverPrimary: '#f5c532',
-    textColorGhost: '#e6edf3',
+    textColorGhost: appStore.isDark ? '#e6edf3' : '#2d2d44',
     textColorGhostHover: '#f0b90b',
   },
   Tag: { borderRadius: '6px' },
@@ -54,9 +57,9 @@ const themeOverrides = {
   },
   DataTable: {
     borderRadius: '10px',
-    tdColor: '#161b22',
-    thColor: '#1c2333',
-    borderColor: '#2d3139',
+    tdColor: appStore.isDark ? '#161b22' : '#ffffff',
+    thColor: appStore.isDark ? '#1c2333' : '#f5f7fa',
+    borderColor: appStore.isDark ? '#2d3139' : '#e0e4e8',
     thFontWeight: '600',
   },
   Menu: {
@@ -64,24 +67,24 @@ const themeOverrides = {
     itemColorActive: 'rgba(240, 185, 11, 0.12)',
     itemTextColorActive: '#f0b90b',
     itemIconColorActive: '#f0b90b',
-    itemTextColor: '#8b949e',
-    itemIconColor: '#8b949e',
-    itemTextColorHover: '#e6edf3',
-    itemIconColorHover: '#e6edf3',
+    itemTextColor: appStore.isDark ? '#8b949e' : '#6e7681',
+    itemIconColor: appStore.isDark ? '#8b949e' : '#6e7681',
+    itemTextColorHover: appStore.isDark ? '#e6edf3' : '#1a1a2e',
+    itemIconColorHover: appStore.isDark ? '#e6edf3' : '#1a1a2e',
   },
   Modal: { borderRadius: '16px' },
-  Select: { menuColor: '#1c2333' },
+  Select: { menuColor: appStore.isDark ? '#1c2333' : '#ffffff' },
   Switch: { railColorActive: '#f0b90b' },
-  Progress: { railColor: '#2d3139' },
+  Progress: { railColor: appStore.isDark ? '#2d3139' : '#e0e4e8' },
   Statistic: {
     labelFontSize: '13px',
     valueFontSize: '22px',
     labelFontWeight: '500',
   },
   Descriptions: {
-    thColor: '#1c2333',
-    tdColor: '#161b22',
-    borderColor: '#2d3139',
+    thColor: appStore.isDark ? '#1c2333' : '#f5f7fa',
+    tdColor: appStore.isDark ? '#161b22' : '#ffffff',
+    borderColor: appStore.isDark ? '#2d3139' : '#e0e4e8',
   },
   PageHeader: {
     titleFontSize: '22px',
@@ -90,11 +93,11 @@ const themeOverrides = {
   },
   Notification: { borderRadius: '12px' },
   Drawer: { borderRadius: '16px 0 0 16px' },
-}
+}))
 </script>
 
 <template>
-  <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
+  <n-config-provider :theme="appStore.naiveTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-notification-provider>
         <n-dialog-provider>

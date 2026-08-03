@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, h, onMounted, onUnmounted } from 'vue'
+import { ref, computed, h, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { darkTheme, NIcon } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
 import {
   AnalyticsOutline, WalletOutline, SettingsOutline, DocumentTextOutline,
   BarChartOutline, PowerOutline, PlayOutline, StopOutline,
   ReaderOutline, CalendarNumberOutline,
+  MoonOutline, SunnyOutline, LanguageOutline,
 } from '@vicons/ionicons5'
 import { useAccountStore } from '@/stores/account'
 import { usePositionStore } from '@/stores/positions'
@@ -17,6 +20,15 @@ import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog,
 import { useMessage, useDialog } from 'naive-ui'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
 import NewsBiasPopup from '@/components/NewsBiasPopup.vue'
+
+const { t, locale } = useI18n()
+const appStore = useAppStore()
+
+// 监听语言变化，刷新菜单
+const menuKey = ref(0)
+watch(() => locale.value, () => { menuKey.value++ })
+// 同步 appStore locale 到 i18n
+watch(() => appStore.locale, (val) => { if (val) locale.value = val }, { immediate: true })
 
 // 新闻弹窗
 const showNewsBias = ref(false)
@@ -115,13 +127,13 @@ function renderIcon(icon: any) {
 }
 
 const menuOptions = [
-  { label: '交易终端', key: '/', icon: renderIcon(AnalyticsOutline) },
-  { label: '账户持仓', key: '/positions', icon: renderIcon(WalletOutline) },
-  { label: '策略中心', key: '/strategies', icon: renderIcon(BarChartOutline) },
-  { label: '历史成交', key: '/trades', icon: renderIcon(ReaderOutline) },
-  { label: '运行配置', key: '/config', icon: renderIcon(SettingsOutline) },
-  { label: '日报周报', key: '/report', icon: renderIcon(CalendarNumberOutline) },
-  { label: '系统日志', key: '/logs', icon: renderIcon(DocumentTextOutline) },
+  { label: () => t('nav.trading'), key: '/', icon: renderIcon(AnalyticsOutline) },
+  { label: () => t('nav.positions'), key: '/positions', icon: renderIcon(WalletOutline) },
+  { label: () => t('nav.strategies'), key: '/strategies', icon: renderIcon(BarChartOutline) },
+  { label: () => t('nav.trades'), key: '/trades', icon: renderIcon(ReaderOutline) },
+  { label: () => t('nav.config'), key: '/config', icon: renderIcon(SettingsOutline) },
+  { label: () => t('nav.report'), key: '/report', icon: renderIcon(CalendarNumberOutline) },
+  { label: () => t('nav.logs'), key: '/logs', icon: renderIcon(DocumentTextOutline) },
 ]
 
 function handleMenuUpdate(key: string) {
@@ -138,18 +150,18 @@ async function checkEngineStatus() {
 async function toggleEngine(checked: boolean) {
   if (!checked) {
     dialog.warning({
-      title: '确认停止引擎',
-      content: '停止引擎后所有策略暂停运行，确定继续？',
-      positiveText: '确定',
-      negativeText: '取消',
+      title: t('engine.confirm_stop'),
+      content: t('engine.confirm_stop_msg'),
+      positiveText: t('common.confirm'),
+      negativeText: t('common.cancel'),
       onPositiveClick: async () => {
         toggleLoading.value = true
         try {
           await stopEngine()
           engineStatus.value = 'stopped'
-          message.success('引擎已停止')
+          message.success(t('engine.stop_success'))
         } catch (e: any) {
-          message.error(e?.response?.data?.detail || '停止失败')
+          message.error(e?.response?.data?.detail || t('engine.stop_fail'))
           engineStatus.value = 'running'
         }
         toggleLoading.value = false
@@ -163,9 +175,9 @@ async function toggleEngine(checked: boolean) {
     try {
       await startEngine()
       engineStatus.value = 'running'
-      message.success('引擎启动成功')
+      message.success(t('engine.start_success'))
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || '启动失败')
+      message.error(e?.response?.data?.detail || t('engine.start_fail'))
       engineStatus.value = 'stopped'
     }
     toggleLoading.value = false
@@ -226,12 +238,29 @@ onUnmounted(() => {
               <path d="M16 1 L6 16 L14 16 L6 31 L26 16 L18 16 L26 1 Z" fill="url(#lg2)" stroke="#1c2333" stroke-width="1.5" stroke-linejoin="round"/>
             </svg>
           </n-h2>
-          <n-text v-if="!collapsed" depth="3" class="sider-subtitle">XAUUSD 黄金量化交易系统</n-text>
+          <n-text v-if="!collapsed" depth="3" class="sider-subtitle">{{ t('app.subtitle') }}</n-text>
         </div>
 
         <n-menu :value="route.path" :options="menuOptions" :collapsed="collapsed"
                 :collapsed-width="64" :collapsed-icon-size="22"
+                :key="menuKey"
                 @update:value="handleMenuUpdate" />
+
+        <!-- 侧边栏底部：主题/语言切换 -->
+        <div class="sider-footer">
+          <n-button quaternary size="small" @click="appStore.toggleTheme()" class="sider-toggle-btn">
+            <template #icon>
+              <n-icon><component :is="appStore.isDark ? SunnyOutline : MoonOutline" /></n-icon>
+            </template>
+            <span v-if="!collapsed">{{ appStore.isDark ? t('theme.light') : t('theme.dark') }}</span>
+          </n-button>
+          <n-button quaternary size="small" @click="appStore.setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN')" class="sider-toggle-btn">
+            <template #icon>
+              <n-icon><LanguageOutline /></n-icon>
+            </template>
+            <span v-if="!collapsed">{{ locale === 'zh-CN' ? 'English' : '中文' }}</span>
+          </n-button>
+        </div>
       </n-layout-sider>
 
       <!-- 主内容 -->
@@ -243,8 +272,8 @@ onUnmounted(() => {
             </template>
           </n-button>
           <n-breadcrumb>
-            <n-breadcrumb-item>AlgoForge - XAUUSD 黄金量化交易系统</n-breadcrumb-item>
-            <n-breadcrumb-item>{{ route.name === 'config' ? '配置' : route.name === 'positions' ? '持仓' : route.name === 'strategies' ? '策略' : route.name === 'logs' ? '日志' : route.name === 'patrol' ? '监控' : '仪表板' }}</n-breadcrumb-item>
+            <n-breadcrumb-item>{{ t('app.breadcrumb') }}</n-breadcrumb-item>
+            <n-breadcrumb-item>{{ route.name === 'config' ? t('common.config') : route.name === 'positions' ? t('common.positions') : route.name === 'strategies' ? t('common.strategies') : route.name === 'logs' ? t('common.logs') : route.name === 'patrol' ? t('common.patrol') : t('common.dashboard') }}</n-breadcrumb-item>
           </n-breadcrumb>
           <div class="header-spacer"></div>
           <n-tooltip trigger="hover" placement="bottom">
@@ -258,12 +287,12 @@ onUnmounted(() => {
               </div>
             </template>
             <div class="version-tooltip">
-              <div><b>分支:</b> {{ versionInfo.branch }}</div>
-              <div><b>提交:</b> {{ versionInfo.commit }}</div>
-              <div v-if="versionInfo.has_update" class="version-update-available">⬆ 有 {{ versionInfo.behind_count }} 个新 commit 可更新</div>
-              <div v-else class="version-up-to-date">✓ 已是最新版本</div>
-              <div v-if="versionInfo.dirty" class="version-dirty">* 本地有未提交修改</div>
-              <div class="version-click-hint">点击查看详情</div>
+              <div><b>{{ t('version.branch') }}:</b> {{ versionInfo.branch }}</div>
+              <div><b>{{ t('version.commit') }}:</b> {{ versionInfo.commit }}</div>
+              <div v-if="versionInfo.has_update" class="version-update-available">⬆ {{ t('version.update_available', {count: versionInfo.behind_count}) }}</div>
+              <div v-else class="version-up-to-date">✓ {{ t('version.latest') }}</div>
+              <div v-if="versionInfo.dirty" class="version-dirty">* {{ t('version.local_dirty') }}</div>
+              <div class="version-click-hint">{{ t('version.click_hint') }}</div>
             </div>
           </n-tooltip>
           <PatrolIndicator />
@@ -297,14 +326,14 @@ onUnmounted(() => {
 
     <!-- 版本变更日志弹窗 -->
     <n-modal v-model:show="showChangelog" preset="card" class="changelog-modal"
-             :title="versionInfo.has_update ? `版本更新 — v${versionInfo.version} → 落后 ${versionInfo.behind_count} 个 commit` : `版本信息 — v${versionInfo.version} 已是最新`">
+             :title="versionInfo.has_update ? `v${versionInfo.version} — ${t('version.update_available', {count: versionInfo.behind_count})}` : `${t('version.title')} — v${versionInfo.version} ${t('version.latest')}`">
       <template #header-extra>
-        <n-tag size="small" :bordered="false" type="success" v-if="!versionInfo.has_update">已是最新</n-tag>
-        <n-tag size="small" :bordered="false" type="warning" v-else>有更新</n-tag>
+        <n-tag size="small" :bordered="false" type="success" v-if="!versionInfo.has_update">{{ t('version.up_to_date') }}</n-tag>
+        <n-tag size="small" :bordered="false" type="warning" v-else>{{ t('version.has_update') }}</n-tag>
       </template>
 
       <div v-if="versionInfo.has_update">
-        <div v-if="loadingRemote" class="changelog-loading">加载中...</div>
+        <div v-if="loadingRemote" class="changelog-loading">{{ t('version.loading') }}</div>
         <div v-else class="changelog-list">
           <div v-for="(c, i) in remoteChangelog" :key="i" class="changelog-item">
             <div class="cl-hash">{{ c.hash }}</div>
@@ -317,11 +346,11 @@ onUnmounted(() => {
 
       <div v-else>
         <div class="version-info-bar">
-          <span>当前版本: <b class="version-highlight">v{{ versionInfo.version }}</b></span>
-          <span>提交: <b class="version-highlight">{{ versionInfo.commit }}</b></span>
-          <span>分支: <b class="version-highlight">{{ versionInfo.branch }}</b></span>
+          <span>{{ t('version.current') }}: <b class="version-highlight">v{{ versionInfo.version }}</b></span>
+          <span>{{ t('version.commit') }}: <b class="version-highlight">{{ versionInfo.commit }}</b></span>
+          <span>{{ t('version.branch') }}: <b class="version-highlight">{{ versionInfo.branch }}</b></span>
         </div>
-        <div v-if="!changelog.length" class="changelog-loading">加载中...</div>
+        <div v-if="!changelog.length" class="changelog-loading">{{ t('version.loading') }}</div>
         <div v-else class="changelog-list">
           <div v-for="(c, i) in changelog" :key="i" class="changelog-item">
             <div class="cl-hash">{{ c.hash }}</div>
@@ -333,13 +362,13 @@ onUnmounted(() => {
 
       <template #footer>
         <div class="changelog-footer">
-          <span v-if="versionInfo.has_update" class="footer-text">待更新 {{ versionInfo.behind_count }} 个 commit</span>
-          <span v-else class="footer-text">最近 {{ changelog.length }} 条 commit</span>
+          <span v-if="versionInfo.has_update" class="footer-text">{{ t('version.pending_commits', {count: versionInfo.behind_count}) }}</span>
+          <span v-else class="footer-text">{{ t('version.recent_commits', {count: changelog.length}) }}</span>
           <div class="footer-actions">
-            <span v-if="versionInfo.dirty && versionInfo.has_update" class="footer-dirty-warning">⚠ 本地有未提交修改</span>
-            <n-button size="small" quaternary :loading="loadingRemote" @click="checkUpdate">↻ 检查更新</n-button>
+            <span v-if="versionInfo.dirty && versionInfo.has_update" class="footer-dirty-warning">⚠ {{ t('version.local_dirty') }}</span>
+            <n-button size="small" quaternary :loading="loadingRemote" @click="checkUpdate">↻ {{ t('version.check_update') }}</n-button>
             <n-button size="small" type="warning" secondary :disabled="!versionInfo.has_update || versionInfo.dirty" :loading="updating" @click="doUpdate">
-              ⬇ 版本更新
+              ⬇ {{ t('version.do_update') }}
             </n-button>
           </div>
         </div>
@@ -395,6 +424,23 @@ onUnmounted(() => {
 }
 .sider-subtitle {
   font-size: 11px;
+}
+
+/* ── 侧边栏底部切换按钮 ── */
+.sider-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px;
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  border-top: 1px solid var(--n-border-color, #2d3139);
+}
+.sider-toggle-btn {
+  flex: 1;
+  font-size: 12px !important;
 }
 
 /* ── 版本号徽标 ── */
