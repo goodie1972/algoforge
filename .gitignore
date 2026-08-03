@@ -23,6 +23,9 @@ runtime_config.json
 *.jpg
 *.jpeg
 
+# 但保留 docs/assets/ 下的截图资源
+!docs/assets/screenshot_*.png
+
 # 可执行文件
 *.exe
 

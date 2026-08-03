@@ -7,6 +7,7 @@ export const useLogStore = defineStore('logs', () => {
   const entries = ref<LogEntry[]>([])
   const filterLevel = ref<string | null>(null)
   const maxEntries = 500
+  let idCounter = 0
 
   const filteredEntries = computed(() => {
     if (!filterLevel.value) return entries.value
@@ -16,9 +17,9 @@ export const useLogStore = defineStore('logs', () => {
   })
 
   function append(entry: LogEntry) {
-    entries.value.unshift(entry)
+    entries.value.push({ ...entry, _id: ++idCounter })
     if (entries.value.length > maxEntries) {
-      entries.value = entries.value.slice(0, maxEntries)
+      entries.value.splice(0, entries.value.length - maxEntries)
     }
   }
 
@@ -28,11 +29,11 @@ export const useLogStore = defineStore('logs', () => {
       const existing = new Set(entries.value.map(e => e.timestamp + e.message))
       for (const log of logs) {
         if (!existing.has(log.timestamp + log.message)) {
-          entries.value.push(log)
+          entries.value.push({ ...log, _id: ++idCounter })
         }
       }
       if (entries.value.length > maxEntries) {
-        entries.value = entries.value.slice(0, maxEntries)
+        entries.value.splice(0, entries.value.length - maxEntries)
       }
     } catch { /* ignore */ }
   }

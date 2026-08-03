@@ -21,12 +21,23 @@ const displayLogs = computed(() => store.filteredEntries)
 function scrollToNewest() {
   if (autoScroll.value && logContainer.value) {
     nextTick(() => {
-      logContainer.value!.scrollTop = 0
+      logContainer.value!.scrollTop = logContainer.value!.scrollHeight
     })
   }
 }
 
-watch(() => store.entries.length, scrollToNewest)
+watch(() => store.entries.length, () => {
+  if (!logContainer.value) return
+  if (logContainer.value.scrollTop >= logContainer.value.scrollHeight - logContainer.value.clientHeight - 50) {
+    scrollToNewest()
+  }
+})
+
+function onScroll(e: Event) {
+  const el = e.target as HTMLElement
+  const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 50
+  autoScroll.value = atBottom
+}
 
 function logStyle(level: string) {
   switch (level) {
@@ -54,11 +65,11 @@ function logStyle(level: string) {
     </div>
 
     <n-card :bordered="true" size="small" class="log-card">
-      <!-- 空态 -->
-      <n-empty v-if="displayLogs.length === 0" description="暂无日志" class="log-empty" />
-      <!-- 日志列表 -->
-      <div v-else ref="logContainer" class="log-list">
-        <div v-for="(entry, i) in displayLogs" :key="i"
+      <!-- 日志列表 - 始终渲染，不销毁容器 -->
+      <div ref="logContainer" class="log-list" @scroll="onScroll">
+        <!-- 空态 -->
+        <n-empty v-if="displayLogs.length === 0" description="暂无日志" class="log-empty" />
+        <div v-for="entry in displayLogs" :key="entry._id"
              class="log-entry"
              @mouseenter="($event.target as HTMLElement).style.background = '#2c3038'"
              @mouseleave="($event.target as HTMLElement).style.background = 'transparent'">
