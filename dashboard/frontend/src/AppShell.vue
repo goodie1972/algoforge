@@ -214,8 +214,17 @@ onUnmounted(() => {
         :native-scrollbar="false" class="app-sider">
         <div class="sider-header">
           <n-h2 prefix="bar" class="sider-title">
-            <n-text v-if="!collapsed" class="sider-logo-text">AlgoForge</n-text>
-            <n-text v-else class="sider-logo-mini">AF</n-text>
+            <svg v-if="!collapsed" class="sider-logo-svg" viewBox="0 0 32 32" width="28" height="28">
+              <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0b90b"/><stop offset="100%" stop-color="#d4a309"/></linearGradient></defs>
+              <circle cx="16" cy="16" r="12.5" fill="url(#lg)"/>
+              <path d="M16 1 L6 16 L14 16 L6 31 L26 16 L18 16 L26 1 Z" fill="url(#lg)" stroke="#1c2333" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+            <span v-if="!collapsed" class="sider-logo-text">AlgoForge</span>
+            <svg v-else class="sider-logo-svg" viewBox="0 0 32 32" width="28" height="28">
+              <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0b90b"/><stop offset="100%" stop-color="#d4a309"/></linearGradient></defs>
+              <circle cx="16" cy="16" r="12.5" fill="url(#lg2)"/>
+              <path d="M16 1 L6 16 L14 16 L6 31 L26 16 L18 16 L26 1 Z" fill="url(#lg2)" stroke="#1c2333" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
           </n-h2>
           <n-text v-if="!collapsed" depth="3" class="sider-subtitle">XAUUSD 黄金量化交易系统</n-text>
         </div>
@@ -372,15 +381,17 @@ onUnmounted(() => {
   margin: 0;
   color: #f0b90b;
 }
+.sider-logo-svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
 .sider-logo-text {
   color: #f0b90b;
   font-size: 22px;
   font-weight: 700;
-}
-.sider-logo-mini {
-  color: #f0b90b;
-  font-size: 18px;
-  font-weight: 700;
+  vertical-align: middle;
 }
 .sider-subtitle {
   font-size: 11px;
