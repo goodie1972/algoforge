@@ -160,12 +160,12 @@ async function save() {
 <template>
   <n-space vertical size="medium">
     <n-alert type="info" :bordered="false" closable>
-      共 {{ allStrategies.length }} 个策略，已启用 {{ enabledCount }} 个。
-      左侧开关控制是否进入实盘交易。展开 > 查看完整进出场逻辑。
+      {{ $t('strategy.pool_summary', { total: allStrategies.length, enabled: enabledCount }) }}
+      {{ $t('strategy.pool_hint') }}
     </n-alert>
 
     <n-spin :show="loading">
-      <n-empty v-if="!loading && !allStrategies.length" description="未发现可交易策略" />
+      <n-empty v-if="!loading && !allStrategies.length" :description="$t('strategy.no_strategies')" />
 
       <n-card v-for="meta in allStrategies" :key="meta.id" size="small" :bordered="true"
         :style="{
@@ -190,7 +190,7 @@ async function save() {
 
           <div style="display: flex; align-items: center; gap: 12px;">
             <n-space size="small" align="center">
-              <n-text depth="3" style="font-size: 11px;">Magic</n-text>
+              <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.magic') }}</n-text>
               <n-input :value="String(pool[meta.id]?.magic || '')" size="tiny"
                 style="width: 76px;" @click.stop
                 @update:value="updateMagic(meta.id, $event)" />
@@ -209,12 +209,12 @@ async function save() {
         <div v-if="expanded.has(meta.id)" style="margin-top: 6px;">
           <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 8px;">
             <n-space align="center" size="small">
-              <n-text depth="3" style="font-size: 11px;">最大持仓</n-text>
+              <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.max_positions') }}</n-text>
               <app-input-number v-model:value="pool[meta.id].max_positions"
                 size="tiny" :min="1" :max="5" style="width: 60px;" @click.stop />
             </n-space>
             <n-space align="center" size="small">
-              <n-text depth="3" style="font-size: 11px;">双倍首单</n-text>
+              <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.double_first') }}</n-text>
               <n-switch v-model:value="pool[meta.id].double_first" size="small" @click.stop />
             </n-space>
           </div>
@@ -228,14 +228,14 @@ async function save() {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <!-- 做多 (左) -->
               <div style="border-left: 3px solid #0ecb81; padding-left: 8px;">
-                <div style="font-weight: 600; color: #0ecb81; font-size: 12px; margin-bottom: 3px;">▲ 做多</div>
+                <div style="font-weight: 600; color: #0ecb81; font-size: 12px; margin-bottom: 3px;">▲ {{ $t('strategy.long') }}</div>
                 <n-table size="small" bordered single-line :style="{ fontSize: '11px' }">
                   <thead>
                     <tr>
                       <th style="width: 20px; text-align: center;">#</th>
-                      <th>因子</th>
-                      <th style="width: 34px; text-align: center;">得分</th>
-                      <th>条件</th>
+                      <th>{{ $t('strategy.factor') }}</th>
+                      <th style="width: 34px; text-align: center;">{{ $t('strategy.score') }}</th>
+                      <th>{{ $t('strategy.condition') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -253,9 +253,9 @@ async function save() {
                   <thead>
                     <tr>
                       <th style="width:16px;text-align:center;">#</th>
-                      <th>出场方式</th>
-                      <th>正常模式</th>
-                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">加宽</th>
+                      <th>{{ $t('strategy.exit_method') }}</th>
+                      <th>{{ $t('strategy.normal_mode') }}</th>
+                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ $t('strategy.widen') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,14 +274,14 @@ async function save() {
 
               <!-- 做空 (右) -->
               <div style="border-left: 3px solid #f6465d; padding-left: 8px;">
-                <div style="font-weight: 600; color: #f6465d; font-size: 12px; margin-bottom: 3px;">▼ 做空</div>
+                <div style="font-weight: 600; color: #f6465d; font-size: 12px; margin-bottom: 3px;">▼ {{ $t('strategy.short') }}</div>
                 <n-table size="small" bordered single-line :style="{ fontSize: '11px' }">
                   <thead>
                     <tr>
                       <th style="width: 20px; text-align: center;">#</th>
-                      <th>因子</th>
-                      <th style="width: 34px; text-align: center;">得分</th>
-                      <th>条件</th>
+                      <th>{{ $t('strategy.factor') }}</th>
+                      <th style="width: 34px; text-align: center;">{{ $t('strategy.score') }}</th>
+                      <th>{{ $t('strategy.condition') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -299,9 +299,9 @@ async function save() {
                   <thead>
                     <tr>
                       <th style="width:16px;text-align:center;">#</th>
-                      <th>出场方式</th>
-                      <th>正常模式</th>
-                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">加宽</th>
+                      <th>{{ $t('strategy.exit_method') }}</th>
+                      <th>{{ $t('strategy.normal_mode') }}</th>
+                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ $t('strategy.widen') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -319,13 +319,13 @@ async function save() {
               </div>
             </div>
           </template>
-          <div v-else style="font-size:12px; color:#8b8f97; padding:4px 0;">暂无详细策略说明</div>
+          <div v-else style="font-size:12px; color:#8b8f97; padding:4px 0;">{{ $t('strategy.no_logic') }}</div>
         </div>
       </n-card>
 
       <n-button type="primary" :loading="saving" @click="save" block size="large"
         :disabled="loading">
-        保存策略配置
+        {{ $t('strategy.save_config') }}
       </n-button>
     </n-spin>
   </n-space>

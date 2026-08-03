@@ -55,9 +55,9 @@ async function run() {
 
 <template>
   <n-space vertical size="large">
-    <n-card title="回测参数" size="small">
+    <n-card :title="$t('backtest.parameters')" size="small">
       <n-form label-placement="left" label-width="100" size="small">
-        <n-form-item label="策略选择" required>
+        <n-form-item :label="$t('backtest.strategy_select')" required>
           <n-checkbox-group v-model:value="form.strategies">
             <n-space>
               <n-checkbox v-for="s in strategyOptions" :key="s.value" :value="s.value" :label="s.label" />
@@ -67,17 +67,17 @@ async function run() {
 
         <n-grid :cols="3" :x-gap="16">
           <n-gi>
-            <n-form-item label="品种">
+            <n-form-item :label="$t('backtest.symbol')">
               <n-input value="XAUUSD" disabled size="small" />
             </n-form-item>
           </n-gi>
           <n-gi>
-            <n-form-item label="周期">
+            <n-form-item :label="$t('backtest.timeframe')">
               <n-select v-model:value="form.timeframe" :options="timeframeOptions" size="small" />
             </n-form-item>
           </n-gi>
           <n-gi>
-            <n-form-item label="初始资金">
+            <n-form-item :label="$t('backtest.initial_cash')">
               <app-input-number v-model:value="form.initial_cash" :min="100" :step="1000" size="small" style="width: 100%;" />
             </n-form-item>
           </n-gi>
@@ -85,17 +85,17 @@ async function run() {
 
         <n-grid :cols="3" :x-gap="16">
           <n-gi>
-            <n-form-item label="开始日期">
+            <n-form-item :label="$t('backtest.start_date')">
               <n-date-picker v-model:formatted-value="form.start_date" type="date" value-format="yyyy-MM-dd" size="small" style="width: 100%;" />
             </n-form-item>
           </n-gi>
           <n-gi>
-            <n-form-item label="结束日期">
+            <n-form-item :label="$t('backtest.end_date')">
               <n-date-picker v-model:formatted-value="form.end_date" type="date" value-format="yyyy-MM-dd" size="small" style="width: 100%;" />
             </n-form-item>
           </n-gi>
           <n-gi>
-            <n-form-item label="手续费/张">
+            <n-form-item :label="$t('backtest.commission')">
               <app-input-number v-model:value="form.commission" :min="0" :step="0.1" size="small" style="width: 100%;" />
             </n-form-item>
           </n-gi>
@@ -103,7 +103,7 @@ async function run() {
 
         <n-button type="primary" :loading="submitting || backtest.loading"
                   @click="run" :disabled="backtest.loading" block>
-          {{ backtest.loading ? backtest.progress || '运行中...' : '开始回测' }}
+          {{ backtest.loading ? backtest.progress || $t('backtest.running') : $t('backtest.start') }}
         </n-button>
       </n-form>
 

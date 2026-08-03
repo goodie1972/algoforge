@@ -151,17 +151,17 @@ function arrowDown() {
   <n-card size="small" :bordered="true" style="margin-bottom: 12px;">
     <n-space justify="space-between" align="center" style="margin-bottom: 12px;">
       <n-button size="tiny" quaternary @click="showCriteria = true">
-        评估标准
+        {{ $t('radar.title') }}
       </n-button>
       <n-space size="small" align="center">
         <n-select v-if="strategyNames.length"
           :value="selectedStrategy" :options="strategyNames.map(n => ({ label: n, value: n }))"
           @update:value="(v: string) => emit('select', v)"
-          style="width: 180px;" placeholder="选择策略" />
+          style="width: 180px;" :placeholder="$t('radar.select_strategy')" />
         <n-select v-if="versionOptions.length && selectedStrategy"
           :value="selectedVersion || ''" :options="versionOptions"
           @update:value="(v: string) => emit('select-version', v)"
-          style="width: 170px;" placeholder="版本筛选" clearable />
+          style="width: 170px;" :placeholder="$t('radar.select_version')" clearable />
       </n-space>
     </n-space>
 
@@ -191,7 +191,7 @@ function arrowDown() {
               text-anchor="middle" dominant-baseline="middle"
               fill="#aaa" font-size="12">{{ lab.text }}</text>
           </svg>
-          <n-empty v-else description="暂无数据" />
+          <n-empty v-else :description="$t('radar.no_data')" />
         </div>
       </n-gi>
 
@@ -199,7 +199,7 @@ function arrowDown() {
       <n-gi>
         <n-space vertical size="small">
           <n-h3 style="margin: 0;">
-            综合评分
+            {{ $t('radar.composite_score') }}
             <n-tag :color="{ color: grade.color }" size="small" style="margin-left: 8px;">
               {{ grade.label }}
             </n-tag>
@@ -212,9 +212,9 @@ function arrowDown() {
           <n-table size="small" :bordered="false" :single-line="false" style="font-size: 13px;">
             <thead>
               <tr>
-                <th>指标</th>
-                <th style="text-align:right;">当前值</th>
-                <th style="text-align:right;">得分</th>
+                <th>{{ $t('radar.indicator') }}</th>
+                <th style="text-align:right;">{{ $t('radar.current_value') }}</th>
+                <th style="text-align:right;">{{ $t('radar.score') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -230,7 +230,7 @@ function arrowDown() {
                 </td>
               </tr>
               <tr>
-                <td><strong>总分</strong></td>
+                <td><strong>{{ $t('radar.total_score') }}</strong></td>
                 <td></td>
                 <td style="text-align:right;">
                   <strong :style="{ color: grade.color }">{{ totalScore }}</strong>
@@ -244,27 +244,27 @@ function arrowDown() {
   </n-card>
 
   <!-- 评估标准弹窗 -->
-  <n-modal v-model:show="showCriteria" preset="card" title="评估标准" style="max-width: 520px;">
+  <n-modal v-model:show="showCriteria" preset="card" :title="$t('radar.title')" style="max-width: 520px;">
     <n-space vertical size="small">
-      <n-text depth="2">每个指标 0~100 分，按加权计算总分：</n-text>
+      <n-text depth="2">{{ $t('radar.scoring_desc') }}</n-text>
       <n-table size="small" :bordered="true" :single-line="false" style="font-size: 13px;">
         <thead>
           <tr>
-            <th>指标</th>
-            <th>权重</th>
-            <th>评分方式</th>
+            <th>{{ $t('radar.indicator') }}</th>
+            <th>{{ $t('radar.weight') }}</th>
+            <th>{{ $t('radar.scoring_method') }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Profit Factor</td><td>25%</td><td>0~4 → 0~100 分</td></tr>
-          <tr><td>胜率</td><td>20%</td><td>0%~100% → 0~100 分</td></tr>
-          <tr><td>盈亏比</td><td>25%</td><td>0~4 → 0~100 分</td></tr>
-          <tr><td>连亏控制</td><td>15%</td><td>20次→0分, 0次→100分</td></tr>
-          <tr><td>期望收益</td><td>15%</td><td>-\$20~+\$20 → 0~100 分</td></tr>
+          <tr><td>Profit Factor</td><td>25%</td><td>{{ $t('radar.method_pf') }}</td></tr>
+          <tr><td>{{ $t('radar.indicator_winrate') }}</td><td>20%</td><td>{{ $t('radar.method_winrate') }}</td></tr>
+          <tr><td>{{ $t('radar.indicator_ratio') }}</td><td>25%</td><td>{{ $t('radar.method_ratio') }}</td></tr>
+          <tr><td>{{ $t('radar.indicator_consec') }}</td><td>15%</td><td>{{ $t('radar.method_consec') }}</td></tr>
+          <tr><td>{{ $t('radar.indicator_ep') }}</td><td>15%</td><td>{{ $t('radar.method_ep') }}</td></tr>
         </tbody>
       </n-table>
       <n-text depth="3" style="font-size: 13px;">
-        <b>优秀</b> ≥ 80 &nbsp; <b>良好</b> ≥ 60 &nbsp; <b>及格</b> ≥ 40 &nbsp; <b>不及格</b> &lt; 40
+        <b>{{ $t('radar.excellent') }}</b> ≥ 80 &nbsp; <b>{{ $t('radar.good') }}</b> ≥ 60 &nbsp; <b>{{ $t('radar.pass') }}</b> ≥ 40 &nbsp; <b>{{ $t('radar.fail') }}</b> &lt; 40
       </n-text>
     </n-space>
   </n-modal>

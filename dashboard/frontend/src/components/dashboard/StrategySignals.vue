@@ -246,15 +246,15 @@ onUnmounted(() => {
 
         <!-- 报价：一行显示，统一格式 -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0;">
-          <span style="font-size: 15px; font-weight: 600;">现价 {{ priceStore.midPrice.toFixed(2) }}</span>
+          <span style="font-size: 15px; font-weight: 600;">{{ $t('signals.current_price') }} {{ priceStore.midPrice.toFixed(2) }}</span>
           <span style="font-size: 15px; font-weight: 600;">Bid {{ priceStore.bid.toFixed(2) }} / Ask {{ priceStore.ask.toFixed(2) }}</span>
-          <span style="font-size: 15px; font-weight: 600;">点差 {{ priceStore.spread.toFixed(2) }}</span>
+          <span style="font-size: 15px; font-weight: 600;">{{ $t('signals.spread') }} {{ priceStore.spread.toFixed(2) }}</span>
         </div>
       </n-space>
     </n-card>
 
     <!-- ═══════════════ 新闻日历 ═══════════════ -->
-    <n-card title="新闻日历" size="small" :bordered="true"
+    <n-card :title="$t('signals.news_calendar')" size="small" :bordered="true"
       :segmented="{ content: true }"
       :style="{
         borderLeft: `4px solid ${
@@ -275,15 +275,15 @@ onUnmounted(() => {
           <n-space align="center" size="small">
             <n-tag
               v-if="calendarData?.is_blackout"
-              type="error" size="tiny" :bordered="false">禁售中</n-tag>
+              type="error" size="tiny" :bordered="false">{{ $t('signals.blackout') }}</n-tag>
             <n-tag v-else size="tiny" :bordered="false"
-              style="background: #8b8f9720; color: #8b8f97;">正常交易</n-tag>
+              style="background: #8b8f9720; color: #8b8f97;">{{ $t('signals.normal_trading') }}</n-tag>
             <n-text v-if="calendarData?.is_blackout" depth="2" style="font-size: 12px;">
               {{ calendarData.blackout_reason }}
             </n-text>
           </n-space>
           <n-text v-if="calendarData?.upcoming_events?.length" depth="3" style="font-size: 11px;">
-            待 {{ calendarData.upcoming_events.length }} 事件
+            {{ $t('signals.pending_events', { count: calendarData.upcoming_events.length }) }}
           </n-text>
         </div>
 
@@ -292,7 +292,7 @@ onUnmounted(() => {
           padding: '6px 10px', borderRadius: '4px',
           background: calendarData?.is_blackout ? '#f6465d10' : 'var(--n-color-embedded)',
         }">
-          <n-text depth="3" style="font-size: 10px;">下一事件</n-text>
+          <n-text depth="3" style="font-size: 10px;">{{ $t('signals.next_event') }}</n-text>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
             <n-text style="font-size: 13px; font-weight: 600;">{{ evtName(nextEvent.title) }}</n-text>
             <n-tag size="tiny" :color="{ color: impactColor(nextEvent.impact) }" text-color="#fff">
@@ -302,8 +302,8 @@ onUnmounted(() => {
           <div style="display: flex; justify-content: space-between; margin-top: 4px;">
             <n-text depth="3" style="font-size: 11px;">{{ nextEvent.datetime }}</n-text>
             <n-text depth="3" style="font-size: 11px;">
-              {{ nextEvent.previous ? '前值 ' + nextEvent.previous : '' }}
-              {{ nextEvent.forecast ? ' | 预测 ' + nextEvent.forecast : '' }}
+              {{ nextEvent.previous ? $t('signals.previous') + ' ' + nextEvent.previous : '' }}
+              {{ nextEvent.forecast ? ' | ' + $t('signals.forecast') + ' ' + nextEvent.forecast : '' }}
             </n-text>
           </div>
         </div>
@@ -325,12 +325,12 @@ onUnmounted(() => {
               <div style="display: flex; justify-content: space-between; margin-top: 4px;">
                 <n-text depth="3" style="font-size: 11px;">{{ evt.datetime }}</n-text>
                 <n-text depth="3" style="font-size: 11px;">
-                  前值 {{ evt.previous || '-' }} | 预测 {{ evt.forecast || '-' }}
+                  {{ $t('signals.previous') }} {{ evt.previous || '-' }} | {{ $t('signals.forecast') }} {{ evt.forecast || '-' }}
                 </n-text>
               </div>
             </div>
             <div v-if="!calendarData?.upcoming_events?.length" style="text-align: center; padding: 8px;">
-              <n-empty description="暂无高影响事件" />
+              <n-empty :description="$t('signals.no_high_impact')" />
             </div>
           </n-space>
         </n-collapse-transition>
@@ -359,29 +359,29 @@ onUnmounted(() => {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
               <!-- 做空 -->
               <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #f6465d;">
-                <div style="font-weight:700; color:#f6465d; font-size:12px; margin-bottom:4px;">▼ 做空</div>
-                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
+                <div style="font-weight:700; color:#f6465d; font-size:12px; margin-bottom:4px;">{{ $t('signals.short_label') }}</div>
+                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">{{ $t('signals.entry') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.short.entry" :key="'se'+li"
                   style="font-size:10px; color:#ccc; padding:1px 0;">{{ renderLogic(l) }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
+                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">{{ $t('signals.exit') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.short.exit" :key="'sx'+li"
                   style="font-size:10px; color:#999; padding:1px 0;">{{ renderLogic(l) }}</div>
               </div>
               <!-- 做多 -->
               <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #0ecb81;">
-                <div style="font-weight:700; color:#0ecb81; font-size:12px; margin-bottom:4px;">▲ 做多</div>
-                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">开仓:</div>
+                <div style="font-weight:700; color:#0ecb81; font-size:12px; margin-bottom:4px;">{{ $t('signals.long_label') }}</div>
+                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">{{ $t('signals.entry') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.long.entry" :key="'le'+li"
                   style="font-size:10px; color:#ccc; padding:1px 0;">{{ renderLogic(l) }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">平仓:</div>
+                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">{{ $t('signals.exit') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.long.exit" :key="'lx'+li"
                   style="font-size:10px; color:#999; padding:1px 0;">{{ renderLogic(l) }}</div>
               </div>
             </div>
           </template>
-          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">暂无详细策略说明</div>
+          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">{{ $t('signals.no_strategy_desc') }}</div>
         </n-collapse-item>
-        <n-empty v-if="!activeStrategies.length" description="暂无运行策略" />
+        <n-empty v-if="!activeStrategies.length" :description="$t('signals.no_running_strategy')" />
       </n-collapse>
     </n-card>
   </n-space>

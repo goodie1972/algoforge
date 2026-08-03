@@ -690,7 +690,7 @@ function clearAllPanes() {
 </script>
 
 <template>
-  <n-card title="XAUUSD 交易终端" size="small">
+  <n-card :title="$t('terminal.title')" size="small">
     <template #header-extra>
       <n-space size="small">
         <n-button v-for="tf in timeframes" :key="tf" size="tiny"
@@ -703,10 +703,10 @@ function clearAllPanes() {
 
     <!-- 实时价格栏 -->
     <n-grid :cols="4" :x-gap="16" style="margin-bottom: 6px;">
-      <n-gi><n-text depth="3" style="font-size:12px;">买价</n-text> <span class="price-up" :class="{ 'flash-num': bidFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.bid.toFixed(2) }}</strong></span></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">卖价</n-text> <span class="price-down" :class="{ 'flash-num': askFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.ask.toFixed(2) }}</strong></span></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">点差</n-text> <strong :class="{ 'flash-num': spreadFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">{{ store.spread.toFixed(2) }}</strong></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">中间价</n-text> <span class="price-gold" style="font-size:13px;"><strong>{{ store.midPrice.toFixed(2) }}</strong></span></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.bid') }}</n-text> <span class="price-up" :class="{ 'flash-num': bidFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.bid.toFixed(2) }}</strong></span></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.ask') }}</n-text> <span class="price-down" :class="{ 'flash-num': askFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.ask.toFixed(2) }}</strong></span></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.spread') }}</n-text> <strong :class="{ 'flash-num': spreadFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">{{ store.spread.toFixed(2) }}</strong></n-gi>
+      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.mid') }}</n-text> <span class="price-gold" style="font-size:13px;"><strong>{{ store.midPrice.toFixed(2) }}</strong></span></n-gi>
     </n-grid>
 
     <!-- 指标选择 — 紧凑网格布局 -->
@@ -771,7 +771,7 @@ function clearAllPanes() {
       </n-gi>
       <n-gi>
         <n-space size="small" align="center">
-          <n-checkbox v-model:checked="showVolume" size="small">成交量</n-checkbox>
+          <n-checkbox v-model:checked="showVolume" size="small">{{ $t('terminal.volume') }}</n-checkbox>
         </n-space>
       </n-gi>
     </n-grid>
@@ -782,13 +782,13 @@ function clearAllPanes() {
         <n-spin size="large" />
       </div>
       <div v-else-if="!store.loading && store.candles.length === 0" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a1d23; z-index: 1;">
-        <n-result status="info" title="暂无数据" description="连接 MT4 后自动加载 K 线数据" size="small" />
+        <n-result status="info" :title="$t('terminal.no_data')" :description="$t('terminal.no_data_desc')" size="small" />
       </div>
     </div>
 
     <!-- 副图区域（按需渲染） -->
     <div v-if="showRSI" ref="rsiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">RSI ({{ rsiPeriod }}) 超买{{ rsiOb }} 超卖{{ rsiOs }}</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">{{ $t('terminal.rsi_label', {period: rsiPeriod, ob: rsiOb, os: rsiOs}) }}</n-text>
     </div>
     <div v-if="showStoch" ref="stochRef" style="width: 100%; height: 110px; position: relative;">
       <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">Stoch ({{ stochK }},{{ stochKSmooth }},{{ stochDSmooth }})</n-text>

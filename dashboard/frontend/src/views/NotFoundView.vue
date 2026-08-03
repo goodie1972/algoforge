@@ -2,10 +2,10 @@
   <div class="nf-root">
     <div class="nf-content">
       <div class="nf-code">404</div>
-      <h1 class="nf-title">页面未找到</h1>
-      <p class="nf-desc">您访问的页面不存在，或已被移除。</p>
+      <h1 class="nf-title">{{ $t('not_found.title') }}</h1>
+      <p class="nf-desc">{{ $t('not_found.desc') }}</p>
       <n-button type="primary" size="large" @click="$router.push('/')">
-        返回仪表盘
+        {{ $t('not_found.back') }}
       </n-button>
     </div>
   </div>
