@@ -384,7 +384,7 @@ onUnmounted(() => {
   left: 0;
 }
 .app-sider {
-  background: #1a1d23;
+  background: var(--n-color, #1a1d23);
 }
 .app-header {
   height: 48px;

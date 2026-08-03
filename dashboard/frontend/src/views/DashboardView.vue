@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { usePositionStore } from '@/stores/positions'
 import { usePriceStore } from '@/stores/prices'
 import TradingTerminal from '@/components/dashboard/TradingTerminal.vue'
@@ -8,6 +9,7 @@ import PositionsTableBase from '@/components/dashboard/PositionsTableBase.vue'
 
 const positionStore = usePositionStore()
 const priceStore = usePriceStore()
+const { t } = useI18n()
 
 onMounted(() => {
   positionStore.fetch()
@@ -24,7 +26,7 @@ onMounted(() => {
     </n-grid>
 
     <!-- 持仓摘要 -->
-    <n-card size="small" :bordered="true" title="当前持仓">
+    <n-card size="small" :bordered="true" :title="t('positions.current')">
       <PositionsTableBase />
     </n-card>
   </n-space>
