@@ -17,7 +17,9 @@ export const useLogStore = defineStore('logs', () => {
   })
 
   function append(entry: LogEntry) {
-    entries.value.push({ ...entry, _id: ++idCounter })
+    // 统一字段名：WebSocket 推送的是 time，数据库返回的是 timestamp
+    const normalized = { ...entry, timestamp: (entry as any).time || entry.timestamp }
+    entries.value.push({ ...normalized, _id: ++idCounter })
     if (entries.value.length > maxEntries) {
       entries.value.splice(0, entries.value.length - maxEntries)
     }

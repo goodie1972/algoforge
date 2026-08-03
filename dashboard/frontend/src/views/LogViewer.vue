@@ -73,7 +73,7 @@ function logStyle(level: string) {
              class="log-entry"
              @mouseenter="($event.target as HTMLElement).style.background = '#2c3038'"
              @mouseleave="($event.target as HTMLElement).style.background = 'transparent'">
-          <span class="log-time">{{ entry.timestamp.slice(11, 23) }}</span>
+          <span class="log-time">{{ entry.timestamp?.slice(11, 23) || entry.timestamp || '' }}</span>
           <span :style="{ ...logStyle(entry.level), flexShrink: 0, width: 60, fontWeight: 600 }">{{ entry.level }}</span>
           <span class="log-name">{{ entry.name }}</span>
           <span class="log-msg">{{ entry.message }}</span>
