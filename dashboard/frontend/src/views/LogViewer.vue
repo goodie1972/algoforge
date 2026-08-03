@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useLogStore } from '@/stores/logs'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const store = useLogStore()
 const logContainer = ref<HTMLDivElement>()
 const autoScroll = ref(true)
 
 const levelOptions = [
-  { label: '全部', value: null },
+  { label: t('log.filter_all'), value: null },
   { label: 'DEBUG', value: 'DEBUG' },
   { label: 'INFO', value: 'INFO' },
   { label: 'WARNING', value: 'WARNING' },
@@ -52,15 +54,15 @@ function logStyle(level: string) {
 <template>
   <n-space vertical size="large">
     <div class="log-header">
-      <n-h2 class="log-title">系统日志</n-h2>
+      <n-h2 class="log-title">{{ t('log.title') }}</n-h2>
       <n-space size="small" align="center">
         <n-radio-group :value="store.filterLevel" @update:value="(v: any) => store.filterLevel = v">
           <n-radio-button v-for="opt in levelOptions" :key="opt.value || 'all'" :value="opt.value">
             {{ opt.label }}
           </n-radio-button>
         </n-radio-group>
-        <n-checkbox v-model:checked="autoScroll">自动滚动</n-checkbox>
-        <n-button size="small" quaternary @click="store.clear()">清空</n-button>
+        <n-checkbox v-model:checked="autoScroll">{{ t('log.auto_scroll') }}</n-checkbox>
+        <n-button size="small" quaternary @click="store.clear()">{{ t('log.clear') }}</n-button>
       </n-space>
     </div>
 
@@ -68,7 +70,7 @@ function logStyle(level: string) {
       <!-- 日志列表 - 始终渲染，不销毁容器 -->
       <div ref="logContainer" class="log-list" @scroll="onScroll">
         <!-- 空态 -->
-        <n-empty v-if="displayLogs.length === 0" description="暂无日志" class="log-empty" />
+        <n-empty v-if="displayLogs.length === 0" :description="t('log.empty')" class="log-empty" />
         <div v-for="entry in displayLogs" :key="entry._id"
              class="log-entry"
              @mouseenter="($event.target as HTMLElement).style.background = '#2c3038'"

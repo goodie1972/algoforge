@@ -1,4 +1,4 @@
-/* 全局覆盖 - Naive UI 深色主题微调 */
+/* 全局覆盖 - 主题 */
 body {
   margin: 0;
   padding: 0;
@@ -8,6 +8,19 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+[data-theme="light"] body {
+  background: #f5f7fa;
+  color: #1a1a2e;
+}
+
+/* 自定义 scrollbar - 暗色 */
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #3d4149; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* 自定义 scrollbar - 亮色 */
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: #c0c4cc; }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #a0a4ac; }
 
 /* 数字与代码使用等宽增强 */
 code, pre, .mono {
@@ -96,8 +109,11 @@ body::after {
 }
 
 /* 卡片细微渐变增强 */
-.n-card {
+[data-theme="dark"] .n-card {
   background: linear-gradient(135deg, #161b22 0%, #1a1f2e 100%) !important;
+}
+[data-theme="light"] .n-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 100%) !important;
 }
 
 /* 数据表格行交替渐变 */
