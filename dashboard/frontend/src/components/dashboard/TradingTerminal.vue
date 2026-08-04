@@ -773,7 +773,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showEMA" size="small" @update:checked="applyOverlay">EMA</n-checkbox>
-          <span v-show="showEMA" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showEMA }]">
             <app-input-number v-model:value="ema1" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
             <app-input-number v-model:value="ema2" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
             <app-input-number v-model:value="ema3" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
@@ -783,7 +783,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showSMA" size="small" @update:checked="applyOverlay">SMA</n-checkbox>
-          <span v-show="showSMA" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showSMA }]">
             <app-input-number v-model:value="sma1" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
             <app-input-number v-model:value="sma2" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
           </span>
@@ -792,7 +792,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showBB" size="small" @update:checked="applyOverlay">BB</n-checkbox>
-          <span v-show="showBB" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showBB }]">
             <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 20px;" @update:value="applyOverlay" />
             <n-text depth="3" style="font-size:10px;">×</n-text>
             <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 20px;" @update:value="applyOverlay" />
@@ -802,7 +802,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showRSI" size="small">RSI</n-checkbox>
-          <span v-show="showRSI" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showRSI }]">
             <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" @update:value="refreshRSI" />
             <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 20px;" @update:value="refreshRSI" />
             <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 20px;" @update:value="refreshRSI" />
@@ -813,7 +813,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showStoch" size="small">Stoch</n-checkbox>
-          <span v-show="showStoch" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showStoch }]">
             <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 20px;" @update:value="refreshStoch" />
             <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 20px;" @update:value="refreshStoch" />
             <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 20px;" @update:value="refreshStoch" />
@@ -823,7 +823,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showMACD" size="small">MACD</n-checkbox>
-          <span v-show="showMACD" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showMACD }]">
             <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 20px;" @update:value="refreshMACD" />
             <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 20px;" @update:value="refreshMACD" />
             <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 20px;" @update:value="refreshMACD" />
@@ -833,7 +833,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showATR" size="small">ATR</n-checkbox>
-          <span v-show="showATR" class="ind-params">
+          <span :class="['ind-params', { 'ind-hidden': !showATR }]">
             <app-input-number v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" @update:value="refreshATR" />
           </span>
         </div>
@@ -841,7 +841,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showVolume" size="small">{{ $t('terminal.volume') }}</n-checkbox>
-          <span v-show="showVolume" class="ind-params"></span>
+          <span :class="['ind-params', { 'ind-hidden': !showVolume }]"></span>
         </div>
       </n-gi>
     </n-grid>
@@ -886,5 +886,9 @@ function clearAllPanes() {
   display: inline-flex;
   align-items: center;
   gap: 1px;
+}
+.ind-hidden {
+  visibility: hidden;
+  pointer-events: none;
 }
 </style>
