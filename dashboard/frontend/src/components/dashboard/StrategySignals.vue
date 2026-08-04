@@ -246,9 +246,9 @@ onUnmounted(() => {
 
         <!-- 报价：一行显示，统一格式 -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0;">
-          <span style="font-size: 15px; font-weight: 600;">{{ $t('signals.current_price') }} {{ priceStore.midPrice.toFixed(2) }}</span>
-          <span style="font-size: 15px; font-weight: 600;">Bid {{ priceStore.bid.toFixed(2) }} / Ask {{ priceStore.ask.toFixed(2) }}</span>
-          <span style="font-size: 15px; font-weight: 600;">{{ $t('signals.spread') }} {{ priceStore.spread.toFixed(2) }}</span>
+          <span style="font-size: 15px; font-weight: 600;">{{ $t('signals.current_price') }} <span style="color:#f0b90b;">{{ priceStore.midPrice.toFixed(2) }}</span></span>
+          <span style="font-size: 15px; font-weight: 600;">Bid <span style="color:#0ecb81;">{{ priceStore.bid.toFixed(2) }}</span> / Ask <span style="color:#f6465d;">{{ priceStore.ask.toFixed(2) }}</span></span>
+          <span style="font-size: 15px; font-weight: 600;">{{ $t('signals.spread') }} <span style="color:#8b8f97;">{{ priceStore.spread.toFixed(2) }}</span></span>
         </div>
       </n-space>
     </n-card>
