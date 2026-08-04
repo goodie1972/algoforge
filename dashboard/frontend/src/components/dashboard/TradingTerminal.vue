@@ -63,6 +63,55 @@ const timeframes = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1']
 const activeTf = ref('H1')
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
+// ---- localStorage 持久化（保存周期和指标配置） ----
+const STORAGE_KEY = 'algoforge_terminal_config'
+function loadTerminalConfig() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return
+    const cfg = JSON.parse(raw)
+    activeTf.value = cfg.tf || 'H1'
+    showEMA.value = cfg.showEMA ?? false
+    showSMA.value = cfg.showSMA ?? false
+    showBB.value = cfg.showBB ?? false
+    showRSI.value = cfg.showRSI ?? false
+    showStoch.value = cfg.showStoch ?? false
+    showMACD.value = cfg.showMACD ?? false
+    showATR.value = cfg.showATR ?? false
+    showVolume.value = cfg.showVolume ?? false
+    if (cfg.emaPeriods) emaPeriods.value = cfg.emaPeriods
+    if (cfg.smaPeriods) smaPeriods.value = cfg.smaPeriods
+    if (cfg.bbPeriod) bbPeriod.value = cfg.bbPeriod
+    if (cfg.bbStd) bbStd.value = cfg.bbStd
+    if (cfg.rsiPeriod) rsiPeriod.value = cfg.rsiPeriod
+    if (cfg.rsiOb) rsiOb.value = cfg.rsiOb
+    if (cfg.rsiOs) rsiOs.value = cfg.rsiOs
+    if (cfg.stochK) stochK.value = cfg.stochK
+    if (cfg.stochKSmooth) stochKSmooth.value = cfg.stochKSmooth
+    if (cfg.stochDSmooth) stochDSmooth.value = cfg.stochDSmooth
+    if (cfg.macdFast) macdFast.value = cfg.macdFast
+    if (cfg.macdSlow) macdSlow.value = cfg.macdSlow
+    if (cfg.macdSignal) macdSignal.value = cfg.macdSignal
+    if (cfg.atrPeriod) atrPeriod.value = cfg.atrPeriod
+  } catch (e) { /* ignore corrupt config */ }
+}
+function saveTerminalConfig() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      tf: activeTf.value,
+      showEMA: showEMA.value, showSMA: showSMA.value, showBB: showBB.value,
+      showRSI: showRSI.value, showStoch: showStoch.value, showMACD: showMACD.value,
+      showATR: showATR.value, showVolume: showVolume.value,
+      emaPeriods: emaPeriods.value, smaPeriods: smaPeriods.value,
+      bbPeriod: bbPeriod.value, bbStd: bbStd.value,
+      rsiPeriod: rsiPeriod.value, rsiOb: rsiOb.value, rsiOs: rsiOs.value,
+      stochK: stochK.value, stochKSmooth: stochKSmooth.value, stochDSmooth: stochDSmooth.value,
+      macdFast: macdFast.value, macdSlow: macdSlow.value, macdSignal: macdSignal.value,
+      atrPeriod: atrPeriod.value,
+    }))
+  } catch (e) { /* ignore storage error */ }
+}
+
 // 各周期默认指标预设 — 切换周期时自动启用/停用
 const tfIndicatorPresets: Record<string, Record<string, boolean>> = {
   M5:  { rsi: false, stoch: false, macd: false, bb: true,  volume: true  },
@@ -139,19 +188,20 @@ function parsePeriods(s: string): number[] {
 // 参数变更时重建对应指标
 watch([showEMA, showSMA, showBB, emaPeriods, smaPeriods, bbPeriod, bbStd], () => {
   applyOverlay()
+  saveTerminalConfig()
 })
 // 复选框切换时重建/销毁副图
-watch(showRSI, () => { destroyPane('rsi'); if (showRSI.value) applyRSI() })
-watch(showStoch, () => { destroyPane('stoch'); if (showStoch.value) applyStoch() })
-watch(showMACD, () => { destroyPane('macd'); if (showMACD.value) applyMACD() })
-watch(showATR, () => { destroyPane('atr'); if (showATR.value) applyATR() })
-watch(showVolume, () => { destroyPane('volume'); if (showVolume.value) applyVolume() })
+watch(showRSI, () => { destroyPane('rsi'); if (showRSI.value) applyRSI(); saveTerminalConfig() })
+watch(showStoch, () => { destroyPane('stoch'); if (showStoch.value) applyStoch(); saveTerminalConfig() })
+watch(showMACD, () => { destroyPane('macd'); if (showMACD.value) applyMACD(); saveTerminalConfig() })
+watch(showATR, () => { destroyPane('atr'); if (showATR.value) applyATR(); saveTerminalConfig() })
+watch(showVolume, () => { destroyPane('volume'); if (showVolume.value) applyVolume(); saveTerminalConfig() })
 
 // 参数数值变更时刷新副图（代替无效的 @update:value="{...}" 语法）
-function refreshRSI() { destroyPane('rsi'); if (showRSI.value) applyRSI() }
-function refreshStoch() { destroyPane('stoch'); if (showStoch.value) applyStoch() }
-function refreshMACD() { destroyPane('macd'); if (showMACD.value) applyMACD() }
-function refreshATR() { destroyPane('atr'); if (showATR.value) applyATR() }
+function refreshRSI() { destroyPane('rsi'); if (showRSI.value) applyRSI(); saveTerminalConfig() }
+function refreshStoch() { destroyPane('stoch'); if (showStoch.value) applyStoch(); saveTerminalConfig() }
+function refreshMACD() { destroyPane('macd'); if (showMACD.value) applyMACD(); saveTerminalConfig() }
+function refreshATR() { destroyPane('atr'); if (showATR.value) applyATR(); saveTerminalConfig() }
 
 const chartHeight = 420
 const paneHeight = 110
@@ -198,6 +248,8 @@ function makeChartOptions(width: number, height: number, showTimeScale: boolean)
 
 onMounted(() => {
   if (!chartContainer.value) return
+  // 加载上次保存的配置
+  loadTerminalConfig()
   const w = chartContainer.value.clientWidth
 
   chart = createChart(chartContainer.value, makeChartOptions(w, chartHeight, true))
@@ -659,7 +711,7 @@ function applyTfPreset() {
   showATR.value = false
 }
 
-async function switchTf(tf: string) {
+function switchTf(tf: string) {
   activeTf.value = tf
   // 先停自动刷新，防止旧周期回调覆盖新数据
   stopAutoRefresh()
@@ -667,8 +719,9 @@ async function switchTf(tf: string) {
   clearAllOverlays()
   clearAllPanes()
   applyTfPreset()
-  await loadCandles()
+  loadCandles()
   startAutoRefresh()
+  saveTerminalConfig()
 }
 
 function clearAllOverlays() {
@@ -727,9 +780,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showBB" size="small" @update:checked="applyOverlay">BB</n-checkbox>
           <template v-if="showBB">
-            <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 56px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 80px;" @update:value="applyOverlay" />
             <n-text depth="3" style="font-size:10px;">×</n-text>
-            <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 46px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 72px;" @update:value="applyOverlay" />
           </template>
         </n-space>
       </n-gi>
@@ -737,9 +790,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showRSI" size="small">RSI</n-checkbox>
           <template v-if="showRSI">
-            <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 52px;" @update:value="refreshRSI" />
-            <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 46px;" @update:value="refreshRSI" />
-            <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 46px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 72px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 68px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 68px;" @update:value="refreshRSI" />
           </template>
         </n-space>
       </n-gi>
@@ -747,9 +800,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showStoch" size="small">Stoch</n-checkbox>
           <template v-if="showStoch">
-            <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 46px;" @update:value="refreshStoch" />
-            <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 40px;" @update:value="refreshStoch" />
-            <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 40px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 68px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 60px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 60px;" @update:value="refreshStoch" />
           </template>
         </n-space>
       </n-gi>
@@ -757,16 +810,16 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showMACD" size="small">MACD</n-checkbox>
           <template v-if="showMACD">
-            <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 46px;" @update:value="refreshMACD" />
-            <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 46px;" @update:value="refreshMACD" />
-            <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 46px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 68px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 68px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 68px;" @update:value="refreshMACD" />
           </template>
         </n-space>
       </n-gi>
       <n-gi>
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showATR" size="small">ATR</n-checkbox>
-          <app-input-number v-if="showATR" v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 52px;" @update:value="refreshATR" />
+          <app-input-number v-if="showATR" v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 72px;" @update:value="refreshATR" />
         </n-space>
       </n-gi>
       <n-gi>
