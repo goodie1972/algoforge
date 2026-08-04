@@ -753,7 +753,12 @@ function clearAllPanes() {
 <template>
   <n-card :title="$t('terminal.title')" size="small">
     <template #header-extra>
-      <n-space size="small">
+      <n-space size="small" align="center">
+        <span class="price-mini" style="font-size:12px;margin-right:8px;">
+          <n-text depth="3">Bid</n-text> <span class="price-up" :class="{'flash-num':bidFlash}"><strong>{{ store.bid.toFixed(2) }}</strong></span>
+          <n-text depth="3" style="margin-left:6px;">Ask</n-text> <span class="price-down" :class="{'flash-num':askFlash}"><strong>{{ store.ask.toFixed(2) }}</strong></span>
+          <n-text depth="3" style="margin-left:6px;">Spr</n-text> <strong :class="{'flash-num':spreadFlash}">{{ store.spread.toFixed(1) }}</strong>
+        </span>
         <n-button v-for="tf in timeframes" :key="tf" size="tiny"
                   :type="activeTf === tf ? 'primary' : 'default'"
                   @click="switchTf(tf)">
@@ -762,85 +767,82 @@ function clearAllPanes() {
       </n-space>
     </template>
 
-    <!-- 实时价格栏 -->
-    <n-grid :cols="4" :x-gap="16" style="margin-bottom: 6px;">
-      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.bid') }}</n-text> <span class="price-up" :class="{ 'flash-num': bidFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.bid.toFixed(2) }}</strong></span></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.ask') }}</n-text> <span class="price-down" :class="{ 'flash-num': askFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;"><strong>{{ store.ask.toFixed(2) }}</strong></span></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.spread') }}</n-text> <strong :class="{ 'flash-num': spreadFlash }" style="font-size:13px;display:inline-block;padding:1px 4px;border-radius:3px;transition:background .15s;">{{ store.spread.toFixed(2) }}</strong></n-gi>
-      <n-gi><n-text depth="3" style="font-size:12px;">{{ $t('terminal.mid') }}</n-text> <span class="price-gold" style="font-size:13px;"><strong>{{ store.midPrice.toFixed(2) }}</strong></span></n-gi>
-    </n-grid>
-
-    <!-- 指标选择 — 紧凑网格布局 -->
-    <n-grid :cols="4" :x-gap="8" :y-gap="4" style="margin-bottom: 6px;">
+    <!-- 指标选择 — 2行4列固定布局，用 v-show 保持位置 -->
+    <n-grid :cols="4" :x-gap="6" :y-gap="2" style="margin-bottom: 6px;">
+      <!-- 第一行：EMA, SMA, BB, RSI -->
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showEMA" size="small" @update:checked="applyOverlay">EMA</n-checkbox>
-          <template v-if="showEMA">
-            <app-input-number v-model:value="ema1" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
-            <app-input-number v-model:value="ema2" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
-            <app-input-number v-model:value="ema3" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
-          </template>
-        </n-space>
+          <span v-show="showEMA" class="ind-params">
+            <app-input-number v-model:value="ema1" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema2" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema3" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
+          </span>
+        </div>
       </n-gi>
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showSMA" size="small" @update:checked="applyOverlay">SMA</n-checkbox>
-          <template v-if="showSMA">
-            <app-input-number v-model:value="sma1" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
-            <app-input-number v-model:value="sma2" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
-          </template>
-        </n-space>
+          <span v-show="showSMA" class="ind-params">
+            <app-input-number v-model:value="sma1" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="sma2" size="tiny" :min="2" :max="999" style="width: 20px;" @update:value="applyOverlay" />
+          </span>
+        </div>
       </n-gi>
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showBB" size="small" @update:checked="applyOverlay">BB</n-checkbox>
-          <template v-if="showBB">
-            <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 40px;" @update:value="applyOverlay" />
+          <span v-show="showBB" class="ind-params">
+            <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 20px;" @update:value="applyOverlay" />
             <n-text depth="3" style="font-size:10px;">×</n-text>
-            <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 38px;" @update:value="applyOverlay" />
-          </template>
-        </n-space>
+            <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 20px;" @update:value="applyOverlay" />
+          </span>
+        </div>
       </n-gi>
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showRSI" size="small">RSI</n-checkbox>
-          <template v-if="showRSI">
-            <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 38px;" @update:value="refreshRSI" />
-            <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 36px;" @update:value="refreshRSI" />
-            <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 36px;" @update:value="refreshRSI" />
-          </template>
-        </n-space>
+          <span v-show="showRSI" class="ind-params">
+            <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 20px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 20px;" @update:value="refreshRSI" />
+          </span>
+        </div>
       </n-gi>
+      <!-- 第二行：Stoch, MACD, ATR, Volume -->
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showStoch" size="small">Stoch</n-checkbox>
-          <template v-if="showStoch">
-            <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 36px;" @update:value="refreshStoch" />
-            <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 36px;" @update:value="refreshStoch" />
-            <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 36px;" @update:value="refreshStoch" />
-          </template>
-        </n-space>
+          <span v-show="showStoch" class="ind-params">
+            <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 20px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 20px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 20px;" @update:value="refreshStoch" />
+          </span>
+        </div>
       </n-gi>
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showMACD" size="small">MACD</n-checkbox>
-          <template v-if="showMACD">
-            <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 36px;" @update:value="refreshMACD" />
-            <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 36px;" @update:value="refreshMACD" />
-            <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 36px;" @update:value="refreshMACD" />
-          </template>
-        </n-space>
+          <span v-show="showMACD" class="ind-params">
+            <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 20px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 20px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 20px;" @update:value="refreshMACD" />
+          </span>
+        </div>
       </n-gi>
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showATR" size="small">ATR</n-checkbox>
-          <app-input-number v-if="showATR" v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 38px;" @update:value="refreshATR" />
-        </n-space>
+          <span v-show="showATR" class="ind-params">
+            <app-input-number v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" @update:value="refreshATR" />
+          </span>
+        </div>
       </n-gi>
       <n-gi>
-        <n-space size="small" align="center">
+        <div class="ind-line">
           <n-checkbox v-model:checked="showVolume" size="small">{{ $t('terminal.volume') }}</n-checkbox>
-        </n-space>
+          <span v-show="showVolume" class="ind-params"></span>
+        </div>
       </n-gi>
     </n-grid>
 
@@ -872,3 +874,17 @@ function clearAllPanes() {
     </div>
   </n-card>
 </template>
+
+<style scoped>
+.ind-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.ind-params {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+</style>
