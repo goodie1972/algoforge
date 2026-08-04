@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { NInput } from 'naive-ui'
+import { ref, onMounted } from 'vue'
 import { IconChevronUp, IconChevronDown } from '@tabler/icons-vue'
 
 const props = defineProps<{
-  modelValue: number | null
+  value: number | null
   min?: number
   max?: number
   step?: number
@@ -15,40 +14,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: number | null]
   'update:value': [value: number | null]
 }>()
 
-// 显示用字符串（保证 n-input 始终有值显示）
 const displayVal = ref('')
 
-// 从 modelValue 同步到 displayVal
-watch(() => props.modelValue, (v) => {
-  displayVal.value = v != null ? String(v) : ''
-}, { immediate: true })
-
-// 从显示值同步回 modelValue
-function onInput(v: string | null) {
-  const raw = (v ?? '').trim()
-  displayVal.value = raw
-  if (raw === '') {
-    emit('update:modelValue', null)
-    emit('update:value', null)
-    return
-  }
-  const n = parseFloat(raw)
-  if (!isNaN(n)) {
-    const min = props.min ?? -Infinity
-    const max = props.max ?? Infinity
-    const clamped = Math.max(min, Math.min(max, n))
-    let final = clamped
-    if (props.precision != null) {
-      final = parseFloat(clamped.toFixed(props.precision))
-    }
-    emit('update:modelValue', final)
-    emit('update:value', final)
-  }
-}
+onMounted(() => {
+  displayVal.value = props.value != null ? String(props.value) : ''
+})
 
 function clamp(v: number): number {
   const min = props.min ?? -Infinity
@@ -56,30 +29,38 @@ function clamp(v: number): number {
   return Math.max(min, Math.min(max, v))
 }
 
-function inc() {
-  const step = props.step ?? 1
-  const cur = props.modelValue ?? 0
-  const next = clamp(cur + step)
-  let final = next
+function emitValue(n: number) {
+  let final = n
   if (props.precision != null) {
-    final = parseFloat(next.toFixed(props.precision))
+    final = parseFloat(n.toFixed(props.precision))
   }
   displayVal.value = String(final)
-  emit('update:modelValue', final)
   emit('update:value', final)
+}
+
+function inc() {
+  const step = props.step ?? 1
+  const cur = props.value ?? 0
+  emitValue(clamp(cur + step))
 }
 
 function dec() {
   const step = props.step ?? 1
-  const cur = props.modelValue ?? 0
-  const next = clamp(cur - step)
-  let final = next
-  if (props.precision != null) {
-    final = parseFloat(next.toFixed(props.precision))
+  const cur = props.value ?? 0
+  emitValue(clamp(cur - step))
+}
+
+function onInput(e: Event) {
+  const raw = (e.target as HTMLInputElement).value.trim()
+  displayVal.value = raw
+  if (raw === '') {
+    emit('update:value', null)
+    return
   }
-  displayVal.value = String(final)
-  emit('update:modelValue', final)
-  emit('update:value', final)
+  const n = parseFloat(raw)
+  if (!isNaN(n)) {
+    emitValue(clamp(n))
+  }
 }
 
 function getBtnSize(): number {
@@ -90,32 +71,32 @@ function getBtnSize(): number {
 </script>
 
 <template>
-  <div class="custom-input-number" :class="[size ?? 'tiny']">
-    <button class="num-btn num-up" :disabled="disabled" @click="inc" tabindex="-1">
+  <div class="cnum" :class="[size ?? 'tiny']">
+    <button class="cnum-btn cnum-up" :disabled="disabled" @click="inc" tabindex="-1">
       <IconChevronUp :size="getBtnSize()" />
     </button>
-    <n-input
-      v-model:value="displayVal"
+    <input
+      class="cnum-input"
+      type="text"
+      :value="displayVal"
       :placeholder="placeholder"
       :disabled="disabled"
-      :size="size"
-      class="num-input"
-      @update:value="onInput"
+      @input="onInput"
     />
-    <button class="num-btn num-down" :disabled="disabled" @click="dec" tabindex="-1">
+    <button class="cnum-btn cnum-down" :disabled="disabled" @click="dec" tabindex="-1">
       <IconChevronDown :size="getBtnSize()" />
     </button>
   </div>
 </template>
 
 <style scoped>
-.custom-input-number {
+.cnum {
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0;
 }
-.num-btn {
+.cnum-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -125,52 +106,60 @@ function getBtnSize(): number {
   cursor: pointer;
   padding: 0;
   line-height: 1;
-  transition: background 0.15s, color 0.15s;
-  border-radius: 0;
+  transition: background 0.12s, color 0.12s;
   user-select: none;
 }
-.num-btn:hover:not(:disabled) {
+.cnum-btn:hover:not(:disabled) {
   background: #3a3a3a;
   color: #f0b90b;
 }
-.num-btn:active:not(:disabled) {
+.cnum-btn:active:not(:disabled) {
   background: #4a4a4a;
 }
-.num-btn:disabled {
+.cnum-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.num-up {
+.cnum-up {
   border-bottom: none;
   border-radius: 3px 3px 0 0;
 }
-.num-down {
+.cnum-down {
   border-top: none;
   border-radius: 0 0 3px 3px;
 }
-.num-input {
-  --n-border: 1px solid #3b3b3b !important;
-  --n-border-hover: 1px solid #f0b90b !important;
-  --n-border-focus: 1px solid #f0b90b !important;
+.cnum-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #3b3b3b;
+  border-top: none;
+  border-bottom: none;
+  background: #1a1d23;
+  color: #e6edf3;
+  text-align: center;
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+  padding: 0 2px;
+  min-width: 0;
 }
-.num-input :deep(.n-input) {
-  border-radius: 0 !important;
+.cnum-input:focus {
+  border-color: #f0b90b;
+  background: #22262e;
 }
-/* tiny 尺寸 */
-.custom-input-number.tiny .num-btn {
-  height: 12px;
-  min-height: 12px;
+.cnum-input:disabled {
+  opacity: 0.5;
 }
-.custom-input-number.small .num-btn {
-  height: 14px;
-  min-height: 14px;
+.cnum-input::placeholder {
+  color: #555;
 }
-.custom-input-number.medium .num-btn {
-  height: 16px;
-  min-height: 16px;
-}
-.custom-input-number.large .num-btn {
-  height: 18px;
-  min-height: 18px;
-}
+.cnum.tiny .cnum-btn { height: 12px; }
+.cnum.tiny .cnum-input { height: 20px; font-size: 10px; }
+.cnum.small .cnum-btn { height: 14px; }
+.cnum.small .cnum-input { height: 24px; font-size: 11px; }
+.cnum.medium .cnum-btn { height: 16px; }
+.cnum.medium .cnum-input { height: 28px; font-size: 12px; }
+.cnum.large .cnum-btn { height: 18px; }
+.cnum.large .cnum-input { height: 32px; font-size: 13px; }
 </style>
