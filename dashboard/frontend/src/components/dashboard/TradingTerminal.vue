@@ -248,8 +248,6 @@ function makeChartOptions(width: number, height: number, showTimeScale: boolean)
 
 onMounted(() => {
   if (!chartContainer.value) return
-  // 加载上次保存的配置
-  loadTerminalConfig()
   const w = chartContainer.value.clientWidth
 
   chart = createChart(chartContainer.value, makeChartOptions(w, chartHeight, true))
@@ -263,7 +261,9 @@ onMounted(() => {
     wickDownColor: '#f6465d',
   })
 
+  // 先应用周期预设，再加载保存的配置覆盖（让保存的配置优先）
   applyTfPreset()
+  loadTerminalConfig()
   loadCandles()
 
   const observer = new ResizeObserver(() => {
@@ -711,15 +711,13 @@ function applyTfPreset() {
   showATR.value = false
 }
 
-function switchTf(tf: string) {
+async function switchTf(tf: string) {
   activeTf.value = tf
-  // 先停自动刷新，防止旧周期回调覆盖新数据
   stopAutoRefresh()
-  // 切换周期时清除旧指标系列（新数据到达后重建）
   clearAllOverlays()
   clearAllPanes()
   applyTfPreset()
-  loadCandles()
+  await loadCandles()
   startAutoRefresh()
   saveTerminalConfig()
 }
