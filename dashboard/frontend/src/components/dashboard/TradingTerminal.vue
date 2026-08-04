@@ -776,9 +776,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showEMA" size="small" @update:checked="applyOverlay">EMA</n-checkbox>
           <template v-if="showEMA">
-            <app-input-number v-model:value="ema1" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
-            <app-input-number v-model:value="ema2" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
-            <app-input-number v-model:value="ema3" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema1" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema2" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema3" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
           </template>
         </n-space>
       </n-gi>
@@ -786,8 +786,8 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showSMA" size="small" @update:checked="applyOverlay">SMA</n-checkbox>
           <template v-if="showSMA">
-            <app-input-number v-model:value="sma1" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
-            <app-input-number v-model:value="sma2" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="sma1" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="sma2" size="tiny" :min="2" :max="999" style="width: 36px;" @update:value="applyOverlay" />
           </template>
         </n-space>
       </n-gi>
@@ -795,9 +795,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showBB" size="small" @update:checked="applyOverlay">BB</n-checkbox>
           <template v-if="showBB">
-            <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 80px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="bbPeriod" size="tiny" :min="2" :max="200" style="width: 40px;" @update:value="applyOverlay" />
             <n-text depth="3" style="font-size:10px;">×</n-text>
-            <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 72px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="bbStd" size="tiny" :min="1" :max="5" :step="0.1" style="width: 38px;" @update:value="applyOverlay" />
           </template>
         </n-space>
       </n-gi>
@@ -805,9 +805,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showRSI" size="small">RSI</n-checkbox>
           <template v-if="showRSI">
-            <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 72px;" @update:value="refreshRSI" />
-            <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 68px;" @update:value="refreshRSI" />
-            <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 68px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiPeriod" size="tiny" :min="2" :max="100" style="width: 38px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiOb" size="tiny" :min="50" :max="100" style="width: 36px;" @update:value="refreshRSI" />
+            <app-input-number v-model:value="rsiOs" size="tiny" :min="0" :max="50" style="width: 36px;" @update:value="refreshRSI" />
           </template>
         </n-space>
       </n-gi>
@@ -815,9 +815,9 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showStoch" size="small">Stoch</n-checkbox>
           <template v-if="showStoch">
-            <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 68px;" @update:value="refreshStoch" />
-            <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 60px;" @update:value="refreshStoch" />
-            <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 60px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochK" size="tiny" :min="2" :max="100" style="width: 36px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochKSmooth" size="tiny" :min="1" :max="20" style="width: 36px;" @update:value="refreshStoch" />
+            <app-input-number v-model:value="stochDSmooth" size="tiny" :min="1" :max="20" style="width: 36px;" @update:value="refreshStoch" />
           </template>
         </n-space>
       </n-gi>
@@ -825,16 +825,16 @@ function clearAllPanes() {
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showMACD" size="small">MACD</n-checkbox>
           <template v-if="showMACD">
-            <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 68px;" @update:value="refreshMACD" />
-            <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 68px;" @update:value="refreshMACD" />
-            <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 68px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdFast" size="tiny" :min="2" :max="200" style="width: 36px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdSlow" size="tiny" :min="2" :max="200" style="width: 36px;" @update:value="refreshMACD" />
+            <app-input-number v-model:value="macdSignal" size="tiny" :min="1" :max="50" style="width: 36px;" @update:value="refreshMACD" />
           </template>
         </n-space>
       </n-gi>
       <n-gi>
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showATR" size="small">ATR</n-checkbox>
-          <app-input-number v-if="showATR" v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 72px;" @update:value="refreshATR" />
+          <app-input-number v-if="showATR" v-model:value="atrPeriod" size="tiny" :min="2" :max="100" style="width: 38px;" @update:value="refreshATR" />
         </n-space>
       </n-gi>
       <n-gi>
