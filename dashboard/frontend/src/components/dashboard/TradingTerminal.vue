@@ -852,7 +852,7 @@ function clearAllPanes() {
       <n-gi>
         <div class="ind-line">
           <n-checkbox v-model:checked="showVolume" size="small">{{ $t('terminal.volume') }}</n-checkbox>
-          <span :class="['ind-params', { 'ind-hidden': !showVolume }]"></span>
+          <span :class="['ind-params', { 'ind-hidden': !showVolume }]"><span class="ind-placeholder"></span></span>
         </div>
       </n-gi>
     </n-grid>
@@ -892,6 +892,7 @@ function clearAllPanes() {
   align-items: center;
   gap: 2px;
   white-space: nowrap;
+  min-height: 44px;
 }
 .ind-params {
   display: inline-flex;
@@ -901,5 +902,9 @@ function clearAllPanes() {
 .ind-hidden {
   visibility: hidden;
   pointer-events: none;
+}
+.ind-placeholder {
+  display: inline-block;
+  width: 20px;
 }
 </style>
