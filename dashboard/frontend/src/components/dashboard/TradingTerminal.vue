@@ -65,11 +65,15 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 // ---- localStorage 持久化（保存周期和指标配置） ----
 const STORAGE_KEY = 'algoforge_terminal_config'
+
+/** 按周期保存/加载配置，格式: { tf: { showEMA, ema1, ... } } */
 function loadTerminalConfig() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return
-    const cfg = JSON.parse(raw)
+    const all = JSON.parse(raw)
+    const cfg = all[activeTf.value]
+    if (!cfg) return
     activeTf.value = cfg.tf || 'H1'
     showEMA.value = cfg.showEMA ?? false
     showSMA.value = cfg.showSMA ?? false
@@ -100,7 +104,9 @@ function loadTerminalConfig() {
 }
 function saveTerminalConfig() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const all = raw ? JSON.parse(raw) : {}
+    all[activeTf.value] = {
       tf: activeTf.value,
       showEMA: showEMA.value, showSMA: showSMA.value, showBB: showBB.value,
       showRSI: showRSI.value, showStoch: showStoch.value, showMACD: showMACD.value,
@@ -112,7 +118,8 @@ function saveTerminalConfig() {
       stochK: stochK.value, stochKSmooth: stochKSmooth.value, stochDSmooth: stochDSmooth.value,
       macdFast: macdFast.value, macdSlow: macdSlow.value, macdSignal: macdSignal.value,
       atrPeriod: atrPeriod.value,
-    }))
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
   } catch (e) { /* ignore storage error */ }
 }
 
@@ -722,11 +729,15 @@ function applyTfPreset() {
 }
 
 async function switchTf(tf: string) {
+  // 先保存当前周期配置
+  saveTerminalConfig()
   activeTf.value = tf
   stopAutoRefresh()
   clearAllOverlays()
   clearAllPanes()
+  // 尝试加载目标周期已保存的配置，否则用预设
   applyTfPreset()
+  loadTerminalConfig()
   await loadCandles()
   startAutoRefresh()
   saveTerminalConfig()
@@ -767,7 +778,7 @@ function clearAllPanes() {
       </n-space>
     </template>
 
-    <!-- 指标选择 — 2行4列固定布局，用 v-show 保持位置 -->
+    <!-- 网格布局：每格宽度一致，避免内容不齐 -->
     <n-grid :cols="4" :x-gap="6" :y-gap="2" style="margin-bottom: 6px;">
       <!-- 第一行：EMA, SMA, BB, RSI -->
       <n-gi>
