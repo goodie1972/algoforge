@@ -79,8 +79,11 @@ function loadTerminalConfig() {
     showMACD.value = cfg.showMACD ?? false
     showATR.value = cfg.showATR ?? false
     showVolume.value = cfg.showVolume ?? false
-    if (cfg.emaPeriods) emaPeriods.value = cfg.emaPeriods
-    if (cfg.smaPeriods) smaPeriods.value = cfg.smaPeriods
+    if (cfg.ema1) ema1.value = cfg.ema1
+    if (cfg.ema2) ema2.value = cfg.ema2
+    if (cfg.ema3) ema3.value = cfg.ema3
+    if (cfg.sma1) sma1.value = cfg.sma1
+    if (cfg.sma2) sma2.value = cfg.sma2
     if (cfg.bbPeriod) bbPeriod.value = cfg.bbPeriod
     if (cfg.bbStd) bbStd.value = cfg.bbStd
     if (cfg.rsiPeriod) rsiPeriod.value = cfg.rsiPeriod
@@ -102,7 +105,8 @@ function saveTerminalConfig() {
       showEMA: showEMA.value, showSMA: showSMA.value, showBB: showBB.value,
       showRSI: showRSI.value, showStoch: showStoch.value, showMACD: showMACD.value,
       showATR: showATR.value, showVolume: showVolume.value,
-      emaPeriods: emaPeriods.value, smaPeriods: smaPeriods.value,
+      ema1: ema1.value, ema2: ema2.value, ema3: ema3.value,
+      sma1: sma1.value, sma2: sma2.value,
       bbPeriod: bbPeriod.value, bbStd: bbStd.value,
       rsiPeriod: rsiPeriod.value, rsiOb: rsiOb.value, rsiOs: rsiOs.value,
       stochK: stochK.value, stochKSmooth: stochKSmooth.value, stochDSmooth: stochDSmooth.value,
@@ -166,8 +170,11 @@ const showATR = ref(false)
 const showVolume = ref(false)
 
 // 指标参数
-const emaPeriods = ref('20,50,200')
-const smaPeriods = ref('20,50')
+const ema1 = ref(20)
+const ema2 = ref(50)
+const ema3 = ref(200)
+const sma1 = ref(20)
+const sma2 = ref(50)
 const bbPeriod = ref(20)
 const bbStd = ref(2)
 const rsiPeriod = ref(14)
@@ -185,8 +192,11 @@ function parsePeriods(s: string): number[] {
   return s.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n > 0)
 }
 
+function getEmaPeriods(): number[] { return [ema1.value, ema2.value, ema3.value].filter(n => n > 0) }
+function getSmaPeriods(): number[] { return [sma1.value, sma2.value].filter(n => n > 0) }
+
 // 参数变更时重建对应指标
-watch([showEMA, showSMA, showBB, emaPeriods, smaPeriods, bbPeriod, bbStd], () => {
+watch([showEMA, showSMA, showBB, ema1, ema2, ema3, sma1, sma2, bbPeriod, bbStd], () => {
   applyOverlay()
   saveTerminalConfig()
 })
@@ -384,7 +394,7 @@ function applyOverlay() {
   // EMA
   const emaColors = ['#f0b90b', '#e88b37', '#ef3b6d', '#0ecb81', '#8b8f97']
   if (showEMA.value) {
-    const periods = parsePeriods(emaPeriods.value)
+    const periods = getEmaPeriods()
     periods.forEach((p, i) => {
       const key = `ema${p}`
       ensureOverlaySeries(key, { color: emaColors[i % emaColors.length], lineWidth: 1 })
@@ -392,7 +402,7 @@ function applyOverlay() {
     })
   }
   // 清理不在参数列表中的 EMA 系列（取消勾选时全部清理）
-  const emaKeys = showEMA.value ? parsePeriods(emaPeriods.value).map(p => `ema${p}`) : []
+  const emaKeys = showEMA.value ? getEmaPeriods().map(p => `ema${p}`) : []
   Object.keys(overlaySeries).forEach(k => {
     if (k.startsWith('ema') && !emaKeys.includes(k)) removeOverlaySeries(k)
   })
@@ -400,14 +410,14 @@ function applyOverlay() {
   // SMA
   const smaColors = ['#0ecb81', '#f6465d', '#f0b90b', '#e88b37', '#8b8f97']
   if (showSMA.value) {
-    const periods = parsePeriods(smaPeriods.value)
+    const periods = getSmaPeriods()
     periods.forEach((p, i) => {
       const key = `sma${p}`
       ensureOverlaySeries(key, { color: smaColors[i % smaColors.length], lineWidth: 1, lineStyle: 2 })
       overlaySeries[key].setData(castTime(padLinePoints(data, calcSMA(data, p))))
     })
   }
-  const smaKeys = showSMA.value ? parsePeriods(smaPeriods.value).map(p => `sma${p}`) : []
+  const smaKeys = showSMA.value ? getSmaPeriods().map(p => `sma${p}`) : []
   Object.keys(overlaySeries).forEach(k => {
     if (k.startsWith('sma') && !smaKeys.includes(k)) removeOverlaySeries(k)
   })
@@ -765,13 +775,20 @@ function clearAllPanes() {
       <n-gi>
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showEMA" size="small" @update:checked="applyOverlay">EMA</n-checkbox>
-          <n-input v-if="showEMA" v-model:value="emaPeriods" size="tiny" placeholder="20,50,200" style="width: 88px;" @change="applyOverlay" />
+          <template v-if="showEMA">
+            <app-input-number v-model:value="ema1" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema2" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="ema3" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+          </template>
         </n-space>
       </n-gi>
       <n-gi>
         <n-space size="small" align="center">
           <n-checkbox v-model:checked="showSMA" size="small" @update:checked="applyOverlay">SMA</n-checkbox>
-          <n-input v-if="showSMA" v-model:value="smaPeriods" size="tiny" placeholder="20,50" style="width: 88px;" @change="applyOverlay" />
+          <template v-if="showSMA">
+            <app-input-number v-model:value="sma1" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+            <app-input-number v-model:value="sma2" size="tiny" :min="2" :max="999" style="width: 60px;" @update:value="applyOverlay" />
+          </template>
         </n-space>
       </n-gi>
       <n-gi>
