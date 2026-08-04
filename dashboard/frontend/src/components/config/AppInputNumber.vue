@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { NInput } from 'naive-ui'
 import { IconChevronUp, IconChevronDown } from '@tabler/icons-vue'
 
@@ -19,13 +19,36 @@ const emit = defineEmits<{
   'update:value': [value: number | null]
 }>()
 
-const local = computed({
-  get: () => props.modelValue,
-  set: (v) => {
-    emit('update:modelValue', v)
-    emit('update:value', v)
-  },
-})
+// 显示用字符串（保证 n-input 始终有值显示）
+const displayVal = ref('')
+
+// 从 modelValue 同步到 displayVal
+watch(() => props.modelValue, (v) => {
+  displayVal.value = v != null ? String(v) : ''
+}, { immediate: true })
+
+// 从显示值同步回 modelValue
+function onInput(v: string | null) {
+  const raw = (v ?? '').trim()
+  displayVal.value = raw
+  if (raw === '') {
+    emit('update:modelValue', null)
+    emit('update:value', null)
+    return
+  }
+  const n = parseFloat(raw)
+  if (!isNaN(n)) {
+    const min = props.min ?? -Infinity
+    const max = props.max ?? Infinity
+    const clamped = Math.max(min, Math.min(max, n))
+    let final = clamped
+    if (props.precision != null) {
+      final = parseFloat(clamped.toFixed(props.precision))
+    }
+    emit('update:modelValue', final)
+    emit('update:value', final)
+  }
+}
 
 function clamp(v: number): number {
   const min = props.min ?? -Infinity
@@ -35,35 +58,28 @@ function clamp(v: number): number {
 
 function inc() {
   const step = props.step ?? 1
-  const cur = local.value ?? 0
+  const cur = props.modelValue ?? 0
   const next = clamp(cur + step)
+  let final = next
   if (props.precision != null) {
-    local.value = parseFloat(next.toFixed(props.precision))
-  } else {
-    local.value = next
+    final = parseFloat(next.toFixed(props.precision))
   }
+  displayVal.value = String(final)
+  emit('update:modelValue', final)
+  emit('update:value', final)
 }
 
 function dec() {
   const step = props.step ?? 1
-  const cur = local.value ?? 0
+  const cur = props.modelValue ?? 0
   const next = clamp(cur - step)
+  let final = next
   if (props.precision != null) {
-    local.value = parseFloat(next.toFixed(props.precision))
-  } else {
-    local.value = next
+    final = parseFloat(next.toFixed(props.precision))
   }
-}
-
-function onInput(v: string | null) {
-  if (v === null || v === '') {
-    local.value = null
-    return
-  }
-  const n = parseFloat(v)
-  if (!isNaN(n)) {
-    local.value = clamp(n)
-  }
+  displayVal.value = String(final)
+  emit('update:modelValue', final)
+  emit('update:value', final)
 }
 
 function getBtnSize(): number {
@@ -79,7 +95,7 @@ function getBtnSize(): number {
       <IconChevronUp :size="getBtnSize()" />
     </button>
     <n-input
-      :value="local != null ? String(local) : ''"
+      v-model:value="displayVal"
       :placeholder="placeholder"
       :disabled="disabled"
       :size="size"
