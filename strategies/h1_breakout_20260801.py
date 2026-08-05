@@ -32,6 +32,7 @@ class H1BreakoutStrategy(BaseStrategy):
 
     def __init__(self, bridge: MT4BridgeBase, **kwargs):
         super().__init__(bridge, **kwargs)
+        self._trail_data: dict = {}
         self.timeframe = self.timeframe or "H1"
 
         # Entry params
