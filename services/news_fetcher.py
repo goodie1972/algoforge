@@ -93,8 +93,8 @@ LOGICAL_CHAINS = {
         "bearish": "鹰派信号 → 降息预期↓ → 实际利率↑ → 金价↓",
     },
     "geopolitical": {
-        "bullish": "和平协议 → 油价↓ → 通胀预期↓ → 加息↓ → 金价↑",
-        "bearish": "地缘紧张 → 油价↑ → 通胀预期↑ → 加息↑ → 金价↓（新版逻辑）",
+        "bullish": "地缘紧张 → 避险情绪↑ → 资金流入黄金 → 金价↑",
+        "bearish": "和平/停火 → 避险情绪消退 → 资金流出黄金 → 金价↓",
     },
     "usd": {
         "bullish": "美元↓/收益率↓ → 持有成本↓ → 金价↑",
@@ -141,9 +141,9 @@ def classify_direction(title: str, summary: str = "") -> str:
         # 央行购金
         (["央行增持", "增持黄金", "gold purchase", "increase reserve",
           "央行购金"], "bullish"),
-        # 和平协议（新逻辑：油价↓→通胀↓→金价↑）
+        # 和平协议（旧逻辑修正：和平/停火 → 避险消退 → 金价↓）
         (["peace", "ceasefire", "truce", "agreement", "de-escalat",
-          "和平协议", "停火"], "bullish"),
+          "和平协议", "停火"], "bearish"),
     ]
     bearish_patterns = [
         # 通胀升温
@@ -153,8 +153,6 @@ def classify_direction(title: str, summary: str = "") -> str:
         # 鹰派
         (["hawkish", "rate hike", "加息", "tighten", "加息预期",
           "point to hike", "aggressive"], "bearish"),
-        # 地缘和平（旧逻辑修正：和平→油价↓→通胀↓→利多）
-        # 实际上和平是 bullish，所以这里不重复列出
         # 美元走强
         (["dollar strong", "dollar surge", "dollar rally", "dollar index up",
           "美元走强", "美元上涨", "美元指数", "收益率上行",
@@ -165,13 +163,13 @@ def classify_direction(title: str, summary: str = "") -> str:
     ]
 
     # 先检查是否有"地缘紧张+避险"这种需要特殊处理的
-    # 地缘紧张 → 油价↑ → 通胀↑ → 加息↑ → 金价↓（新版逻辑）
+    # 地缘紧张 → 避险情绪↑ → 资金流入黄金 → 金价↑（传统避险逻辑）
     geopolitical_tension_kw = ["war", "sanction", "conflict", "tension",
                                 "strike", "attack", "missile"]
     for kw in geopolitical_tension_kw:
         if kw in text:
-            # 地缘紧张在新逻辑下是 bearish（通过油价推通胀）
-            return "bearish"
+            # 地缘紧张 → 避险升温 → 黄金作为避险资产受追捧 → 金价↑
+            return "bullish"
 
     for patterns, direction in bullish_patterns:
         for p in patterns:

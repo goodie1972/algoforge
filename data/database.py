@@ -165,6 +165,39 @@ CREATE TABLE IF NOT EXISTS news_calendar (
 CREATE INDEX IF NOT EXISTS idx_news_country ON news_calendar(country);
 CREATE INDEX IF NOT EXISTS idx_news_impact ON news_calendar(impact);
 
+-- 复盘分析表
+CREATE TABLE IF NOT EXISTS prediction_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER,
+    predicted_direction TEXT NOT NULL,
+    actual_direction TEXT NOT NULL,
+    is_correct INTEGER NOT NULL DEFAULT 0,
+    error_type TEXT DEFAULT '',
+    root_cause TEXT DEFAULT '',
+    suggestion TEXT DEFAULT '',
+    keywords_used TEXT DEFAULT '',
+    price_at_prediction REAL DEFAULT 0,
+    price_after_15m REAL DEFAULT 0,
+    price_after_1h REAL DEFAULT 0,
+    price_after_4h REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (report_id) REFERENCES news_bias_reports(id)
+);
+CREATE INDEX IF NOT EXISTS idx_pred_review_report ON prediction_reviews(report_id);
+CREATE INDEX IF NOT EXISTS idx_pred_review_date ON prediction_reviews(created_at);
+
+-- 准确率统计表
+CREATE TABLE IF NOT EXISTS accuracy_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    total INTEGER NOT NULL DEFAULT 0,
+    correct INTEGER NOT NULL DEFAULT 0,
+    accuracy REAL DEFAULT 0,
+    breakdown TEXT DEFAULT '{}',
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(date)
+);
+
 CREATE TABLE IF NOT EXISTS metadata (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -1088,6 +1121,119 @@ def get_latest_news_bias_report() -> dict | None:
             "SELECT * FROM news_bias_reports ORDER BY id DESC LIMIT 1"
         ).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# ── Prediction Review ───────────────────────────────────
+
+def insert_prediction_review(report_id, predicted, actual, is_correct, error_type="", root_cause="", suggestion="", keywords_used="", price_at_pred=0.0, price_15m=0.0, price_1h=0.0, price_4h=0.0):
+    """插入复盘记录，返回id"""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            """INSERT INTO prediction_reviews
+               (report_id, predicted_direction, actual_direction, is_correct,
+                error_type, root_cause, suggestion, keywords_used,
+                price_at_prediction, price_after_15m, price_after_1h, price_after_4h)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (report_id, predicted, actual, is_correct,
+             error_type, root_cause, suggestion, keywords_used,
+             price_at_pred, price_15m, price_1h, price_4h),
+        )
+        conn.commit()
+        return cur.lastrowid or 0
+    except Exception as e:
+        logger.warning(f"[DB] 插入复盘记录失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_prediction_reviews(limit=20, offset=0):
+    """获取复盘记录列表，按时间倒序，含report_id联表查询title"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT r.id, r.report_id, r.predicted_direction, r.actual_direction,
+                      r.is_correct, r.error_type, r.root_cause, r.suggestion,
+                      r.keywords_used, r.price_at_prediction, r.price_after_15m,
+                      r.price_after_1h, r.price_after_4h, r.created_at,
+                      n.title
+               FROM prediction_reviews r
+               LEFT JOIN news_bias_reports n ON r.report_id = n.id
+               ORDER BY r.created_at DESC LIMIT ? OFFSET ?""",
+            (limit, offset),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_prediction_review(id):
+    """获取单条复盘详情"""
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            """SELECT r.*, n.title
+               FROM prediction_reviews r
+               LEFT JOIN news_bias_reports n ON r.report_id = n.id
+               WHERE r.id=?""",
+            (id,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def upsert_accuracy_stats(date, total, correct, accuracy, breakdown_json):
+    """插入或更新每日准确率统计"""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            """INSERT INTO accuracy_stats (date, total, correct, accuracy, breakdown)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(date) DO UPDATE SET
+                 total=excluded.total,
+                 correct=excluded.correct,
+                 accuracy=excluded.accuracy,
+                 breakdown=excluded.breakdown""",
+            (date, total, correct, accuracy, breakdown_json),
+        )
+        conn.commit()
+        return cur.lastrowid or 0
+    except Exception as e:
+        logger.warning(f"[DB] 写入准确率统计失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_accuracy_stats(days=30):
+    """获取最近N天准确率趋势"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT date, total, correct, accuracy, breakdown FROM accuracy_stats ORDER BY date DESC LIMIT ?",
+            (days,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_unreviewed_reports():
+    """获取尚未被复盘、且创建时间超过12小时的报告"""
+    conn = get_conn()
+    try:
+        cutoff = (datetime.now() - timedelta(hours=12)).strftime("%Y-%m-%d %H:%M:%S")
+        rows = conn.execute(
+            """SELECT * FROM news_bias_reports
+               WHERE id NOT IN (SELECT report_id FROM prediction_reviews WHERE report_id IS NOT NULL)
+                 AND created_at <= ?""",
+            (cutoff,),
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 

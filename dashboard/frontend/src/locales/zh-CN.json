@@ -303,6 +303,7 @@
   "report.var_not_significant": "变量不显著",
   "report.load_fail": "加载失败",
   "report.gen_fail": "生成失败",
+  "report.review_tab": "复盘分析",
 
   "common.confirm": "确定",
   "common.cancel": "取消",
