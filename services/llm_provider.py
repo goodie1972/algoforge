@@ -113,6 +113,7 @@ class LLMProviderManager:
             "api_key": data.get("api_key", ""),
             "base_url": data.get("base_url", "https://api.openai.com/v1"),
             "models": data.get("models", []),
+            "enabled_models": data.get("enabled_models", []),
             "selected_model": data.get("selected_model", ""),
             "is_active": data.get("is_active", False),
             "created_at": datetime.now().isoformat(),
@@ -126,7 +127,7 @@ class LLMProviderManager:
         for p in self._providers:
             if p["id"] == provider_id:
                 for key in ("name", "type", "api_key", "base_url", "models",
-                            "selected_model", "is_active"):
+                            "enabled_models", "selected_model", "is_active"):
                     if key in data:
                         p[key] = data[key]
                 self._save()
@@ -258,6 +259,8 @@ class LLMProviderManager:
                 provider["models"] = models
                 if not provider["selected_model"] and models:
                     provider["selected_model"] = models[0]
+                # 自动启用所有可用模型
+                provider["enabled_models"] = models[:]
                 self._save()
                 return {"success": True, "models": models}
             else:
@@ -269,6 +272,7 @@ class LLMProviderManager:
                 models = [m["id"] for m in data.get("data", [])]
                 if models:
                     provider["models"] = models
+                    provider["enabled_models"] = models[:]
                     if not provider["selected_model"]:
                         provider["selected_model"] = models[0]
                     self._save()
