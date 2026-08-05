@@ -8,6 +8,7 @@ import ConnectionConfig from '@/components/config/ConnectionConfig.vue'
 import NewsFilterConfig from '@/components/config/NewsFilterConfig.vue'
 // import CoordinatorConfig from '@/components/config/CoordinatorConfig.vue'
 import PaperConfig from '@/components/config/PaperConfig.vue'
+import AiAgentConfig from '@/components/config/AiAgentConfig.vue'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -42,6 +43,9 @@ async function resetAll() {
         </n-tab-pane>
         <n-tab-pane name="paper" :tab="t('config.tab_paper')">
           <PaperConfig />
+        </n-tab-pane>
+        <n-tab-pane name="ai" :tab="t('config.tab_ai')">
+          <AiAgentConfig />
         </n-tab-pane>
       </n-tabs>
 

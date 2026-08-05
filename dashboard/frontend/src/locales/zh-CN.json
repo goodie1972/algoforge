@@ -2,7 +2,6 @@
   "app.title": "AlgoForge",
   "app.subtitle": "XAUUSD 黄金量化交易系统",
   "app.breadcrumb": "AlgoForge - XAUUSD 黄金量化交易系统",
-
   "nav.trading": "交易终端",
   "nav.positions": "账户持仓",
   "nav.strategies": "策略中心",
@@ -10,12 +9,10 @@
   "nav.config": "运行配置",
   "nav.report": "日报周报",
   "nav.logs": "系统日志",
-
   "theme.dark": "深色",
   "theme.light": "亮色",
   "lang.zh": "中文",
   "lang.en": "English",
-
   "engine.running": "运行中",
   "engine.stopped": "已停止",
   "engine.start": "启动引擎",
@@ -26,7 +23,6 @@
   "engine.stop_success": "引擎已停止",
   "engine.start_fail": "启动失败",
   "engine.stop_fail": "停止失败",
-
   "version.title": "版本信息",
   "version.current": "当前版本",
   "version.commit": "提交",
@@ -44,13 +40,11 @@
   "version.pending_commits": "待更新 {{count}} 个 commit",
   "version.has_update": "有更新",
   "version.up_to_date": "已是最新",
-
   "log.title": "系统日志",
   "log.filter_all": "全部",
   "log.auto_scroll": "自动滚动",
   "log.clear": "清空",
   "log.empty": "暂无日志",
-
   "positions.title": "持仓管理",
   "positions.current": "当前持仓",
   "positions.recent_trades": "最近成交",
@@ -58,7 +52,7 @@
   "positions.all_history": "全部历史成交",
   "positions.long": "多头",
   "positions.short": "空头",
-  "positions.summary": "汇总",
+  "positions.summary": "总计",
   "positions.history": "历史持仓",
   "positions.close": "平仓",
   "positions.close_all": "全部平仓",
@@ -72,7 +66,6 @@
   "positions.profit": "盈亏",
   "positions.magic": "策略",
   "positions.open_time": "开仓时间",
-
   "trades.title": "历史成交",
   "trades.search": "搜索: 策略名 / Magic / Ticket",
   "trades.filter": "筛选",
@@ -160,19 +153,17 @@
   "trades.trade_count": "交易次数",
   "trades.money": "盈亏",
   "trades.stats_fail": "获取统计失败",
-
   "strategy.title": "策略中心",
   "strategy.tab_pool": "策略组合",
   "strategy.tab_backtest": "回测",
   "strategy.tab_records": "回测记录",
   "strategy.status": "状态",
   "strategy.enabled": "已启用",
-  "strategy.disabled": "已禁用",
+  "strategy.disabled": "未启用",
   "strategy.magic": "Magic",
-  "strategy.timeframe": "周期",
+  "strategy.timeframe": "时间周期",
   "strategy.positions": "持仓数",
-  "strategy.signals": "信号",
-
+  "strategy.signals": "信号数",
   "config.title": "系统配置",
   "config.desc": "风控/连接/新闻/协调器修改后点击\"保存\"按钮提交，引擎将在下一个 tick 周期（约 60 秒内）自动生效；纸面交易配置变更即时生效",
   "config.tab_risk": "风控参数",
@@ -183,7 +174,6 @@
   "config.reset_done": "配置已重置为默认值",
   "config.save": "保存配置",
   "config.saved": "配置已保存",
-
   "report.title": "日报周报",
   "report.daily": "日报",
   "report.weekly": "周报",
@@ -304,7 +294,6 @@
   "report.load_fail": "加载失败",
   "report.gen_fail": "生成失败",
   "report.review_tab": "复盘分析",
-
   "common.confirm": "确定",
   "common.cancel": "取消",
   "common.loading": "加载中...",
@@ -330,7 +319,6 @@
   "common.no_data": "暂无数据",
   "common.entry": "入场",
   "common.exit": "出场",
-
   "patrol.title": "监控",
   "patrol.subtitle": "监控告警",
   "patrol.status": "巡检状态",
@@ -344,7 +332,6 @@
   "patrol.level_critical": "严重",
   "patrol.level_warning": "告警",
   "patrol.level_info": "信息",
-
   "terminal.title": "XAUUSD 交易终端",
   "terminal.bid": "买价",
   "terminal.ask": "卖价",
@@ -355,7 +342,6 @@
   "terminal.no_data": "暂无数据",
   "terminal.no_data_desc": "连接 MT4 后自动加载 K 线数据",
   "terminal.rsi_label": "RSI ({{period}}) 超买{{ob}} 超卖{{os}}",
-
   "account.title": "账户信息",
   "account.load_fail": "获取账户信息失败",
   "account.waiting": "等待连接",
@@ -367,21 +353,14 @@
   "account.account": "账户",
   "account.leverage": "杠杆",
   "account.currency": "货币",
-
-  "positions.current": "当前持仓",
   "positions.long_tag": "多头",
   "positions.short_tag": "空头",
-  "positions.summary": "总计",
-  "positions.empty": "暂无持仓",
   "positions.empty_desc": "启动引擎后自动获取持仓数据",
   "positions.modify_sltp": "修改 SL/TP - #",
   "positions.sl": "止损 (SL)",
   "positions.tp": "止盈 (TP)",
   "positions.confirm_modify": "确认修改",
-
-  "trades.empty": "暂无历史成交",
   "trades.empty_desc": "启动引擎后自动记录已平仓订单",
-
   "radar.title": "评估标准",
   "radar.select_strategy": "选择策略",
   "radar.select_version": "版本筛选",
@@ -402,7 +381,6 @@
   "radar.profit_ratio": "盈亏比",
   "radar.consec_loss_ctrl": "连亏控制",
   "radar.expected_return": "期望收益",
-
   "signals.current_price": "现价",
   "signals.spread": "点差",
   "signals.news_calendar": "新闻日历",
@@ -419,11 +397,9 @@
   "signals.exit": "平仓:",
   "signals.no_detail": "暂无详细策略说明",
   "signals.no_running": "暂无运行策略",
-
   "not_found.title": "页面未找到",
   "not_found.desc": "您访问的页面不存在，或已被移除。",
   "not_found.back": "返回仪表盘",
-
   "strategy.count": "共 {{total}} 个策略，已启用 {{active}} 个。",
   "strategy.switch_on": "左侧开关控制是否进入实盘交易。展开 > 查看完整进出场逻辑。",
   "strategy.no_strategies": "未发现可交易策略",
@@ -431,7 +407,6 @@
   "strategy.disabled_tag": "未启用",
   "strategy.collapse": "收起",
   "strategy.expand": "展开",
-  "strategy.timeframe": "时间周期",
   "strategy.max_positions": "最大持仓",
   "strategy.double_first": "双倍首单",
   "strategy.long": "▲ 做多",
@@ -444,13 +419,6 @@
   "strategy.wide_mode": "加宽",
   "strategy.no_detail": "暂无详细策略说明",
   "strategy.save": "保存策略配置",
-  "strategy.status": "状态",
-  "strategy.enabled": "已启用",
-  "strategy.disabled": "未启用",
-  "strategy.magic": "Magic",
-  "strategy.positions": "持仓数",
-  "strategy.signals": "信号数",
-
   "backtest.params": "回测参数",
   "backtest.select_strategy": "策略选择",
   "backtest.symbol": "品种",
@@ -473,7 +441,6 @@
   "backtest.refresh": "刷新",
   "backtest.no_records": "暂无回测记录",
   "backtest.no_records_hint": "在\"回测\"标签页提交回测任务",
-
   "config.connection": "连接",
   "config.mt4_title": "MT4 连接",
   "config.mt4_address": "MT4 地址",
@@ -481,7 +448,6 @@
   "config.mt4_desc": "MT4 连接参数在 config/settings.py 中配置，修改后重启引擎生效。",
   "config.enabled_strategies": "已启用策略",
   "config.no_strategies": "尚未启用任何策略",
-
   "config.coordinator": "协调器",
   "config.coord_enable": "启用协调器",
   "config.coord_desc": "开启后启用下方 K 线过滤器功能",
@@ -510,7 +476,6 @@
   "config.drawdown_pct": "回撤比例",
   "config.peak_threshold": "峰值门槛(ATR)",
   "config.save_coord": "保存协调器配置",
-
   "config.news": "新闻过滤",
   "config.news_enable": "启用新闻过滤",
   "config.blackout_window": "禁售时间窗口",
@@ -542,7 +507,6 @@
   "config.high_impact_events": "本周高影响事件",
   "config.no_events": "本周无高影响事件",
   "config.refresh_events": "刷新事件列表",
-
   "config.paper": "纸面模式",
   "config.paper_enable": "纸面模式开关",
   "config.paper_desc": "开启后所有交易通过 PaperBridge 本地模拟，不影响真实 MT4 账户",
@@ -561,7 +525,6 @@
   "config.reset_paper_action": "清空纸面成交记录",
   "config.reset_paper_desc": "清空 papertest_bridge.csv 和本地模拟持仓，不可恢复",
   "config.save_paper": "保存纸面配置",
-
   "config.risk": "风控参数",
   "config.position_mgmt": "仓位管理",
   "config.position_size": "每次开仓手数",
@@ -601,5 +564,6 @@
   "config.consec_loss_desc": "连续亏损达到此次数后触发冷却",
   "config.consec_loss_cooldown": "冷却时长 (小时)",
   "config.consec_loss_cooldown_desc": "冷却到期后自动恢复",
-  "config.save_risk": "保存风控配置"
+  "config.save_risk": "保存风控配置",
+  "config.tab_ai": "AI Agent"
 }
