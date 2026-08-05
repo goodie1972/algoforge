@@ -565,5 +565,7 @@
   "config.consec_loss_cooldown": "冷却时长 (小时)",
   "config.consec_loss_cooldown_desc": "冷却到期后自动恢复",
   "config.save_risk": "保存风控配置",
-  "config.tab_ai": "AI Agent"
+  "config.tab_ai": "AI Agent",
+  "strategy.pool_summary": "共 {total} 个策略，已启用 {enabled} 个",
+  "strategy.pool_hint": "勾选启用，取消勾选禁用。禁用的策略将不会触发交易信号。"
 }
