@@ -19,6 +19,10 @@ const local = reactive({
   block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
   block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
   news_bias_di_gap: store.items?.coordinator?.news_bias_di_gap ?? 8,
+  review_enabled: store.items.review_enabled ?? true,
+  review_accuracy_threshold: store.items.review_accuracy_threshold ?? 50,
+  review_interval_hours: store.items.review_interval_hours ?? 6,
+  _current_accuracy: 0,
 })
 
 const original = computed(() => ({
@@ -32,6 +36,9 @@ const original = computed(() => ({
   block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
   block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
   news_bias_di_gap: store.items?.coordinator?.news_bias_di_gap ?? 8,
+  review_enabled: store.items.review_enabled ?? true,
+  review_accuracy_threshold: store.items.review_accuracy_threshold ?? 50,
+  review_interval_hours: store.items.review_interval_hours ?? 6,
 }))
 
 const changed = computed(() => JSON.stringify(local) !== JSON.stringify(original.value))
@@ -49,14 +56,27 @@ watch(() => store.items, () => {
     block_long_when_bias_bearish: store.items.block_long_when_bias_bearish ?? false,
     block_short_when_bias_bullish: store.items.block_short_when_bias_bullish ?? false,
     news_bias_di_gap: store.items?.coordinator?.news_bias_di_gap ?? 8,
+    review_enabled: store.items.review_enabled ?? true,
+    review_accuracy_threshold: store.items.review_accuracy_threshold ?? 50,
+    review_interval_hours: store.items.review_interval_hours ?? 6,
   })
 }, { deep: true })
 
 async function save() {
-  const { news_bias_di_gap, ...general } = local
+  const { news_bias_di_gap, _current_accuracy, ...general } = local
   await store.update(general)
   await store.updateCoordinator({ news_bias_di_gap })
   message.success('新闻配置已保存')
+}
+
+async function loadAccuracy() {
+  try {
+    const res = await fetch('/api/news-review/stats?days=1')
+    const data = await res.json()
+    if (data.success) {
+      local._current_accuracy = data.data?.summary?.accuracy ?? 0
+    }
+  } catch { /* ignore */ }
 }
 
 const calendar = ref<any>(null)
@@ -73,7 +93,7 @@ async function refreshCalendar() {
   }
 }
 
-onMounted(() => refreshCalendar())
+onMounted(() => { refreshCalendar(); loadAccuracy() })
 
 const impactOptions = [
   { label: '仅 High', value: 'High' },
@@ -145,6 +165,36 @@ const impactOptions = [
             @update:value="(v: number) => local.news_bias_di_gap = v"
             :min="0" :max="30" :step="1" style="width: 110px;" />
           <template #feedback>M30 |+DI - -DI| &lt; 此值时绕过方向阻塞（0=关闭绕过，默认8）</template>
+        </n-form-item>
+
+        <n-divider title-position="left">AI 复盘 Agent</n-divider>
+
+        <n-form-item label="启用自动复盘">
+          <n-switch :value="local.review_enabled ?? true"
+            @update:value="(v: boolean) => local.review_enabled = v" />
+          <template #feedback>每6小时自动运行复盘分析，比对预测与实际走势</template>
+        </n-form-item>
+
+        <n-form-item label="准确率门限">
+          <app-input-number :value="local.review_accuracy_threshold ?? 50"
+            @update:value="(v: number) => local.review_accuracy_threshold = v"
+            :min="0" :max="100" :step="5" style="width: 110px;" />
+          <template #feedback>低于此准确率时，偏误方向自动切换为 neutral（不阻塞交易）</template>
+        </n-form-item>
+
+        <n-form-item label="复盘间隔">
+          <app-input-number :value="local.review_interval_hours ?? 6"
+            @update:value="(v: number) => local.review_interval_hours = v"
+            :min="1" :max="24" :step="1" style="width: 110px;" />
+          <template #feedback>每隔 N 小时自动复盘一次</template>
+        </n-form-item>
+
+        <n-form-item label="当前准确率">
+          <BiasStateIndicator v-if="false" />
+          <n-tag :bordered="false" :type="(local._current_accuracy ?? 0) >= 50 ? 'success' : 'error'">
+            {{ local._current_accuracy ?? 0 }}%
+          </n-tag>
+          <template #feedback>最近 10 条复盘的准确率</template>
         </n-form-item>
 
         <n-button type="primary" :disabled="!changed" @click="save" block>

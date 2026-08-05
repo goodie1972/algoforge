@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, h } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   NCard, NSpace, NSpin, NEmpty, NAlert, NButton, NDatePicker, NTag,
@@ -29,6 +29,32 @@ function errorTypeLabel(t: string): string {
     'unknown': '未分类',
   }
   return map[t] || t
+}
+
+function renderAccuracyChart() {
+  const el = accuracyChartRef.value
+  if (!el) return
+  const trend = (reviewStats.value as any).accuracy_trend || []
+  if (trend.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#888">暂无数据</div>'
+    return
+  }
+  // 简单柱状图
+  const maxVal = Math.max(...trend.map((t: any) => t.accuracy || 0), 10)
+  const barWidth = Math.min(60, Math.floor((el.clientWidth - 40) / trend.length))
+  let html = '<div style="display:flex;align-items:flex-end;gap:8px;height:160px;padding:0 10px">'
+  for (const t of trend) {
+    const pct = t.accuracy || 0
+    const h = Math.max(4, (pct / maxVal) * 140)
+    const color = pct >= 50 ? '#0ecb81' : pct >= 30 ? '#f0b90b' : '#f6465d'
+    html += `<div style="display:flex;flex-direction:column;align-items:center;width:${barWidth}px">`
+    html += `<span style="font-size:11px;font-weight:bold;color:${color}">${pct.toFixed(0)}%</span>`
+    html += `<div style="width:${barWidth-8}px;height:${h}px;background:${color};border-radius:3px 3px 0 0;margin:2px 0"></div>`
+    html += `<span style="font-size:10px;color:#888">${t.date.slice(5)}</span>`
+    html += '</div>'
+  }
+  html += '</div>'
+  el.innerHTML = html
 }
 
 async function loadReviewData() {
@@ -193,12 +219,14 @@ async function refreshPrice() {
   } catch { /* ignore */ }
 }
 
-watch(activeTab, (tab) => {
+watch(activeTab, async (tab) => {
   if (tab === 'news_bias') {
     refreshPrice()
     priceTimer = setInterval(refreshPrice, 5000)
   } else if (tab === 'review') {
-    loadReviewData()
+    await loadReviewData()
+    await nextTick()
+    renderAccuracyChart()
   } else if (priceTimer) {
     clearInterval(priceTimer)
     priceTimer = null
