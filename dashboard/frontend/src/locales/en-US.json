@@ -565,5 +565,7 @@
   "config.consec_loss_cooldown": "Cooldown Duration (hours)",
   "config.consec_loss_cooldown_desc": "Auto-resume after cooldown expires",
   "config.save_risk": "Save Risk Config",
-  "config.tab_ai": "AI Agent"
+  "config.tab_ai": "AI Agent",
+  "strategy.pool_summary": "Total {total} strategies, {enabled} enabled",
+  "strategy.pool_hint": "Check to enable, uncheck to disable. Disabled strategies will not trigger trading signals."
 }
