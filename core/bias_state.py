@@ -123,6 +123,19 @@ def _get_h1_adx(period: int = 14) -> Optional[float]:
         return None
 
 
+def _get_recent_accuracy(reviews: int = 10) -> float:
+    """获取最近 N 条复盘的准确率（0.0~1.0），无数据返回 0.5（保守默认）"""
+    try:
+        from data import database as _db
+        items = _db.get_prediction_reviews(limit=reviews)
+        if not items:
+            return 0.5
+        correct = sum(1 for r in items if r.get("is_correct"))
+        return correct / len(items)
+    except Exception:
+        return 0.5
+
+
 def refresh_from_db() -> Optional[str]:
     """从 DB 读最新报告并更新缓存，返回新方向（H1 ADX ≤ 阈值时强制 neutral）"""
     try:
@@ -150,6 +163,12 @@ def refresh_from_db() -> Optional[str]:
                         return "neutral"
             except Exception:
                 pass
+
+            # 准确率门禁：最近 10 条复盘准确率 < 50% 时强制 neutral
+            _accuracy = _get_recent_accuracy(reviews=10)
+            if _accuracy < 0.5:
+                set("neutral", score, source=f"accuracy_gate(acc={_accuracy:.0%})")
+                return "neutral"
 
             set(raw_dir, score, source="db_refresh")
             return get()
