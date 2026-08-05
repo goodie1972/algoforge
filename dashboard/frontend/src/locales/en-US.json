@@ -2,7 +2,6 @@
   "app.title": "AlgoForge",
   "app.subtitle": "XAUUSD Gold Trading System",
   "app.breadcrumb": "AlgoForge - XAUUSD Gold Trading System",
-
   "nav.trading": "Trading Terminal",
   "nav.positions": "Positions",
   "nav.strategies": "Strategy Center",
@@ -10,12 +9,10 @@
   "nav.config": "Configuration",
   "nav.report": "Reports",
   "nav.logs": "System Logs",
-
   "theme.dark": "Dark",
   "theme.light": "Light",
   "lang.zh": "中文",
   "lang.en": "English",
-
   "engine.running": "Running",
   "engine.stopped": "Stopped",
   "engine.start": "Start Engine",
@@ -26,7 +23,6 @@
   "engine.stop_success": "Engine stopped",
   "engine.start_fail": "Failed to start",
   "engine.stop_fail": "Failed to stop",
-
   "version.title": "Version Info",
   "version.current": "Current Version",
   "version.commit": "Commit",
@@ -44,13 +40,11 @@
   "version.pending_commits": "{{count}} commits pending",
   "version.has_update": "Update Available",
   "version.up_to_date": "Up to Date",
-
   "log.title": "System Logs",
   "log.filter_all": "All",
   "log.auto_scroll": "Auto Scroll",
   "log.clear": "Clear",
   "log.empty": "No logs available",
-
   "positions.title": "Position Management",
   "positions.current": "Current Positions",
   "positions.recent_trades": "Recent Trades",
@@ -72,7 +66,6 @@
   "positions.profit": "Profit",
   "positions.magic": "Strategy",
   "positions.open_time": "Open Time",
-
   "trades.title": "Trade History",
   "trades.search": "Search: Strategy / Magic / Ticket",
   "trades.filter": "Filter",
@@ -94,7 +87,7 @@
   "trades.stats_tab": "Strategy Stats",
   "trades.voided_tab": "Voided",
   "trades.voided_count": "{{count}} items",
-  "trades.empty": "No trade history yet",
+  "trades.empty": "No trade history",
   "trades.empty_hint": "Closed orders will be recorded automatically after engine starts",
   "trades.stats_empty": "No closed trade records yet",
   "trades.stats_hint": "Statistics will appear after engine runs and closes positions",
@@ -160,7 +153,6 @@
   "trades.trade_count": "Trades",
   "trades.money": "P&L",
   "trades.stats_fail": "Failed to load statistics",
-
   "strategy.title": "Strategy Center",
   "strategy.tab_pool": "Strategy Pool",
   "strategy.tab_backtest": "Backtest",
@@ -172,7 +164,6 @@
   "strategy.timeframe": "Timeframe",
   "strategy.positions": "Positions",
   "strategy.signals": "Signals",
-
   "config.title": "Configuration",
   "config.desc": "Changes to risk/connection/news/coordinator settings take effect after saving. The engine will auto-apply within ~60s on next tick cycle. Paper trading changes take effect immediately.",
   "config.tab_risk": "Risk Parameters",
@@ -183,7 +174,6 @@
   "config.reset_done": "Configuration reset to defaults",
   "config.save": "Save Config",
   "config.saved": "Configuration saved",
-
   "report.title": "Reports",
   "report.daily": "Daily",
   "report.weekly": "Weekly",
@@ -304,7 +294,6 @@
   "report.load_fail": "Load failed",
   "report.gen_fail": "Generation failed",
   "report.review_tab": "Review Analysis",
-
   "common.confirm": "Confirm",
   "common.cancel": "Cancel",
   "common.loading": "Loading...",
@@ -330,7 +319,6 @@
   "common.no_data": "No data",
   "common.entry": "Entry",
   "common.exit": "Exit",
-
   "patrol.title": "Monitor",
   "patrol.subtitle": "Patrol Alerts",
   "patrol.status": "Patrol Status",
@@ -344,7 +332,6 @@
   "patrol.level_critical": "Critical",
   "patrol.level_warning": "Warning",
   "patrol.level_info": "Info",
-
   "terminal.title": "XAUUSD Trading Terminal",
   "terminal.bid": "Bid",
   "terminal.ask": "Ask",
@@ -355,7 +342,6 @@
   "terminal.no_data": "No data",
   "terminal.no_data_desc": "K-line data will load automatically after connecting MT4",
   "terminal.rsi_label": "RSI ({{period}}) Overbought {{ob}} Oversold {{os}}",
-
   "account.title": "Account Info",
   "account.load_fail": "Failed to load account info",
   "account.waiting": "Waiting for connection",
@@ -367,21 +353,14 @@
   "account.account": "Account",
   "account.leverage": "Leverage",
   "account.currency": "Currency",
-
-  "positions.current": "Current Positions",
   "positions.long_tag": "Long",
   "positions.short_tag": "Short",
-  "positions.summary": "Summary",
-  "positions.empty": "No positions",
   "positions.empty_desc": "Position data will load automatically after engine starts",
   "positions.modify_sltp": "Modify SL/TP - #",
   "positions.sl": "Stop Loss (SL)",
   "positions.tp": "Take Profit (TP)",
   "positions.confirm_modify": "Confirm Modifications",
-
-  "trades.empty": "No trade history",
   "trades.empty_desc": "Closed orders will be recorded automatically after engine starts",
-
   "radar.title": "Evaluation Criteria",
   "radar.select_strategy": "Select Strategy",
   "radar.select_version": "Filter Version",
@@ -402,7 +381,6 @@
   "radar.profit_ratio": "Profit/Loss Ratio",
   "radar.consec_loss_ctrl": "Consec Loss Control",
   "radar.expected_return": "Expected Return",
-
   "signals.current_price": "Current Price",
   "signals.spread": "Spread",
   "signals.news_calendar": "News Calendar",
@@ -419,11 +397,9 @@
   "signals.exit": "Exit:",
   "signals.no_detail": "No detailed strategy description",
   "signals.no_running": "No running strategies",
-
   "not_found.title": "Page Not Found",
   "not_found.desc": "The page you visited does not exist or has been removed.",
   "not_found.back": "Back to Dashboard",
-
   "strategy.count": "{{total}} strategies, {{active}} active",
   "strategy.switch_on": "Toggle switch to enable/disable real trading. Expand > View full entry/exit logic.",
   "strategy.no_strategies": "No tradable strategies found",
@@ -431,7 +407,6 @@
   "strategy.disabled_tag": "Disabled",
   "strategy.collapse": "Collapse",
   "strategy.expand": "Expand",
-  "strategy.timeframe": "Timeframe",
   "strategy.max_positions": "Max Positions",
   "strategy.double_first": "Double First Order",
   "strategy.long": "▲ Long",
@@ -444,13 +419,6 @@
   "strategy.wide_mode": "Wide",
   "strategy.no_detail": "No detailed strategy description",
   "strategy.save": "Save Strategy Config",
-  "strategy.status": "Status",
-  "strategy.enabled": "Enabled",
-  "strategy.disabled": "Disabled",
-  "strategy.magic": "Magic",
-  "strategy.positions": "Positions",
-  "strategy.signals": "Signals",
-
   "backtest.params": "Backtest Parameters",
   "backtest.select_strategy": "Select Strategy",
   "backtest.symbol": "Symbol",
@@ -473,7 +441,6 @@
   "backtest.refresh": "Refresh",
   "backtest.no_records": "No backtest records",
   "backtest.no_records_hint": "Submit a backtest job in the Backtest tab",
-
   "config.connection": "Connection",
   "config.mt4_title": "MT4 Connection",
   "config.mt4_address": "MT4 Address",
@@ -481,7 +448,6 @@
   "config.mt4_desc": "MT4 connection parameters are configured in config/settings.py. Restart engine after modification.",
   "config.enabled_strategies": "Enabled Strategies",
   "config.no_strategies": "No strategies enabled yet",
-
   "config.coordinator": "Coordinator",
   "config.coord_enable": "Enable Coordinator",
   "config.coord_desc": "Enable K-line filter functions below",
@@ -510,7 +476,6 @@
   "config.drawdown_pct": "Drawdown Ratio",
   "config.peak_threshold": "Peak Threshold (ATR)",
   "config.save_coord": "Save Coordinator Config",
-
   "config.news": "News Filter",
   "config.news_enable": "Enable News Filter",
   "config.blackout_window": "Blackout Window",
@@ -542,7 +507,6 @@
   "config.high_impact_events": "High Impact Events This Week",
   "config.no_events": "No high impact events this week",
   "config.refresh_events": "Refresh Events",
-
   "config.paper": "Paper Trading",
   "config.paper_enable": "Paper Trading Mode",
   "config.paper_desc": "When enabled, all trades go through PaperBridge local simulation without affecting real MT4 account",
@@ -561,7 +525,6 @@
   "config.reset_paper_action": "Clear Paper Records",
   "config.reset_paper_desc": "Clear papertest_bridge.csv and local simulated positions, irreversible",
   "config.save_paper": "Save Paper Config",
-
   "config.risk": "Risk Parameters",
   "config.position_mgmt": "Position Management",
   "config.position_size": "Position Size",
@@ -601,5 +564,6 @@
   "config.consec_loss_desc": "Trigger cooldown after this many consecutive losses",
   "config.consec_loss_cooldown": "Cooldown Duration (hours)",
   "config.consec_loss_cooldown_desc": "Auto-resume after cooldown expires",
-  "config.save_risk": "Save Risk Config"
+  "config.save_risk": "Save Risk Config",
+  "config.tab_ai": "AI Agent"
 }
