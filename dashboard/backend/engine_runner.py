@@ -525,6 +525,39 @@ class EngineRunner:
         self._bias_thread = threading.Thread(target=_refresh, daemon=True, name="bias_refresher")
         self._bias_thread.start()
 
+    def _start_review_scheduler(self):
+        """定期自动复盘：每 6 小时运行一次 NewsBiasReviewer，检查待复盘报告。"""
+        if hasattr(self, '_review_thread') and self._review_thread and self._review_thread.is_alive():
+            return
+
+        def _run_review():
+            # 启动后延迟 5 分钟，等引擎稳定
+            for _ in range(300):
+                if self._stop_requested:
+                    return
+                time.sleep(1)
+            while not self._stop_requested:
+                try:
+                    from services.news_bias_reviewer import NewsBiasReviewer
+                    reviewer = NewsBiasReviewer()
+                    result = reviewer.review_past_reports(hours=48)
+                    if result:
+                        correct = sum(1 for r in result if r.get("is_correct"))
+                        self.logger.info(
+                            f"[自动复盘] 完成 {len(result)} 条，正确 {correct} 条"
+                            f"，准确率 {correct/len(result)*100:.0f}%"
+                        )
+                except Exception as e:
+                    self.logger.warning(f"[自动复盘] 执行失败: {e}")
+                # 每 6 小时跑一次
+                for _ in range(21600):
+                    if self._stop_requested:
+                        return
+                    time.sleep(1)
+
+        self._review_thread = threading.Thread(target=_run_review, daemon=True, name="review_scheduler")
+        self._review_thread.start()
+
     # ======================== 引擎主循环 ========================
 
     def _run(self):
@@ -595,6 +628,7 @@ class EngineRunner:
 
         # 启动 News-Bias 缓存刷新（用于阻塞开关）
         self._start_bias_refresher()
+        self._start_review_scheduler()
 
         # 校准 MT4 服务器时间 vs 本机 UTC
         engine._calibrate_mt4_time()
