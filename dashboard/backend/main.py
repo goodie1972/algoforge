@@ -161,22 +161,16 @@ async def report_daily_loop():
 
 
 async def report_weekly_loop():
-    """每天 00:00 生成前一天的周报"""
+    """每 6 小时生成一次快照报告，保留历史记录"""
     from dashboard.backend.routes.reports import _gather_weekly_report
     while PollerState.running:
-        now = datetime.now()
-        # 计算到下一个 00:00 的秒数
-        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        wait_sec = (next_midnight - now).total_seconds()
-        await asyncio.sleep(wait_sec)
-        if not PollerState.running:
-            break
-        try:
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-            _gather_weekly_report(target_date=yesterday)
-            logger.info(f"[报告] 周报已生成 ({yesterday})")
-        except Exception as e:
-            logger.warning(f"[报告] 周报生成失败: {e}")
+        _gather_weekly_report()
+        logger.info("[报告] 快照已生成")
+        # 每 6 小时
+        for _ in range(21600):
+            if not PollerState.running:
+                return
+            await asyncio.sleep(1)
 
 
 async def news_bias_loop():

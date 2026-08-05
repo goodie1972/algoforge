@@ -409,13 +409,18 @@ def _gather_daily_report() -> dict:
 
 
 def _gather_weekly_report(target_date: str = "") -> dict:
-    """生成周报并写入数据库。返回报告 id"""
-    content = _build_weekly_report(target_date)
+    """生成周报并写入数据库。使用日报的完整内容，确保有历史记录可查看。"""
+    content = _build_daily_report()
+    # 日报内容已有完整引擎状态，用周报标题封装
+    report_title = content.get("summary", "").split("·")[0].strip() if "·" in content.get("summary", "") else "XAUUSD 状态快照"
     record = {
         "type": "weekly",
-        "title": f"XAUUSD 交易周报 - {target_date}",
+        "title": f"{report_title} - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         "summary": content.get("summary", ""),
         "content": json.dumps(content, ensure_ascii=False, default=str),
+        "account_balance": content.get("account_balance", 0),
+        "account_equity": content.get("account_equity", 0),
+        "floating_pnl": content.get("floating_pnl", 0),
         "daily_pnl": content.get("daily_pnl", 0),
         "position_count": content.get("position_count", 0),
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
