@@ -303,6 +303,7 @@
   "report.var_not_significant": "Not significant",
   "report.load_fail": "Load failed",
   "report.gen_fail": "Generation failed",
+  "report.review_tab": "Review Analysis",
 
   "common.confirm": "Confirm",
   "common.cancel": "Cancel",

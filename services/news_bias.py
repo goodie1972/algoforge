@@ -77,9 +77,10 @@ CONFIDENCE_MAP = {
 }
 
 
-def classify_event(title: str) -> tuple[str, str, str]:
+def classify_event(title: str, actual: Optional[str] = None, forecast: Optional[str] = None) -> tuple[str, str, str]:
     """
     根据事件标题分类。
+    可传入 actual 和 forecast 值进行数据对比判断（经济数据类事件）。
     返回 (expected_bias, reason, confidence)
     bias: 'bullish' / 'bearish' / 'neutral'
     """
@@ -93,6 +94,31 @@ def classify_event(title: str) -> tuple[str, str, str]:
     for kw in neutral_keywords:
         if kw in title_lower:
             return "neutral", f"事件类型({title})需实际内容判断", "low"
+
+    # ── actual vs forecast 数据对比判断（经济数据类事件） ──
+    if actual is not None and forecast is not None and actual != "" and forecast != "":
+        economic_keywords = [
+            "cpi", "consumer price", "nfp", "non-farm", "non farm",
+            "payrolls", "ppi", "producer price", "gdp", "retail sales",
+        ]
+        for ekw in economic_keywords:
+            if ekw in title_lower:
+                try:
+                    actual_val = float(actual.replace("%", "").strip())
+                    forecast_val = float(forecast.replace("%", "").strip())
+                    if actual_val < forecast_val:
+                        # 不及预期 → 弱美元 → 利多黄金
+                        return "bullish", f"实际({actual}) < 预期({forecast}) → 利多黄金({title})", "high"
+                    elif actual_val > forecast_val:
+                        # 超预期 → 强美元 → 利空黄金
+                        return "bearish", f"实际({actual}) > 预期({forecast}) → 利空黄金({title})", "high"
+                    else:
+                        # 持平 → 中性
+                        return "neutral", f"实际({actual}) = 预期({forecast}) → 影响有限({title})", "medium"
+                except (ValueError, TypeError):
+                    # 数值转换失败，退回到关键词匹配
+                    pass
+                break
 
     # 检查利空黄金模式
     for keywords, reason in BEARISH_PATTERNS:

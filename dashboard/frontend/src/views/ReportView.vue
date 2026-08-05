@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import {
   NCard, NSpace, NSpin, NEmpty, NAlert, NButton, NDatePicker, NTag,
   NGrid, NGi, NStatistic, NDataTable,
-  NTabs, NTabPane, NThing
+  NTabs, NTabPane, NThing, NList, NListItem
 } from 'naive-ui'
 import {
   getReports, getReportById, getReportTimeline, generateReport,
@@ -13,6 +13,41 @@ import {
 } from '@/api/client'
 
 const { t } = useI18n()
+
+const reviewLoading = ref(false)
+const reviews = ref<any[]>([])
+const reviewStats = ref({ errorDistribution: {}, suggestions: [] })
+const accuracyChartRef = ref<HTMLDivElement>()
+
+function errorTypeLabel(t: string): string {
+  const map: Record<string,string> = {
+    'data_counterintuitive': '数据反直觉',
+    'other_factor_dominant': '其他因素主导',
+    'technical_override': '技术面压制',
+    'premature_pricing': '提前消化',
+    'time_window_mismatch': '时间窗口错位',
+    'unknown': '未分类',
+  }
+  return map[t] || t
+}
+
+async function loadReviewData() {
+  reviewLoading.value = true
+  try {
+    const [revRes, statsRes] = await Promise.all([
+      fetch('/api/news-review/reviews?limit=10'),
+      fetch('/api/news-review/stats?days=7'),
+    ])
+    const revData = await revRes.json()
+    const statsData = await statsRes.json()
+    if (revData.success) reviews.value = revData.data
+    if (statsData.success) reviewStats.value = statsData.data
+  } catch (e) {
+    console.error('加载复盘数据失败', e)
+  } finally {
+    reviewLoading.value = false
+  }
+}
 
 const loading = ref(false)
 const error = ref('')
@@ -162,6 +197,8 @@ watch(activeTab, (tab) => {
   if (tab === 'news_bias') {
     refreshPrice()
     priceTimer = setInterval(refreshPrice, 5000)
+  } else if (tab === 'review') {
+    loadReviewData()
   } else if (priceTimer) {
     clearInterval(priceTimer)
     priceTimer = null
@@ -304,6 +341,7 @@ function nbBuildSummary(r: any): string {
         <n-tab-pane name="daily" :tab="$t('report.daily')" />
         <n-tab-pane name="weekly" :tab="$t('report.weekly')" />
         <n-tab-pane name="news_bias" :tab="$t('report.news_eval')" />
+        <n-tab-pane name="review" :tab="$t('report.review_tab')" />
       </n-tabs>
 
       <!-- 时间轴 -->
@@ -811,6 +849,75 @@ function nbBuildSummary(r: any): string {
             {{ $t('report.auto_update') }}
           </div>
         </template>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════
+           复盘分析 tab
+           ══════════════════════════════════════════════════ -->
+      <div v-if="activeTab === 'review'">
+        <div v-if="reviewLoading" style="text-align:center;padding:40px"><n-spin size="large" /></div>
+        <div v-else>
+          <!-- 准确率趋势 -->
+          <n-card title="准确率趋势" size="small" style="margin-bottom:12px">
+            <div ref="accuracyChartRef" style="width:100%;height:200px"></div>
+          </n-card>
+
+          <!-- 偏差分布 -->
+          <n-card title="偏差分布" size="small" style="margin-bottom:12px">
+            <n-grid :cols="2" :x-gap="12">
+              <n-gi v-for="(count,type) in reviewStats.errorDistribution" :key="type">
+                <div style="display:flex;justify-content:space-between;padding:4px 0">
+                  <span>{{ errorTypeLabel(type) }}</span>
+                  <n-tag :bordered="false" :type="count > 5 ? 'error' : 'warning'" size="small">{{ count }}次</n-tag>
+                </div>
+              </n-gi>
+            </n-grid>
+          </n-card>
+
+          <!-- 逐条对比 -->
+          <n-card title="最近复盘记录" size="small" style="margin-bottom:12px">
+            <n-empty v-if="reviews.length === 0" description="暂无复盘记录" />
+            <n-list v-else>
+              <n-list-item v-for="r in reviews" :key="r.id">
+                <template #prefix>
+                  <n-tag :bordered="false" :type="r.is_correct ? 'success' : 'error'" size="tiny">
+                    {{ r.is_correct ? '✓' : '✗' }}
+                  </n-tag>
+                </template>
+                <n-thing :title="r.title || '#'+r.report_id" :description="r.created_at">
+                  <template #header-extra>
+                    <n-space size="small">
+                      <n-tag size="tiny" :bordered="false" :type="r.predicted_direction==='bullish'?'success':'error'">
+                        预测: {{ r.predicted_direction==='bullish'?'📈涨':'📉跌' }}
+                      </n-tag>
+                      <n-tag size="tiny" :bordered="false" :type="r.actual_direction==='bullish'?'success':'error'">
+                        实际: {{ r.actual_direction==='bullish'?'📈涨':'📉跌' }}
+                      </n-tag>
+                    </n-space>
+                  </template>
+                  <div v-if="r.error_type" style="font-size:12px;color:#8b8f97;margin-top:4px">
+                    偏差: {{ errorTypeLabel(r.error_type) }}
+                  </div>
+                  <div v-if="r.suggestion" style="font-size:12px;color:#f0b90b;margin-top:2px">
+                    建议: {{ r.suggestion }}
+                  </div>
+                </n-thing>
+              </n-list-item>
+            </n-list>
+          </n-card>
+
+          <!-- 改进建议汇总 -->
+          <n-card title="改进建议汇总" size="small">
+            <n-empty v-if="reviewStats.suggestions.length === 0" description="暂无改进建议" />
+            <n-list v-else>
+              <n-list-item v-for="(s,i) in reviewStats.suggestions" :key="i">
+                <n-alert :title="'建议 '+(i+1)" type="warning" :bordered="false" closable>
+                  {{ s }}
+                </n-alert>
+              </n-list-item>
+            </n-list>
+          </n-card>
+        </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════

@@ -71,6 +71,7 @@ from dashboard.backend.routes import version as route_version
 from dashboard.backend.routes import strategies as route_strategies
 from dashboard.backend.routes import supervisor as route_supervisor
 from dashboard.backend.routes import paper_trading as route_paper_trading
+from dashboard.backend.routes.news_review import router as news_review_router
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -276,6 +277,7 @@ app.include_router(route_version.router)
 app.include_router(route_strategies.router)
 app.include_router(route_supervisor.router)
 app.include_router(route_paper_trading.router)
+app.include_router(news_review_router)
 
 
 # === WebSocket 端点 ===
