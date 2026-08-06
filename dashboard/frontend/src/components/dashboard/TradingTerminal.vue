@@ -45,7 +45,7 @@ const adxRef = ref<HTMLDivElement>()
 const mfiRef = ref<HTMLDivElement>()
 
 function getPaneEl(name: string): HTMLDivElement | undefined {
-  const map: Record<string, any> = { rsi: rsiRef, stoch: stochRef, macd: macdRef, atr: atrRef, volume: volRef }
+  const map: Record<string, any> = { rsi: rsiRef, stoch: stochRef, macd: macdRef, atr: atrRef, volume: volRef, adx: adxRef, mfi: mfiRef }
   return map[name]?.value
 }
 
