@@ -241,5 +241,45 @@
     "max_positions": 5,
     "ignore_gates": true,
     "initial_balance": 5000
+  },
+  "mfi_bb_m30": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "mfi_bb_m30_optimized": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "m30_bb_deepreturn": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "m30_bb_deepreturn_optimized": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "rsi_grading_m30": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "rsi_grading_m30_upgraded": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "momentum_pulse_pro": {
+    "enabled": true,
+    "max_positions": 5
+  },
+  "h1_breakout": {
+    "enabled": true,
+    "max_positions": 3
+  },
+  "sanqing_h1_upgraded": {
+    "enabled": true,
+    "max_positions": 3
+  },
+  "gold_auto_research": {
+    "enabled": true,
+    "max_positions": 3
   }
 }
