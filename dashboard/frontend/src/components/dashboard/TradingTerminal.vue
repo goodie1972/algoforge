@@ -16,7 +16,7 @@ import { useFlashOnChange } from '@/composables/useFlashOnChange'
 import { createChart, ColorType, type UTCTimestamp } from 'lightweight-charts'
 import {
   calcEMA, calcSMA, calcBollinger, calcRSI, calcStoch,
-  calcMACD, calcATR, calcVolume,
+  calcMACD, calcATR, calcVolume, calcADX, calcMFI,
   type CandleData, type LinePoint, type BandPoint, type HistogramPoint,
 } from '@/utils/indicators'
 
@@ -41,6 +41,8 @@ const stochRef = ref<HTMLDivElement>()
 const macdRef = ref<HTMLDivElement>()
 const atrRef = ref<HTMLDivElement>()
 const volRef = ref<HTMLDivElement>()
+const adxRef = ref<HTMLDivElement>()
+const mfiRef = ref<HTMLDivElement>()
 
 function getPaneEl(name: string): HTMLDivElement | undefined {
   const map: Record<string, any> = { rsi: rsiRef, stoch: stochRef, macd: macdRef, atr: atrRef, volume: volRef }
@@ -671,6 +673,121 @@ function applyVolume() {
   })
 }
 
+function applyADX() {
+  if (!showADX.value) { destroyPane('adx'); return }
+  const data = getCandleData()
+  if (data.length === 0) return
+  const { adx, pdi, ndi } = calcADX(data, adxPeriod.value)
+  if (adx.length === 0) return
+
+  nextTick(() => {
+    const container = getPaneEl('adx')
+    if (!container || !chart) return
+    const w = chartContainer.value!.clientWidth
+
+    let pc = paneCharts['adx']
+    if (!pc) {
+      pc = createChart(container, makeChartOptions(w, paneHeight, false))
+      paneCharts['adx'] = pc
+      pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
+    }
+
+    if (!paneSeries['adx']) {
+      paneSeries['adx'] = pc.addLineSeries({
+        color: '#f0b90b', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+      })
+    }
+    if (!paneSeries['pdi']) {
+      paneSeries['pdi'] = pc.addLineSeries({
+        color: '#0ecb81', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+      })
+    }
+    if (!paneSeries['ndi']) {
+      paneSeries['ndi'] = pc.addLineSeries({
+        color: '#f6465d', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+      })
+    }
+
+    paneSeries['adx'].setData(castTime(adx))
+    paneSeries['pdi'].setData(castTime(pdi))
+    paneSeries['ndi'].setData(castTime(ndi))
+    syncPaneRange('adx')
+    requestAnimationFrame(() => syncAllPriceScaleWidths())
+  })
+}
+
+function applyMFI() {
+  if (!showMFI.value) { destroyPane('mfi'); return }
+  const data = getCandleData()
+  if (data.length === 0) return
+  const mfiData = padLinePoints(data, calcMFI(data, mfiPeriod.value))
+  if (mfiData.length === 0) return
+
+  nextTick(() => {
+    const container = getPaneEl('mfi')
+    if (!container || !chart) return
+    const w = chartContainer.value!.clientWidth
+
+    let pc = paneCharts['mfi']
+    if (!pc) {
+      pc = createChart(container, makeChartOptions(w, paneHeight, false))
+      paneCharts['mfi'] = pc
+      pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
+    }
+
+    if (!paneSeries['mfi']) {
+      paneSeries['mfi'] = pc.addLineSeries({
+        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      })
+      // Add 80/20 reference lines
+      const obLine = pc.addLineSeries({
+        color: '#f6465d', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      })
+      const osLine = pc.addLineSeries({
+        color: '#0ecb81', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      })
+      const midLine = pc.addLineSeries({
+        color: '#888', lineWidth: 1, lineStyle: 3, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+      })
+      const last = mfiData[mfiData.length - 1]
+      obLine.setData([{ time: mfiData[0].time, value: 80 }, { time: last.time, value: 80 }])
+      osLine.setData([{ time: mfiData[0].time, value: 20 }, { time: last.time, value: 20 }])
+      midLine.setData([{ time: mfiData[0].time, value: 50 }, { time: last.time, value: 50 }])
+    }
+
+    paneSeries['mfi'].setData(castTime(mfiData))
+    syncPaneRange('mfi')
+    requestAnimationFrame(() => syncAllPriceScaleWidths())
+  })
+}
+
+function applyBBI() {
+  if (!showBBI.value) { removeOverlaySeries('bbi'); return }
+  const data = getCandleData()
+  if (data.length === 0) return
+  // BBI = (SMA3 + SMA6 + SMA12 + SMA24) / 4
+  const sma3 = calcSMA(data, 3).map(p => p.value)
+  const sma6 = calcSMA(data, 6).map(p => p.value)
+  const sma12 = calcSMA(data, 12).map(p => p.value)
+  const sma24 = calcSMA(data, 24).map(p => p.value)
+  const minLen = Math.min(sma3.length, sma6.length, sma12.length, sma24.length)
+  if (minLen < 1) return
+  const offset = data.length - minLen
+  const bbi = []
+  for (let i = 0; i < minLen; i++) {
+    bbi.push({ time: data[offset + i].time, value: (sma3[i] + sma6[i] + sma12[i] + sma24[i]) / 4 })
+  }
+  createOverlay('bbi', { color: '#8b5cf6', lineWidth: 2 })
+  overlaySeries['bbi'].setData(castTime(bbi))
+}
+
 function syncPriceScaleWidth(name: string) {
   const pc = paneCharts[name]
   if (!pc || !chart) return
@@ -732,6 +849,9 @@ function afterDataLoad() {
   applyMACD()
   applyATR()
   applyVolume()
+  applyADX()
+  applyMFI()
+  applyBBI()
 }
 
 /** 根据当前周期应用预设指标 */
@@ -936,6 +1056,12 @@ function clearAllPanes() {
     </div>
     <div v-if="showVolume" ref="volRef" style="width: 100%; height: 110px; position: relative;">
       <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">Volume</n-text>
+    </div>
+    <div v-if="showADX" ref="adxRef" style="width: 100%; height: 110px; position: relative;">
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">ADX ({{ adxPeriod }})</n-text>
+    </div>
+    <div v-if="showMFI" ref="mfiRef" style="width: 100%; height: 110px; position: relative;">
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">MFI ({{ mfiPeriod }})</n-text>
     </div>
   </n-card>
 </template>

@@ -211,3 +211,86 @@ export function calcVolume(candles: CandleData[]): HistogramPoint[] {
     color: c.close >= c.open ? '#0ecb81' : '#f6465d',
   }))
 }
+
+// ---- ADX ----
+export function calcADX(candles: CandleData[], period: number = 14): { adx: LinePoint[]; pdi: LinePoint[]; ndi: LinePoint[] } {
+  const highs = candles.map(c => c.high)
+  const lows = candles.map(c => c.low)
+  const closes = candles.map(c => c.close)
+  const n = closes.length
+  if (n < period + 2) return { adx: [], pdi: [], ndi: [] }
+
+  const tr: number[] = []
+  const plusDM: number[] = []
+  const minusDM: number[] = []
+  for (let i = 1; i < n; i++) {
+    const h = highs[i], l = lows[i], pc = closes[i - 1]
+    const ph = highs[i - 1], pl = lows[i - 1]
+    tr.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)))
+    const up = h - ph
+    const down = pl - l
+    plusDM.push(up > down && up > 0 ? up : 0)
+    minusDM.push(down > up && down > 0 ? down : 0)
+  }
+
+  // Wilder smoothing
+  const atr: number[] = [tr.slice(0, period).reduce((a, b) => a + b, 0) / period]
+  const pdi: number[] = [plusDM.slice(0, period).reduce((a, b) => a + b, 0) / period]
+  const ndi: number[] = [minusDM.slice(0, period).reduce((a, b) => a + b, 0) / period]
+  for (let i = period; i < tr.length; i++) {
+    atr.push((atr[atr.length - 1] * (period - 1) + tr[i]) / period)
+    pdi.push((pdi[pdi.length - 1] * (period - 1) + plusDM[i]) / period)
+    ndi.push((ndi[ndi.length - 1] * (period - 1) + minusDM[i]) / period)
+  }
+
+  const pdiPct = pdi.map((v, i) => atr[i] > 0 ? (v / atr[i]) * 100 : 0)
+  const ndiPct = ndi.map((v, i) => atr[i] > 0 ? (v / atr[i]) * 100 : 0)
+  const dx: number[] = []
+  for (let i = 0; i < pdiPct.length; i++) {
+    const sum = pdiPct[i] + ndiPct[i]
+    dx.push(sum > 0 ? Math.abs(pdiPct[i] - ndiPct[i]) / sum * 100 : 0)
+  }
+
+  const adx: number[] = [dx.slice(0, period).reduce((a, b) => a + b, 0) / period]
+  for (let i = period; i < dx.length; i++) {
+    adx.push((adx[adx.length - 1] * (period - 1) + dx[i]) / period)
+  }
+
+  // Align with candle timestamps
+  const offset = candles.length - adx.length
+  return {
+    adx: adx.map((v, i) => ({ time: candles[offset + i].time, value: Math.round(v * 100) / 100 })),
+    pdi: pdiPct.map((v, i) => ({ time: candles[offset + i].time, value: Math.round(v * 100) / 100 })),
+    ndi: ndiPct.map((v, i) => ({ time: candles[offset + i].time, value: Math.round(v * 100) / 100 })),
+  }
+}
+
+// ---- MFI ----
+export function calcMFI(candles: CandleData[], period: number = 14): LinePoint[] {
+  const n = candles.length
+  if (n < period + 1) return []
+
+  const typicalPrices = candles.map(c => (c.high + c.low + c.close) / 3)
+  const rawMoney = candles.map(c => c.volume || 0)
+  const moneyFlow = typicalPrices.map((tp, i) => tp * rawMoney[i])
+
+  const result: number[] = []
+  for (let i = period; i < n; i++) {
+    let positive = 0, negative = 0
+    for (let j = i - period + 1; j <= i; j++) {
+      if (typicalPrices[j] >= typicalPrices[j - 1]) {
+        positive += moneyFlow[j]
+      } else {
+        negative += moneyFlow[j]
+      }
+    }
+    const mfr = negative > 0 ? positive / negative : 100
+    result.push(100 - 100 / (1 + mfr))
+  }
+
+  const offset = candles.length - result.length
+  return result.map((v, i) => ({
+    time: candles[offset + i].time,
+    value: Math.round(v * 100) / 100,
+  }))
+}
