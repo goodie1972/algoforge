@@ -929,7 +929,10 @@ class TradingEngine:
 
         # ---- 止损平仓：所有风控/新闻禁售不限制平仓 ----
         for strategy in snapshot:
-            self._run_exits(strategy)
+            try:
+                self._run_exits(strategy)
+            except Exception as e:
+                logger.error(f"[{strategy.name}] 出场执行异常: {e}")
 
         # ---- 多策略协调出场：信号盈利时联动平目标 ----
         self._coordinated_exits(snapshot)
@@ -1010,7 +1013,10 @@ class TradingEngine:
                 if block_reason:
                     logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
                     continue
-            self._run_strategy(strategy)
+            try:
+                self._run_strategy(strategy)
+            except Exception as e:
+                logger.error(f"[{strategy.name}] 开仓执行异常: {e}")
 
         # 三轨：运动员验证（每 tick 轮询 + 处理回调）
         if self._athlete:
