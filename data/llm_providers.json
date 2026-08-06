@@ -38,5 +38,23 @@
     "selected_model": "",
     "is_active": false,
     "created_at": ""
+  },
+  {
+    "id": "e5d89023",
+    "name": "deepseek",
+    "type": "openai",
+    "api_key": "sk-d2f2525675a44724aae9f4ea260b79ec",
+    "base_url": "https://api.deepseek.com/v1",
+    "models": [
+      "deepseek-v4-flash",
+      "deepseek-v4-pro"
+    ],
+    "enabled_models": [
+      "deepseek-v4-flash",
+      "deepseek-v4-pro"
+    ],
+    "selected_model": "deepseek-v4-flash",
+    "is_active": false,
+    "created_at": "2026-08-06T08:49:05.143232"
   }
 ]
