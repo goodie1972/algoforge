@@ -83,6 +83,10 @@ function loadTerminalConfig() {
     showMACD.value = cfg.showMACD ?? false
     showATR.value = cfg.showATR ?? false
     showVolume.value = cfg.showVolume ?? false
+    showADX.value = cfg.showADX ?? false
+    showDI.value = cfg.showDI ?? false
+    showMFI.value = cfg.showMFI ?? false
+    showBBI.value = cfg.showBBI ?? false
     if (cfg.ema1) ema1.value = cfg.ema1
     if (cfg.ema2) ema2.value = cfg.ema2
     if (cfg.ema3) ema3.value = cfg.ema3
@@ -100,6 +104,9 @@ function loadTerminalConfig() {
     if (cfg.macdSlow) macdSlow.value = cfg.macdSlow
     if (cfg.macdSignal) macdSignal.value = cfg.macdSignal
     if (cfg.atrPeriod) atrPeriod.value = cfg.atrPeriod
+    if (cfg.adxPeriod) adxPeriod.value = cfg.adxPeriod
+    if (cfg.diPeriod) diPeriod.value = cfg.diPeriod
+    if (cfg.mfiPeriod) mfiPeriod.value = cfg.mfiPeriod
   } catch (e) { /* ignore corrupt config */ }
 }
 function saveTerminalConfig() {
@@ -111,6 +118,7 @@ function saveTerminalConfig() {
       showEMA: showEMA.value, showSMA: showSMA.value, showBB: showBB.value,
       showRSI: showRSI.value, showStoch: showStoch.value, showMACD: showMACD.value,
       showATR: showATR.value, showVolume: showVolume.value,
+      showADX: showADX.value, showDI: showDI.value, showMFI: showMFI.value, showBBI: showBBI.value,
       ema1: ema1.value, ema2: ema2.value, ema3: ema3.value,
       sma1: sma1.value, sma2: sma2.value,
       bbPeriod: bbPeriod.value, bbStd: bbStd.value,
@@ -118,6 +126,7 @@ function saveTerminalConfig() {
       stochK: stochK.value, stochKSmooth: stochKSmooth.value, stochDSmooth: stochDSmooth.value,
       macdFast: macdFast.value, macdSlow: macdSlow.value, macdSignal: macdSignal.value,
       atrPeriod: atrPeriod.value,
+      adxPeriod: adxPeriod.value, diPeriod: diPeriod.value, mfiPeriod: mfiPeriod.value,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all))
   } catch (e) { /* ignore storage error */ }
@@ -125,13 +134,13 @@ function saveTerminalConfig() {
 
 // 各周期默认指标预设 — 切换周期时自动启用/停用
 const tfIndicatorPresets: Record<string, Record<string, boolean>> = {
-  M5:  { rsi: false, stoch: false, macd: false, bb: true,  volume: true  },
-  M15: { rsi: false, stoch: false, macd: false, bb: true,  volume: false },
-  M30: { rsi: false, stoch: false, macd: true,  bb: true,  volume: false },
-  H1:  { rsi: true,  stoch: false, macd: false, bb: true,  volume: false },
-  H4:  { rsi: false, stoch: true,  macd: false, bb: true,  volume: false },
-  D1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false },
-  W1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false },
+  M5:  { rsi: false, stoch: false, macd: false, bb: true,  volume: true,  adx: true  },
+  M15: { rsi: false, stoch: false, macd: false, bb: true,  volume: false, adx: false },
+  M30: { rsi: false, stoch: false, macd: true,  bb: true,  volume: false, adx: false },
+  H1:  { rsi: true,  stoch: false, macd: false, bb: true,  volume: false, adx: false },
+  H4:  { rsi: false, stoch: true,  macd: false, bb: true,  volume: false, adx: false },
+  D1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false, adx: false },
+  W1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false, adx: false },
 }
 
 function getRefreshInterval(tf: string): number {
@@ -175,6 +184,10 @@ const showStoch = ref(false)
 const showMACD = ref(false)
 const showATR = ref(false)
 const showVolume = ref(false)
+const showADX = ref(false)
+const showDI = ref(false)
+const showMFI = ref(false)
+const showBBI = ref(false)
 
 // 指标参数
 const ema1 = ref(20)
@@ -194,6 +207,9 @@ const macdFast = ref(12)
 const macdSlow = ref(26)
 const macdSignal = ref(9)
 const atrPeriod = ref(14)
+const adxPeriod = ref(14)
+const diPeriod = ref(14)
+const mfiPeriod = ref(14)
 
 function parsePeriods(s: string): number[] {
   return s.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n > 0)
@@ -213,6 +229,10 @@ watch(showStoch, () => { destroyPane('stoch'); if (showStoch.value) applyStoch()
 watch(showMACD, () => { destroyPane('macd'); if (showMACD.value) applyMACD(); saveTerminalConfig() })
 watch(showATR, () => { destroyPane('atr'); if (showATR.value) applyATR(); saveTerminalConfig() })
 watch(showVolume, () => { destroyPane('volume'); if (showVolume.value) applyVolume(); saveTerminalConfig() })
+watch(showADX, () => saveTerminalConfig())
+watch(showDI, () => saveTerminalConfig())
+watch(showMFI, () => saveTerminalConfig())
+watch(showBBI, () => saveTerminalConfig())
 
 // 参数数值变更时刷新副图（代替无效的 @update:value="{...}" 语法）
 function refreshRSI() { destroyPane('rsi'); if (showRSI.value) applyRSI(); saveTerminalConfig() }
@@ -726,6 +746,10 @@ function applyTfPreset() {
   showEMA.value = false
   showSMA.value = false
   showATR.value = false
+  showADX.value = preset.adx ?? false
+  showDI.value = false
+  showMFI.value = false
+  showBBI.value = false
 }
 
 async function switchTf(tf: string) {
@@ -779,8 +803,8 @@ function clearAllPanes() {
     </template>
 
     <!-- 网格布局：每格宽度一致，避免内容不齐 -->
-    <n-grid :cols="4" :x-gap="6" :y-gap="2" style="margin-bottom: 6px;">
-      <!-- 第一行：EMA, SMA, BB, RSI -->
+    <n-grid :cols="6" :x-gap="6" :y-gap="2" style="margin-bottom: 6px;">
+      <!-- 第一行：EMA, SMA, BB, RSI, Stoch, MACD -->
       <n-gi>
         <div class="ind-line">
           <span class="ind-cb"><n-checkbox v-model:checked="showEMA" size="small" @update:checked="applyOverlay">EMA</n-checkbox></span>
@@ -820,7 +844,6 @@ function clearAllPanes() {
           </span>
         </div>
       </n-gi>
-      <!-- 第二行：Stoch, MACD, ATR, Volume -->
       <n-gi>
         <div class="ind-line">
           <span class="ind-cb"><n-checkbox v-model:checked="showStoch" size="small">Stoch</n-checkbox></span>
@@ -841,6 +864,7 @@ function clearAllPanes() {
           </span>
         </div>
       </n-gi>
+      <!-- 第二行：ATR, Volume, ADX, DI, MFI, BBI -->
       <n-gi>
         <div class="ind-line">
           <span class="ind-cb"><n-checkbox v-model:checked="showATR" size="small">ATR</n-checkbox></span>
@@ -853,6 +877,36 @@ function clearAllPanes() {
         <div class="ind-line">
           <span class="ind-cb"><n-checkbox v-model:checked="showVolume" size="small">{{ $t('terminal.volume') }}</n-checkbox></span>
           <span :class="['ind-params', { 'ind-hidden': !showVolume }]"><span class="ind-placeholder"></span></span>
+        </div>
+      </n-gi>
+      <n-gi>
+        <div class="ind-line">
+          <span class="ind-cb"><n-checkbox v-model:checked="showADX" size="small">ADX</n-checkbox></span>
+          <span :class="['ind-params', { 'ind-hidden': !showADX }]">
+            <app-input-number v-model:value="adxPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" />
+          </span>
+        </div>
+      </n-gi>
+      <n-gi>
+        <div class="ind-line">
+          <span class="ind-cb"><n-checkbox v-model:checked="showDI" size="small">DI</n-checkbox></span>
+          <span :class="['ind-params', { 'ind-hidden': !showDI }]">
+            <app-input-number v-model:value="diPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" />
+          </span>
+        </div>
+      </n-gi>
+      <n-gi>
+        <div class="ind-line">
+          <span class="ind-cb"><n-checkbox v-model:checked="showMFI" size="small">MFI</n-checkbox></span>
+          <span :class="['ind-params', { 'ind-hidden': !showMFI }]">
+            <app-input-number v-model:value="mfiPeriod" size="tiny" :min="2" :max="100" style="width: 20px;" />
+          </span>
+        </div>
+      </n-gi>
+      <n-gi>
+        <div class="ind-line">
+          <span class="ind-cb"><n-checkbox v-model:checked="showBBI" size="small">BBI</n-checkbox></span>
+          <span :class="['ind-params', { 'ind-hidden': !showBBI }]"><span class="ind-placeholder"></span></span>
         </div>
       </n-gi>
     </n-grid>
