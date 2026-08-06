@@ -231,10 +231,10 @@ watch(showStoch, () => { destroyPane('stoch'); if (showStoch.value) applyStoch()
 watch(showMACD, () => { destroyPane('macd'); if (showMACD.value) applyMACD(); saveTerminalConfig() })
 watch(showATR, () => { destroyPane('atr'); if (showATR.value) applyATR(); saveTerminalConfig() })
 watch(showVolume, () => { destroyPane('volume'); if (showVolume.value) applyVolume(); saveTerminalConfig() })
-watch(showADX, () => saveTerminalConfig())
-watch(showDI, () => saveTerminalConfig())
-watch(showMFI, () => saveTerminalConfig())
-watch(showBBI, () => saveTerminalConfig())
+watch(showADX, () => { destroyPane('adx'); if (showADX.value) applyADX(); saveTerminalConfig() })
+watch(showDI, () => { destroyPane('adx'); if (showADX.value || showDI.value) applyADX(); saveTerminalConfig() })
+watch(showMFI, () => { destroyPane('mfi'); if (showMFI.value) applyMFI(); saveTerminalConfig() })
+watch(showBBI, () => { if (showBBI.value) applyBBI(); else { removeOverlaySeries('bbi'); } saveTerminalConfig() })
 
 // 参数数值变更时刷新副图（代替无效的 @update:value="{...}" 语法）
 function refreshRSI() { destroyPane('rsi'); if (showRSI.value) applyRSI(); saveTerminalConfig() }
