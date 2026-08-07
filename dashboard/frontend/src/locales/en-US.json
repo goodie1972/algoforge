@@ -341,7 +341,7 @@
   "terminal.loading": "Loading...",
   "terminal.no_data": "No data",
   "terminal.no_data_desc": "K-line data will load automatically after connecting MT4",
-  "terminal.rsi_label": "RSI ({{period}}) Overbought {{ob}} Oversold {{os}}",
+  "terminal.rsi_label": "RSI ({period}) Overbought {ob} Oversold {os}",
   "account.title": "Account Info",
   "account.load_fail": "Failed to load account info",
   "account.waiting": "Waiting for connection",
