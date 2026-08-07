@@ -341,7 +341,7 @@
   "terminal.loading": "加载中...",
   "terminal.no_data": "暂无数据",
   "terminal.no_data_desc": "连接 MT4 后自动加载 K 线数据",
-  "terminal.rsi_label": "RSI ({{period}}) 超买{{ob}} 超卖{{os}}",
+  "terminal.rsi_label": "RSI ({period}) 超买{ob} 超卖{os}",
   "account.title": "账户信息",
   "account.load_fail": "获取账户信息失败",
   "account.waiting": "等待连接",

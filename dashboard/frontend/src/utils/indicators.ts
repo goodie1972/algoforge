@@ -256,12 +256,13 @@ export function calcADX(candles: CandleData[], period: number = 14): { adx: Line
     adx.push((adx[adx.length - 1] * (period - 1) + dx[i]) / period)
   }
 
-  // Align with candle timestamps
-  const offset = candles.length - adx.length
+  // Align with candle timestamps (adx 与 pdi/ndi 长度不同，offset 需分别计算，否则越界)
+  const adxOffset = candles.length - adx.length
+  const diOffset = candles.length - pdiPct.length
   return {
-    adx: adx.map((v, i) => ({ time: candles[offset + i].time, value: Math.round(v * 100) / 100 })),
-    pdi: pdiPct.map((v, i) => ({ time: candles[offset + i].time, value: Math.round(v * 100) / 100 })),
-    ndi: ndiPct.map((v, i) => ({ time: candles[offset + i].time, value: Math.round(v * 100) / 100 })),
+    adx: adx.map((v, i) => ({ time: candles[adxOffset + i].time, value: Math.round(v * 100) / 100 })),
+    pdi: pdiPct.map((v, i) => ({ time: candles[diOffset + i].time, value: Math.round(v * 100) / 100 })),
+    ndi: ndiPct.map((v, i) => ({ time: candles[diOffset + i].time, value: Math.round(v * 100) / 100 })),
   }
 }
 

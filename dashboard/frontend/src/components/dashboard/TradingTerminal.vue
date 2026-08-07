@@ -43,9 +43,11 @@ const atrRef = ref<HTMLDivElement>()
 const volRef = ref<HTMLDivElement>()
 const adxRef = ref<HTMLDivElement>()
 const mfiRef = ref<HTMLDivElement>()
+const bbiRef = ref<HTMLDivElement>()
+const diRef = ref<HTMLDivElement>()
 
 function getPaneEl(name: string): HTMLDivElement | undefined {
-  const map: Record<string, any> = { rsi: rsiRef, stoch: stochRef, macd: macdRef, atr: atrRef, volume: volRef, adx: adxRef, mfi: mfiRef }
+  const map: Record<string, any> = { rsi: rsiRef, stoch: stochRef, macd: macdRef, atr: atrRef, volume: volRef, adx: adxRef, mfi: mfiRef, bbi: bbiRef, di: diRef }
   return map[name]?.value
 }
 
@@ -136,13 +138,13 @@ function saveTerminalConfig() {
 
 // 各周期默认指标预设 — 切换周期时自动启用/停用
 const tfIndicatorPresets: Record<string, Record<string, boolean>> = {
-  M5:  { rsi: false, stoch: false, macd: false, bb: true,  volume: true,  adx: true  },
-  M15: { rsi: false, stoch: false, macd: false, bb: true,  volume: false, adx: false },
-  M30: { rsi: false, stoch: false, macd: true,  bb: true,  volume: false, adx: false },
-  H1:  { rsi: true,  stoch: false, macd: false, bb: true,  volume: false, adx: false },
-  H4:  { rsi: false, stoch: true,  macd: false, bb: true,  volume: false, adx: false },
-  D1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false, adx: false },
-  W1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false, adx: false },
+  M5:  { rsi: false, stoch: false, macd: false, bb: true,  volume: true,  adx: true,  mfi: true,  bbi: false },
+  M15: { rsi: false, stoch: false, macd: false, bb: true,  volume: false, adx: false, mfi: false, bbi: false },
+  M30: { rsi: false, stoch: false, macd: true,  bb: true,  volume: false, adx: false, mfi: false, bbi: false },
+  H1:  { rsi: true,  stoch: false, macd: false, bb: true,  volume: false, adx: false, mfi: false, bbi: true  },
+  H4:  { rsi: false, stoch: true,  macd: false, bb: true,  volume: false, adx: false, mfi: false, bbi: true  },
+  D1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false, adx: false, mfi: false, bbi: false },
+  W1:  { rsi: false, stoch: false, macd: false, bb: false, volume: false, adx: false, mfi: false, bbi: false },
 }
 
 function getRefreshInterval(tf: string): number {
@@ -232,9 +234,9 @@ watch(showMACD, () => { destroyPane('macd'); if (showMACD.value) applyMACD(); sa
 watch(showATR, () => { destroyPane('atr'); if (showATR.value) applyATR(); saveTerminalConfig() })
 watch(showVolume, () => { destroyPane('volume'); if (showVolume.value) applyVolume(); saveTerminalConfig() })
 watch(showADX, () => { destroyPane('adx'); if (showADX.value) applyADX(); saveTerminalConfig() })
-watch(showDI, () => { destroyPane('adx'); if (showADX.value || showDI.value) applyADX(); saveTerminalConfig() })
+watch(showDI, () => { destroyPane('di'); if (showDI.value) applyDI(); saveTerminalConfig() })
 watch(showMFI, () => { destroyPane('mfi'); if (showMFI.value) applyMFI(); saveTerminalConfig() })
-watch(showBBI, () => { if (showBBI.value) applyBBI(); else { removeOverlaySeries('bbi'); } saveTerminalConfig() })
+watch(showBBI, () => { destroyPane('bbi'); if (showBBI.value) applyBBI(); saveTerminalConfig() })
 
 // 参数数值变更时刷新副图（代替无效的 @update:value="{...}" 语法）
 function refreshRSI() { destroyPane('rsi'); if (showRSI.value) applyRSI(); saveTerminalConfig() }
@@ -674,11 +676,13 @@ function applyVolume() {
 }
 
 function applyADX() {
+  console.log('[ADX] v2.4.8 applyADX called, showADX:', showADX.value)
   if (!showADX.value) { destroyPane('adx'); return }
   const data = getCandleData()
   if (data.length === 0) return
-  const { adx, pdi, ndi } = calcADX(data, adxPeriod.value)
+  const { adx } = calcADX(data, adxPeriod.value)
   if (adx.length === 0) return
+  const adxData = padLinePoints(data, adx)
 
   nextTick(() => {
     const container = getPaneEl('adx')
@@ -698,23 +702,51 @@ function applyADX() {
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
     }
+
+    paneSeries['adx'].setData(castTime(adxData))
+    syncPaneRange('adx')
+    requestAnimationFrame(() => syncAllPriceScaleWidths())
+  })
+}
+
+function applyDI() {
+  console.log('[DI] v2.4.8 applyDI called, showDI:', showDI.value)
+  if (!showDI.value) { destroyPane('di'); return }
+  const data = getCandleData()
+  if (data.length === 0) return
+  const { pdi, ndi } = calcADX(data, diPeriod.value)
+  if (pdi.length === 0) return
+  const pdiData = padLinePoints(data, pdi)
+  const ndiData = padLinePoints(data, ndi).map(p => ({ ...p, value: -p.value }))
+
+  nextTick(() => {
+    const container = getPaneEl('di')
+    if (!container || !chart) return
+    const w = chartContainer.value!.clientWidth
+
+    let pc = paneCharts['di']
+    if (!pc) {
+      pc = createChart(container, makeChartOptions(w, paneHeight, false))
+      paneCharts['di'] = pc
+      pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
+    }
+
     if (!paneSeries['pdi']) {
-      paneSeries['pdi'] = pc.addLineSeries({
-        color: '#0ecb81', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+      paneSeries['pdi'] = pc.addHistogramSeries({
+        color: '#0ecb81', priceLineVisible: false, lastValueVisible: false,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
     }
     if (!paneSeries['ndi']) {
-      paneSeries['ndi'] = pc.addLineSeries({
-        color: '#f6465d', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+      paneSeries['ndi'] = pc.addHistogramSeries({
+        color: '#f6465d', priceLineVisible: false, lastValueVisible: false,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
     }
 
-    paneSeries['adx'].setData(castTime(adx))
-    paneSeries['pdi'].setData(castTime(pdi))
-    paneSeries['ndi'].setData(castTime(ndi))
-    syncPaneRange('adx')
+    paneSeries['pdi'].setData(castTime(pdiData))
+    paneSeries['ndi'].setData(castTime(ndiData))
+    syncPaneRange('di')
     requestAnimationFrame(() => syncAllPriceScaleWidths())
   })
 }
@@ -769,7 +801,8 @@ function applyMFI() {
 }
 
 function applyBBI() {
-  if (!showBBI.value) { removeOverlaySeries('bbi'); return }
+  console.log('[BBI] v2.4.8 applyBBI called, showBBI:', showBBI.value)
+  if (!showBBI.value) { destroyPane('bbi'); return }
   const data = getCandleData()
   if (data.length === 0) return
   // BBI = (SMA3 + SMA6 + SMA12 + SMA24) / 4
@@ -780,12 +813,42 @@ function applyBBI() {
   const minLen = Math.min(sma3.length, sma6.length, sma12.length, sma24.length)
   if (minLen < 1) return
   const offset = data.length - minLen
-  const bbi = []
+  const bbi: { time: number; value: number }[] = []
   for (let i = 0; i < minLen; i++) {
     bbi.push({ time: data[offset + i].time, value: (sma3[i] + sma6[i] + sma12[i] + sma24[i]) / 4 })
   }
-  createOverlay('bbi', { color: '#8b5cf6', lineWidth: 2 })
-  overlaySeries['bbi'].setData(castTime(bbi))
+  // A 线（收盘价线）
+  const price: { time: number; value: number }[] = data.map(c => ({ time: c.time, value: c.close }))
+
+  nextTick(() => {
+    const container = getPaneEl('bbi')
+    if (!container || !chart) return
+    const w = chartContainer.value!.clientWidth
+
+    let pc = paneCharts['bbi']
+    if (!pc) {
+      pc = createChart(container, makeChartOptions(w, paneHeight, false))
+      paneCharts['bbi'] = pc
+      pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
+    }
+
+    if (!paneSeries['bbi']) {
+      const bbiLine = pc.addLineSeries({
+        color: '#8b5cf6', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+      })
+      const priceLine = pc.addLineSeries({
+        color: '#f0b90b', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+      })
+      paneSeries['bbi'] = { line: bbiLine, price: priceLine }
+    }
+
+    paneSeries['bbi'].line.setData(castTime(bbi))
+    paneSeries['bbi'].price.setData(castTime(price))
+    syncPaneRange('bbi')
+    requestAnimationFrame(() => syncAllPriceScaleWidths())
+  })
 }
 
 function syncPriceScaleWidth(name: string) {
@@ -850,6 +913,7 @@ function afterDataLoad() {
   applyATR()
   applyVolume()
   applyADX()
+  applyDI()
   applyMFI()
   applyBBI()
 }
@@ -868,8 +932,8 @@ function applyTfPreset() {
   showATR.value = false
   showADX.value = preset.adx ?? false
   showDI.value = false
-  showMFI.value = false
-  showBBI.value = false
+  showMFI.value = preset.mfi ?? false
+  showBBI.value = preset.bbi ?? false
 }
 
 async function switchTf(tf: string) {
@@ -899,8 +963,8 @@ function clearAllPanes() {
   Object.keys(paneCharts).forEach(k => {
     paneCharts[k].remove()
     delete paneCharts[k]
-    delete paneSeries[k]
   })
+  Object.keys(paneSeries).forEach(k => delete paneSeries[k])
 }
 
 </script>
@@ -1060,8 +1124,14 @@ function clearAllPanes() {
     <div v-if="showADX" ref="adxRef" style="width: 100%; height: 110px; position: relative;">
       <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">ADX ({{ adxPeriod }})</n-text>
     </div>
+    <div v-if="showDI" ref="diRef" style="width: 100%; height: 110px; position: relative;">
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">DI ({{ diPeriod }})</n-text>
+    </div>
     <div v-if="showMFI" ref="mfiRef" style="width: 100%; height: 110px; position: relative;">
       <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">MFI ({{ mfiPeriod }})</n-text>
+    </div>
+    <div v-if="showBBI" ref="bbiRef" style="width: 100%; height: 110px; position: relative;">
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">BBI</n-text>
     </div>
   </n-card>
 </template>

@@ -3,6 +3,17 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.4.8] - 2026-08-07 — 交易终端指标显示大修
+
+### 修复
+- **ADX 副图修复**：`calcADX` 中 adx 与 pdi/ndi 长度不同导致 offset 越界，分别计算偏移量
+- **DI 独立副图**：±DI 从 ADX 副图分离为独立 DI 副图（红绿正负柱状图），`applyDI()` 使用 `addHistogramSeries`
+- **BBI 副图 + A 价格线**：BBI 改回独立副图，同花顺风格（BBI 紫色实线 + A 收盘价黄色虚线）
+- **MFI/BBI 加入周期预设**：各周期切换时自动应用默认指标
+- **数据对齐**：`padLinePoints` 补齐 ADX/DI 数据到与 K 线等长，解决时间轴错位
+- **清理残留**：`clearAllPanes` 同时清理 `paneSeries` 对象，防止切换周期后跳过 series 创建
+- **i18n 修复**：嵌套双花括号占位符 `{{period}}` → `{period}`
+
 ## [2.1.0] - 2026-07-11 — 纸面测试+策略优化
 
 ### 新增
