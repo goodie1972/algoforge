@@ -2,6 +2,9 @@
 import { h } from 'vue'
 import { NTag, NDataTable, NEmpty, NText, NAlert } from 'naive-ui'
 import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   items: any[]
@@ -11,16 +14,16 @@ const props = defineProps<{
 }>()
 
 const exitReasonLabels: Record<string, string> = {
-  'strategy_exit': '策略出场',
-  'mt4_history': 'MT4历史',
-  'stop_loss': '止损',
-  'take_profit': '止盈',
+  'strategy_exit': t('positions.exit_reason_strategy'),
+  'mt4_history': t('positions.exit_reason_mt4'),
+  'stop_loss': t('positions.exit_reason_sl'),
+  'take_profit': t('positions.exit_reason_tp'),
 }
 
 const columns = [
   { title: 'Ticket', key: 'ticket', width: 80 },
   {
-    title: '策略', key: 'strategy', width: 160,
+    title: t('positions.strategy'), key: 'strategy', width: 160,
     render(row: any) {
       const name = row.strategy || row.comment || ''
       const color = getStrategyColor(name)
@@ -31,23 +34,23 @@ const columns = [
     }
   },
   {
-    title: '方向', key: 'order_type', width: 40,
+    title: t('positions.direction'), key: 'order_type', width: 40,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
       return h(NTag, { type: isBuy ? 'success' : 'error', size: 'tiny' },
-        { default: () => isBuy ? '多' : '空' }
+        { default: () => isBuy ? t('positions.buy') : t('positions.sell') }
       )
     }
   },
-  { title: '手数', key: 'volume', width: 40 },
-  { title: '开仓价', key: 'entry_price', width: 70,
+  { title: t('positions.volume'), key: 'volume', width: 40 },
+  { title: t('positions.entry_price'), key: 'entry_price', width: 70,
     render(row: any) { return row.entry_price?.toFixed(2) }
   },
-  { title: '平仓价', key: 'exit_price', width: 70,
+  { title: t('positions.exit_price'), key: 'exit_price', width: 70,
     render(row: any) { return row.exit_price?.toFixed(2) }
   },
   {
-    title: '盈亏', key: 'pnl', width: 70,
+    title: t('positions.pnl'), key: 'pnl', width: 70,
     render(row: any) {
       const val = row.pnl ?? 0
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -56,7 +59,7 @@ const columns = [
     }
   },
   {
-    title: '净盈亏', key: 'net_pnl', width: 70,
+    title: t('positions.net_pnl'), key: 'net_pnl', width: 70,
     render(row: any) {
       const val = (row.pnl ?? 0) + (row.swap ?? 0) + (row.commission ?? 0)
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -64,7 +67,7 @@ const columns = [
       )
     }
   },
-  { title: '持仓', key: 'hold_seconds', width: 50,
+  { title: t('positions.hold_time'), key: 'hold_seconds', width: 50,
     render(row: any) {
       const sec = row.hold_seconds ?? 0
       if (sec < 60) return `${sec}s`
@@ -73,7 +76,7 @@ const columns = [
     }
   },
   {
-    title: '出场原因', key: 'exit_reason', width: 70,
+    title: t('positions.exit_reason'), key: 'exit_reason', width: 70,
     render(row: any) {
       const reason = row.exit_reason || ''
       const label = exitReasonLabels[reason] || reason || '-'
@@ -81,7 +84,7 @@ const columns = [
       return h(NTag, { size: 'small', type }, { default: () => label })
     }
   },
-  { title: '开仓时间', key: 'open_time', width: 125,
+  { title: t('positions.entry_time'), key: 'open_time', width: 125,
     render(row: any) {
       if (!row.open_time) return '-'
       if (typeof row.open_time === 'string') return row.open_time
@@ -90,7 +93,7 @@ const columns = [
       return new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false })
     }
   },
-  { title: '平仓时间', key: 'close_time', width: 130 },
+  { title: t('positions.exit_time'), key: 'close_time', width: 130 },
 ]
 </script>
 

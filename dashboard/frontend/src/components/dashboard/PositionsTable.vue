@@ -4,7 +4,9 @@ import { usePositionStore } from '@/stores/positions'
 import { NButton, NTag, NSpace, NDataTable, useDialog, useMessage } from 'naive-ui'
 import { closePosition } from '@/api/client'
 import { getStrategyColor, textColorForBg } from '@/utils/strategyColors'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const store = usePositionStore()
 const dialog = useDialog()
 const message = useMessage()
@@ -22,16 +24,16 @@ watch(() => store.totalProfit, (n: number) => {
 const columns = [
   { title: 'Ticket', key: 'ticket', width: 100 },
   {
-    title: '方向', key: 'order_type', width: 80,
+    title: t('positions.direction'), key: 'order_type', width: 80,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
       return h(NTag, { type: isBuy ? 'success' : 'error', size: 'small' },
-        { default: () => isBuy ? '多' : '空' }
+        { default: () => isBuy ? t('positions.buy') : t('positions.sell') }
       )
     }
   },
   {
-    title: '策略', key: 'strategy', width: 180,
+    title: t('positions.strategy'), key: 'strategy', width: 180,
     render(row: any) {
       const name = row.comment || row._strategy_name || ''
       const magic = row.magic || ''
@@ -53,21 +55,21 @@ const columns = [
       )
     }
   },
-  { title: '手数', key: 'volume', width: 70 },
-  { title: '开仓价', key: 'open_price', width: 100,
+  { title: t('positions.volume'), key: 'volume', width: 70 },
+  { title: t('positions.open_price'), key: 'open_price', width: 100,
     render(row: any) { return row.open_price?.toFixed(2) }
   },
-  { title: '现价', key: 'current_price', width: 100,
+  { title: t('positions.current_price'), key: 'current_price', width: 100,
     render(row: any) { return row.current_price?.toFixed(2) }
   },
-  { title: '止损', key: 'stop_loss', width: 90,
+  { title: t('positions.stop_loss'), key: 'stop_loss', width: 90,
     render(row: any) { return row.stop_loss || '-' }
   },
-  { title: '止盈', key: 'take_profit', width: 90,
+  { title: t('positions.take_profit'), key: 'take_profit', width: 90,
     render(row: any) { return row.take_profit || '-' }
   },
   {
-    title: '盈亏', key: 'profit', width: 100,
+    title: t('positions.profit'), key: 'profit', width: 100,
     render(row: any) {
       const val = row.profit ?? 0
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 600 } },
@@ -76,7 +78,7 @@ const columns = [
     }
   },
   {
-    title: '操作', key: 'actions', width: 140,
+    title: t('positions.actions'), key: 'actions', width: 140,
     render(row: any) {
       return h(NSpace, { size: 'small' }, {
         default: () => [
@@ -85,24 +87,24 @@ const columns = [
             loading: loadingClose.value === row.ticket,
             onClick: () => {
               dialog.warning({
-                title: '确认平仓',
-                content: `确定平掉订单 #${row.ticket} 吗？`,
-                positiveText: '确认',
-                negativeText: '取消',
+                title: t('positions.confirm_close'),
+                content: t('positions.confirm_close_msg', { ticket: row.ticket }),
+                positiveText: t('common.confirm'),
+                negativeText: t('common.cancel'),
                 onPositiveClick: async () => {
                   loadingClose.value = row.ticket
                   try {
                     await closePosition(row.ticket)
-                    message.success(`订单 #${row.ticket} 已平仓`)
+                    message.success(t('positions.close_success', { ticket: row.ticket }))
                     await store.fetch()
                   } catch (e: any) {
-                    message.error(e?.message || '平仓失败')
+                    message.error(e?.message || t('positions.close_failed'))
                   }
                   loadingClose.value = null
                 }
               })
             }
-          }, { default: () => '平仓' }),
+          }, { default: () => t('positions.close') }),
         ]
       })
     }
@@ -111,7 +113,7 @@ const columns = [
 
 const summaryRows = () => {
   return {
-    ticket: { title: '汇总', colSpan: 2 },
+    ticket: { title: t('positions.summary'), colSpan: 2 },
     volume: { value: store.items.reduce((s, p) => s + p.volume, 0).toFixed(2) },
     profit: {
       value: (() => {

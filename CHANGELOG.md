@@ -3,6 +3,22 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.5.0] - 2026-08-08 — 全量 i18n 国际化 + 配置布局优化
+
+### 新增
+- **全量 i18n 国际化**：所有 14 个 Vue 组件完成国际化，中文/英文 833 键同步，覆盖全部按钮、标签、说明、反馈
+- **RiskConfig 三列布局**：保持两栏结构，每栏内部每行 3 个字段排列，减少垂直滚动
+
+### 修改
+- **配置输入框宽度**：风控参数 30px，报告时间 60px，关注货币 60px
+- **NewsFilterConfig 布局**：成对字段同行 flex 排列，输入框窄化
+- **PaperConfig/StrategyConfig 标签同行**：label-placement="left" 确保标签与输入框同行
+
+### 修复
+- **多处 hardcoded 中文 → t() 调用**：策略雷达、信号面板、回测报告、AI 配置、协调器配置等
+- **i18n 键名修复**：`save_config→save`、`exit_method→exit_mode`、`widen→wide_mode` 等
+- **vue-i18n 占位符修复**：`{{n}}` → `{n}` 禁止嵌套占位符
+
 ## [2.4.9] - 2026-08-08 — 策略优化 + 周末休市检查 + 策略池清理
 
 ### 新增

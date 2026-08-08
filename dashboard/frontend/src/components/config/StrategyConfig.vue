@@ -2,9 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 
 const store = useConfigStore()
 const message = useMessage()
+const { t } = useI18n()
 
 interface StrategyMeta {
   id: string
@@ -88,9 +90,9 @@ async function savePool() {
       }
     }
     await store.updateStrategyPool(payload)
-    message.success('策略池已保存，重启引擎后生效')
+    message.success(t('strategy.saved_pool'))
   } catch (e: any) {
-    message.error('保存失败: ' + (e.message || '未知错误'))
+    message.error(t('common.failed') + ': ' + (e.message || '--'))
   }
   saving.value = false
 }
@@ -99,7 +101,7 @@ async function savePool() {
 <template>
   <n-space vertical size="large">
     <n-alert type="info" :bordered="false">
-      {{ $t('strategy.config_pool_desc', { total: allStrategies.length, enabled: enabledCount }) }}
+      {{ $t('strategy.pool_summary', { total: allStrategies.length, enabled: enabledCount }) }}
     </n-alert>
 
     <n-spin :show="loading">
@@ -129,9 +131,9 @@ async function savePool() {
               style="padding: 12px 16px; border-top: 1px solid var(--n-border-color);">
               <n-grid :cols="2" :x-gap="12" :y-gap="8">
                 <n-grid-item>
-                  <n-form-item :label="$t('strategy.magic')" :label-placement="'top'" size="small">
+                  <n-form-item :label="$t('strategy.magic')" label-placement="left" size="small">
                     <app-input-number v-model:value="pool[meta.id].magic" :min="100000" :max="999999"
-                      style="width:100%;" size="small" />
+                      style="width: 30px;" size="small" />
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
@@ -141,9 +143,9 @@ async function savePool() {
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
-                  <n-form-item :label="$t('strategy.max_positions')" :label-placement="'top'" size="small">
+                  <n-form-item :label="$t('strategy.max_positions')" label-placement="left" size="small">
                     <app-input-number v-model:value="pool[meta.id].max_positions" :min="1" :max="5"
-                      style="width:100%;" size="small" />
+                      style="width: 30px;" size="small" />
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
@@ -158,7 +160,7 @@ async function savePool() {
       </n-grid>
 
       <n-button type="primary" :loading="saving" @click="savePool" block size="large" :disabled="loading">
-        {{ $t('strategy.save_config') }}
+        {{ $t('strategy.save') }}
       </n-button>
     </n-spin>
   </n-space>

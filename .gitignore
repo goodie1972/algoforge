@@ -13,7 +13,10 @@ dist/
 .playwright-mcp/
 runtime_config.json
 
-# 数据库
+# 临时工具/扫描脚本
+add_i18n_keys.py
+scan_i18n.py
+scan_signals.py
 *.db
 *.db-shm
 *.db-wal

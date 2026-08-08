@@ -2,10 +2,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 import { getStrategyColor } from '@/utils/strategyColors'
 
 const store = useConfigStore()
 const message = useMessage()
+const { t } = useI18n()
 const saving = ref(false)
 
 interface StrategyMeta {
@@ -149,9 +151,9 @@ async function save() {
       }
     }
     await store.updateStrategyPool(payload)
-    message.success('策略配置已保存，引擎将在下个 tick 生效')
+    message.success(t('strategy.saved'))
   } catch (e: any) {
-    message.error(e?.message || '保存失败')
+    message.error(e?.message || t('common.failed'))
   }
   saving.value = false
 }
@@ -253,9 +255,9 @@ async function save() {
                   <thead>
                     <tr>
                       <th style="width:16px;text-align:center;">#</th>
-                      <th>{{ $t('strategy.exit_method') }}</th>
+                      <th>{{ $t('strategy.exit_mode') }}</th>
                       <th>{{ $t('strategy.normal_mode') }}</th>
-                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ $t('strategy.widen') }}</th>
+                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ $t('strategy.wide_mode') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -299,9 +301,9 @@ async function save() {
                   <thead>
                     <tr>
                       <th style="width:16px;text-align:center;">#</th>
-                      <th>{{ $t('strategy.exit_method') }}</th>
+                      <th>{{ $t('strategy.exit_mode') }}</th>
                       <th>{{ $t('strategy.normal_mode') }}</th>
-                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ $t('strategy.widen') }}</th>
+                      <th v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ $t('strategy.wide_mode') }}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -325,7 +327,7 @@ async function save() {
 
       <n-button type="primary" :loading="saving" @click="save" block size="large"
         :disabled="loading">
-        {{ $t('strategy.save_config') }}
+        {{ $t('strategy.save') }}
       </n-button>
     </n-spin>
   </n-space>

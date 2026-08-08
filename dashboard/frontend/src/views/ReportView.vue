@@ -19,16 +19,16 @@ const reviews = ref<any[]>([])
 const reviewStats = ref({ errorDistribution: {}, suggestions: [] })
 const accuracyChartRef = ref<HTMLDivElement>()
 
-function errorTypeLabel(t: string): string {
+function errorTypeLabel(type: string): string {
   const map: Record<string,string> = {
-    'data_counterintuitive': '数据反直觉',
-    'other_factor_dominant': '其他因素主导',
-    'technical_override': '技术面压制',
-    'premature_pricing': '提前消化',
-    'time_window_mismatch': '时间窗口错位',
-    'unknown': '未分类',
+    'data_counterintuitive': t('report.reason.data_counterintuitive'),
+    'other_factor_dominant': t('report.reason.other_factor_dominant'),
+    'technical_override': t('report.reason.technical_override'),
+    'premature_pricing': t('report.reason.premature_pricing'),
+    'time_window_mismatch': t('report.reason.time_window_mismatch'),
+    'unknown': t('report.reason.unknown'),
   }
-  return map[t] || t
+  return map[type] || type
 }
 
 function renderAccuracyChart() {
@@ -36,7 +36,7 @@ function renderAccuracyChart() {
   if (!el) return
   const trend = (reviewStats.value as any).accuracy_trend || []
   if (trend.length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:#888">暂无数据</div>'
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:#888">${t('report.no_data_placeholder')}</div>`
     return
   }
   // 简单柱状图
@@ -886,25 +886,25 @@ function nbBuildSummary(r: any): string {
         <div v-if="reviewLoading" style="text-align:center;padding:40px"><n-spin size="large" /></div>
         <div v-else>
           <!-- 准确率趋势 -->
-          <n-card title="准确率趋势" size="small" style="margin-bottom:12px">
+          <n-card :title="$t('report.accuracy_trend')" size="small" style="margin-bottom:12px">
             <div ref="accuracyChartRef" style="width:100%;height:200px"></div>
           </n-card>
 
           <!-- 偏差分布 -->
-          <n-card title="偏差分布" size="small" style="margin-bottom:12px">
+          <n-card :title="$t('report.error_distribution')" size="small" style="margin-bottom:12px">
             <n-grid :cols="2" :x-gap="12">
               <n-gi v-for="(count,type) in reviewStats.errorDistribution" :key="type">
                 <div style="display:flex;justify-content:space-between;padding:4px 0">
                   <span>{{ errorTypeLabel(type) }}</span>
-                  <n-tag :bordered="false" :type="count > 5 ? 'error' : 'warning'" size="small">{{ count }}次</n-tag>
+                  <n-tag :bordered="false" :type="count > 5 ? 'error' : 'warning'" size="small">{{ count }}{{ $t('report.times') }}</n-tag>
                 </div>
               </n-gi>
             </n-grid>
           </n-card>
 
           <!-- 逐条对比 -->
-          <n-card title="最近复盘记录" size="small" style="margin-bottom:12px">
-            <n-empty v-if="reviews.length === 0" description="暂无复盘记录" />
+          <n-card :title="$t('report.recent_reviews')" size="small" style="margin-bottom:12px">
+            <n-empty v-if="reviews.length === 0" :description="$t('report.no_reviews')" />
             <n-list v-else>
               <n-list-item v-for="r in reviews" :key="r.id">
                 <template #prefix>
@@ -916,18 +916,18 @@ function nbBuildSummary(r: any): string {
                   <template #header-extra>
                     <n-space size="small">
                       <n-tag size="tiny" :bordered="false" :type="r.predicted_direction==='bullish'?'success':'error'">
-                        预测: {{ r.predicted_direction==='bullish'?'📈涨':'📉跌' }}
+                        {{ $t('report.prediction_label') }}{{ r.predicted_direction==='bullish' ? $t('report.up_emoji') : $t('report.down_emoji') }}
                       </n-tag>
                       <n-tag size="tiny" :bordered="false" :type="r.actual_direction==='bullish'?'success':'error'">
-                        实际: {{ r.actual_direction==='bullish'?'📈涨':'📉跌' }}
+                        {{ $t('report.actual_label') }}{{ r.actual_direction==='bullish' ? $t('report.up_emoji') : $t('report.down_emoji') }}
                       </n-tag>
                     </n-space>
                   </template>
                   <div v-if="r.error_type" style="font-size:12px;color:#8b8f97;margin-top:4px">
-                    偏差: {{ errorTypeLabel(r.error_type) }}
+                    {{ $t('report.error_label') }}{{ errorTypeLabel(r.error_type) }}
                   </div>
                   <div v-if="r.suggestion" style="font-size:12px;color:#f0b90b;margin-top:2px">
-                    建议: {{ r.suggestion }}
+                    {{ $t('report.suggestion_label') }}{{ r.suggestion }}
                   </div>
                 </n-thing>
               </n-list-item>
@@ -935,11 +935,11 @@ function nbBuildSummary(r: any): string {
           </n-card>
 
           <!-- 改进建议汇总 -->
-          <n-card title="改进建议汇总" size="small">
-            <n-empty v-if="reviewStats.suggestions.length === 0" description="暂无改进建议" />
+          <n-card :title="$t('report.suggestion_title')" size="small">
+            <n-empty v-if="reviewStats.suggestions.length === 0" :description="$t('report.no_suggestions')" />
             <n-list v-else>
               <n-list-item v-for="(s,i) in reviewStats.suggestions" :key="i">
-                <n-alert :title="'建议 '+(i+1)" type="warning" :bordered="false" closable>
+                <n-alert :title="t('report.suggestion') + ' ' + (i+1)" type="warning" :bordered="false" closable>
                   {{ s }}
                 </n-alert>
               </n-list-item>

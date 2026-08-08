@@ -4,7 +4,9 @@ import { usePositionStore } from '@/stores/positions'
 import { useMessage, useDialog, NButton, NTag, NSpace, NInputNumber, NDataTable, NEmpty, NText, NAlert, NDrawer, NDrawerContent, NFormItem } from 'naive-ui'
 import { closePosition, modifyPosition } from '@/api/client'
 import { getStrategyColor, textColorForBg } from '@/utils/strategyColors'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const store = usePositionStore()
 const message = useMessage()
 const dialog = useDialog()
@@ -20,21 +22,21 @@ const expandedRowKeys = ref<(string | number)[]>([])
 function renderPosExpand(row: any) {
   return h('div', { style: 'padding: 12px 24px; font-size: 13px; line-height: 1.8; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;' }, [
     h('div', {}, [
-      h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #0ecb81;' }, '开仓信息'),
-      h('div', {}, `Magic: ${row.magic || '-'}`),
-      h('div', {}, `策略名: ${row.comment || row._strategy_name || '-'}`),
-      h('div', {}, `开仓时间: ${row.open_time ? new Date((typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)) * 1000).toLocaleString() : '-'}`),
-      row.stop_loss ? h('div', {}, `止损距离: ${(Math.abs(row.open_price - row.stop_loss)).toFixed(2)}`) : null,
-      row.take_profit ? h('div', {}, `止盈距离: ${(Math.abs(row.take_profit - row.open_price)).toFixed(2)}`) : null,
+      h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #0ecb81;' }, t('positions.open_info')),
+      h('div', {}, t('positions.magic_label') + ': ' + (row.magic || '-')),
+      h('div', {}, t('positions.strategy_label') + ': ' + (row.comment || row._strategy_name || '-')),
+      h('div', {}, t('positions.open_time_label') + ': ' + (row.open_time ? new Date((typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)) * 1000).toLocaleString() : '-')),
+      row.stop_loss ? h('div', {}, t('positions.sl_distance') + ': ' + (Math.abs(row.open_price - row.stop_loss)).toFixed(2)) : null,
+      row.take_profit ? h('div', {}, t('positions.tp_distance') + ': ' + (Math.abs(row.take_profit - row.open_price)).toFixed(2)) : null,
     ]),
     h('div', {}, [
-      h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #f0a020;' }, '当前状态'),
-      h('div', {}, `入场价: ${row.open_price?.toFixed(2)}`),
-      h('div', {}, `现价: ${row.current_price?.toFixed(2)}`),
+      h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #f0a020;' }, t('positions.status')),
+      h('div', {}, t('positions.entry_price_label') + ': ' + row.open_price?.toFixed(2)),
+      h('div', {}, t('positions.current_price_label') + ': ' + row.current_price?.toFixed(2)),
       h('div', { style: { color: row.profit >= 0 ? '#0ecb81' : '#f6465d' } },
-        `浮动盈亏: ${row.profit >= 0 ? '+' : ''}$${row.profit?.toFixed(2)}`),
-      row.stop_loss ? h('div', {}, `止损位: ${row.stop_loss.toFixed(2)}`) : null,
-      row.take_profit ? h('div', {}, `止盈位: ${row.take_profit.toFixed(2)}`) : null,
+        t('positions.floating_pnl') + ': ' + (row.profit >= 0 ? '+' : '') + '$' + row.profit?.toFixed(2)),
+      row.stop_loss ? h('div', {}, t('positions.sl_label') + ': ' + row.stop_loss.toFixed(2)) : null,
+      row.take_profit ? h('div', {}, t('positions.tp_label') + ': ' + row.take_profit.toFixed(2)) : null,
     ]),
   ])
 }
@@ -43,7 +45,7 @@ const columns = [
   { type: 'expand' as const, width: 30, renderExpand: renderPosExpand },
   { title: 'Ticket', key: 'ticket', width: 80 },
   {
-    title: '策略', key: 'strategy', width: 150,
+    title: t('positions.strategy'), key: 'strategy', width: 150,
     render(row: any) {
       const name = row.comment || row._strategy_name || ''
       const magic = row.magic || ''
@@ -66,28 +68,28 @@ const columns = [
     }
   },
   {
-    title: '方向', key: 'order_type', width: 40,
+    title: t('positions.direction'), key: 'order_type', width: 40,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
       return h(NTag, { type: isBuy ? 'success' : 'error', size: 'small' },
-        { default: () => isBuy ? '多' : '空' }
+        { default: () => isBuy ? t('positions.buy') : t('positions.sell') }
       )
     }
   },
-  { title: '手数', key: 'volume', width: 40 },
-  { title: '开仓价', key: 'open_price', width: 80,
+  { title: t('positions.volume'), key: 'volume', width: 40 },
+  { title: t('positions.open_price'), key: 'open_price', width: 80,
     render(row: any) { return row.open_price?.toFixed(2) }
   },
-  { title: '现价', key: 'current_price', width: 80,
+  { title: t('positions.current_price'), key: 'current_price', width: 80,
     render(row: any) { return row.current_price?.toFixed(2) }
   },
-  { title: '止损', key: 'stop_loss', width: 80,
+  { title: t('positions.stop_loss'), key: 'stop_loss', width: 80,
     render(row: any) { return row.stop_loss || '-' }
   },
-  { title: '止盈', key: 'take_profit', width: 80,
+  { title: t('positions.take_profit'), key: 'take_profit', width: 80,
     render(row: any) { return row.take_profit || '-' }
   },
-  { title: '开仓时间', key: 'open_time', width: 120,
+  { title: t('positions.open_time'), key: 'open_time', width: 120,
     render(row: any) {
       if (!row.open_time) return '-'
       const ts = typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)
@@ -96,7 +98,7 @@ const columns = [
     }
   },
   {
-    title: '盈亏', key: 'profit', width: 80,
+    title: t('positions.profit'), key: 'profit', width: 80,
     render(row: any) {
       const val = row.profit ?? 0
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
@@ -105,7 +107,7 @@ const columns = [
     }
   },
   {
-    title: '操作', key: 'actions', width: 135,
+    title: t('positions.actions'), key: 'actions', width: 135,
     render(row: any) {
       return h(NSpace, { size: 'small' }, {
         default: () => [
@@ -116,30 +118,30 @@ const columns = [
               editSl.value = row.stop_loss || 0
               editTp.value = row.take_profit || 0
             }
-          }, { default: () => '改 SL/TP' }),
+          }, { default: () => t('positions.modify_sltp_btn') }),
           h(NButton, {
             size: 'tiny', type: 'error', secondary: true,
             loading: loadingClose.value === row.ticket,
             onClick: () => {
               dialog.warning({
-                title: '确认平仓',
-                content: `确定平掉 #${row.ticket} (${row.order_type?.includes('BUY') ? '多' : '空'} ${row.volume}手) 吗？`,
-                positiveText: '确认平仓',
-                negativeText: '取消',
+              title: t('positions.confirm_close'),
+                content: t('positions.confirm_close_msg', { ticket: '#' + row.ticket, direction: row.order_type?.includes('BUY') ? t('positions.buy') : t('positions.sell'), volume: row.volume }),
+                positiveText: t('positions.confirm_close'),
+                negativeText: t('common.cancel'),
                 onPositiveClick: async () => {
                   loadingClose.value = row.ticket
                   try {
                     await closePosition(row.ticket)
-                    message.success(`#${row.ticket} 已平仓`)
+                    message.success(t('positions.close_success', { ticket: '#' + row.ticket }))
                     await store.fetch()
                   } catch (e: any) {
-                    message.error(e?.message || '平仓失败')
+                    message.error(e?.message || t('positions.close_failed'))
                   }
                   loadingClose.value = null
                 }
               })
             }
-          }, { default: () => '平仓' }),
+          }, { default: () => t('positions.close') }),
         ]
       })
     }
@@ -151,11 +153,11 @@ async function handleModify() {
   loadingModify.value = true
   try {
     await modifyPosition(editingTicket.value, editSl.value, editTp.value)
-    message.success(`#${editingTicket.value} SL/TP 已更新`)
+    message.success(t('positions.modify_sl_tp_updated', { ticket: '#' + editingTicket.value }))
     editingTicket.value = null
     await store.fetch()
   } catch (e: any) {
-    message.error(e?.message || '修改失败')
+    message.error(e?.message || t('positions.modify_failed'))
   }
   loadingModify.value = false
 }
