@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSignalStore } from '@/stores/signals'
 import { usePriceStore } from '@/stores/prices'
 import { useConfigStore } from '@/stores/config'
@@ -8,6 +9,8 @@ import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 const signalStore = useSignalStore()
 const priceStore = usePriceStore()
 const configStore = useConfigStore()
+
+const { t } = useI18n()
 
 // ── News calendar ──
 
@@ -46,115 +49,10 @@ async function fetchCalendar() {
 
 const nextEvent = computed(() => calendarData.value?.upcoming_events?.[0] ?? null)
 
-// 财经事件中文名映射
-const eventCN: Record<string, string> = {
-  'CPI': '消费者物价指数',
-  'CPI m/m': '消费者物价指数月率',
-  'CPI y/y': '消费者物价指数年率',
-  'Core CPI': '核心消费者物价指数',
-  'Core CPI m/m': '核心消费者物价指数月率',
-  'PPI': '生产者物价指数',
-  'PPI m/m': '生产者物价指数月率',
-  'Non-Farm Employment Change': '非农就业人数',
-  'Unemployment Rate': '失业率',
-  'Average Hourly Earnings m/m': '平均时薪月率',
-  'Employment Change': '就业人数变化',
-  'GDP': '国内生产总值',
-  'GDP q/q': 'GDP季率',
-  'GDP y/y': 'GDP年率',
-  'Final GDP q/q': 'GDP终值季率',
-  'GDP Price Index q/q': 'GDP平减指数季率',
-  'Retail Sales': '零售销售',
-  'Retail Sales m/m': '零售销售月率',
-  'Core Retail Sales m/m': '核心零售销售月率',
-  'Industrial Production': '工业生产',
-  'Industrial Production m/m': '工业生产月率',
-  'Capacity Utilization Rate': '产能利用率',
-  'Manufacturing Production m/m': '制造业生产月率',
-  'Building Permits': '营建许可',
-  'Building Permits m/m': '营建许可月率',
-  'Housing Starts': '新屋开工',
-  'Housing Starts m/m': '新屋开工月率',
-  'Existing Home Sales': '成屋销售',
-  'New Home Sales': '新屋销售',
-  'CB Consumer Confidence': '消费者信心指数',
-  'Michigan Consumer Sentiment': '密歇根消费者信心指数',
-  'Michigan 1-Year Inflation Expectations': '密歇根1年通胀预期',
-  'ISM Manufacturing PMI': 'ISM制造业PMI',
-  'ISM Non-Manufacturing PMI': 'ISM非制造业PMI',
-  'ISM Services PMI': 'ISM服务业PMI',
-  'Manufacturing PMI': '制造业PMI',
-  'Services PMI': '服务业PMI',
-  'Composite PMI': '综合PMI',
-  'S&P Global Manufacturing PMI': '标普全球制造业PMI',
-  'S&P Global Services PMI': '标普全球服务业PMI',
-  'S&P Global Composite PMI': '标普全球综合PMI',
-  'Philly Fed Manufacturing Index': '费城联储制造业指数',
-  'Empire State Manufacturing Index': '纽约联储制造业指数',
-  'Durable Goods Orders': '耐用品订单',
-  'Durable Goods Orders m/m': '耐用品订单月率',
-  'Core Durable Goods Orders m/m': '核心耐用品订单月率',
-  'Factory Orders m/m': '工厂订单月率',
-  'Business Inventories m/m': '商业库存月率',
-  'Wholesale Inventories m/m': '批发库存月率',
-  'Trade Balance': '贸易帐',
-  'Import Prices m/m': '进口物价指数月率',
-  'Export Prices m/m': '出口物价指数月率',
-  'JOLTS Job Openings': 'JOLTS职位空缺',
-  'ADP Non-Farm Employment Change': 'ADP就业人数',
-  'Initial Jobless Claims': '初请失业金人数',
-  'Continuing Jobless Claims': '续请失业金人数',
-  '4-Week Moving Average': '四周均值',
-  'Treasury Budget': '联邦预算',
-  'Federal Budget Balance': '联邦预算平衡',
-  'Consumer Credit m/m': '消费者信贷月率',
-  'Personal Spending m/m': '个人支出月率',
-  'Personal Income m/m': '个人收入月率',
-  'PCE Price Index m/m': 'PCE物价指数月率',
-  'PCE Price Index y/y': 'PCE物价指数年率',
-  'Core PCE Price Index m/m': '核心PCE物价指数月率',
-  'Core PCE Price Index y/y': '核心PCE物价指数年率',
-  'FOMC Statement': 'FOMC声明',
-  'FOMC Meeting Minutes': 'FOMC会议纪要',
-  'FOMC Press Conference': 'FOMC新闻发布会',
-  'Federal Funds Rate': '联邦基金利率',
-  'Consumer Inflation Expectations': '消费者通胀预期',
-  'Inflation Expectations': '通胀预期',
-  '10-y Bond Auction': '10年期国债拍卖',
-  '30-y Bond Auction': '30年期国债拍卖',
-  '5-y Note Auction': '5年期国债拍卖',
-  '7-y Note Auction': '7年期国债拍卖',
-  '2-y Note Auction': '2年期国债拍卖',
-  'Current Account': '经常帐',
-  'Hourly Wage Index': '时薪指数',
-  'Labor Cost Index q/q': '劳动力成本指数季率',
-  'Labor Productivity q/q': '劳动生产率季率',
-  'Unit Labor Costs q/q': '单位劳动力成本季率',
-  'Chicago PMI': '芝加哥PMI',
-  'Dallas Fed Manufacturing Index': '达拉斯联储制造业指数',
-  'Richmond Fed Manufacturing Index': '里士满联储制造业指数',
-  'Kansas City Fed Manufacturing Index': '堪萨斯联储制造业指数',
-  'Home Price Index m/m': '房价指数月率',
-  'House Price Index y/y': '房价指数年率',
-  'S&P/CS Composite-20 HPI y/y': '标普/Case-Shiller房价指数年率',
-  'NAHB Housing Market Index': 'NAHB房产市场指数',
-  'MBA Mortgage Applications': 'MBA抵押贷款申请',
-  'MBA Mortgage Applications w/w': 'MBA抵押贷款申请周率',
-  'EIA Crude Oil Stocks Change': 'EIA原油库存变化',
-  'Crude Oil Inventories': '原油库存',
-  'Cushing Crude Oil Inventories': '库欣原油库存',
-  'Gasoline Production': '汽油产量',
-  'Distillate Fuel Production': '馏分油产量',
-  'Natural Gas Storage': '天然气库存',
-  'Baker Hughes Oil Rig Count': '贝克休斯石油钻井数',
-  'Fed Chair Powell Speech': '鲍威尔讲话',
-  'Fed Monetary Policy Report': '美联储货币政策报告',
-  'Fed Interest Rate Decision': '美联储利率决议',
-}
-
 function evtName(title: string) {
-  const cn = eventCN[title] || ''
-  return cn ? `${cn}（${title}）` : title
+  const key = `signals.news.${title}`
+  const cn = t(key)
+  return cn !== key ? `${cn}（${title}）` : title
 }
 
 const activeStrategies = computed(() => {
@@ -283,7 +181,7 @@ onUnmounted(() => {
             </n-text>
           </n-space>
           <n-text v-if="calendarData?.upcoming_events?.length" depth="3" style="font-size: 11px;">
-            {{ $t('signals.pending_events', { count: calendarData.upcoming_events.length }) }}
+            {{ $t('signals.pending', { count: calendarData.upcoming_events.length }) }}
           </n-text>
         </div>
 
@@ -379,9 +277,9 @@ onUnmounted(() => {
               </div>
             </div>
           </template>
-          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">{{ $t('signals.no_strategy_desc') }}</div>
+          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">{{ $t('signals.no_detail') }}</div>
         </n-collapse-item>
-        <n-empty v-if="!activeStrategies.length" :description="$t('signals.no_running_strategy')" />
+        <n-empty v-if="!activeStrategies.length" :description="$t('signals.no_running')" />
       </n-collapse>
     </n-card>
   </n-space>

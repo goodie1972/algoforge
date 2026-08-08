@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { NIcon } from 'naive-ui'
 import { NotificationsOutline, AlertCircleOutline, WarningOutline } from '@vicons/ionicons5'
+import { useI18n } from 'vue-i18n'
 import { usePatrolStore } from '@/stores/patrol'
 
 const props = withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false })
 const router = useRouter()
 const patrol = usePatrolStore()
+const { t } = useI18n()
 const showPopover = ref(false)
 
 const levelColor: Record<string, string> = {
@@ -16,11 +18,11 @@ const levelColor: Record<string, string> = {
   critical: '#ef4444',
 }
 
-const tagInfo: Record<string, { type: 'success' | 'warning' | 'error'; text: string }> = {
-  normal: { type: 'success', text: '正常' },
-  warning: { type: 'warning', text: `${patrol.warningCount} 告警` },
-  critical: { type: 'error', text: `${patrol.criticalCount} 紧急` },
-}
+const tagInfo = computed<Record<string, { type: 'success' | 'warning' | 'error'; text: string }>>(() => ({
+  normal: { type: 'success', text: t('patrol.normal') },
+  warning: { type: 'warning', text: t('patrol.alerts', { count: patrol.warningCount }) },
+  critical: { type: 'error', text: t('patrol.critical', { count: patrol.criticalCount }) },
+}))
 
 // 警报音
 let audioCtx: AudioContext | null = null
@@ -53,7 +55,7 @@ onUnmounted(() => { audioCtx?.close(); audioCtx = null })
 <template>
   <!-- 侧边栏折叠模式：简化为小圆点，点击跳 PatrolView -->
   <div v-if="props.collapsed" style="padding: 4px 0; display: flex; justify-content: center;">
-    <div class="bell-btn" @click="router.push('/patrol')" title="监控告警">
+    <div class="bell-btn" @click="router.push('/patrol')" :title="t('patrol.subtitle')">
       <n-icon :color="levelColor[patrol.health]" size="20">
         <NotificationsOutline />
       </n-icon>
@@ -67,7 +69,7 @@ onUnmounted(() => { audioCtx?.close(); audioCtx = null })
       <div class="bell-btn"
         :class="{ 'bell-critical': patrol.health === 'critical', 'bell-warning': patrol.health === 'warning' }"
         @click="showPopover = !showPopover"
-        title="监控告警">
+        :title="t('patrol.subtitle')">
         <n-badge :value="patrol.unreadCount" :max="99"
           :type="patrol.health === 'critical' ? 'error' : patrol.health === 'warning' ? 'warning' : 'success'"
           :show="patrol.unreadCount > 0">
@@ -87,14 +89,14 @@ onUnmounted(() => { audioCtx?.close(); audioCtx = null })
             <WarningOutline v-else-if="patrol.health === 'warning'" />
             <NotificationsOutline v-else />
           </n-icon>
-          <n-text strong style="font-size: 14px;">监控告警</n-text>
+          <n-text strong style="font-size: 14px;">{{ t('patrol.subtitle') }}</n-text>
           <n-tag :type="tagInfo[patrol.health].type" size="tiny" :bordered="false">
             {{ tagInfo[patrol.health].text }}
           </n-tag>
         </n-space>
         <n-space size="small">
-          <n-button size="tiny" quaternary @click="patrol.runPatrol()">刷新</n-button>
-          <n-button size="tiny" quaternary @click="patrol.clearAlerts()">清除</n-button>
+          <n-button size="tiny" quaternary @click="patrol.runPatrol()">{{ t('common.refresh') }}</n-button>
+          <n-button size="tiny" quaternary @click="patrol.clearAlerts()">{{ t('common.clear') }}</n-button>
         </n-space>
       </div>
 
@@ -102,7 +104,7 @@ onUnmounted(() => { audioCtx?.close(); audioCtx = null })
 
       <div v-if="patrol.alerts.length === 0" style="text-align: center; padding: 20px 0;">
         <n-icon :color="'#22c55e'" size="32"><NotificationsOutline /></n-icon>
-        <n-text depth="3" style="display: block; margin-top: 8px; font-size: 13px;">无告警，一切正常</n-text>
+        <n-text depth="3" style="display: block; margin-top: 8px; font-size: 13px;">{{ t('patrol.empty') }}</n-text>
       </div>
 
       <div v-else class="alert-list">
@@ -111,23 +113,23 @@ onUnmounted(() => { audioCtx?.close(); audioCtx = null })
           <span class="alert-time">{{ a.time }}</span>
           <n-tag :type="a.level === 'critical' ? 'error' : a.level === 'warning' ? 'warning' : 'success'"
             size="tiny" :bordered="false" style="flex-shrink: 0;">
-            {{ a.level === 'critical' ? '严重' : a.level === 'warning' ? '告警' : '信息' }}
+            {{ a.level === 'critical' ? t('patrol.level_critical') : a.level === 'warning' ? t('patrol.level_warning') : t('patrol.level_info') }}
           </n-tag>
           <span class="alert-msg">{{ a.message }}</span>
         </div>
       </div>
 
       <div v-if="patrol.alerts.length > 15" style="text-align: center; margin-top: 4px;">
-        <n-text depth="3" style="font-size: 11px;">还有 {{ patrol.alerts.length - 15 }} 条...</n-text>
+        <n-text depth="3" style="font-size: 11px;">{{ t('patrol.more_alerts', { count: patrol.alerts.length - 15 }) }}</n-text>
       </div>
 
       <n-divider style="margin: 8px 0;" />
       <div style="text-align: center;">
         <n-button size="tiny" text @click="showPopover = false; router.push('/patrol')">
-          查看全部 →
+          {{ t('patrol.view_all') }}
         </n-button>
         <n-text depth="3" style="font-size: 11px; margin-left: 8px;">
-          上次: {{ patrol.lastCheckTime }}
+          {{ t('patrol.last_check') }}{{ patrol.lastCheckTime }}
         </n-text>
       </div>
     </div>

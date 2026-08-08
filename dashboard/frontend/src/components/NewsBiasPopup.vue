@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{ data: any }>()
 const emit = defineEmits<{ close: [] }>()
 
 const router = useRouter()
+const { t } = useI18n()
 
 function nbDir(dir: string): string {
-  if (dir === 'bullish') return '看涨 ↑'
-  if (dir === 'bearish') return '看跌 ↓'
-  return '震荡 →'
+  if (dir === 'bullish') return t('news.bullish')
+  if (dir === 'bearish') return t('news.bearish')
+  return t('news.neutral')
 }
 function nbDirTag(dir: string): string {
   if (dir === 'bullish') return 'success'
@@ -18,7 +20,7 @@ function nbDirTag(dir: string): string {
   return 'warning'
 }
 function nbDirLabel(dir: string): string {
-  return dir === 'bullish' ? '利多' : dir === 'bearish' ? '利空' : '中性'
+  return dir === 'bullish' ? t('news.bullish_impact') : dir === 'bearish' ? t('news.bearish_impact') : t('news.neutral_impact')
 }
 function handleGoReport() {
   emit('close')
@@ -34,20 +36,20 @@ function handleGoReport() {
         {{ nbDir(data.prediction?.direction) }}
       </n-tag>
       <div>
-        <span class="label">评分</span>
+        <span class="label">{{ t('news.score') }}</span>
         <span :style="{ fontWeight: 700, color: (data.prediction?.score ?? 0) > 0 ? '#0ecb81' : '#f6465d' }">
           {{ (data.prediction?.score ?? 0).toFixed(2) }}
         </span>
       </div>
       <div>
-        <span class="label">置信度</span>
+        <span class="label">{{ t('news.confidence') }}</span>
         <span style="font-weight: 700;">{{ data.prediction?.confidence ?? 0 }}%</span>
       </div>
     </div>
 
     <div class="reason-text">{{ data.prediction?.reason }}</div>
 
-    <n-divider style="margin: 8px 0;">关键新闻</n-divider>
+    <n-divider style="margin: 8px 0;">{{ t('news.key_news') }}</n-divider>
 
     <div v-if="data.news_items?.length">
       <div v-for="(item, idx) in data.news_items.slice(0, 5)" :key="idx" class="news-item">
@@ -61,11 +63,11 @@ function handleGoReport() {
         <div v-if="item.chain" class="chain-text">{{ item.chain }}</div>
       </div>
     </div>
-    <n-empty v-else description="暂无新闻数据" style="padding: 12px;" />
+    <n-empty v-else :description="t('news.no_data')" style="padding: 12px;" />
 
     <div class="popup-footer">
       <n-text depth="3" style="font-size: 12px;">{{ data.created_at }}</n-text>
-      <n-button type="primary" size="small" @click="handleGoReport">查看详情</n-button>
+      <n-button type="primary" size="small" @click="handleGoReport">{{ t('news.view_detail') }}</n-button>
     </div>
   </div>
 </template>

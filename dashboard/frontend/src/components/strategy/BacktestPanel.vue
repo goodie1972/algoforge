@@ -1,21 +1,23 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useBacktestStore } from '@/stores/backtest'
 import { useMessage } from 'naive-ui'
 import BacktestResultView from './BacktestResultView.vue'
 
+const { t } = useI18n()
 const backtest = useBacktestStore()
 const message = useMessage()
 
 const strategyOptions = [
-  { label: 'M30 RSI+BB（当前实盘）', value: 'm30_rsi_bb' },
-  { label: '— 历史策略 —', value: '' },
-  { label: 'V6 Hybrid（已归档）', value: 'v6_hybrid' },
-  { label: '双均线', value: 'double_ma' },
-  { label: 'ATR 突破', value: 'atr_breakout' },
-  { label: '双确认', value: 'combined' },
-  { label: 'RSI+BB', value: 'rsi_bollinger' },
-  { label: 'Stoch+BB', value: 'stoch_bollinger' },
+  { label: t('backtest.current_live'), value: 'm30_rsi_bb' },
+  { label: t('backtest.history_strategies'), value: '' },
+  { label: t('backtest.archived'), value: 'v6_hybrid' },
+  { label: t('backtest.double_ma'), value: 'double_ma' },
+  { label: t('backtest.atr_breakout'), value: 'atr_breakout' },
+  { label: t('backtest.combined'), value: 'combined' },
+  { label: t('backtest.rsi_bollinger'), value: 'rsi_bollinger' },
+  { label: t('backtest.stoch_bollinger'), value: 'stoch_bollinger' },
 ]
 
 const timeframeOptions = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1'].map(t => ({ label: t, value: t }))
@@ -33,7 +35,7 @@ const submitting = ref(false)
 
 async function run() {
   if (form.value.strategies.length === 0) {
-    message.warning('至少选择一个策略')
+    message.warning(t('backtest.select_at_least_one'))
     return
   }
   submitting.value = true
@@ -47,7 +49,7 @@ async function run() {
       commission: form.value.commission,
     })
   } catch (e: any) {
-    message.error(e?.message || '提交失败')
+    message.error(e?.message || t('backtest.submit_failed'))
   }
   submitting.value = false
 }
@@ -103,7 +105,7 @@ async function run() {
 
         <n-button type="primary" :loading="submitting || backtest.loading"
                   @click="run" :disabled="backtest.loading" block>
-          {{ backtest.loading ? backtest.progress || $t('backtest.running') : $t('backtest.start') }}
+          {{ backtest.loading ? backtest.progress || $t('backtest.running') : $t('backtest.run_backtest') }}
         </n-button>
       </n-form>
 

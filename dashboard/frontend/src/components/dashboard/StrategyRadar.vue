@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { TradeStats } from '@/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   stats: TradeStats | null
@@ -25,7 +28,7 @@ const versionOptions = computed(() => {
   const family = props.stats.by_strategy[props.selectedStrategy]
   if (!family?.versions?.length) return []
   return [
-    { label: '全部版本', value: '' },
+    { label: t('radar.all_versions'), value: '' },
     ...family.versions.map((v: any) => ({
       label: `${v.version} (Magic: ${v.magic})`,
       value: String(v.magic),
@@ -78,11 +81,11 @@ const scores = computed<ScoreItem[]>(() => {
   const epScore = Math.min(100, Math.max(0, Math.round((ep + 20) / 40 * 100)))
 
   return [
-    { label: 'Profit Factor', raw: pf, score: pfScore, max: 100, desc: '毛利/毛损' },
-    { label: '胜率', raw: wr, score: wrScore, max: 100, desc: '盈利单占比' },
-    { label: '盈亏比', raw: ratio, score: ratioScore, max: 100, desc: '平均盈利/平均亏损' },
-    { label: '连亏控制', raw: consec, score: consecScore, max: 100, desc: '最大连亏次数' },
-    { label: '期望收益', raw: ep, score: epScore, max: 100, desc: '每单平均盈亏' },
+    { label: 'Profit Factor', raw: pf, score: pfScore, max: 100, desc: t('radar.desc_pf') },
+    { label: t('radar.win_rate'), raw: wr, score: wrScore, max: 100, desc: t('radar.desc_win_rate') },
+    { label: t('radar.profit_ratio'), raw: ratio, score: ratioScore, max: 100, desc: t('radar.desc_ratio') },
+    { label: t('radar.consec_loss_ctrl'), raw: consec, score: consecScore, max: 100, desc: t('radar.desc_consec') },
+    { label: t('radar.expected_return'), raw: ep, score: epScore, max: 100, desc: t('radar.desc_ep') },
   ]
 })
 
@@ -95,11 +98,11 @@ const totalScore = computed(() => {
 })
 
 const grade = computed(() => {
-  const t = totalScore.value
-  if (t >= 80) return { label: '优秀', color: '#0ecb81' }
-  if (t >= 60) return { label: '良好', color: '#f0b90b' }
-  if (t >= 40) return { label: '及格', color: '#f0a020' }
-  return { label: '不及格', color: '#f6465d' }
+  const score = totalScore.value
+  if (score >= 80) return { label: t('radar.excellent'), color: '#0ecb81' }
+  if (score >= 60) return { label: t('radar.good'), color: '#f0b90b' }
+  if (score >= 40) return { label: t('radar.pass'), color: '#f0a020' }
+  return { label: t('radar.fail'), color: '#f6465d' }
 })
 
 // SVG radar chart dimensions
@@ -257,10 +260,10 @@ function arrowDown() {
         </thead>
         <tbody>
           <tr><td>Profit Factor</td><td>25%</td><td>{{ $t('radar.method_pf') }}</td></tr>
-          <tr><td>{{ $t('radar.indicator_winrate') }}</td><td>20%</td><td>{{ $t('radar.method_winrate') }}</td></tr>
-          <tr><td>{{ $t('radar.indicator_ratio') }}</td><td>25%</td><td>{{ $t('radar.method_ratio') }}</td></tr>
-          <tr><td>{{ $t('radar.indicator_consec') }}</td><td>15%</td><td>{{ $t('radar.method_consec') }}</td></tr>
-          <tr><td>{{ $t('radar.indicator_ep') }}</td><td>15%</td><td>{{ $t('radar.method_ep') }}</td></tr>
+          <tr><td>{{ $t('radar.win_rate') }}</td><td>20%</td><td>{{ $t('radar.method_winrate') }}</td></tr>
+          <tr><td>{{ $t('radar.profit_ratio') }}</td><td>25%</td><td>{{ $t('radar.method_ratio') }}</td></tr>
+          <tr><td>{{ $t('radar.consec_loss_ctrl') }}</td><td>15%</td><td>{{ $t('radar.method_consec') }}</td></tr>
+          <tr><td>{{ $t('radar.expected_return') }}</td><td>15%</td><td>{{ $t('radar.method_ep') }}</td></tr>
         </tbody>
       </n-table>
       <n-text depth="3" style="font-size: 13px;">

@@ -33,7 +33,7 @@ watch(() => appStore.locale, (val) => { if (val) locale.value = val }, { immedia
 // 新闻弹窗
 const showNewsBias = ref(false)
 const newsBiasData = ref<any>(null)
-const titleText = computed(() => newsBiasData.value?.title || 'XAUUSD 新闻预判')
+const titleText = computed(() => newsBiasData.value?.title || t('app.news_title'))
 function closePopup() { showNewsBias.value = false }
 
 
@@ -62,6 +62,7 @@ const showChangelog = ref(false)
 const changelog = ref<Array<{hash: string; date: string; subject: string}>>([])
 const updating = ref(false)
 const updateResult = ref<string>('')
+const updateOk = ref(false)
 async function loadChangelog() {
   try {
     const r = await getChangelog(20)
@@ -90,10 +91,12 @@ async function checkUpdate() {
     versionInfo.value = v as any
     if (v.has_update) {
       loadRemoteChangelog()
-      updateResult.value = `发现 ${v.behind_count} 个新 commit`
+      updateResult.value = t('app.found_new_commits', { count: v.behind_count })
+      updateOk.value = false
     } else {
       loadChangelog()
-      updateResult.value = '已是最新'
+      updateResult.value = t('app.up_to_date')
+      updateOk.value = true
     }
   } catch { /* ignore */ }
 }
@@ -104,13 +107,16 @@ async function doUpdate() {
     const r = await updateVersion()
     if (r.success && r.version) {
       versionInfo.value = r.version as any
-      updateResult.value = '✅ 更新成功！'
+      updateResult.value = t('app.update_success')
+      updateOk.value = true
       remoteChangelog.value = []
     } else {
-      updateResult.value = `❌ ${r.message}`
+      updateResult.value = t('app.update_failed', { message: r.message })
+      updateOk.value = false
     }
   } catch (e: any) {
-    updateResult.value = `❌ ${e?.message || '更新失败'}`
+    updateResult.value = t('app.update_failed', { message: e?.message || t('app.update_failed_msg') })
+    updateOk.value = false
   }
   updating.value = false
 }
@@ -258,7 +264,7 @@ onUnmounted(() => {
             <template #icon>
               <n-icon><LanguageOutline /></n-icon>
             </template>
-            <span v-if="!collapsed">{{ locale === 'zh-CN' ? 'English' : '中文' }}</span>
+            <span v-if="!collapsed">{{ locale === 'zh-CN' ? t('lang.en') : t('lang.zh') }}</span>
           </n-button>
         </div>
       </n-layout-sider>
@@ -341,7 +347,7 @@ onUnmounted(() => {
             <div class="cl-subject">{{ c.subject }}</div>
           </div>
         </div>
-        <div v-if="updateResult" class="update-result" :class="updateResult.includes('成功') || updateResult.includes('最新') ? 'update-success' : 'update-fail'">{{ updateResult }}</div>
+        <div v-if="updateResult" class="update-result" :class="updateOk ? 'update-success' : 'update-fail'">{{ updateResult }}</div>
       </div>
 
       <div v-else>

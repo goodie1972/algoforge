@@ -3,10 +3,12 @@ import { computed, ref, reactive, onMounted, watch } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { getNewsCalendar } from '@/api/client'
 import { useMessage } from 'naive-ui'
+import { useI18n } from 'vue-i18n'
 import BiasStateIndicator from './BiasStateIndicator.vue'
 
 const store = useConfigStore()
 const message = useMessage()
+const { t } = useI18n()
 
 const local = reactive({
   news_filter_enabled: store.items.news_filter_enabled ?? true,
@@ -55,7 +57,7 @@ async function save() {
   const { news_bias_di_gap, ...general } = local
   await store.update(general)
   await store.updateCoordinator({ news_bias_di_gap })
-  message.success('新闻配置已保存')
+  message.success(t('config.saved'))
 }
 
 const calendar = ref<any>(null)
@@ -75,8 +77,8 @@ async function refreshCalendar() {
 onMounted(refreshCalendar)
 
 const impactOptions = [
-  { label: '仅 High', value: 'High' },
-  { label: 'High + Medium', value: 'High,Medium' },
+  { label: t('config.impact_high_only'), value: 'High' },
+  { label: t('config.impact_high_medium'), value: 'High,Medium' },
 ]
 </script>
 
@@ -84,103 +86,104 @@ const impactOptions = [
   <n-grid :cols="2" :x-gap="24" :y-gap="12">
     <n-grid-item>
       <n-space vertical size="medium">
-        <n-form-item label="启用新闻过滤">
+        <n-form-item :label="$t('config.news_filter_enable')">
           <n-switch :value="local.news_filter_enabled"
             @update:value="(v: boolean) => local.news_filter_enabled = v" />
         </n-form-item>
 
-        <n-divider title-position="left">禁售时间窗口</n-divider>
+        <n-divider title-position="left">{{ $t('config.blackout_window') }}</n-divider>
 
-        <n-form-item label="发布前 (分钟)">
-          <app-input-number :value="local.news_before_minutes" :min="0" :max="999"
-            @update:value="(v: any) => v !== null && (local.news_before_minutes = v)"
-            style="width:100%;" />
-          <template #feedback>数据发布前 N 分钟停止开新仓</template>
-        </n-form-item>
+        <div style="display: flex; gap: 24px;">
+          <n-form-item label-placement="left" :label="$t('config.before_release')" style="flex: 1;">
+            <app-input-number :value="local.news_before_minutes" :min="0" :max="999"
+              @update:value="(v: any) => v !== null && (local.news_before_minutes = v)"
+              style="width: 30px;" />
+            <template #feedback>{{ $t('config.before_release_desc') }}</template>
+          </n-form-item>
+          <n-form-item label-placement="left" :label="$t('config.after_release')" style="flex: 1;">
+            <app-input-number :value="local.news_after_minutes" :min="0" :max="999"
+              @update:value="(v: any) => v !== null && (local.news_after_minutes = v)"
+              style="width: 30px;" />
+            <template #feedback>{{ $t('config.after_release_desc') }}</template>
+          </n-form-item>
+        </div>
 
-        <n-form-item label="发布后 (分钟)">
-          <app-input-number :value="local.news_after_minutes" :min="0" :max="999"
-            @update:value="(v: any) => v !== null && (local.news_after_minutes = v)"
-            style="width:100%;" />
-          <template #feedback>数据发布后 N 分钟恢复交易</template>
-        </n-form-item>
+        <n-divider title-position="left">{{ $t('config.news_bias') }}</n-divider>
 
-        <n-divider title-position="left">News-Bias 事后评估</n-divider>
-
-        <n-form-item label="启用评估">
+        <n-form-item :label="$t('config.news_bias_enable')">
           <n-switch :value="local.news_bias_enabled"
             @update:value="(v: boolean) => local.news_bias_enabled = v" />
-          <template #feedback>对高影响 USD 事件打方向标签，事后比对准确率</template>
+          <template #feedback>{{ $t('config.news_bias_desc') }}</template>
         </n-form-item>
 
-        <n-form-item label="报告时间 (UTC)">
+        <n-form-item :label="$t('config.report_time_utc')">
           <n-input :value="local.news_bias_report_hours"
             @update:value="(v: string) => local.news_bias_report_hours = v"
-            style="width:100%;" />
-          <template #feedback>生成报告的小时，逗号分隔（如 "8,20" = 早8点和晚8点）</template>
+            style="width: 60px;" />
+          <template #feedback>{{ $t('config.report_time_desc') }}</template>
         </n-form-item>
 
-        <n-divider title-position="left">News-Bias 阻塞控制</n-divider>
+        <n-divider title-position="left">{{ $t('config.news_block') }}</n-divider>
+        <div style="display: flex; gap: 24px;">
+          <n-form-item :label="$t('config.bearish_block_long')" style="flex: 1;">
+            <n-switch :value="local.block_long_when_bias_bearish"
+              @update:value="(v: boolean) => local.block_long_when_bias_bearish = v" />
+            <template #feedback>{{ $t('config.bearish_block_long_desc') }}</template>
+          </n-form-item>
+          <n-form-item :label="$t('config.bullish_block_short')" style="flex: 1;">
+            <n-switch :value="local.block_short_when_bias_bullish"
+              @update:value="(v: boolean) => local.block_short_when_bias_bullish = v" />
+            <template #feedback>{{ $t('config.bullish_block_short_desc') }}</template>
+          </n-form-item>
+        </div>
 
-        <n-form-item label="看跌禁多">
-          <n-switch :value="local.block_long_when_bias_bearish"
-            @update:value="(v: boolean) => local.block_long_when_bias_bearish = v" />
-          <template #feedback>当 News-Bias 看跌时，阻止所有策略开多 (BUY)</template>
-        </n-form-item>
-
-        <n-form-item label="看涨禁空">
-          <n-switch :value="local.block_short_when_bias_bullish"
-            @update:value="(v: boolean) => local.block_short_when_bias_bullish = v" />
-          <template #feedback>当 News-Bias 看涨时，阻止所有策略开空 (SELL)</template>
-        </n-form-item>
-
-        <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" label="当前 Bias">
+        <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" :label="$t('config.current_bias')">
           <BiasStateIndicator />
         </n-form-item>
 
-        <n-form-item v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" label="DI差值门限">
+        <n-form-item label-placement="left" v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" :label="$t('config.di_gap_threshold')">
           <app-input-number :value="local.news_bias_di_gap"
             @update:value="(v: number) => local.news_bias_di_gap = v"
             :min="0" :max="30" :step="1" style="width: 110px;" />
-          <template #feedback>M30 |+DI - -DI| &lt; 此值时绕过方向阻塞（0=关闭绕过，默认8）</template>
+          <template #feedback>{{ $t('config.di_gap_desc') }}</template>
         </n-form-item>
 
         <n-button type="primary" :disabled="!changed" @click="save" block>
-          保存新闻配置
+          {{ $t('config.save_news') }}
         </n-button>
       </n-space>
     </n-grid-item>
 
     <n-grid-item>
       <n-space vertical size="medium">
-        <n-divider title-position="left">事件筛选</n-divider>
+        <n-divider title-position="left">{{ $t('config.event_filter') }}</n-divider>
 
-        <n-form-item label="影响级别">
+        <n-form-item :label="$t('config.impact_level')">
           <n-select :value="local.news_impact_filter" :options="impactOptions"
             @update:value="(v: string) => local.news_impact_filter = v" />
         </n-form-item>
 
-        <n-form-item label="关注货币">
+        <n-form-item :label="$t('config.currency')">
           <n-input :value="local.news_currency_filter"
             @update:value="(v: string) => local.news_currency_filter = v"
-            style="width:100%;" />
-          <template #feedback>默认 USD，多个用逗号分隔</template>
+            style="width: 60px;" />
+          <template #feedback>{{ $t('config.currency_desc') }}</template>
         </n-form-item>
 
-        <n-divider title-position="left">当前状态</n-divider>
+        <n-divider title-position="left">{{ $t('config.current_status') }}</n-divider>
 
         <n-alert v-if="calendar?.is_blackout" type="warning" :bordered="false">
-          当前处于禁售期: {{ calendar.blackout_reason }}
+          {{ $t('config.blackout_active', { reason: calendar.blackout_reason }) }}
         </n-alert>
         <n-alert v-else type="success" :bordered="false">
-          当前无禁售，正常交易中
+          {{ $t('config.trading_normal') }}
         </n-alert>
 
-        <n-text depth="2" style="font-size: 13px;">本周高影响事件</n-text>
+        <n-text depth="2" style="font-size: 13px;">{{ $t('config.high_impact_events') }}</n-text>
         <n-spin v-if="loading" size="small" />
 
         <n-empty v-else-if="!calendar || !calendar.upcoming_events?.length"
-          description="本周无高影响事件" size="small" />
+          :description="$t('config.no_events')" size="small" />
 
         <div v-else v-for="evt in calendar.upcoming_events.slice(0, 10)" :key="evt.datetime + evt.title"
           style="display: flex; align-items: center; justify-content: space-between;
@@ -201,7 +204,7 @@ const impactOptions = [
         </div>
 
         <n-button @click="refreshCalendar" size="small" secondary>
-          刷新事件列表
+          {{ $t('config.refresh_events') }}
         </n-button>
       </n-space>
     </n-grid-item>

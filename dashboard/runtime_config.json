@@ -281,5 +281,20 @@
   "gold_auto_research": {
     "enabled": true,
     "max_positions": 3
-  }
+  },
+  "lot_size": 0.01,
+  "stop_loss_pips": 50,
+  "take_profit_pips": 100,
+  "slippage": 5,
+  "max_daily_loss_pct": 12,
+  "floating_loss_warn_pct": 5,
+  "floating_loss_block_pct": 10,
+  "per_strategy_realized_loss_pct": 5,
+  "per_strategy_loss_block_hours": 12,
+  "max_rapid_exits": 3,
+  "rapid_exit_window_seconds": 300,
+  "rapid_exit_cooldown_seconds": 7200,
+  "per_strategy_realized_loss_amount": 30,
+  "max_consecutive_losses": 3,
+  "consecutive_loss_cooldown_hours": 4
 }
