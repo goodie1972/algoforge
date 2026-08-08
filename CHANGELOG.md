@@ -3,6 +3,26 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.4.9] - 2026-08-08 — 策略优化 + 周末休市检查 + 策略池清理
+
+### 新增
+- **周末休市检查**：`_is_market_open()` 引擎级阻断，周六全天 + 周日07:00前 + 周六05:00前自动跳过开仓
+- **rsi_grading_m30_upgraded 优化**：恢复ADX>28趋势门禁，新增ADX>25趋势加分（+1）
+
+### 修改
+- **sanqing_h1_upgraded 优化**：评分阈值3→5，ADX阈值20→25，硬止损1.5→1.2ATR
+- **策略池调整**：禁用 `rsi_grading_m30_optimized`（40%胜率-28），启用 `rsi_grading_m30_upgraded`（76%+231）
+- **纸面持仓清零**：清除全部未平仓持仓，余额重置至5000，备份CSV
+
+### 策略池最终状态（7个启用）
+- `gold_auto_research`（核心，100%胜率）
+- `h1_breakout`（核心，趋势突破）
+- `m30_bb_deepreturn_optimized`（核心，93%胜率+380）
+- `mfi_bb_m30_upgraded`（重新评估，+300净利PF=2.21）
+- `rsi_grading_m30_upgraded`（优化版，76%胜率+231）
+- `sanqing_h1`（原版，87.7%胜率+91）
+- `sanqing_h1_upgraded`（优化版，评分门槛提高止损收紧）
+
 ## [2.4.8] - 2026-08-07 — 交易终端指标显示大修
 
 ### 修复

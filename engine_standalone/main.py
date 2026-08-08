@@ -1003,6 +1003,10 @@ class TradingEngine:
                 # 有全局阻断时，跳过本轮开仓
                 return
 
+        # ---- 交易时段检查（周末休市）----
+        if not self._is_market_open():
+            return
+
         # ---- 浮动亏损检查/阻断 ----
         self._check_floating_loss_blocks()
 
@@ -1416,6 +1420,25 @@ class TradingEngine:
             logger.error(f"[安全锁] 暂停开新仓！原因: {reason}")
         except OSError:
             logger.error(f"[安全锁] 写入锁文件失败: {reason}")
+
+    def _is_market_open(self) -> bool:
+        """检查当前是否为交易时段（周末休市）"""
+        from config.settings import LOCAL_TZ
+        from datetime import datetime
+        now = datetime.now(LOCAL_TZ)
+        # 周六整天 (weekday=5) 休市
+        if now.weekday() == 5:
+            logger.info(f"[交易时段] 周六休市，跳过开仓 (UTC+8: {now.strftime('%H:%M')})")
+            return False
+        # 周日 07:00 前休市（黄金 23:00 UTC = 07:00 UTC+8 开盘）
+        if now.weekday() == 6 and now.hour < 7:
+            logger.info(f"[交易时段] 周日未开盘，跳过开仓 (UTC+8: {now.strftime('%H:%M')})")
+            return False
+        # 周六 05:00 后收盘（黄金周五 21:00 UTC = 周六 05:00 UTC+8 收盘）
+        if now.weekday() == 5 and now.hour < 5:
+            logger.info(f"[交易时段] 周六凌晨收市，跳过开仓 (UTC+8: {now.strftime('%H:%M')})")
+            return False
+        return True
 
     def _is_safety_locked(self) -> bool:
         """检查安全锁文件是否存在，90 分钟自动过期"""
