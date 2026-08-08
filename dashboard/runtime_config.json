@@ -40,10 +40,10 @@
       "double_first": false
     },
     "bakome_backup_optimized": {
-      "enabled": true,
+      "enabled": false,
       "magic": 777006,
       "timeframe": "H1",
-      "max_positions": 1,
+      "max_positions": 0,
       "double_first": false
     },
     "bakome_gold_scalper_original": {
@@ -82,10 +82,10 @@
       "double_first": false
     },
     "m30_bb_deepreturn": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661101,
       "timeframe": "M30",
-      "max_positions": 5,
+      "max_positions": 0,
       "double_first": false
     },
     "m30_bb_deepreturn_optimized": {
@@ -96,24 +96,24 @@
       "double_first": false
     },
     "mfi_bb_m30": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661001,
       "timeframe": "M30",
-      "max_positions": 5,
+      "max_positions": 0,
       "double_first": false
     },
     "mfi_bb_m30_optimized": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661002,
       "timeframe": "M30",
-      "max_positions": 5,
+      "max_positions": 0,
       "double_first": false
     },
     "mfi_bb_m30_upgraded": {
-      "enabled": false,
+      "enabled": true,
       "magic": 661003,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "M30_rsi_bb": {
@@ -131,10 +131,10 @@
       "double_first": false
     },
     "momentum_pulse_pro": {
-      "enabled": true,
+      "enabled": false,
       "magic": 661301,
       "timeframe": "M30",
-      "max_positions": 5,
+      "max_positions": 0,
       "double_first": false
     },
     "multi_confluence_quant": {
@@ -145,31 +145,31 @@
       "double_first": false
     },
     "rsi_grading_m30": {
-      "enabled": true,
+      "enabled": false,
       "magic": 660902,
       "timeframe": "M30",
-      "max_positions": 5,
+      "max_positions": 0,
       "double_first": false
     },
     "rsi_grading_m30_optimized": {
       "enabled": false,
       "magic": 660903,
       "timeframe": "M30",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "rsi_grading_m30_upgraded": {
       "enabled": true,
       "magic": 660904,
       "timeframe": "M30",
-      "max_positions": 5,
+      "max_positions": 1,
       "double_first": false
     },
     "sanqing_h1": {
-      "enabled": false,
+      "enabled": true,
       "magic": 880107,
       "timeframe": "H1",
-      "max_positions": 0,
+      "max_positions": 1,
       "double_first": false
     },
     "sanqing_h1_original": {

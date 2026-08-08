@@ -20,6 +20,8 @@ STRATEGY_VERSION = "v5_upgraded"
 STRATEGY_MAGIC = 660904
 STRATEGY_LEGACY_MAGICS: list[int] = [660902, 660903]
 STRATEGY_CHANGELOG = [
+    {"version": "v6_optimized", "magic": 660904, "date": "2026-08-08",
+     "desc": "优化版: 恢复ADX>28趋势方向门禁(禁反手), 新增ADX>25趋势加分(+1)"},
     {"version": "v5_upgraded", "magic": 660904, "date": "2026-07-18",
      "desc": "升级版: RSI<20/+2, 20~35/+1, 35~65/0, 65~80/+1, >80/+2; 固定阈值3分"},
 ]
@@ -205,9 +207,20 @@ class RSIGradingM30Upgraded(BaseStrategy):
                 long_factors.append("BBW-MFI-DN↓")
                 logger.info(f"[{self.name}] BB扩张+价格<中轴+MFI下降，禁做多")
 
-        # ADX>28 趋势门禁 — 纸笔测试期间临时注释(2026-07-21)
-        # 恢复后 gate_side 决定 can_long/can_short 方向拦截
-        gate_side = None
+        # ADX>28 趋势门禁 — 方向性拦截: 趋势方向禁反手
+        if adx is not None and adx > 28:
+            gate_side = 'short' if ma14_trend == 'UP' else 'long'
+        else:
+            gate_side = None
+
+        # 趋势跟随加分（ADX>25 时给顺势方向+1，抓暴涨暴跌行情）
+        if adx is not None and adx > 25:
+            if ma14_trend == 'UP':
+                long_score += 1
+                long_factors.append("TREND-BOOST")
+            elif ma14_trend == 'DOWN':
+                short_score += 1
+                short_factors.append("TREND-BOOST")
 
         # ── Decision ──
         signal = None

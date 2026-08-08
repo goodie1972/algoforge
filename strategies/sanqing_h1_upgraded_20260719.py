@@ -20,8 +20,8 @@ STRATEGY_VERSION = "v9_upgraded"
 STRATEGY_MAGIC = 880108
 STRATEGY_LEGACY_MAGICS: list[int] = [880102, 880103, 880104, 880105, 880106]
 STRATEGY_CHANGELOG = [
-    {"version": "v8_upgraded", "magic": 880108, "date": "2026-07-19",
-     "desc": "升级版: 运动员等回抽EMA9入场; 1.5ATR止损3.0ATR止盈; DI保护利润回撤; DI反转出场"},
+    {"version": "v10_optimized", "magic": 880108, "date": "2026-08-08",
+     "desc": "优化版: 评分阈值3→5, ADX阈值20→25, 硬止损1.5→1.2ATR"},
     {"version": "v9_upgraded", "magic": 880108, "date": "2026-07-21",
      "desc": "ADX自适应出场: 强趋势放宽追踪/止盈让利润跑, 震荡收紧, 新增追踪止损"},
 ]
@@ -39,8 +39,8 @@ class SanQingH1Upgraded(BaseStrategy):
         self._last_exit_detail: Optional[dict] = None
 
         # 评分阈值
-        self.score_threshold = 3
-        self.adx_threshold = 20          # ADX>20 趋势中阈值升到 4
+        self.score_threshold = 5
+        self.adx_threshold = 25          # ADX>25 趋势中阈值升到 4
 
         # Exit params
         # profit_drawdown_pct 继承自 BaseStrategy（默认 0.25）
@@ -53,7 +53,7 @@ class SanQingH1Upgraded(BaseStrategy):
         self.p_profit_chop = 2.5        # 震荡: 小目标落袋
         self.p_profit_normal = 4.0      # 中等: 正常止盈
         self.p_profit_trend = 6.0       # 强趋势: 大目标让利润跑
-        self.p_hard_atr = 1.5           # 硬止损: 固定 1.5 ATR，不随 ADX 变化（最后防线）
+        self.p_hard_atr = 1.2           # 硬止损: 固定 1.2 ATR（最后防线）
 
         # EMA 交叉检测：记录上一次的值（来自 DataFactory）
         self._prev_ema9: float = 0.0
