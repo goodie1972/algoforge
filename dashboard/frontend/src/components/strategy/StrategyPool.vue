@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { getStrategyColor } from '@/utils/strategyColors'
+import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -181,8 +181,7 @@ async function save() {
             <n-switch :value="pool[meta.id]?.enabled"
               @update:value="toggleStrategy(meta.id)" size="small" />
             <n-text strong style="font-size: 14px;">{{ meta.display }}</n-text>
-            <n-tag size="tiny" :bordered="false"
-              :color="{ color: getColor(meta.name) }" text-color="#fff">
+            <n-tag :color="{ color: getColor(meta.name), textColor: getStrategyTextColor(meta.name) }" size="tiny" style="font-weight: 600; font-size: 14px; padding: 2px 7px;">
               {{ meta.name }}
             </n-tag>
             <n-tag v-if="meta.backup_file" size="tiny" :bordered="false" type="info">
