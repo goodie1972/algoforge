@@ -1469,6 +1469,15 @@ class TradingEngine:
             if len(_my_positions) >= _paper_max:
                 return
 
+        # ── 真实模式全局总持仓上限检查 ──
+        if not _paper_enabled:
+            _global_max = self._rt('max_positions')
+            if _global_max and _global_max > 0:
+                _all_positions = self.bridge.get_positions(settings.SYMBOL)
+                if len(_all_positions) >= _global_max:
+                    logger.debug(f"[{strategy.name}] 全局总持仓 {len(_all_positions)} ≥ {_global_max}，跳过开仓")
+                    return
+
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
         try:
             adx_data = strategy.get_adx_data()
