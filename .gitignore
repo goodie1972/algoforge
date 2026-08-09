@@ -12,6 +12,7 @@ dist/
 .engine_pid
 .playwright-mcp/
 runtime_config.json
+data/llm_providers.json
 
 # 临时工具/扫描脚本
 add_i18n_keys.py
