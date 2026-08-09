@@ -41,14 +41,16 @@ async def get_gold_news(limit: int = 20):
         summary = db.get_gold_news_summary()
         news = db.get_gold_news(limit=limit)
         bias = NewsFilter().get_current_bias()
+        eval_stats = db.get_gold_news_evaluation_stats()
         return {
             "summary": summary,
             "current_bias": bias,
+            "evaluation": eval_stats,
             "news": news,
         }
     except Exception as e:
         logger.error(f"[黄金快讯API] 错误: {e}")
-        return {"summary": {}, "current_bias": None, "news": []}
+        return {"summary": {}, "current_bias": None, "evaluation": {}, "news": []}
 
 
 @router.post("/refresh")

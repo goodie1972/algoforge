@@ -176,7 +176,15 @@ CREATE TABLE IF NOT EXISTS gold_news (
     direction_reason TEXT DEFAULT '',
     direction_confidence TEXT DEFAULT 'low',
     news_time TEXT DEFAULT '',
-    fetched_at REAL NOT NULL
+    fetched_at REAL NOT NULL,
+    label TEXT DEFAULT '',
+    pre_price REAL DEFAULT 0,
+    post_price_15m REAL DEFAULT 0,
+    post_price_1h REAL DEFAULT 0,
+    actual_move_15m REAL DEFAULT 0,
+    actual_move_1h REAL DEFAULT 0,
+    direction_match INTEGER DEFAULT NULL,
+    evaluated_at REAL DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gold_news_time ON gold_news(fetched_at);
 CREATE INDEX IF NOT EXISTS idx_gold_news_direction ON gold_news(direction);
@@ -1055,6 +1063,35 @@ def get_gold_news_summary() -> dict:
             "bearish": bearish,
             "neutral": total - bullish - bearish,
             "last_fetch": last_fetch,
+        }
+    finally:
+        conn.close()
+
+
+def get_gold_news_evaluation_stats() -> dict:
+    """获取黄金快讯判断的准确性统计"""
+    conn = get_conn()
+    try:
+        evaluated = conn.execute(
+            "SELECT COUNT(*) FROM gold_news WHERE direction_match IS NOT NULL"
+        ).fetchone()[0]
+        correct = conn.execute(
+            "SELECT COUNT(*) FROM gold_news WHERE direction_match = 1"
+        ).fetchone()[0]
+        wrong = conn.execute(
+            "SELECT COUNT(*) FROM gold_news WHERE direction_match = 0"
+        ).fetchone()[0]
+        pending = conn.execute(
+            "SELECT COUNT(*) FROM gold_news WHERE direction_match IS NULL "
+            "AND direction != 'neutral'"
+        ).fetchone()[0]
+        accuracy = round(correct / evaluated * 100, 1) if evaluated else 0
+        return {
+            "evaluated": evaluated,
+            "correct": correct,
+            "wrong": wrong,
+            "pending": pending,
+            "accuracy": accuracy,
         }
     finally:
         conn.close()

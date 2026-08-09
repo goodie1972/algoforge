@@ -308,7 +308,111 @@ def fetch_and_judge(llm_manager=None) -> list[dict]:
             item["direction_confidence"] = "low"
 
     save_huicong_news(gold_news)
+    # 评估上次的新闻判断准确性
+    try:
+        evaluate_past_gold_news()
+    except Exception as e:
+        logger.warning(f"[黄金快讯] 评估异常: {e}")
     return gold_news
+
+
+def _get_price_at(target_ts: float) -> float:
+    """获取 M5 K 线中离目标时间最近的收盘价，误差 5 分钟内"""
+    try:
+        from data import database as db
+        recent_ts = target_ts - 30 * 86400
+        candles = db.get_candles("M5", start_ts=int(recent_ts), limit=8000)
+        if not candles:
+            return 0
+        best = 0
+        best_diff = float("inf")
+        for c in candles:
+            c_ts = c.get("time", 0)
+            diff = abs(c_ts - target_ts)
+            if diff < best_diff and diff < 300:
+                best = c.get("close", c.get("close_price", 0))
+                best_diff = diff
+        return best or 0
+    except Exception:
+        return 0
+
+
+def evaluate_past_gold_news():
+    """
+    评估过去未评估的黄金快讯判断准确性。
+    找 gold_news 表中 evaluated_at IS NULL 且距今超过 1 小时的记录，
+    对比方向判断 vs 实际价格走势。
+    """
+    from data import database as db
+    conn = db.get_conn()
+    try:
+        # 找未评估且距今超过 1 小时的记录
+        cutoff = time.time() - 3600
+        rows = conn.execute(
+            "SELECT id, content, direction, fetched_at FROM gold_news "
+            "WHERE evaluated_at IS NULL AND fetched_at < ? "
+            "ORDER BY fetched_at ASC LIMIT 20",
+            (cutoff,),
+        ).fetchall()
+
+        if not rows:
+            return
+
+        evaluated = 0
+        for row in rows:
+            row = dict(row)
+            gid = row["id"]
+            direction = row["direction"]
+            fetched_at = row["fetched_at"]
+
+            if direction == "neutral":
+                # 中性判断不评估
+                conn.execute("UPDATE gold_news SET evaluated_at=? WHERE id=?", (time.time(), gid))
+                continue
+
+            # 获取价格: 判断前 15 分钟、后 15 分钟、后 1 小时
+            pre_ts = fetched_at - 900
+            post_15m_ts = fetched_at + 900
+            post_1h_ts = fetched_at + 3600
+
+            pre_price = _get_price_at(pre_ts)
+            post_15m_price = _get_price_at(post_15m_ts)
+            post_1h_price = _get_price_at(post_1h_ts)
+
+            move_15m = round(post_15m_price - pre_price, 2) if post_15m_price and pre_price else 0
+            move_1h = round(post_1h_price - pre_price, 2) if post_1h_price and pre_price else 0
+
+            # 判断方向是否匹配
+            direction_match = None
+            if direction in ("bullish", "bearish") and move_15m != 0:
+                if (direction == "bullish" and move_15m > 0) or (direction == "bearish" and move_15m < 0):
+                    direction_match = 1  # correct
+                else:
+                    direction_match = 0  # wrong
+
+            conn.execute(
+                """UPDATE gold_news SET
+                   pre_price=?, post_price_15m=?, post_price_1h=?,
+                   actual_move_15m=?, actual_move_1h=?,
+                   direction_match=?, evaluated_at=?
+                   WHERE id=?""",
+                (pre_price, post_15m_price, post_1h_price,
+                 move_15m, move_1h,
+                 direction_match, time.time(), gid),
+            )
+            evaluated += 1
+            logger.info(
+                f"[黄金评估] id={gid} {direction} 实动={move_15m:+.2f} "
+                f"{'✅正确' if direction_match==1 else '❌错误' if direction_match==0 else 'N/A'}"
+            )
+
+        conn.commit()
+        if evaluated:
+            logger.info(f"[黄金评估] 本次评估 {evaluated} 条")
+    except Exception as e:
+        logger.warning(f"[黄金评估] 异常: {e}")
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
