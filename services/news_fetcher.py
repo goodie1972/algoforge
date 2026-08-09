@@ -163,13 +163,19 @@ def classify_direction(title: str, summary: str = "") -> str:
     ]
 
     # 先检查是否有"地缘紧张+避险"这种需要特殊处理的
-    # 地缘紧张 → 避险情绪↑ → 资金流入黄金 → 金价↑（传统避险逻辑）
+    # 地缘风险 → 避险升温 → 黄金↑（需排除"停火/和谈/缓和"）
     geopolitical_tension_kw = ["war", "sanction", "conflict", "tension",
-                                "strike", "attack", "missile"]
+                                "strike", "attack", "missile", "hostility",
+                                "escalate", "invasion"]
+    geopolitical_deescalate_kw = ["ceasefire", "truce", "peace", "de-escalat",
+                                   "agreement", "negotiation", "withdraw",
+                                   "停火", "和平协议", "缓和", "谈判", "撤军"]
+    for kw in geopolitical_deescalate_kw:
+        if kw in text:
+            return "bearish"  # 地缘缓和 → 避险消退 → 黄金↓
     for kw in geopolitical_tension_kw:
         if kw in text:
-            # 地缘紧张 → 避险升温 → 黄金作为避险资产受追捧 → 金价↑
-            return "bullish"
+            return "bullish"  # 地缘紧张 → 避险升温 → 黄金↑
 
     for patterns, direction in bullish_patterns:
         for p in patterns:

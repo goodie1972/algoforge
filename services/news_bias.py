@@ -18,132 +18,160 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 
-from config import settings
+from config.settings import LOCAL_TZ
 from services.news_filter import NewsFilter
 
 logger = logging.getLogger(__name__)
 
-# 事件分类规则
-# (关键词列表, 预期方向, 置信度)
-# 方向: 'bullish'=利多黄金(USD利空), 'bearish'=利空黄金(USD利多)
-BULLISH_PATTERNS = [
-    # 通胀降温 → 利空USD → 利多黄金
-    (["CPI", "Consumer Price"], "通胀低于预期时利多黄金"),
-    (["PPI", "Producer Price"], "生产者价格降温利多黄金"),
-    (["Core Inflation"], "核心通胀低于预期利多黄金"),
-    # 就业疲软 → 利空USD → 利多黄金
-    (["Non-Farm", "Non Farm", "NFP", "Payrolls"], "就业低于预期利多黄金"),
-    (["Unemployment", "Jobless"], "失业率上升利多黄金"),
-    # 经济放缓 → 利空USD → 利多黄金
-    (["GDP"], "GDP低于预期利多黄金"),
-    (["Retail Sales"], "零售低于预期利多黄金"),
-    (["Industrial Production", "Manufacturing"], "工业产出低于预期利多黄金"),
-    (["Consumer Confidence", "Consumer Sentiment", "UoM"], "消费者信心低于预期利多黄金"),
-    (["Housing Starts", "Building Permits"], "房市数据低于预期利多黄金"),
-    (["Durable Goods"], "耐用品订单低于预期利多黄金"),
-    (["Trade Balance"], "贸易逆差扩大利多黄金"),
-    (["Philadelphia Fed", "Empire State"], "制造业指数低于预期利多黄金"),
-    # 鸽派信号 → 利空USD → 利多黄金
-    (["FOMC", "Federal Reserve"], "FOMC决议方向需看具体内容"),
-    (["Fed Chair", "Powell", "Bernanke", "Yellen"], "联储讲话鸽派利多黄金"),
+# ═══════════════════════════════════════════════════════════════
+# 事件分类规则 V2 — 预期差逻辑
+# ═══════════════════════════════════════════════════════════════
+# 核心原则：
+#  1. 经济数据类事件（NFP/CPI/GDP/Retail Sales 等）的方向取决于
+#     「实际值 vs 预期值」的偏差，不硬编码方向。
+#  2. 有 actual/forecast 时 → 用预期差判断
+#  3. 无 actual 时 → 返回 neutral（不赌方向）
+#  4. 只有纯方向事件（地缘、灾害等）用关键词表
+# ═══════════════════════════════════════════════════════════════
+
+# 依赖实际数据的「经济数据类」事件关键词
+# 当 actual 不可用时，返回 neutral 而非硬编码
+ECONOMIC_DATA_KW = [
+    "cpi", "consumer price", "producer price", "ppi",
+    "nfp", "non-farm", "non farm", "payrolls",
+    "gdp", "retail sales", "industrial production",
+    "consumer confidence", "consumer sentiment",
+    "unemployment", "jobless claims", "jobless",
+    "housing starts", "building permits", "durable goods",
+    "trade balance", "philadelphia fed", "empire state",
+    "ism", "inflation", "core inflation",
+    "uom", "michigan",
 ]
 
-BEARISH_PATTERNS = [
-    # 通胀升温 → 利空黄金
-    (["CPI", "Consumer Price", "Inflation"], "通胀高于预期利空黄金"),
-    (["PPI", "Producer Price"], "生产者价格升温利空黄金"),
-    # 就业强劲 → 利空黄金
-    (["Non-Farm", "Non Farm", "NFP", "Payrolls"], "就业高于预期利空黄金"),
-    (["Unemployment", "Jobless"], "失业率下降利空黄金"),
-    # 经济过热 → 利空黄金
-    (["GDP"], "GDP高于预期利空黄金"),
-    (["Retail Sales"], "零售高于预期利空黄金"),
-    (["ISM"], "ISM高于预期利空黄金"),
-    (["Industrial Production"], "工业产出高于预期利空黄金"),
-    (["Consumer Confidence", "Consumer Sentiment"], "消费者信心高于预期利空黄金"),
-    # 鹰派信号 → 利空黄金
-    (["FOMC", "Federal Reserve"], "FOMC决议方向需看具体内容"),
-    (["Fed Chair", "Powell"], "联储讲话鹰派利空黄金"),
+# 纯方向事件（不依赖实际数据，地缘/政策/央行动作等）
+# 格式: (关键词列表, 方向, 原因说明)
+DIRECTIONAL_PATTERNS = [
+    # 地缘紧张 → 避险 → 黄金↑
+    (["war", "sanction", "conflict", "missile", "attack", "invasion",
+      "military strike", "hostility", "nuclear test", "terror"], "bullish", "地缘紧张→避险→黄金↑"),
+    # 地缘缓和 → 避险消退 → 黄金↓
+    (["ceasefire", "truce", "peace agreement", "de-escalat", "withdraw",
+      "negotiation", "diplomatic solution"], "bearish", "地缘缓和→避险消退→黄金↓"),
+    # 央行加息 → 利空黄金
+    (["rate hike", "tightening", "raise rate", "lift-off"], "bearish", "加息→利空黄金"),
+    # 央行降息 → 利多黄金
+    (["rate cut", "cut rate", "easing", "lower rate", "stimulus"], "bullish", "降息→利多黄金"),
+    # 鸽派言论 → 利空USD → 利多黄金
+    (["dovish", "accommodative", "patient", "wait-and-see"], "bullish", "鸽派言论→利多黄金"),
+    # 鹰派言论 → 利空黄金
+    (["hawkish", "tighten", "taper", "overheating"], "bearish", "鹰派言论→利空黄金"),
+    # 自然灾害/突发事件 → 避险
+    (["earthquake", "tsunami", "hurricane", "natural disaster", "pandemic"], "bullish", "突发事件→避险→黄金↑"),
+    # 美元走强 → 利空黄金
+    (["dollar strength", "usd strength", "strong dollar", "dollar rally"], "bearish", "美元走强→利空黄金"),
+    # 美元走弱 → 利多黄金
+    (["dollar weakness", "usd weakness", "weak dollar", "dollar sell-off"], "bullish", "美元走弱→利多黄金"),
+    # 美债收益率上升 → 利空黄金
+    (["yield rise", "bond sell-off", "rate increase", "yield spike"], "bearish", "收益率上升→利空黄金"),
+    # 美债收益率下降 → 利多黄金
+    (["yield fall", "bond rally", "rate decline", "yield drop"], "bullish", "收益率下降→利多黄金"),
+    # 央行购金 → 利多黄金
+    (["central bank gold purchase", "gold reserve increase", "gold buying"], "bullish", "央行购金→利多黄金"),
+    # ETF 资金流入 → 利多黄金
+    (["gold etf inflow", "gold fund inflow", "gold holding increase"], "bullish", "ETF流入→利多黄金"),
+    # ETF 资金流出 → 利空黄金
+    (["gold etf outflow", "gold fund outflow", "gold holding decrease"], "bearish", "ETF流出→利空黄金"),
+    # 风险偏好上升 → 利空黄金
+    (["risk-on", "risk appetite", "stock rally", "equity surge"], "bearish", "风险偏好→利空黄金"),
+    # 风险偏好下降 → 利多黄金
+    (["risk-off", "risk aversion", "fear", "uncertainty", "volatility spike"], "bullish", "避险情绪→利多黄金"),
 ]
 
-# 关键词 → 置信度映射
-CONFIDENCE_MAP = {
-    "bullish_high": ["CPI", "NFP", "Non-Farm", "Non Farm", "Payrolls", "FOMC", "Fed", "GDP"],
-    "bullish_medium": ["Retail Sales", "ISM", "Consumer", "Unemployment", "PPI", "Inflation"],
-    "bullish_low": ["Housing", "Durable", "Trade Balance", "Industrial", "Manufacturing"],
-    "bearish_high": ["CPI", "NFP", "Non-Farm", "Non Farm", "Payrolls", "FOMC", "Fed", "GDP"],
-    "bearish_medium": ["Retail Sales", "ISM", "Consumer", "Unemployment", "PPI", "Inflation"],
-    "bearish_low": ["Housing", "Durable", "Trade Balance", "Industrial", "Manufacturing"],
-}
+# 高置信度事件关键词
+HIGH_CONFIDENCE_KW = [
+    "war", "sanction", "ceasefire", "rate hike", "rate cut",
+    "dovish", "hawkish", "nuclear", "missile", "invasion",
+    "earthquake", "pandemic", "fomc decision", "fed decision",
+]
 
 
 def classify_event(title: str, actual: Optional[str] = None, forecast: Optional[str] = None) -> tuple[str, str, str]:
     """
-    根据事件标题分类。
-    可传入 actual 和 forecast 值进行数据对比判断（经济数据类事件）。
-    返回 (expected_bias, reason, confidence)
+    根据事件标题 + 实际/预期值 分类方向。
+    返回 (bias, reason, confidence)
     bias: 'bullish' / 'bearish' / 'neutral'
+
+    逻辑层级：
+      1. 会议/新闻发布会 → neutral（需看内容）
+      2. 经济数据类事件（ECONOMIC_DATA_KW）→ 有 actual/forecast 用预期差，无则 neutral
+      3. 纯方向事件（DIRECTIONAL_PATTERNS）→ 关键词匹配
     """
     if not title:
         return "neutral", "无标题", "low"
 
     title_lower = title.lower()
 
-    # 先检查是否是会议/新闻发布会（无预设方向）
-    neutral_keywords = ["press conference", "meeting", "minutes", " testimony "]
+    # 1. 会议/新闻发布会 → 无预设方向
+    neutral_keywords = ["press conference", "minutes", " testimony "]
     for kw in neutral_keywords:
         if kw in title_lower:
             return "neutral", f"事件类型({title})需实际内容判断", "low"
 
-    # ── actual vs forecast 数据对比判断（经济数据类事件） ──
-    if actual is not None and forecast is not None and actual != "" and forecast != "":
-        economic_keywords = [
-            "cpi", "consumer price", "nfp", "non-farm", "non farm",
-            "payrolls", "ppi", "producer price", "gdp", "retail sales",
-        ]
-        for ekw in economic_keywords:
-            if ekw in title_lower:
-                try:
-                    actual_val = float(actual.replace("%", "").strip())
-                    forecast_val = float(forecast.replace("%", "").strip())
+    # 2. 经济数据类事件（方向依赖 actual vs forecast）
+    is_economic = any(kw in title_lower for kw in ECONOMIC_DATA_KW)
+
+    if is_economic:
+        # 有 actual/forecast → 用预期差判断
+        if actual is not None and forecast is not None and actual != "" and forecast != "":
+            try:
+                # 清理数值（去除 % $ T B M 等符号）
+                actual_clean = re.sub(r'[^\d.\-]', '', actual).strip()
+                forecast_clean = re.sub(r'[^\d.\-]', '', forecast).strip()
+                if actual_clean and forecast_clean:
+                    actual_val = float(actual_clean)
+                    forecast_val = float(forecast_clean)
+
+                    # 失业率/初请: 上升→利多黄金，下降→利空黄金
+                    is_unemployment = any(kw in title_lower for kw in ["unemployment", "jobless rate", "jobless claims"])
+                    if is_unemployment:
+                        if actual_val < forecast_val:
+                            return "bearish", f"失业率实际({actual}) < 预期({forecast}) → 就业改善→强美元→利空黄金", "high"
+                        elif actual_val > forecast_val:
+                            return "bullish", f"失业率实际({actual}) > 预期({forecast}) → 就业恶化→弱美元→利多黄金", "high"
+                        else:
+                            return "neutral", f"失业率实际({actual}) = 预期({forecast}) → 影响有限", "medium"
+
+                    # 消费者信心/情绪: 上升→risk-on→利空黄金
+                    is_confidence = any(kw in title_lower for kw in ["consumer confidence", "consumer sentiment", "uom"])
+                    if is_confidence:
+                        if actual_val > forecast_val:
+                            return "bearish", f"信心实际({actual}) > 预期({forecast}) → 乐观→risk-on→利空黄金", "high"
+                        elif actual_val < forecast_val:
+                            return "bullish", f"信心实际({actual}) < 预期({forecast}) → 悲观→避险→利多黄金", "high"
+                        else:
+                            return "neutral", f"信心实际({actual}) = 预期({forecast}) → 影响有限", "medium"
+
+                    # 核心逻辑：实际 > 预期 → 经济强劲/通胀高 → 强美元 → 利空黄金
+                    # 实际 < 预期 → 经济疲软/通胀低 → 弱美元 → 利多黄金
                     if actual_val < forecast_val:
-                        # 不及预期 → 弱美元 → 利多黄金
-                        return "bullish", f"实际({actual}) < 预期({forecast}) → 利多黄金({title})", "high"
+                        return "bullish", f"实际({actual}) < 预期({forecast}) → 不及预期→弱美元→利多黄金", "high"
                     elif actual_val > forecast_val:
-                        # 超预期 → 强美元 → 利空黄金
-                        return "bearish", f"实际({actual}) > 预期({forecast}) → 利空黄金({title})", "high"
+                        return "bearish", f"实际({actual}) > 预期({forecast}) → 超预期→强美元→利空黄金", "high"
                     else:
-                        # 持平 → 中性
-                        return "neutral", f"实际({actual}) = 预期({forecast}) → 影响有限({title})", "medium"
-                except (ValueError, TypeError):
-                    # 数值转换失败，退回到关键词匹配
-                    pass
-                break
+                        return "neutral", f"实际({actual}) = 预期({forecast}) → 影响有限", "medium"
+            except (ValueError, TypeError) as e:
+                logger.debug(f"数值转换失败: {title} actual={actual} forecast={forecast} error={e}")
+                pass
 
-    # 检查利空黄金模式
-    for keywords, reason in BEARISH_PATTERNS:
-        for kw in keywords:
-            if kw.lower() in title_lower:
-                # 确定置信度
-                confidence = "medium"
-                for level_kws in [CONFIDENCE_MAP["bearish_high"], CONFIDENCE_MAP["bearish_medium"]]:
-                    for lkw in level_kws:
-                        if lkw.lower() in title_lower:
-                            confidence = "high" if lkw in CONFIDENCE_MAP["bearish_high"] else "medium"
-                            break
-                return "bearish", f"{reason}({title})", confidence
+        # 无 actual/forecast → 返回 neutral，不赌方向
+        return "neutral", f"经济数据({title})需实际值判断", "low"
 
-    # 检查利多黄金模式
-    for keywords, reason in BULLISH_PATTERNS:
+    # 3. 纯方向事件关键词匹配
+    for keywords, direction, reason in DIRECTIONAL_PATTERNS:
         for kw in keywords:
-            if kw.lower() in title_lower:
-                confidence = "medium"
-                for level_kws in [CONFIDENCE_MAP["bullish_high"], CONFIDENCE_MAP["bullish_medium"]]:
-                    for lkw in level_kws:
-                        if lkw.lower() in title_lower:
-                            confidence = "high" if lkw in CONFIDENCE_MAP["bullish_high"] else "medium"
-                            break
-                return "bullish", f"{reason}({title})", confidence
+            if kw in title_lower:
+                confidence = "high" if any(hkw in title_lower for hkw in HIGH_CONFIDENCE_KW) else "medium"
+                return direction, f"{reason}({title})", confidence
 
     return "neutral", f"无法分类({title})", "low"
 
@@ -166,16 +194,16 @@ class NewsBiasEvaluator:
         from data import database as db
         db.init_db()
 
-        # 获取新闻日历中的事件
-        events = self._news_filter.get_upcoming_events(limit=50)
+        # 获取新闻日历中的事件（含 actual/forecast，包含过去事件）
+        events = self._news_filter.get_upcoming_events(limit=50, include_past=True)
 
         # 筛选过去 N 小时内的事件
-        now = datetime.now()
+        now = datetime.now(tz=LOCAL_TZ)
         cutoff = now - timedelta(hours=hours)
         past_events = []
         for evt in events:
             try:
-                evt_dt = datetime.strptime(evt["datetime"], "%Y-%m-%d %H:%M")
+                evt_dt = datetime.strptime(evt["datetime"], "%Y-%m-%d %H:%M").replace(tzinfo=LOCAL_TZ)
                 if cutoff <= evt_dt <= now:
                     past_events.append(evt)
             except (ValueError, KeyError):
@@ -193,12 +221,16 @@ class NewsBiasEvaluator:
             if evt["title"] in existing_titles:
                 continue
 
-            # 分类事件
-            bias, reason, confidence = classify_event(evt["title"])
+            # 分类事件（传入 actual/forecast）
+            bias, reason, confidence = classify_event(
+                evt["title"],
+                actual=evt.get("actual") or None,
+                forecast=evt.get("forecast") or None,
+            )
 
             # 获取事件前后的价格
             try:
-                evt_dt = datetime.strptime(evt["datetime"], "%Y-%m-%d %H:%M")
+                evt_dt = datetime.strptime(evt["datetime"], "%Y-%m-%d %H:%M").replace(tzinfo=LOCAL_TZ)
                 pre_price, post_15m, post_1h = self._get_prices_around(evt_dt)
                 move_15m = round(post_15m - pre_price, 2) if post_15m and pre_price else 0
                 move_1h = round(post_1h - pre_price, 2) if post_1h and pre_price else 0

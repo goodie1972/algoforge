@@ -77,14 +77,25 @@ class NewsFilter:
                        f"下次拉取: {datetime.fromtimestamp(self._next_fetch, tz=settings.LOCAL_TZ).strftime('%m-%d %H:%M')}")
 
     def _read_config(self):
-        """读取最新配置"""
-        return {
-            "enabled": getattr(settings, "NEWS_FILTER_ENABLED", True),
-            "before_min": int(getattr(settings, "NEWS_BEFORE_MINUTES", 30)),
-            "after_min": int(getattr(settings, "NEWS_AFTER_MINUTES", 120)),
-            "impact": getattr(settings, "NEWS_IMPACT_FILTER", "High"),
-            "currency": getattr(settings, "NEWS_CURRENCY_FILTER", "USD"),
-        }
+        """读取最新配置（RuntimeConfig 优先，回退 settings.py）"""
+        try:
+            from core.runtime_config import RuntimeConfig
+            rc = RuntimeConfig()
+            return {
+                "enabled": rc.get("news_filter_enabled", getattr(settings, "NEWS_FILTER_ENABLED", True)),
+                "before_min": int(rc.get("news_before_minutes", getattr(settings, "NEWS_BEFORE_MINUTES", 30))),
+                "after_min": int(rc.get("news_after_minutes", getattr(settings, "NEWS_AFTER_MINUTES", 120))),
+                "impact": rc.get("news_impact_filter", getattr(settings, "NEWS_IMPACT_FILTER", "High")),
+                "currency": rc.get("news_currency_filter", getattr(settings, "NEWS_CURRENCY_FILTER", "USD")),
+            }
+        except Exception:
+            return {
+                "enabled": getattr(settings, "NEWS_FILTER_ENABLED", True),
+                "before_min": int(getattr(settings, "NEWS_BEFORE_MINUTES", 30)),
+                "after_min": int(getattr(settings, "NEWS_AFTER_MINUTES", 120)),
+                "impact": getattr(settings, "NEWS_IMPACT_FILTER", "High"),
+                "currency": getattr(settings, "NEWS_CURRENCY_FILTER", "USD"),
+            }
 
     # ── DB 持久化 ──────────────────────────────────────────
 
@@ -365,7 +376,11 @@ class NewsFilter:
                 if evt_dt > cutoff:
                     continue
                 
-                bias, reason, conf = classify_event(evt["title"])
+                bias, reason, conf = classify_event(
+                    evt["title"],
+                    actual=evt.get("actual") or None,
+                    forecast=evt.get("forecast") or None,
+                )
                 weight = {"high": 3, "medium": 2, "low": 1}.get(conf, 1)
                 
                 if bias == "bullish":
@@ -407,8 +422,9 @@ class NewsFilter:
         offset_hours = round(offset.total_seconds() / 3600)
         return dt + timedelta(hours=offset_hours)
 
-    def get_upcoming_events(self, limit: int = 10) -> list[dict]:
-        """获取即将到来的高影响事件（供前端展示）"""
+    def get_upcoming_events(self, limit: int = 10, include_past: bool = False) -> list[dict]:
+        """获取即将到来的高影响事件（供前端展示）。
+        include_past=True 时同时返回过去事件（供偏斜评估）。"""
         cfg = self._read_config()
         if not self._cache:
             return []
@@ -437,8 +453,12 @@ class NewsFilter:
                 "datetime_utc": evt_dt.strftime("%Y-%m-%d %H:%M"),
                 "forecast": evt.get("forecast", ""),
                 "previous": evt.get("previous", ""),
+                "actual": evt.get("actual", ""),
             })
 
+        if include_past:
+            result.sort(key=lambda x: x["datetime"])
+            return result[:limit]
         result.sort(key=lambda x: x["datetime"])
         future = [r for r in result if r["datetime"] >= now.strftime("%Y-%m-%d %H:%M")]
         return future[:limit]

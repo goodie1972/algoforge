@@ -160,6 +160,7 @@ CREATE TABLE IF NOT EXISTS news_calendar (
     impact TEXT DEFAULT '',
     forecast TEXT DEFAULT '',
     previous TEXT DEFAULT '',
+    actual TEXT DEFAULT '',
     fetched_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_news_country ON news_calendar(country);
@@ -939,14 +940,15 @@ def insert_news_events(events: list[dict], fetched_at: float) -> int:
         for evt in events:
             conn.execute(
                 """INSERT INTO news_calendar
-                   (date, time, title, country, impact, forecast, previous, fetched_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (date, time, title, country, impact, forecast, previous, actual, fetched_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     evt.get("date", ""), evt.get("time", ""),
                     evt.get("title", "Unknown"),
                     (evt.get("country") or "").upper(),
                     (evt.get("impact") or "").strip(),
                     evt.get("forecast", ""), evt.get("previous", ""),
+                    evt.get("actual", ""),
                     fetched_at,
                 ),
             )
