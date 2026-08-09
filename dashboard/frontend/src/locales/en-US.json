@@ -664,7 +664,8 @@
     "name": "Name",
     "model": "Model",
     "type": "Type",
-    "name_placeholder": "e.g. DeepSeek"
+    "name_placeholder": "e.g. DeepSeek",
+    "model_placeholder": "Enter model name or test connection"
   },
   "coordinator": {
     "trigger_rate_disabled": "Disabled",

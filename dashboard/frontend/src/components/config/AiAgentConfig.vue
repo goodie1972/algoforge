@@ -216,7 +216,8 @@ onMounted(loadProviders)
         </div>
         <div style="grid-column:span 2">
           <div style="font-size:12px;color:#8b8f97;margin-bottom:4px">{{ t('ai.model') }}</div>
-          <n-input v-model:value="form.selected_model" size="small" placeholder="gpt-4o-mini" />
+          <n-select v-model:value="form.selected_model" size="small" filterable allow-create :placeholder="t('ai.model_placeholder')"
+            :options="form.models.map(m => ({ label: m, value: m }))" />
         </div>
       </div>
 

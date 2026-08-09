@@ -664,7 +664,8 @@
     "name": "名称",
     "model": "模型",
     "type": "类型",
-    "name_placeholder": "例如：DeepSeek"
+    "name_placeholder": "例如：DeepSeek",
+    "model_placeholder": "输入模型名或测试连接获取列表"
   },
   "coordinator": {
     "trigger_rate_disabled": "禁用",
