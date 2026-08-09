@@ -11,6 +11,7 @@ const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const editingId = ref<string | null>(null)  // null=无编辑, 'new'=新增, 其他=编辑某卡片
+const showKey = ref(false)
 
 const form = ref({
   name: '',
@@ -39,6 +40,7 @@ async function loadProviders() {
 
 function openNew() {
   editingId.value = 'new'
+  showKey.value = false
   form.value = { name: '', type: 'openai', api_key: '', base_url: 'https://api.openai.com/v1', models: [], enabled_models: [], selected_model: '' }
 }
 
@@ -46,6 +48,7 @@ function openEdit(id: string) {
   const p = providers.value.find(x => x.id === id)
   if (!p) return
   editingId.value = id
+  showKey.value = false
   form.value = {
     name: p.name, type: p.type, api_key: p.api_key || '',
     base_url: p.base_url, models: p.models || [],
@@ -56,6 +59,7 @@ function openEdit(id: string) {
 
 function cancelEdit() {
   editingId.value = null
+  showKey.value = false
   testing.value = false
 }
 
@@ -75,6 +79,7 @@ async function saveProvider() {
     }
     await loadProviders()
     editingId.value = null  // 保存后缩小
+    showKey.value = false
   } catch (e: any) { message.error(t('ai.save_failed', { error: e.message || '' })) }
   finally { saving.value = false }
 }
@@ -125,8 +130,6 @@ async function testConnection() {
   finally { testing.value = false }
 }
 
-function providerIcon(type: string): string { return type === 'ollama' ? '🦙' : '🤖' }
-
 onMounted(loadProviders)
 </script>
 
@@ -137,41 +140,44 @@ onMounted(loadProviders)
         {{ t('ai.no_providers') }}
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:12px;padding:4px">
-        <!-- 卡片列表 -->
+      <!-- 卡片网格 -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;padding:4px">
         <div v-for="p in providers" :key="p.id">
-          <!-- ── 紧凑模式（未编辑）── -->
+          <!-- ── 紧凑卡片 ── -->
           <div v-if="editingId !== p.id"
             @click="openEdit(p.id)"
-            style="display:flex;align-items:center;gap:12px;border:1px solid var(--n-border-color);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color 0.2s;background:transparent"
+            style="border:1px solid var(--n-border-color);border-radius:10px;padding:16px;cursor:pointer;transition:border-color 0.2s;background:transparent;min-height:120px;display:flex;flex-direction:column"
             :style="{ borderColor: p.is_active ? '#0ecb81' : 'var(--n-border-color)' }">
-            <span style="font-size:22px;width:28px;text-align:center">{{ providerIcon(p.type) }}</span>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-weight:600;font-size:15px">{{ p.name }}</span>
-                <n-tag v-if="p.is_active" :bordered="false" size="tiny" type="success">{{ t('ai.activated') }}</n-tag>
-              </div>
-              <div style="font-size:12px;color:#8b8f97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                {{ p.selected_model || (p.models?.[0] || '') }} · {{ p.base_url }}
+            <!-- 顶部：名称 + 开关 -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-weight:600;font-size:15px">{{ p.name }}</span>
+              <div @click.stop>
+                <n-switch :value="p.is_active" size="small" @update:value="() => activateProvider(p.id)" :round="true" />
               </div>
             </div>
-            <!-- 右上角开关 -->
-            <div @click.stop>
-              <n-switch :value="p.is_active" size="small" @update:value="() => activateProvider(p.id)" :round="true" />
+            <!-- 模型 -->
+            <div style="font-size:13px;color:#333;margin-bottom:4px">{{ p.selected_model || (p.models?.[0] || '') }}</div>
+            <!-- URL -->
+            <div style="font-size:11px;color:#8b8f97;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.base_url }}</div>
+            <!-- 激活标签 -->
+            <div v-if="p.is_active" style="margin-top:auto;padding-top:8px">
+              <n-tag :bordered="false" size="tiny" type="success">{{ t('ai.activated') }}</n-tag>
             </div>
-            <!-- 删除按钮 -->
-            <div @click.stop>
-              <n-popconfirm @positive-click="deleteProvider(p.id)">
-                <template #trigger><n-button size="tiny" quaternary type="error">✕</n-button></template>
-                {{ t('ai.confirm_delete') }}
-              </n-popconfirm>
+            <!-- 删除 -->
+            <div v-else style="margin-top:auto;padding-top:8px;display:flex;justify-content:flex-end">
+              <div @click.stop>
+                <n-popconfirm @positive-click="deleteProvider(p.id)">
+                  <template #trigger><n-button size="tiny" quaternary type="error">✕</n-button></template>
+                  {{ t('ai.confirm_delete') }}
+                </n-popconfirm>
+              </div>
             </div>
           </div>
 
-          <!-- ── 放大编辑模式 ── -->
+          <!-- ── 放大编辑卡片 ── -->
           <div v-else
-            style="border:2px solid var(--n-primary-color);border-radius:10px;padding:20px;transition:all 0.2s;background:transparent">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            style="border:2px solid var(--n-primary-color);border-radius:10px;padding:18px;background:transparent;grid-column:span 2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
               <span style="font-size:16px;font-weight:600">{{ editingId === 'new' ? t('ai.add_provider') : t('ai.configure') }}</span>
               <n-button size="tiny" quaternary @click="cancelEdit">{{ t('ai.cancel') }}</n-button>
             </div>
@@ -194,7 +200,13 @@ onMounted(loadProviders)
               </div>
               <div>
                 <div style="font-size:12px;color:#8b8f97;margin-bottom:4px">{{ t('ai.api_key') }}</div>
-                <n-input v-model:value="form.api_key" size="small" type="password" :placeholder="isEditingExisting ? t('ai.keep_empty') : 'sk-...'" />
+                <n-input v-model:value="form.api_key" size="small" :type="showKey ? 'text' : 'password'" :placeholder="isEditingExisting ? t('ai.keep_empty') : 'sk-...'">
+                  <template #suffix>
+                    <span @click="showKey = !showKey" style="cursor:pointer;color:#8b8f97;font-size:14px" :title="showKey ? '隐藏' : '显示'">
+                      {{ showKey ? '👁️' : '🙈' }}
+                    </span>
+                  </template>
+                </n-input>
               </div>
               <div>
                 <div style="font-size:12px;color:#8b8f97;margin-bottom:4px">{{ t('ai.model') }}</div>
@@ -214,7 +226,7 @@ onMounted(loadProviders)
 
         <!-- 空白卡片：添加新 Provider -->
         <div v-if="editingId !== 'new'" @click="openNew"
-          style="border:1px dashed var(--n-border-color);border-radius:10px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:border-color 0.2s;background:transparent"
+          style="border:1px dashed var(--n-border-color);border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-height:120px;transition:border-color 0.2s;background:transparent"
           @mouseover="(e:any) => e.currentTarget.style.borderColor='#8b8f97'"
           @mouseout="(e:any) => e.currentTarget.style.borderColor='var(--n-border-color)'">
           <span style="font-size:26px;color:#8b8f97;margin-bottom:4px">+</span>
