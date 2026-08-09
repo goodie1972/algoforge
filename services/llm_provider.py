@@ -20,6 +20,19 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# 尝试加载 .env 文件（可选，不阻塞）
+try:
+    from dotenv import load_dotenv
+    # 从项目根目录和 data 目录查找 .env
+    for env_path in [os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"),
+                     os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", ".env")]:
+        if os.path.exists(env_path):
+            load_dotenv(env_path, override=True)
+            logger.info(f"[LLMProvider] 已加载 .env: {env_path}")
+            break
+except Exception:
+    pass
+
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)),
                            "data", "llm_providers.json")
 
@@ -70,7 +83,7 @@ class LLMProviderManager:
     # ── 持久化 ──────────────────────────────────────
 
     def _load(self):
-        """从 JSON 文件加载 Provider 列表"""
+        """从 JSON 文件加载 Provider 列表，环境变量优先级最高"""
         try:
             if os.path.exists(CONFIG_FILE):
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -81,6 +94,39 @@ class LLMProviderManager:
         except Exception as e:
             logger.warning(f"[LLMProvider] 加载失败: {e}")
             self._providers = DEFAULT_PROVIDERS
+
+        # 环境变量覆盖（优先级最高）
+        env_key = os.environ.get("LLM_API_KEY", "").strip()
+        if env_key:
+            env_provider = {
+                "id": "env",
+                "name": os.environ.get("LLM_NAME", "ENV Provider"),
+                "type": os.environ.get("LLM_TYPE", "openai"),
+                "api_key": env_key,
+                "base_url": os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+                "models": [os.environ.get("LLM_MODEL", "gpt-4o-mini")],
+                "selected_model": os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+                "is_active": True,
+                "created_at": datetime.now().isoformat(),
+            }
+            # 替换已有的 env provider 或新增
+            for i, p in enumerate(self._providers):
+                if p["id"] == "env":
+                    # 保留已存在的 key（如果环境变量没设）
+                    for k in ("api_key", "base_url", "selected_model"):
+                        if not os.environ.get(f"LLM_{k.upper()}"):
+                            env_provider[k] = p.get(k, env_provider[k])
+                    # 去激活其他 provider
+                    p["is_active"] = False
+                    self._providers[i] = env_provider
+                    break
+            else:
+                # 去激活其他 provider
+                for p in self._providers:
+                    p["is_active"] = False
+                self._providers.append(env_provider)
+            logger.info(f"[LLMProvider] 环境变量配置生效: "
+                        f"url={env_provider['base_url']} model={env_provider['selected_model']}")
 
     def _save(self):
         """保存到 JSON 文件"""
