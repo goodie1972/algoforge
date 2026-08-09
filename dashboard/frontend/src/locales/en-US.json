@@ -658,7 +658,13 @@
     "keep_empty": "Leave empty to keep current",
     "model_list": "Models",
     "in_use": "In Use",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "configure": "Configure",
+    "add_provider": "Add New LLM",
+    "name": "Name",
+    "model": "Model",
+    "type": "Type",
+    "name_placeholder": "e.g. DeepSeek"
   },
   "coordinator": {
     "trigger_rate_disabled": "Disabled",

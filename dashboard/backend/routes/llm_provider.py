@@ -27,6 +27,7 @@ class ProviderUpdate(BaseModel):
     api_key: Optional[str] = None
     base_url: Optional[str] = None
     models: Optional[list[str]] = None
+    enabled_models: Optional[list[str]] = None
     selected_model: Optional[str] = None
     is_active: Optional[bool] = None
 

@@ -658,7 +658,13 @@
     "keep_empty": "留空保持不变",
     "model_list": "模型列表",
     "in_use": "使用中",
-    "cancel": "取消"
+    "cancel": "取消",
+    "configure": "配置",
+    "add_provider": "添加新 LLM",
+    "name": "名称",
+    "model": "模型",
+    "type": "类型",
+    "name_placeholder": "例如：DeepSeek"
   },
   "coordinator": {
     "trigger_rate_disabled": "禁用",
