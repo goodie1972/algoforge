@@ -1,0 +1,328 @@
+"""
+汇通快讯爬虫 — 抓取汇通网 7×24 快讯，用 LLM 判断对黄金的多空方向
+======================================================================
+数据源: https://kx.fx678.com (免费，无 Cloudflare)
+LLM 判断: 每条快讯判断「利多黄金/利空黄金/中性」
+"""
+
+import logging
+import re
+import time
+from datetime import datetime
+from typing import Optional
+
+import requests
+from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
+
+HUICONG_URL = "https://kx.fx678.com"
+JIN10_URL = "https://www.jin10.com"
+REQUEST_INTERVAL = 10  # 每次请求间隔 10 秒（避免反爬）
+CACHE_TTL = 300  # 内存缓存 5 分钟
+
+# 需要关注的黄金相关关键词（用于预过滤快讯，减少 LLM 调用）
+GOLD_KEYWORDS = [
+    "黄金", "金价", "现货黄金", "伦敦金", "XAUUSD",
+    "非农", "CPI", "PPI", "GDP", "核心通胀",
+    "美联储", "FOMC", "鲍威尔", "加息", "降息",
+    "通胀", "美元指数", "美债", "收益率",
+    "地缘", "避险", "战争", "制裁",
+    "失业", "初请", "零售", "制造业PMI",
+    "ISM", "消费者信心", "耐用品",
+]
+
+
+def fetch_huicong_news() -> list[dict]:
+    """
+    抓取汇通快讯页面，解析快讯列表。
+    从 topaid ID 中提取精确时间戳。
+    返回: [{"time": "2026-08-08 10:53:51", "content": "...", "source": "huicong", ...}, ...]
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.fx678.com/",
+    }
+
+    resp = requests.get(HUICONG_URL, headers=headers, timeout=15)
+    resp.encoding = "utf-8"
+    html = resp.text
+
+    items = []
+
+    # 从 topaid ID 中提取时间: topaid202608081053512063
+    # 格式: topaid{YYYY}{MM}{DD}{HH}{MM}{SS}{随机}
+    for m in re.finditer(
+        r'id=\"topaid(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\d*\"[^>]*>([^<]+)</a>',
+        html,
+    ):
+        y, mo, d, h, mi, s = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), m.group(6)
+        content = m.group(7).strip()
+        if not content or len(content) < 5:
+            continue
+        dt = f"{y}-{mo}-{d} {h}:{mi}:{s}"
+        items.append({
+            "time": dt,
+            "content": content,
+            "source": "huicong",
+            "fetched_at": time.time(),
+        })
+
+    # 去重
+    seen = set()
+    unique = []
+    for item in items:
+        key = item["content"][:60]
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+
+    logger.info(f"[汇通快讯] 抓取到 {len(unique)} 条（原始 {len(items)} 条）")
+    return unique
+
+
+def _extract_nearby_time(html: str, content: str) -> str:
+    """从 HTML 中找内容附近的时间"""
+    # 用正则找时间模式 HH:MM:SS
+    idx = html.find(content[:30])
+    if idx < 0:
+        return ""
+    # 在内容前 500 字符内找时间
+    before = html[max(0, idx - 500):idx]
+    times = re.findall(r"(\d{2}:\d{2}:\d{2})", before)
+    return times[-1] if times else ""
+
+
+def filter_gold_related(news: list[dict]) -> list[dict]:
+    """过滤出与黄金相关的快讯"""
+    gold_news = []
+    for item in news:
+        content = item.get("content", "")
+        if any(kw in content for kw in GOLD_KEYWORDS):
+            gold_news.append(item)
+    return gold_news
+
+
+def judge_with_llm(news: list[dict], llm_manager) -> list[dict]:
+    """
+    用 LLM 判断每条快讯对黄金的多空方向。
+    批量判断（多条合并为一次调用，减少 LLM 请求数）。
+    """
+    if not news or not llm_manager:
+        return []
+
+    # 每次最多 5 条，避免 LLM 上下文过长
+    batch_size = 5
+    results = []
+
+    for i in range(0, len(news), batch_size):
+        batch = news[i:i + batch_size]
+        try:
+            # 构建 LLM 提示
+            news_text = "\n".join([f"{j+1}. {item['content']}" for j, item in enumerate(batch)])
+            prompt = f"""你是一个黄金交易分析专家。请判断以下每条新闻对黄金(XAUUSD)价格的影响是利多还是利空。
+
+规则：
+- 利多黄金 = 利好金价上涨（如：美联储降息预期、通胀降温、就业恶化、地缘避险、美元走弱）
+- 利空黄金 = 利空金价下跌（如：美联储加息预期、通胀升温、就业强劲、避险消退、美元走强）
+- 中性 = 无明显影响或影响不确定
+
+请对每条新闻按序号回答，格式: "序号: 利多/利空/中性"
+
+新闻列表：
+{news_text}"""
+
+            result = llm_manager.chat([
+                {"role": "user", "content": prompt}
+            ])
+
+            if not result:
+                logger.warning("[LLM黄金判断] 调用失败，回退到关键词规则")
+                # 回退到规则判断
+                for item in batch:
+                    item["direction"] = _rule_based_judge(item["content"])
+                    item["direction_reason"] = "规则回退"
+                    item["direction_confidence"] = "low"
+                    results.append(item)
+                continue
+
+            # 解析 LLM 回复
+            for j, item in enumerate(batch):
+                line_num = j + 1
+                direction = "中性"
+                # 在 LLM 回复中找对应序号
+                for line in result.split("\n"):
+                    if str(line_num) in line:
+                        if "利多" in line:
+                            direction = "bullish"
+                        elif "利空" in line:
+                            direction = "bearish"
+                        else:
+                            direction = "neutral"
+                        break
+                else:
+                    # 如果 LLM 没回答，用关键词回退
+                    direction = _rule_based_judge(item["content"])
+
+                item["direction"] = direction
+                item["direction_reason"] = "LLM判断" if direction != _rule_based_judge(item["content"]) else "规则回退"
+                item["direction_confidence"] = "high" if direction != "neutral" else "low"
+                results.append(item)
+
+        except Exception as e:
+            logger.error(f"[LLM黄金判断] 批处理异常: {e}")
+            for item in batch:
+                item["direction"] = _rule_based_judge(item["content"])
+                item["direction_reason"] = "规则回退"
+                item["direction_confidence"] = "low"
+                results.append(item)
+
+        # 批次间隔，避免 LLM API 限流
+        if i + batch_size < len(news):
+            time.sleep(1)
+
+    return results
+
+
+def _rule_based_judge(content: str) -> str:
+    """关键词规则判断（LLM 回退方案）"""
+    content_lower = content.lower()
+
+    # 利多模式
+    bullish = [
+        "飙涨", "狂飙", "大涨", "走高", "攀升", "拉升",
+        "利多黄金", "利好黄金", "黄金上涨", "黄金飙升",
+        "非农减少", "非农爆冷", "就业意外", "失业率上升",
+        "意外降息", "降息", "鸽派", "避险", "冲突",
+        "通胀降温", "CPI低于预期", "物价回落",
+        "美联储放鸽", "美元走弱", "美元下跌",
+        "地缘紧张", "战争", "制裁", "导弹",
+    ]
+    # 利空模式
+    bearish = [
+        "暴跌", "狂跌", "大跌", "走低", "下滑", "承压",
+        "利空黄金", "利空黄金", "黄金下跌", "黄金跳水",
+        "非农增加", "非农超预期", "就业强劲", "失业率下降",
+        "意外加息", "加息", "鹰派", "美元走强",
+        "通胀升温", "CPI高于预期", "物价上涨",
+        "美联储放鹰", "美元上涨",
+        "避险消退", "停火", "风险偏好",
+    ]
+
+    for kw in bullish:
+        if kw in content:
+            return "bullish"
+    for kw in bearish:
+        if kw in content:
+            return "bearish"
+    return "neutral"
+
+
+def save_huicong_news(news: list[dict]):
+    """保存汇通快讯到数据库 gold_news 表"""
+    try:
+        from data import database as db
+        db.init_db()
+        db.insert_gold_news(news)
+        logger.info(f"[汇通快讯] 已保存 {len(news)} 条到数据库")
+    except Exception as e:
+        logger.error(f"[汇通快讯] 保存失败: {e}")
+
+
+def fetch_jin10_news() -> list[dict]:
+    """
+    抓取金十数据首页快讯列表。
+    返回: [{"time": "", "content": "...", "source": "jin10", ...}, ...]
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://www.jin10.com/",
+    }
+
+    resp = requests.get(JIN10_URL, headers=headers, timeout=15)
+    resp.encoding = "utf-8"
+    html = resp.text
+
+    # 金十快讯结构: <div class="flash-item"> 内含 flash-text
+    items = []
+    for m in re.finditer(
+        r'<div[^>]*class="[^"]*flash-item[^"]*"[^>]*>.*?'
+        r'<div[^>]*class="[^"]*flash-text[^"]*"[^>]*>(.*?)</div>',
+        html, re.DOTALL,
+    ):
+        content = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+        if not content or len(content) < 5:
+            continue
+        items.append({
+            "time": "",
+            "content": content,
+            "source": "jin10",
+            "fetched_at": time.time(),
+        })
+
+    # 去重
+    seen = set()
+    unique = []
+    for item in items:
+        key = item["content"][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+
+    logger.info(f"[金十数据] 抓取到 {len(unique)} 条快讯")
+    return unique
+
+
+def fetch_and_judge(llm_manager=None) -> list[dict]:
+    """
+    完整流程：抓取汇通+金十 → 过滤 → LLM判断 → 保存 → 返回
+    """
+    logger.info("[黄金快讯] 开始抓取+判断...")
+
+    # 抓取多源
+    all_news = []
+    try:
+        all_news.extend(fetch_huicong_news())
+    except Exception as e:
+        logger.warning(f"[汇通快讯] 抓取失败: {e}")
+    try:
+        all_news.extend(fetch_jin10_news())
+    except Exception as e:
+        logger.warning(f"[金十数据] 抓取失败: {e}")
+
+    if not all_news:
+        logger.warning("[黄金快讯] 未抓到任何快讯")
+        return []
+
+    gold_news = filter_gold_related(all_news)
+    logger.info(f"[黄金快讯] 黄金相关: {len(gold_news)}/{len(all_news)}")
+
+    if llm_manager:
+        gold_news = judge_with_llm(gold_news, llm_manager)
+    else:
+        for item in gold_news:
+            item["direction"] = _rule_based_judge(item["content"])
+            item["direction_reason"] = "规则判断"
+            item["direction_confidence"] = "low"
+
+    save_huicong_news(gold_news)
+    return gold_news
+
+
+if __name__ == "__main__":
+    # 测试
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s [%(levelname)s] %(message)s")
+    from services.llm_provider import LLMProviderManager
+    mgr = LLMProviderManager()
+    active = mgr.get_active()
+    if not active:
+        for p in mgr._providers:
+            if p.get("api_key"):
+                mgr.set_active(p["id"])
+                break
+    results = fetch_and_judge(mgr)
+    for r in results[:5]:
+        print(f"  [{r.get('direction','?')}] {r['content'][:60]}")

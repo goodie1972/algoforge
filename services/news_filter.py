@@ -159,6 +159,7 @@ class NewsFilter:
         """每个 tick 调用，到期自动拉取。is_in_blackout 不触发 HTTP"""
         now = time.time()
         self._run_bias_evaluation()
+        self._run_gold_news_fetch()
         if now < self._retry_after:
             return
         if self._next_fetch > 0 and now < self._next_fetch:
@@ -216,6 +217,30 @@ class NewsFilter:
     def _run_bias_evaluation(self):
         """执行 news-bias 事后评估（受配置控制，每 10 分钟限频一次）"""
         cfg = self._read_bias_config()
+
+    def _run_gold_news_fetch(self):
+        """定时抓取汇通+金十快讯并用 LLM 判断方向（每 10 分钟限频一次）"""
+        now = time.time()
+        if now - getattr(self, '_last_gold_news_fetch', 0) < 600:
+            return
+        self._last_gold_news_fetch = now
+        try:
+            from services.huicong_news import fetch_and_judge
+            from services.llm_provider import LLMProviderManager
+            mgr = LLMProviderManager()
+            active = mgr.get_active()
+            if not active:
+                for p in mgr._providers:
+                    if p.get("api_key"):
+                        mgr.set_active(p["id"])
+                        break
+            results = fetch_and_judge(mgr)
+            if results:
+                bullish = sum(1 for r in results if r['direction'] == 'bullish')
+                bearish = sum(1 for r in results if r['direction'] == 'bearish')
+                logger.info(f"[黄金快讯] 定时抓取完成: {len(results)}条, 利多{bullish}/利空{bearish}")
+        except Exception as e:
+            logger.warning(f"[黄金快讯] 定时抓取异常: {e}")
         if not cfg["enabled"]:
             return
 
@@ -349,50 +374,45 @@ class NewsFilter:
     # ── News-Bias 实时方向阻塞 ──────────────────────────────
 
     def get_current_bias(self) -> Optional[dict]:
-        """获取当前新闻事件的预期方向（用于阻塞控制）。
+        """
+        获取当前黄金快讯方向偏向（用于阻塞控制）。
+        从 gold_news 表读取最近 N 条快讯的 LLM 判断方向。
         返回 {'overall': 'BULLISH'|'BEARISH'|'NEUTRAL', 'details': [...]} 或 None
         """
         try:
-            from services.news_bias import classify_event
             from config import settings
             
             if not getattr(settings, 'NEWS_BIAS_ENABLED', True):
                 return None
             
-            events = self.get_upcoming_events(limit=50)
-            if not events:
+            # 从 gold_news 表读取最近快讯的方向
+            from data import database as db
+            db.init_db()
+            gold_news = db.get_gold_news(limit=20, direction="")
+            
+            if not gold_news:
                 return None
             
             bullish_score = 0
             bearish_score = 0
             details = []
             
-            now = datetime.now()
-            # 只看未来 4 小时内的新闻
-            cutoff = now + timedelta(hours=4)
-            
-            for evt in events:
-                evt_dt = datetime.strptime(evt["datetime"], "%Y-%m-%d %H:%M")
-                if evt_dt > cutoff:
-                    continue
+            for item in gold_news[:20]:
+                direction = item.get("direction", "neutral")
+                confidence = item.get("direction_confidence", "low")
+                weight = {"high": 3, "medium": 2, "low": 1}.get(confidence, 1)
                 
-                bias, reason, conf = classify_event(
-                    evt["title"],
-                    actual=evt.get("actual") or None,
-                    forecast=evt.get("forecast") or None,
-                )
-                weight = {"high": 3, "medium": 2, "low": 1}.get(conf, 1)
-                
-                if bias == "bullish":
+                if direction == "bullish":
                     bullish_score += weight
-                elif bias == "bearish":
+                elif direction == "bearish":
                     bearish_score += weight
                 
                 details.append({
-                    "event": evt["title"],
-                    "time": evt["datetime"],
-                    "bias": bias,
-                    "confidence": conf,
+                    "event": item.get("content", "")[:80],
+                    "time": item.get("news_time", ""),
+                    "bias": direction,
+                    "confidence": confidence,
+                    "source": item.get("source", "?"),
                 })
             
             if not details:

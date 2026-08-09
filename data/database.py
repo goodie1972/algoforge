@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -165,6 +166,20 @@ CREATE TABLE IF NOT EXISTS news_calendar (
 );
 CREATE INDEX IF NOT EXISTS idx_news_country ON news_calendar(country);
 CREATE INDEX IF NOT EXISTS idx_news_impact ON news_calendar(impact);
+
+-- 黄金新闻快讯表（汇通/金十爬取，含LLM方向判断）
+CREATE TABLE IF NOT EXISTS gold_news (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT DEFAULT '',
+    content TEXT NOT NULL,
+    direction TEXT DEFAULT 'neutral',
+    direction_reason TEXT DEFAULT '',
+    direction_confidence TEXT DEFAULT 'low',
+    news_time TEXT DEFAULT '',
+    fetched_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gold_news_time ON gold_news(fetched_at);
+CREATE INDEX IF NOT EXISTS idx_gold_news_direction ON gold_news(direction);
 
 -- 复盘分析表
 CREATE TABLE IF NOT EXISTS prediction_reviews (
@@ -965,6 +980,82 @@ def load_news_events() -> list[dict]:
     try:
         rows = conn.execute("SELECT * FROM news_calendar ORDER BY date, time").fetchall()
         return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+# ── Gold News（汇通/金十快讯）───────────────────────────────
+
+def insert_gold_news(items: list[dict]) -> int:
+    """批量插入黄金新闻快讯。返回插入条数"""
+    conn = get_conn()
+    try:
+        count = 0
+        for item in items:
+            conn.execute(
+                """INSERT INTO gold_news
+                   (source, content, direction, direction_reason,
+                    direction_confidence, news_time, fetched_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    item.get("source", "huicong"),
+                    item.get("content", ""),
+                    item.get("direction", "neutral"),
+                    item.get("direction_reason", ""),
+                    item.get("direction_confidence", "low"),
+                    item.get("time", ""),
+                    item.get("fetched_at", time.time()),
+                ),
+            )
+            count += 1
+        conn.commit()
+        return count
+    except Exception as e:
+        logger.warning(f"[DB] 插入 gold_news 失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
+
+def get_gold_news(limit: int = 50, source: str = "", direction: str = "") -> list[dict]:
+    """获取黄金新闻快讯"""
+    conn = get_conn()
+    try:
+        where = []
+        params = []
+        if source:
+            where.append("source = ?")
+            params.append(source)
+        if direction:
+            where.append("direction = ?")
+            params.append(direction)
+        sql = "SELECT * FROM gold_news"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY fetched_at DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_gold_news_summary() -> dict:
+    """获取黄金新闻方向统计摘要"""
+    conn = get_conn()
+    try:
+        total = conn.execute("SELECT COUNT(*) FROM gold_news").fetchone()[0]
+        bullish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bullish'").fetchone()[0]
+        bearish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bearish'").fetchone()[0]
+        latest = conn.execute("SELECT fetched_at FROM gold_news ORDER BY fetched_at DESC LIMIT 1").fetchone()
+        last_fetch = latest[0] if latest else 0
+        return {
+            "total": total,
+            "bullish": bullish,
+            "bearish": bearish,
+            "neutral": total - bullish - bearish,
+            "last_fetch": last_fetch,
+        }
     finally:
         conn.close()
 
