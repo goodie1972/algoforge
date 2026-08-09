@@ -219,9 +219,9 @@ class NewsFilter:
         cfg = self._read_bias_config()
 
     def _run_gold_news_fetch(self):
-        """定时抓取汇通+金十快讯并用 LLM 判断方向（每 10 分钟限频一次）"""
+        """定时抓取汇通+金十快讯并用 LLM 判断方向（每 4 小时限频一次）"""
         now = time.time()
-        if now - getattr(self, '_last_gold_news_fetch', 0) < 600:
+        if now - getattr(self, '_last_gold_news_fetch', 0) < 14400:
             return
         self._last_gold_news_fetch = now
         try:
@@ -308,13 +308,13 @@ class NewsFilter:
         return windows
 
     def is_in_blackout(self, now: Optional[datetime] = None) -> tuple[bool, str]:
-        """检查是否在禁售窗口内。空缓存 → 安全默认 True"""
+        """检查是否在禁售窗口内。"""
         cfg = self._read_config()
         if not cfg["enabled"]:
             return False, ""
 
         if not self._cache:
-            return True, "日历数据未加载"
+            return False, "新闻日历已切换为黄金快讯模式，无禁售窗口数据"
 
         if now is None:
             now = datetime.utcnow()
@@ -332,13 +332,13 @@ class NewsFilter:
         return self._is_in_window(now, "force_close")
 
     def _is_in_window(self, now: Optional[datetime], mode: str) -> bool:
-        """通用窗口检查。空缓存 → 安全默认 True"""
+        """通用窗口检查。"""
         cfg = self._read_config()
         if not cfg["enabled"]:
             return False
 
         if not self._cache:
-            return True
+            return False
 
         if now is None:
             now = datetime.utcnow()

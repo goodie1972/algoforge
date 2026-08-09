@@ -32,6 +32,25 @@ async def get_calendar():
     }
 
 
+@router.get("/gold")
+async def get_gold_news(limit: int = 20):
+    """获取黄金新闻快讯（汇通+金十）的 LLM 方向判断结果"""
+    try:
+        from data import database as db
+        db.init_db()
+        summary = db.get_gold_news_summary()
+        news = db.get_gold_news(limit=limit)
+        bias = NewsFilter().get_current_bias()
+        return {
+            "summary": summary,
+            "current_bias": bias,
+            "news": news,
+        }
+    except Exception as e:
+        logger.error(f"[黄金快讯API] 错误: {e}")
+        return {"summary": {}, "current_bias": None, "news": []}
+
+
 @router.post("/refresh")
 async def refresh_calendar():
     """强制刷新新闻日历（重新拉取 ForexFactory + 合并内置 FOMC 事件）"""
