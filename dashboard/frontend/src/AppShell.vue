@@ -48,6 +48,20 @@ const versionInfo = ref<{version: string; commit: string; branch: string; dirty:
   version: '0.0.0', commit: '?', branch: '?', dirty: false, display: 'v0.0.0', has_update: false, behind_count: 0,
 })
 const showChangelog = ref(false)
+const calendarShowAll = ref(false)
+const calendarData = ref<any>(null)
+async function fetchCalendar() {
+  try {
+    const res = await fetch('/api/news/calendar')
+    if (res.ok) calendarData.value = await res.json()
+  } catch { /* ignore */ }
+}
+function evtName(title: string) {
+  const key = `signals.news.${title}`
+  const cn = t(key)
+  return cn !== key ? cn : title
+}
+
 const changelog = ref<Array<{hash: string; date: string; subject: string}>>([])
 const updating = ref(false)
 const updateResult = ref<string>('')
@@ -185,6 +199,7 @@ onMounted(() => {
   accountStore.fetch()
   logStore.fetchHistory()
   getVersionInfo().then((v) => { versionInfo.value = v as any }).catch(() => { /* keep default */ })
+  fetchCalendar()
   // 每 5 分钟检查远程更新
   updateCheckTimer = setInterval(() => {
     getVersionInfo().then((v) => { versionInfo.value = v as any }).catch(() => {})
@@ -266,7 +281,16 @@ onUnmounted(() => {
             <n-breadcrumb-item>{{ t('app.breadcrumb') }}</n-breadcrumb-item>
             <n-breadcrumb-item>{{ route.name === 'config' ? t('common.config') : route.name === 'positions' ? t('common.positions') : route.name === 'strategies' ? t('common.strategies') : route.name === 'logs' ? t('common.logs') : route.name === 'patrol' ? t('common.patrol') : t('common.dashboard') }}</n-breadcrumb-item>
           </n-breadcrumb>
-          <div class="header-spacer"></div>
+                    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;flex:1;margin:0 12px;font-size:12px;line-height:1.6;padding:2px 8px;border-radius:4px;background:var(--n-color-embedded)">
+            <span class="marquee-inner">
+              <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:50px">
+                <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
+                {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
+              </span>
+              <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
+            </span>
+          </div>
+<div class="header-spacer"></div>
           <n-tooltip trigger="hover" placement="bottom">
             <template #trigger>
               <div class="version-badge" @click="openChangelog">
@@ -298,7 +322,28 @@ onUnmounted(() => {
         <n-layout-content class="app-content" :native-scrollbar="false">
           <router-view />
         </n-layout-content>
-      </n-layout>
+      
+    <!-- 经济日历完整窗口 -->
+    <n-modal v-model:show="calendarShowAll" :mask-closable="true" preset="card" :title="'经济日历 - 完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
+      <div style="max-height:calc(75vh - 100px);overflow-y:auto">
+        <n-space vertical size="small">
+          <div v-for="evt in calendarData?.upcoming_events" :key="evt.datetime + evt.title"
+            style="padding:8px;border-radius:6px;background:var(--n-color-embedded)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <n-text style="font-size:13px;font-weight:600">{{ evt.title }}</n-text>
+              <n-tag size="tiny" :color="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }" text-color="#fff">{{ evt.impact }}</n-tag>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+              <n-text depth="3" style="font-size:12px">{{ evt.country }} {{ evt.datetime }}</n-text>
+              <n-text depth="3" style="font-size:12px">前值 {{ evt.previous || '-' }} | 预测 {{ evt.forecast || '-' }}</n-text>
+            </div>
+          </div>
+          <div v-if="!calendarData?.upcoming_events?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无经济日历事件</div>
+        </n-space>
+      </div>
+    </n-modal>
+
+</n-layout>
     </n-layout>
   </n-layout>
 
@@ -594,5 +639,15 @@ onUnmounted(() => {
 }
 .footer-dirty-warning {
   color: #f0b90b;
+}
+
+.marquee-inner {
+  display: inline-block;
+  animation: marquee 20s linear infinite;
+  padding-left: 100%;
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
 }
 </style>

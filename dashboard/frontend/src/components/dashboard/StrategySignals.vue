@@ -161,17 +161,7 @@ onUnmounted(() => {
 <template>
   <n-space vertical size="small">
 
-    <!-- ═══════════════ 经济日历跑马灯（独立） ═══════════════ -->
-    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;padding:6px 10px;border-radius:6px;border:1px solid var(--n-border-color);font-size:12px;line-height:1.6">
-      <span class="marquee-inner">
-        <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:50px">
-          <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
-          {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
-        </span>
-        <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
-      </span>
-    </div>
-
+    
 <!-- ═══════════════ 实盘信号 ═══════════════ -->
     <n-card size="small" :bordered="true"
       :style="{
@@ -253,25 +243,7 @@ onUnmounted(() => {
       </n-space>
     </n-card>
 
-    <!-- 经济日历完整窗口（居中悬浮） -->
-    <n-modal v-model:show="calendarShowAll" :mask-closable="true" preset="card" :title="'经济日历 - 完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
-      <div style="max-height:calc(75vh - 100px);overflow-y:auto">
-        <n-space vertical size="small">
-          <div v-for="evt in calendarData?.upcoming_events" :key="evt.datetime + evt.title"
-            style="padding:8px;border-radius:6px;background:var(--n-color-embedded)">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <n-text style="font-size:13px;font-weight:600">{{ evtName(evt.title) }}</n-text>
-              <n-tag size="tiny" :color="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }" text-color="#fff">{{ evt.impact }}</n-tag>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:4px">
-              <n-text depth="3" style="font-size:12px">{{ evt.country }} {{ evt.datetime }}</n-text>
-              <n-text depth="3" style="font-size:12px">前值 {{ evt.previous || '-' }} | 预测 {{ evt.forecast || '-' }}</n-text>
-            </div>
-          </div>
-          <div v-if="!calendarData?.upcoming_events?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无经济日历事件</div>
-        </n-space>
-      </div>
-    </n-modal>
+    
 
     <!-- 黄金快讯完整窗口（居中悬浮） -->
     <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="'黄金快讯完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
