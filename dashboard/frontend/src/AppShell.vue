@@ -297,7 +297,7 @@ onUnmounted(() => {
             <n-breadcrumb-item>{{ t('app.breadcrumb') }}</n-breadcrumb-item>
             <n-breadcrumb-item>{{ route.name === 'config' ? t('common.config') : route.name === 'positions' ? t('common.positions') : route.name === 'strategies' ? t('common.strategies') : route.name === 'logs' ? t('common.logs') : route.name === 'patrol' ? t('common.patrol') : t('common.dashboard') }}</n-breadcrumb-item>
           </n-breadcrumb>
-                    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;flex:2;margin:0 12px;font-size:12px;line-height:1.6;padding:2px 8px;border-radius:4px;background:var(--n-color-embedded)">
+                    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;flex:3;margin:0 12px;font-size:12px;line-height:1.6;padding:2px 8px;border-radius:4px;background:var(--n-color-embedded)">
             <span class="marquee-inner">
               <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:60px">
                 <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
@@ -662,7 +662,7 @@ onUnmounted(() => {
 
 .marquee-inner {
   display: inline-block;
-  animation: marquee 40s linear infinite;
+  animation: marquee 57s linear infinite;
   padding-left: 100%;
 }
 @keyframes marquee {
