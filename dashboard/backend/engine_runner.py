@@ -169,7 +169,7 @@ class EngineRunner:
                 }
                 db.insert_trade(record)
             except Exception as e:
-                self.logger.error(f"记录手动平仓失败 ticket={ticket}: {e}")
+                self.logger.error(f"Failed to log manual close ticket={ticket}: {e}")
 
         # 立即刷新缓存
         self._update_positions_cache()
@@ -211,10 +211,10 @@ class EngineRunner:
                         )
                         total += 1
                 except Exception as e:
-                    self.logger.warning(f"[版本同步] {mod_name} 失败: {e}")
-            self.logger.info(f"[版本同步] 写入 {total} 条版本记录")
+                    self.logger.warning(f"[VersionSync] {mod_name} failed: {e}")
+            self.logger.info(f"[VersionSync] Wrote {total} version records")
         except Exception as e:
-            self.logger.warning(f"[版本同步] 跳过: {e}")
+            self.logger.warning(f"[VersionSync] Skipped: {e}")
 
     # ======================== 数据库数据完整性检查 ========================
 
@@ -237,10 +237,10 @@ class EngineRunner:
                     active_tfs.add(tf)
 
             if not active_tfs:
-                self.logger.info("[数据同步] 无活跃策略，跳过")
+                self.logger.info("[DataSync] No active strategies, skipped")
                 return
 
-            self.logger.info(f"[数据同步] 检查周期: {active_tfs}")
+            self.logger.info(f"[DataSync] Checking timeframes: {active_tfs}")
             for tf in sorted(active_tfs):
                 try:
                     latest = db.get_latest_timestamp(tf)
@@ -250,27 +250,27 @@ class EngineRunner:
                     interval = tf_sec.get(tf, 3600)
 
                     if latest is None:
-                        self.logger.info(f"[数据同步] {tf} 无数据，开始下载")
+                        self.logger.info(f"[DataSync] {tf} no data, starting download")
                         n = download_timeframe(engine.bridge, tf)
-                        self.logger.info(f"[数据同步] {tf} 下载完成，写入 {n} 条")
+                        self.logger.info(f"[DataSync] {tf} download complete, wrote {n} candles")
                     else:
                         gap = now_ts - latest
                         if gap > interval * 3:  # 缺失超过 3 根
-                            self.logger.info(f"[数据同步] {tf} 最新数据 {datetime.fromtimestamp(latest).strftime('%Y-%m-%d %H:%M')}，缺口 {gap//interval} 根，开始补漏")
+                            self.logger.info(f"[DataSync] {tf} latest data {datetime.fromtimestamp(latest).strftime('%Y-%m-%d %H:%M')}, gap {gap//interval} candles, starting backfill")
                             n = download_timeframe(engine.bridge, tf)
-                            self.logger.info(f"[数据同步] {tf} 补漏完成，写入 {n} 条")
+                            self.logger.info(f"[DataSync] {tf} backfill complete, wrote {n} candles")
                         else:
-                            self.logger.info(f"[数据同步] {tf} 数据完整（最新 {datetime.fromtimestamp(latest).strftime('%Y-%m-%d %H:%M')}）")
+                            self.logger.info(f"[DataSync] {tf} data is complete (latest {datetime.fromtimestamp(latest).strftime('%Y-%m-%d %H:%M')})")
                 except Exception as e:
-                    self.logger.error(f"[数据同步] {tf} 处理失败: {e}")
+                    self.logger.error(f"[DataSync] {tf} processing failed: {e}")
 
             # 打印汇总
             stats = db.get_db_stats()
             for tf, info in stats.items():
                 if info["count"] > 0:
-                    self.logger.info(f"[数据同步] {tf}: {info['count']} 条 ({info['from']} ~ {info['to']})")
+                    self.logger.info(f"[DataSync] {tf}: {info['count']} candles ({info['from']} ~ {info['to']})")
         except Exception as e:
-            self.logger.warning(f"[数据同步] 跳过（模块未就绪: {e}）")
+            self.logger.warning(f"[DataSync] Skipped (module not ready: {e})")
 
     # ======================== 缓存更新（仅从价格轮询线程调用，消除主线程 bridge 竞争） ========================
 
@@ -438,27 +438,27 @@ class EngineRunner:
 
             for tf, status in tfs.items():
                 if not status.get("ok", False):
-                    self.logger.warning(f"[数据工厂监控] {tf} 同步失败")
+                    self.logger.warning(f"[DataFactoryMonitor] {tf} sync failed")
                     continue
                 age = now - status.get("last_sync", 0)
                 if age > 60:
-                    self.logger.warning(f"[数据工厂监控] {tf} 数据过期 {age:.0f}s（超过 60s 未同步）")
+                    self.logger.warning(f"[DataFactoryMonitor] {tf} data stale {age:.0f}s (over 60s since last sync)")
                 if status.get("candles", 0) < 30:
-                    self.logger.warning(f"[数据工厂监控] {tf} 数据不足: {status.get('candles', 0)} 根")
+                    self.logger.warning(f"[DataFactoryMonitor] {tf} insufficient data: {status.get('candles', 0)} candles")
 
             tick_age = now - health.get("last_tick_time", 0)
             if tick_age > 60 and health.get("bridging", False):
-                self.logger.warning(f"[数据工厂监控] 报价过期 {tick_age:.0f}s")
+                self.logger.warning(f"[DataFactoryMonitor] Quotes stale {tick_age:.0f}s")
 
             if not health.get("bridging", False):
-                self.logger.error("[数据工厂监控] 桥接未连接！")
+                self.logger.error("[DataFactoryMonitor] Bridge not connected!")
 
             errs = health.get("sync_errors", [])
             if errs:
                 last = errs[-1]
-                self.logger.warning(f"[数据工厂监控] 最近同步错误: {last.get('tf','?')} - {last.get('err','?')[:60]}")
+                self.logger.warning(f"[DataFactoryMonitor] Recent sync error: {last.get('tf','?')} - {last.get('err','?')[:60]}")
         except Exception as e:
-            self.logger.warning(f"[数据工厂监控] 检查失败: {e}")
+            self.logger.warning(f"[DataFactoryMonitor] Check failed: {e}")
 
 
     # ======================== 独立价格轮询线程 ========================
@@ -502,7 +502,7 @@ class EngineRunner:
                 from core import bias_state
                 bias_state.refresh_from_db()
             except Exception as e:
-                self.logger.warning(f"[bias_refresher] 首次刷新失败: {e}")
+                self.logger.warning(f"[bias_refresher] First refresh failed: {e}")
 
             while not self._stop_requested:
                 for _ in range(60):
@@ -513,7 +513,7 @@ class EngineRunner:
                     from core import bias_state
                     bias_state.refresh_from_db()
                 except Exception as e:
-                    self.logger.debug(f"[bias_refresher] 刷新失败: {e}")
+                    self.logger.debug(f"[bias_refresher] Refresh failed: {e}")
 
         self._bias_thread = threading.Thread(target=_refresh, daemon=True, name="bias_refresher")
         self._bias_thread.start()
@@ -525,7 +525,7 @@ class EngineRunner:
         try:
             self._run_impl()
         except Exception as e:
-            self.logger.exception(f"引擎线程异常终止: {e}")
+            self.logger.exception(f"Engine thread terminated abnormally: {e}")
             self._stop_requested = True
             self._running = False
             self._engine = None
@@ -539,13 +539,13 @@ class EngineRunner:
         sys.path.insert(0, project_root)
 
         self.logger.info("=" * 60)
-        self.logger.info("XAUUSD Web Dashboard - 启动多策略交易引擎")
+        self.logger.info("XAUUSD Web Dashboard - Starting multi-strategy trading engine")
         self.logger.info("=" * 60)
 
         # 强制重载配置，确保引擎使用最新的 settings.py
         import config.settings as _cfg_reload
         importlib.reload(_cfg_reload)
-        self.logger.info(f"[配置] STRATEGY_POOL: {list(_cfg_reload.STRATEGY_POOL.keys())}")
+        self.logger.info(f"[Config] STRATEGY_POOL: {list(_cfg_reload.STRATEGY_POOL.keys())}")
 
         # 导入多策略引擎（用 importlib 避开 module 缓存冲突 'main'）
         try:
@@ -553,14 +553,14 @@ class EngineRunner:
             main_path = os.path.join(project_root, "engine_standalone", "main.py")
             spec = importlib.util.spec_from_file_location("xauusd_trading_engine", main_path)
             if spec is None or spec.loader is None:
-                self.logger.error(f"无法加载 TradingEngine: {main_path} 不存在或格式错误")
+                self.logger.error(f"Failed to load TradingEngine: {main_path} does not exist or is malformed")
                 self._running = False
                 return
             main_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(main_module)
             TradingEngine = main_module.TradingEngine
         except Exception as e:
-            self.logger.error(f"无法导入 TradingEngine: {e}")
+            self.logger.error(f"Failed to import TradingEngine: {e}")
             self._running = False
             return
 
@@ -569,14 +569,14 @@ class EngineRunner:
 
         # 连接 MT4（带重试）
         if not engine.bridge.connect():
-            self.logger.warning("无法连接 MT4，每 10 秒重试...")
+            self.logger.warning("Failed to connect to MT4, retrying every 10 seconds...")
             for attempt in range(30):
                 time.sleep(10)
                 if engine.bridge.connect():
-                    self.logger.info(f"第 {attempt+1} 次重试后连接成功")
+                    self.logger.info(f"Connected after {attempt+1} retries")
                     break
             else:
-                self.logger.error("重试 30 次仍无法连接 MT4")
+                self.logger.error("Failed to connect to MT4 after 30 retries")
                 self._running = False
                 return
 
@@ -609,16 +609,16 @@ class EngineRunner:
         engine.running = True
         self._start_time = datetime.now()
         self._running = True
-        self.logger.info("进入主循环...")
+        self.logger.info("Entering main loop...")
 
         # 连接数据桥接 + 启动数据工厂独立线程
         try:
             if getattr(engine, '_data_factory', None):
                 engine._data_factory.connect()
                 engine._data_factory.start()
-                self.logger.info("[数据工厂] 已启动（数据桥接模式）")
+                self.logger.info("[DataFactory] Started (data bridge mode)")
         except Exception as e:
-            self.logger.warning(f"[数据工厂] 启动失败: {e}")
+            self.logger.warning(f"[DataFactory] Start failed: {e}")
 
         # 自动补充遗漏历史成交
         engine._recover_missing_trades()
@@ -635,7 +635,7 @@ class EngineRunner:
             try:
                 engine._tick()  # 内含心跳、策略处理、执行
             except Exception as e:
-                self.logger.exception(f"主循环异常: {e}")
+                self.logger.exception(f"Main loop exception: {e}")
                 time.sleep(60)
 
             # K 线缓存后台刷新（低频率，与 _tick 串行避免桥接冲突）
@@ -653,4 +653,4 @@ class EngineRunner:
         self._running = False
         self._engine = None
         self.bridge = None
-        self.logger.info("交易引擎已停止")
+        self.logger.info("Trading engine stopped")

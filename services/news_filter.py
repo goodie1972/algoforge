@@ -68,12 +68,12 @@ class NewsFilter:
         last_fetch = self._get_last_fetch_time()
         now = time.time()
         if last_fetch == 0 or (now - last_fetch) >= FETCH_INTERVAL:
-            logger.info("[新闻过滤] 日历过期或缺失，启动时拉取")
+            logger.info("[NewsFilter] Calendar expired or missing, fetching at start")
             self._do_fetch(now)
         else:
             elapsed = now - last_fetch
             self._next_fetch = last_fetch + FETCH_INTERVAL
-            logger.info(f"[新闻过滤] 日历有效（{elapsed/3600:.1f}h 前拉取），"
+            logger.info(f"[NewsFilter] Calendar valid (fetched {elapsed/3600:.1f}h ago)，"
                        f"下次拉取: {datetime.fromtimestamp(self._next_fetch, tz=settings.LOCAL_TZ).strftime('%m-%d %H:%M')}")
 
     def _read_config(self):
@@ -110,9 +110,9 @@ class NewsFilter:
                     self._cache = events
                     self._cache_time = time.time()
                 self._merge_builtin_events()
-                logger.info(f"[新闻过滤] 从 DB 加载 {len(events)} 个事件")
+                logger.info(f"[NewsFilter] Loaded {len(events)} events from DB")
         except Exception as e:
-            logger.warning(f"[新闻过滤] DB 加载失败: {e}")
+            logger.warning(f"[NewsFilter] DB loadfailed: {e}")
 
     def _save_to_db(self, events: list[dict]):
         """将事件持久化到 SQLite"""
@@ -122,9 +122,9 @@ class NewsFilter:
             now = time.time()
             db.insert_news_events(events, now)
             db.set_metadata("news_last_fetch_time", str(now))
-            logger.info(f"[新闻过滤] 已持久化 {len(events)} 个事件")
+            logger.info(f"[NewsFilter] Persisted {len(events)} events")
         except Exception as e:
-            logger.warning(f"[新闻过滤] DB 持久化失败: {e}")
+            logger.warning(f"[NewsFilter] DB persist failed: {e}")
 
     def _merge_builtin_events(self):
         """将内置高影响事件（FOMC）合并到缓存，避免 ForexFactory 周历覆盖不到"""
@@ -140,7 +140,7 @@ class NewsFilter:
                 existing_keys.add(key)
                 added += 1
         if added:
-            logger.info(f"[新闻过滤] 合并 {added} 个内置事件 (FOMC)")
+            logger.info(f"[NewsFilter] merged {added} built-in events (FOMC)")
 
     def _get_last_fetch_time(self) -> float:
         """读取上次成功拉取的时间戳"""
@@ -180,20 +180,20 @@ class NewsFilter:
                 self._next_fetch = now + FETCH_INTERVAL
                 merged = list(self._cache)
                 self._save_to_db(merged)
-                logger.info(f"[新闻过滤] HTTP 拉取成功: {len(data)} 个事件, "
+                logger.info(f"[NewsFilter] HTTP fetch success: {len(data)} event, "
                            f"下次拉取: {datetime.fromtimestamp(self._next_fetch, tz=settings.LOCAL_TZ).strftime('%m-%d %H:%M')}")
             else:
-                logger.warning(f"[新闻过滤] 日历格式异常: {type(data)}")
+                logger.warning(f"[NewsFilter] Calendar format exception: {type(data)}")
                 self._next_fetch = now + 3600  # 1h 后重试
         except requests.exceptions.HTTPError as e:
             if resp.status_code == 429:
                 self._retry_after = now + 3600
-                logger.warning("[新闻过滤] API 限流，1h 内不重试")
+                logger.warning("[NewsFilter] API rate limited, skip retry for 1h")
             else:
-                logger.warning(f"[新闻过滤] HTTP 失败: {e}")
+                logger.warning(f"[NewsFilter] HTTP failed: {e}")
             self._next_fetch = now + 3600
         except requests.RequestException as e:
-            logger.warning(f"[新闻过滤] HTTP 失败: {e}")
+            logger.warning(f"[NewsFilter] HTTP failed: {e}")
             self._next_fetch = now + 3600
 
     def force_refresh(self):
@@ -222,9 +222,9 @@ class NewsFilter:
             if results:
                 bullish = sum(1 for r in results if r['direction'] == 'bullish')
                 bearish = sum(1 for r in results if r['direction'] == 'bearish')
-                logger.info(f"[黄金快讯] 定时抓取完成: {len(results)}条, 利多{bullish}/利空{bearish}")
+                logger.info(f"[GoldNews] Scheduled fetch done: {len(results)}, bullish{bullish}/bearish{bearish}")
         except Exception as e:
-            logger.warning(f"[黄金快讯] 定时抓取异常: {e}")
+            logger.warning(f"[GoldNews] Scheduled fetch exception: {e}")
         if not cfg["enabled"]:
             return
 
@@ -252,7 +252,7 @@ class NewsFilter:
                                 f"准确率{report['accuracy']}%")
                 logger.info(summary)
         except Exception as e:
-            logger.warning(f"[NewsBias] 评估异常: {e}")
+            logger.warning(f"[NewsBias] evaluateexception: {e}")
 
     def get_blackout_windows(self) -> list[tuple[datetime, datetime, str]]:
         """返回当前应生效的禁售窗口列表"""
@@ -415,7 +415,7 @@ class NewsFilter:
                 "details": details,
             }
         except Exception as e:
-            logger.error(f"[News-Bias] 获取方向异常: {e}")
+            logger.error(f"[NewsBias] direction fetch exception: {e}")
             return None
 
     # ── 前端展示 ──────────────────────────────────────────

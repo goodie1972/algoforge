@@ -67,7 +67,7 @@ class TradeSupervisor:
             "scores": entry_data.get("scores", {}),
             "entry_timestamp": time.time(),
         }
-        logger.info(f"[监督者] 记录开仓 #{ticket} {strategy} {direction} @{price}")
+        logger.info(f"[Supervisor] recordopen #{ticket} {strategy} {direction} @{price}")
 
     def on_trade_close(self, record: dict, exit_type: str = "strategy_exit"):
         """平仓后分析交易质量
@@ -319,7 +319,7 @@ class TradeSupervisor:
                             except json.JSONDecodeError:
                                 continue
         except Exception as e:
-            logger.warning(f"[监督者] 加载成交文件失败: {e}")
+            logger.warning(f"[Supervisor] loadfilledfilefailed: {e}")
         return trades
 
     def _load_trades_for_strategy(self, strategy: str) -> list[dict]:
@@ -347,7 +347,7 @@ class TradeSupervisor:
         if len(self._alerts) > 500:
             self._alerts = self._alerts[-500:]
 
-        logger.warning(f"[监督者告警] {strategy} #{ticket}: {issue}")
+        logger.warning(f"[SupervisorAlert] {strategy} #{ticket}: {issue}")
 
     # ── 公开查询方法 ─────────────────────────────────
 
@@ -393,7 +393,7 @@ class TradeSupervisor:
             with open(alerts_file, "w", encoding="utf-8") as f:
                 json.dump(self._alerts, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.warning(f"[监督者] 持久化告警失败: {e}")
+            logger.warning(f"[Supervisor] persist alert failed: {e}")
 
     def _load_alerts(self):
         """加载持久化告警"""
@@ -404,6 +404,6 @@ class TradeSupervisor:
             if os.path.exists(alerts_file):
                 with open(alerts_file, "r", encoding="utf-8") as f:
                     self._alerts = json.load(f)
-                logger.info(f"[监督者] 加载 {len(self._alerts)} 条历史告警")
+                logger.info(f"[Supervisor] Loaded {len(self._alerts)} history alerts")
         except Exception as e:
-            logger.warning(f"[监督者] 加载历史告警失败: {e}")
+            logger.warning(f"[Supervisor] load history alerts failed: {e}")

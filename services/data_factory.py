@@ -262,7 +262,7 @@ class DataFactory:
                 _HEALTH["bridging"] = ok
             return ok
         except Exception as e:
-            logger.warning(f"[数据工厂] 桥接连接失败: {e}")
+            logger.warning(f"[DataFactory] bridge connect failed: {e}")
             with _CACHE_LOCK:
                 _HEALTH["bridging"] = False
                 _HEALTH["sync_errors"].append({"time": time.time(), "tf": "bridge", "err": str(e)})
@@ -279,7 +279,7 @@ class DataFactory:
         self._init_indicators_from_db()
         self._thread = threading.Thread(target=self._run, daemon=True, name="data-factory")
         self._thread.start()
-        logger.info("[数据工厂] 已启动")
+        logger.info("[DataFactory] started")
 
     def _init_indicators_from_db(self):
         """从 DB 读最近 350 根 K 线的指标填充内存缓存（启动恢复）。
@@ -296,22 +296,22 @@ class DataFactory:
                 _DATA_CACHE[tf].update(rows[-1]["indicators"])
                 self._last_db_ts[tf] = int(rows[-1]["timestamp"])
                 _HEALTH["db_health"]["reads_at_startup"] += len(rows)
-        logger.info("[数据工厂] 启动从 DB 恢复指标完成（EA 还没出 F043 时策略能跑）")
+        logger.info("[DataFactory] started, indicators recovered from DB (Strategy can run before EA F043)")
 
     def stop(self):
         self._running = False
-        logger.info("[数据工厂] 已停止")
+        logger.info("[DataFactory] stopped")
 
     def _run(self):
-        logger.info("[数据工厂] 开始首次全量加载...")
+        logger.info("[DataFactory] First full load started...")
         for attempt in range(10):
             if self._initial_load():
                 break
-            logger.info(f"[数据工厂] 首次加载未完成({attempt+1}/10)，1秒后重试...")
+            logger.info(f"[DataFactory] First load not done ({attempt+1}/10), retry in 1s...")
             time.sleep(1)
         else:
-            logger.warning("[数据工厂] 首次加载10次重试后仍有缺失，继续增量循环")
-        logger.info("[数据工厂] 首次加载完成，进入增量循环")
+            logger.warning("[DataFactory] After 10 retries still missing, resuming incremental loop")
+        logger.info("[DataFactory] First load done, entering incremental loop")
         _last_validation = 0
         _last_tick_persist = 0.0
         while self._running:
@@ -433,7 +433,7 @@ class DataFactory:
                 _HEALTH["sync_errors"].append({"time": time.time(), "tf": tf, "err": str(e)[:100]})
                 _HEALTH["sync_errors"] = _HEALTH["sync_errors"][-_SYNC_ERRORS_MAX:]
             if full:
-                logger.warning(f"[数据工厂] 加载 {tf} 失败: {e}")
+                logger.warning(f"[DataFactory] load {tf} failed: {e}")
             return False
 
     def _validate_data(self):
@@ -472,10 +472,10 @@ class DataFactory:
                 if count >= 3:
                     avg_diff = diff_sum / count
                     if avg_diff > 5.0:
-                        logger.warning(f"[数据工厂] {tf} 数据偏差 {avg_diff:.1f} 点（>5点），可能数据异常")
+                        logger.warning(f"[DataFactory] {tf} data deviation {avg_diff:.1f}  points (>5), possible data exception")
             conn.close()
         except Exception as e:
-            logger.warning(f"[数据工厂] 数据校验失败: {e}")
+            logger.warning(f"[DataFactory] data validation failed: {e}")
 
     def _sync_tick(self, bridge):
         global _TICK_COUNTER
@@ -501,7 +501,7 @@ class DataFactory:
         try:
             upsert_tick(int(tick.get("time", time.time())), tick.get("bid", 0), tick.get("ask", 0))
         except Exception as e:
-            logger.warning(f"[数据工厂] tick 写 DB 失败: {e}")
+            logger.warning(f"[DataFactory] tick write to DB failed: {e}")
 
     def _sync_indicators(self, bridge):
         """从 MT4 EA 直接获取指标值 (F043)。
@@ -520,10 +520,10 @@ class DataFactory:
             try:
                 mt4_ind = bridge.get_indicators("XAUUSD", tf) if hasattr(bridge, "get_indicators") else {}
             except Exception as _e:
-                logger.warning(f"[数据工厂] F043 tf={tf} 异常: {_e}")
+                logger.warning(f"[DataFactory] F043 tf={tf} exception: {_e}")
                 mt4_ind = {}
             if not mt4_ind:
-                logger.warning(f"[数据工厂] F043 tf={tf} 返回空(hasattr={hasattr(bridge,'get_indicators')})")
+                logger.warning(f"[DataFactory] F043 tf={tf} returned shorts(hasattr={hasattr(bridge,'get_indicators')})")
                 continue
             ea_ts = mt4_ind.get("time")
             with _CACHE_LOCK:

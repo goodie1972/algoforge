@@ -78,7 +78,7 @@ def fetch_huicong_news() -> list[dict]:
             seen.add(key)
             unique.append(item)
 
-    logger.info(f"[汇通快讯] 抓取到 {len(unique)} 条（原始 {len(items)} 条）")
+    logger.info(f"[HuiChengNews] Fetched {len(unique)} (raw {len(items)})")
     return unique
 
 
@@ -140,7 +140,7 @@ def judge_with_llm(news: list[dict], llm_manager) -> list[dict]:
             ])
 
             if not result:
-                logger.warning("[LLM黄金判断] 调用失败，回退到关键词规则")
+                logger.warning("[LLM GoldJudge] call failed, falling back to keyword rules")
                 # 回退到规则判断
                 for item in batch:
                     item["direction"] = _rule_based_judge(item["content"])
@@ -180,7 +180,7 @@ def judge_with_llm(news: list[dict], llm_manager) -> list[dict]:
                 results.append(item)
 
         except Exception as e:
-            logger.error(f"[LLM黄金判断] 批处理异常: {e}")
+            logger.error(f"[LLM GoldJudge] batch processing exception: {e}")
             for item in batch:
                 item["direction"] = _rule_based_judge(item["content"])
                 item["direction_reason"] = "规则回退"
@@ -234,9 +234,9 @@ def save_huicong_news(news: list[dict]):
         from data import database as db
         db.init_db()
         db.insert_gold_news(news)
-        logger.info(f"[汇通快讯] 已保存 {len(news)} 条到数据库")
+        logger.info(f"[HuiChengNews] saved {len(news)} to database")
     except Exception as e:
-        logger.error(f"[汇通快讯] 保存失败: {e}")
+        logger.error(f"[HuiChengNews] savefailed: {e}")
 
 
 def fetch_jin10_news() -> list[dict]:
@@ -280,7 +280,7 @@ def fetch_jin10_news() -> list[dict]:
             seen.add(key)
             unique.append(item)
 
-    logger.info(f"[金十数据] 抓取到 {len(unique)} 条快讯")
+    logger.info(f"[Jin10Data] Fetched {len(unique)} news")
     return unique
 
 
@@ -288,25 +288,25 @@ def fetch_and_judge(llm_manager=None) -> list[dict]:
     """
     完整流程：抓取汇通+金十 → 过滤 → LLM判断 → 保存 → 返回
     """
-    logger.info("[黄金快讯] 开始抓取+判断...")
+    logger.info("[GoldNews] Starting fetch + judge...")
 
     # 抓取多源
     all_news = []
     try:
         all_news.extend(fetch_huicong_news())
     except Exception as e:
-        logger.warning(f"[汇通快讯] 抓取失败: {e}")
+        logger.warning(f"[HuiChengNews] fetch failed: {e}")
     try:
         all_news.extend(fetch_jin10_news())
     except Exception as e:
-        logger.warning(f"[金十数据] 抓取失败: {e}")
+        logger.warning(f"[Jin10Data] fetch failed: {e}")
 
     if not all_news:
-        logger.warning("[黄金快讯] 未抓到任何快讯")
+        logger.warning("[GoldNews] No news fetched")
         return []
 
     gold_news = filter_gold_related(all_news)
-    logger.info(f"[黄金快讯] 黄金相关: {len(gold_news)}/{len(all_news)}")
+    logger.info(f"[GoldNews] gold related: {len(gold_news)}/{len(all_news)}")
 
     if llm_manager:
         gold_news = judge_with_llm(gold_news, llm_manager)
@@ -321,7 +321,7 @@ def fetch_and_judge(llm_manager=None) -> list[dict]:
     try:
         evaluate_past_gold_news()
     except Exception as e:
-        logger.warning(f"[黄金快讯] 评估异常: {e}")
+        logger.warning(f"[GoldNews] evaluateexception: {e}")
     return gold_news
 
 
@@ -411,15 +411,15 @@ def evaluate_past_gold_news():
             )
             evaluated += 1
             logger.info(
-                f"[黄金评估] id={gid} {direction} 实动={move_15m:+.2f} "
+                f"[GoldEval] id={gid} {direction} 实动={move_15m:+.2f} "
                 f"{'✅正确' if direction_match==1 else '❌错误' if direction_match==0 else 'N/A'}"
             )
 
         conn.commit()
         if evaluated:
-            logger.info(f"[黄金评估] 本次评估 {evaluated} 条")
+            logger.info(f"[GoldEval] Evaluated {evaluated} this round ")
     except Exception as e:
-        logger.warning(f"[黄金评估] 异常: {e}")
+        logger.warning(f"[GoldEval] exception: {e}")
     finally:
         conn.close()
 

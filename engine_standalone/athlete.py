@@ -25,7 +25,7 @@ class Athlete:
         strategy_name = signal.get("strategy", "")
         for item in self._pending:
             if item["signal"].get("strategy") == strategy_name and item["direction"] == direction:
-                logger.debug(f"[运动员] 重复门票 #{signal_id} {direction}，跳过（已有 #{item['signal_id']} 在等待）")
+                logger.debug(f"[Athlete] Duplicate ticket #{signal_id} {direction}, skipped (#{item['signal_id']} already pending)")
                 return
         self._pending.append({
             "signal_id": signal_id,
@@ -33,7 +33,7 @@ class Athlete:
             "signal": signal,
             "ticks_left": _MAX_TICKS,  # 从 _MAX_TICKS 开始
         })
-        logger.info(f"[运动员] 收到候选门票 #{signal_id} {direction}，剩余 {_MAX_TICKS} tick")
+        logger.info(f"[Athlete] Received candidate ticket #{signal_id} {direction}, {_MAX_TICKS} ticks remaining")
         # 提交后立即验证一轮
         self.run()
 
@@ -44,7 +44,7 @@ class Athlete:
             item["ticks_left"] -= 1
             if item["ticks_left"] < 0:
                 self._void(item, "tick_expired")
-                logger.info(f"[运动员] 门票 #{item['signal_id']} 作废（{_MAX_TICKS} tick 均未通过）")
+                logger.info(f"[Athlete] Ticket #{item['signal_id']} voided (all {_MAX_TICKS} ticks failed)")
                 continue
             tick = get_tick()
             if not tick:
@@ -85,7 +85,7 @@ class Athlete:
                 except TypeError:
                     return cls._verify_entry(signal, tick_price, latest)
         except Exception as e:
-            logger.warning(f"[运动员] scanner异常({strategy_name}): {e}")
+            logger.warning(f"[Athlete] scanner exception ({strategy_name}): {e}")
 
         # 默认 fallback
         bb = latest.get("bb") or signal.get("indicator_values", {}).get("bb") or {}
@@ -127,12 +127,12 @@ class Athlete:
             )
             if ticket:
                 db.update_signal_status(item["signal_id"], {"status": "opened", "ticket": ticket})
-                logger.info(f"[运动员] 开仓成功 #{ticket} {direction} @ {price:.2f}")
+                logger.info(f"[Athlete] Order opened successfully #{ticket} {direction} @ {price:.2f}")
                 self._recently_opened.append((ticket, strategy))
             else:
                 self._void(item, "order_failed")
         except Exception as e:
-            logger.error(f"[运动员] 开仓失败: {e}")
+            logger.error(f"[Athlete] Order failed: {e}")
             self._void(item, f"order_error:{e}")
 
     def _void(self, item: dict, reason: str):

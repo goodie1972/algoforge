@@ -48,7 +48,7 @@ MIN_HOLD_SECONDS = 30  # 持仓小于此时间被平仓视为可疑
 
 @dataclass
 class StrategyRiskState:
-    """单策略风控状态"""
+    """ orders策略风控状态"""
     name: str
     magic: int
     realized_pnl: float = 0.0                     # 累计已实现盈亏
@@ -74,20 +74,20 @@ def create_strategies(bridge, pool=None):
     for name, cfg in pool.items():
         cls = scan_strategies().get(name)
         if cls is None:
-            logger.warning(f"未知策略: {name}，跳过")
+            logger.warning(f"Unknown strategy: {name}, skip")
             continue
         if not cfg.get("enabled", True):
-            logger.info(f"[策略加载] {name} 已禁用，跳过")
+            logger.info(f"[StrategyLoad] {name} disabled, skip")
             continue
         if cfg.get("max_positions", 1) == 0:
-            logger.info(f"[策略加载] {name} 最大持仓为 0，跳过")
+            logger.info(f"[StrategyLoad] {name} max_positions=0, skip")
             continue
         strategy = cls(bridge, magic=cfg["magic"], timeframe=cfg["timeframe"])
         strategy.magic = cfg["magic"]
         strategy.double_first = cfg.get("double_first", False)
         strategy.max_positions = cfg.get("max_positions", 1)
         strategies.append(strategy)
-        logger.info(f"[策略加载] {name} Magic={strategy.magic} TF={strategy.timeframe}")
+        logger.info(f"[StrategyLoad] {name} Magic={strategy.magic} TF={strategy.timeframe}")
     return strategies
 
 
@@ -97,14 +97,14 @@ class TradingEngine:
     def __init__(self, config_service=None):
         self._config_service = config_service
         # 三轨架构：双桥接 + 数据工厂 + 运动员
-        # 数据桥接(推送K线/报价) 和 执行桥接(下单)，纸面模式下执行桥接用PaperBridge包装
+        # 数据桥接(推送K线/报价) 和 执行桥接(下 orders)，纸面模式下执行桥接用PaperBridge包装
         from services.data_factory import DataFactory, get_cache, get_tick
         from engine_standalone.athlete import Athlete
         self._data_bridge, self._exec_bridge = create_bridge_pair()
         self.bridge = self._exec_bridge            # 引擎主桥接 = 执行通道
         self._data_factory = DataFactory(self._data_bridge)
         self._athlete = Athlete(self._exec_bridge)
-        logger.info("[三轨] 双桥接 + DataFactory + Athlete 初始化成功，待连接")
+        logger.info("[ThreeRail] dual bridge + DataFactory + Athlete initialized successfully, awaiting connection")
         pool = self._get_strategy_pool()
         self.strategies = create_strategies(self.bridge, pool)
         self._strategies_lock = threading.Lock()
@@ -205,15 +205,15 @@ class TradingEngine:
         try:
             mt4_ts = self.bridge.get_server_time()
             if mt4_ts <= 0:
-                logger.warning("[时间校准] MT4 服务器时间获取失败，跳过校准")
+                logger.warning("[TimeSync] MT4 server time unavailable, skip sync")
                 return
             now_utc = int(time.time())
             self._mt4_offset = mt4_ts - now_utc
             sign = "+" if self._mt4_offset >= 0 else ""
-            logger.info(f"[时间校准] MT4: {mt4_ts} | 本机UTC: {now_utc} | "
+            logger.info(f"[TimeSync] MT4: {mt4_ts} | Local UTC: {now_utc} | "
                        f"偏移: {sign}{self._mt4_offset/3600:.1f}h")
         except Exception as e:
-            logger.warning(f"[时间校准] 失败: {e}")
+            logger.warning(f"[TimeSync] failed: {e}")
 
     def _mt4_to_local(self, mt4_ts: int):
         """将 MT4 时间戳转为本地 datetime（UTC+8）
@@ -294,7 +294,7 @@ class TradingEngine:
         try:
             candles = self.bridge.get_candles(settings.SYMBOL, tf, count)
         except Exception as e:
-            logger.warning(f"[K线获取] {tf} 桥接失败: {e}")
+            logger.warning(f"[CandleFetch] {tf} bridge failed: {e}")
             candles = []
 
         if len(candles) >= count:
@@ -306,7 +306,7 @@ class TradingEngine:
         if not candles:
             db_raw = db.get_candles(tf, end_ts=int(time.time()), limit=count)
             if db_raw:
-                logger.info(f"[K线获取] {tf} 桥接无数据，从数据库补充 {len(db_raw)} 条")
+                logger.info(f"[CandleFetch] {tf} bridge returned no data, fallback to DB {len(db_raw)} ")
                 return self._db_to_candles(db_raw)
             return []
 
@@ -314,7 +314,7 @@ class TradingEngine:
         try:
             oldest_ts = self._parse_bridge_time(candles[0].time)
         except Exception as e:
-            logger.warning(f"[K线获取] {tf} 解析桥接头时间失败: {e}")
+            logger.warning(f"[CandleFetch] {tf} bridge header parse failed: {e}")
             return candles
 
         tf_sec = self._tf_to_seconds(tf)
@@ -328,7 +328,7 @@ class TradingEngine:
 
         db_candles = self._db_to_candles(db_raw)
         total = len(db_candles) + len(candles)
-        logger.info(f"[K线获取] {tf} 桥接 {len(candles)} + 补充 {len(db_candles)} = {total}")
+        logger.info(f"[CandleFetch] {tf} bridge {len(candles)} + Backfilled {len(db_candles)} = {total}")
 
         return db_candles + candles
 
@@ -344,16 +344,16 @@ class TradingEngine:
                                 self._closed_trades.append(json.loads(line))
                             except json.JSONDecodeError:
                                 continue
-                logger.info(f"加载历史成交 {len(self._closed_trades)} 条")
+                logger.info(f"Loaded historical trades {len(self._closed_trades)} ")
         except Exception as e:
-            logger.warning(f"加载历史成交失败: {e}")
+            logger.warning(f"Loaded historical tradesfailed: {e}")
 
     def _recover_missing_trades(self):
         """启动时从 MT4 补充遗漏的历史成交记录"""
         try:
             orders = self.bridge.get_order_history(settings.SYMBOL)
         except Exception as e:
-            logger.warning(f"[成交恢复] 获取历史失败: {e}")
+            logger.warning(f"[TradeRecovery] History fetch failed: {e}")
             return
         if not orders:
             return
@@ -361,7 +361,7 @@ class TradingEngine:
         existing_tickets = {t["ticket"] for t in self._closed_trades}
         missing = [o for o in orders if o["ticket"] not in existing_tickets]
         if not missing:
-            logger.info(f"[成交恢复] 无需补充，已是最新")
+            logger.info(f"[TradeRecovery] No backfill needed, already up-to-date")
             return
 
         records = []
@@ -398,7 +398,7 @@ class TradingEngine:
                 for r in records:
                     f.write(json.dumps(r, ensure_ascii=False) + "\n")
         except OSError as e:
-            logger.warning(f"[成交恢复] 写入文件失败: {e}")
+            logger.warning(f"[TradeRecovery] File write failed: {e}")
         try:
             db.insert_trades_batch(records)
             for r in records:
@@ -417,18 +417,18 @@ class TradingEngine:
         except Exception:
             pass
 
-        logger.info(f"[成交恢复] 补充 {len(records)} 条历史成交")
+        logger.info(f"[TradeRecovery] Backfilled {len(records)} historical trades")
 
     # ======================== 成交同步监督 ========================
 
     def _check_trade_sync(self):
-        """轻量监督：对比 MT4 历史与本地数据库的成交数量，不一致时告警"""
+        """轻量监督：对比 MT4 历史与本地数据库的成交数量， mismatch时告警"""
         try:
             orders = self.bridge.get_order_history(settings.SYMBOL)
             if not orders:
                 return
         except Exception as e:
-            logger.warning(f"[成交监督] 获取MT4历史失败: {e}")
+            logger.warning(f"[TradeAudit] MT4 history fetch failed: {e}")
             return
 
         mt4_count = len(orders)
@@ -440,31 +440,31 @@ class TradingEngine:
         if mt4_count > db_count:
             missing = mt4_count - db_count
             logger.warning(
-                f"[成交监督] MT4 有 {mt4_count} 笔，本地数据库 {db_count} 笔，"
+                f"[TradeAudit] MT4 有 {mt4_count} 笔，本地数据库 {db_count} 笔，"
                 f"缺失 {missing} 笔，启动恢复..."
             )
             self._recover_missing_trades()
         elif mt4_count < db_count:
             logger.warning(
-                f"[成交监督] 本地数据库 {db_count} 笔 > MT4 {mt4_count} 笔，"
+                f"[TradeAudit] 本地数据库 {db_count} 笔 > MT4 {mt4_count} 笔，"
                 f"可能是 MT4 历史被清理"
             )
         else:
-            logger.info(f"[成交监督] 数据一致 (MT4={mt4_count}, DB={db_count})")
+            logger.info(f"[TradeAudit] data consistent (MT4={mt4_count}, DB={db_count})")
 
     def add_strategy(self, name: str, cfg: dict) -> bool:
         """动态添加策略（运行中），返回是否成功"""
         with self._strategies_lock:
             if any(s.name == name for s in self.strategies):
-                logger.warning(f"[策略动态添加] {name} 已存在，跳过")
+                logger.warning(f"[StrategyAdd] {name} already exists, skip")
                 return False
             magic = cfg["magic"]
             if any(s.magic == magic for s in self.strategies):
-                logger.warning(f"[策略动态添加] Magic {magic} 已被占用，跳过")
+                logger.warning(f"[StrategyAdd] Magic {magic} already in use, skip")
                 return False
             cls = scan_strategies().get(name)
             if cls is None:
-                logger.warning(f"[策略动态添加] 未知策略: {name}")
+                logger.warning(f"[StrategyAdd] Unknown strategy: {name}")
                 return False
             strategy = cls(self.bridge, magic=magic, timeframe=cfg.get("timeframe", "H1"))
             strategy.magic = magic
@@ -475,7 +475,7 @@ class TradingEngine:
             existing = self.bridge.takeover_existing_positions(settings.SYMBOL, magic)
             for pos in existing:
                 self._entry_times[pos.ticket] = time.time()
-            logger.info(f"[策略动态添加] {name} Magic={magic} TF={cfg.get('timeframe','H1')}")
+            logger.info(f"[StrategyAdd] {name} Magic={magic} TF={cfg.get('timeframe','H1')}")
             return True
 
     def remove_strategy(self, name: str, close_positions: bool = True) -> bool:
@@ -483,7 +483,7 @@ class TradingEngine:
         with self._strategies_lock:
             strategy = next((s for s in self.strategies if s.name == name), None)
             if strategy is None:
-                logger.warning(f"[策略动态移除] {name} 不存在")
+                logger.warning(f"[StrategyRemove] {name} does not exist")
                 return False
             if close_positions:
                 positions = self.bridge.get_positions(settings.SYMBOL)
@@ -493,7 +493,7 @@ class TradingEngine:
                         self._entry_times.pop(pos.ticket, None)
             self.strategies = [s for s in self.strategies if s.name != name]
             self._risk_states.pop(strategy.magic, None)
-            logger.info(f"[策略动态移除] {name} Magic={strategy.magic}")
+            logger.info(f"[StrategyRemove] {name} Magic={strategy.magic}")
             return True
 
     def _sync_strategy_pool(self):
@@ -511,7 +511,7 @@ class TradingEngine:
             if cfg is None or not cfg.get("enabled", True) or cfg.get("max_positions", 1) == 0:
                 if name in current:
                     self.remove_strategy(name, close_positions=True)
-                    logger.info(f"[策略池同步] 已移除 {name}")
+                    logger.info(f"[StrategyPoolSync] removed {name}")
 
         # 重新获取快照（移除后 list 已变）
         with self._strategies_lock:
@@ -523,7 +523,7 @@ class TradingEngine:
                 continue
             if name not in current:
                 self.add_strategy(name, cfg)
-                logger.info(f"[策略池同步] 已添加 {name}")
+                logger.info(f"[StrategyPoolSync] added {name}")
 
         # 3. 更新：参数变更（max_positions / double_first）
         with self._strategies_lock:
@@ -533,10 +533,10 @@ class TradingEngine:
                     continue
                 if s.max_positions != cfg.get("max_positions", 1):
                     s.max_positions = cfg.get("max_positions", 1)
-                    logger.info(f"[策略池同步] {name} max_positions → {s.max_positions}")
+                    logger.info(f"[StrategyPoolSync] {name} max_positions → {s.max_positions}")
                 if s.double_first != cfg.get("double_first", False):
                     s.double_first = cfg.get("double_first", False)
-                    logger.info(f"[策略池同步] {name} double_first → {s.double_first}")
+                    logger.info(f"[StrategyPoolSync] {name} double_first → {s.double_first}")
 
     @staticmethod
     def _strategy_magics(strategy) -> set[int]:
@@ -544,7 +544,7 @@ class TradingEngine:
         return {strategy.magic} | set(getattr(strategy, 'legacy_magics', []))
 
     def _init_risk_state(self, name: str, magic: int):
-        """初始化单策略风控状态"""
+        """初始化 orders策略风控状态"""
         if magic not in self._risk_states:
             self._risk_states[magic] = StrategyRiskState(name=name, magic=magic)
 
@@ -617,8 +617,8 @@ class TradingEngine:
                     self._profit_exit_cooldown[magic] = {}
                 self._profit_exit_cooldown[magic][direction] = time.time()
                 logger.info(
-                    f"[止盈冷却] {state.name} {direction} 盈利 ${pnl:.2f}，"
-                    f"{self._rt('profit_exit_cooldown_hours')}h 内不再开同向单"
+                    f"[TPCooldown] {state.name} {direction} 盈利 ${pnl:.2f}，"
+                    f"{self._rt('profit_exit_cooldown_hours')}h 内不再开同向 orders"
                 )
 
         # 绝对亏损阻断：已实现亏损 ≥$30 触发 12h 冷却
@@ -633,7 +633,7 @@ class TradingEngine:
         # 亏损回正自动解除
         if state.realized_pnl > 0 and state.realized_loss_amount_blocked:
             state.realized_loss_amount_blocked = False
-            logger.info(f"[{state.name}] 已实现亏损回正，解除绝对亏损冷却")
+            logger.info(f"[{state.name}] Loss recovered, cooling lifted")
 
         # 已实现亏损阻断检查（百分比）
         balance = self._get_balance()
@@ -664,14 +664,14 @@ class TradingEngine:
         if loss_pct >= self._rt('max_daily_loss_pct'):
             if not self._global_loss_blocked:
                 logger.error(
-                    f"[全局硬止损] 已实现亏损 {loss_pct:.2f}% "
+                    f"[GlobalHardStop] 已实现亏损 {loss_pct:.2f}% "
                     f"（上限 {self._rt('max_daily_loss_pct')}%），全策略停开仓"
                 )
             self._global_loss_blocked = True
             return True
 
         if self._global_loss_blocked:
-            logger.info(f"[全局硬止损] 已实现亏损恢复至 {loss_pct:.2f}%，恢复开仓")
+            logger.info(f"[GlobalHardStop] Loss recovered to {loss_pct:.2f}%，trading resumed")
         self._global_loss_blocked = False
         return False
 
@@ -757,22 +757,22 @@ class TradingEngine:
 
     def start(self):
         logger.info("=" * 60)
-        logger.info("XAUUSD 多策略交易系统 启动")
-        logger.info(f"品种: {settings.SYMBOL} | 手数: {self._rt('lot_size')}")
+        logger.info("XAUUSD Multi-Strategy Trading Engine Starting")
+        logger.info(f"Symbol: {settings.SYMBOL} | Lot: {self._rt('lot_size')}")
         for s in self.strategies:
-            logger.info(f"  策略: {s.name} | Magic={s.magic} | TF={s.timeframe} | "
-                        f"双倍首单={s.double_first} | 最大仓位={s.max_positions}")
+            logger.info(f"  Strategy: {s.name} | Magic={s.magic} | TF={s.timeframe} | "
+                        f"双倍首 orders={s.double_first} | 最大仓位={s.max_positions}")
         logger.info("=" * 60)
 
         if not self.bridge.connect():
-            logger.warning("无法连接 MT4，每 10 秒重试...")
+            logger.warning("Failed to connect to MT4, retrying every 10s...")
             for attempt in range(30):  # 最多重试 5 分钟
                 time.sleep(10)
                 if self.bridge.connect():
-                    logger.info(f"第 {attempt+1} 次重试后连接成功")
+                    logger.info(f"Connected after {attempt+1} retries")
                     break
             else:
-                logger.error("重试 30 次仍无法连接 MT4，退出")
+                logger.error("Failed to connect after 30 retries, exiting")
                 return
 
         # 初始化策略风控状态
@@ -806,9 +806,9 @@ class TradingEngine:
                             setattr(rs, flag, True)
                             setattr(rs, f"{flag}_at", time.time())
             if saved_states:
-                logger.info(f"[风控恢复] 已恢复 {len(saved_states)} 个策略的风控状态")
+                logger.info(f"[RiskRestore] restored {len(saved_states)} strategies risk states")
         except Exception as e:
-            logger.warning(f"[风控恢复] 加载失败: {e}")
+            logger.warning(f"[RiskRestore] loadfailed: {e}")
 
         # 接管现有持仓（含 legacy magic）+ 填充 _entry_times
         for s in self.strategies:
@@ -818,7 +818,7 @@ class TradingEngine:
             self._known_position_count[s.magic] = len(existing)
             for pos in existing:
                 self._entry_times[pos.ticket] = time.time()
-                logger.info(f"[接管] {s.name} Ticket={pos.ticket}(Magic={pos.magic}) 已记录入场时间")
+                logger.info(f"[Takeover] {s.name} Ticket={pos.ticket}(Magic={pos.magic}) entry time recorded")
 
         self._daily_start_balance = self._get_balance()
         self.running = True
@@ -837,24 +837,24 @@ class TradingEngine:
         # 新闻过滤初始化加载
         windows = self.news_filter.get_blackout_windows()
         if windows:
-            logger.info(f"[新闻过滤] 已加载 {len(windows)} 个禁售窗口:")
+            logger.info(f"[NewsFilter] loaded {len(windows)} blackout windows:")
             for s, e, t in windows[:5]:
                 logger.info(f"  {s.strftime('%m-%d %H:%M')} ~ {e.strftime('%H:%M')} | {t}")
 
-        logger.info("进入主循环...")
+        logger.info("Entering main loop...")
 
         while self.running:
             try:
                 self._tick()
             except KeyboardInterrupt:
-                logger.info("收到中断信号，停止交易")
+                logger.info("Interrupt received, stopping")
                 self.running = False
             except Exception as e:
-                logger.exception(f"主循环异常: {e}")
+                logger.exception(f"Main loop exception: {e}")
                 time.sleep(60)
 
         self.bridge.disconnect()
-        logger.info("交易引擎已停止")
+        logger.info("Trading engine stopped")
 
     def _tick(self):
         # 取策略快照（线程安全，允许运行中加减策略）
@@ -873,10 +873,10 @@ class TradingEngine:
                 self._config_mtime = mtime
                 importlib.reload(settings)
                 RuntimeConfig().reload()
-                logger.info("[热重载] RuntimeConfig 已重新加载，当前 active 配置已更新")
+                logger.info("[HotReload] RuntimeConfig reloaded，current active Config updated")
                 for s in snapshot:
                     s.reload_config()
-                logger.info("[热重载] 配置已更新")
+                logger.info("[HotReload] Config updated")
         except OSError:
             pass
 
@@ -889,7 +889,7 @@ class TradingEngine:
                 RuntimeConfig().reload()
                 for s in snapshot:
                     s.reload_config()
-                logger.info("[RuntimeConfig] 热重载完成")
+                logger.info("[RuntimeConfig] Hot reload complete")
         except OSError:
             pass
 
@@ -900,16 +900,16 @@ class TradingEngine:
         try:
             self.bridge.send_heartbeat()
         except Exception:
-            logger.warning("[桥接] 心跳失败，尝试重连...")
+            logger.warning("[Bridge] Heartbeat failed, reconnecting...")
             try:
                 self.bridge.disconnect()
                 time.sleep(2)
                 if self.bridge.connect():
-                    logger.info("[桥接] 重连成功")
+                    logger.info("[Bridge] Reconnected")
                 else:
-                    logger.error("[桥接] 重连失败")
+                    logger.error("[Bridge] Reconnect failed")
             except Exception as e:
-                logger.error(f"[桥接] 重连异常: {e}")
+                logger.error(f"[Bridge] Reconnect error: {e}")
 
         # 周期性同步K线数据到SQLite
         self._sync_market_data()
@@ -932,12 +932,12 @@ class TradingEngine:
             try:
                 self._run_exits(strategy)
             except Exception as e:
-                logger.error(f"[{strategy.name}] 出场执行异常: {e}")
+                logger.error(f"[{strategy.name}] Exit execution error: {e}")
 
         # ---- 多策略协调出场：信号盈利时联动平目标 ----
         self._coordinated_exits(snapshot)
 
-        # ---- 短周期反向止盈：M15/M5 趋势反转时平盈利单 ----
+        # ---- 短周期反向止盈：M15/M5 趋势反转时平盈利 orders ----
         self._check_trend_reverse_tp()
 
         # 更新浮动盈亏
@@ -991,19 +991,19 @@ class TradingEngine:
             if not global_blocked and not news_blocked:
                 bias_blocked = self._check_news_bias_block()
                 if bias_blocked:
-                    logger.warning("[News-Bias] 方向阻塞触发，跳过开仓")
+                    logger.warning("[NewsBias] Direction block triggered, skipopen")
 
             safety_blocked = False
             if not global_blocked and not news_blocked:
                 if self._is_safety_locked():
                     safety_blocked = True
-                    logger.warning("[安全锁] 检测到锁文件，暂停开新仓")
+                    logger.warning("[SafetyLock] Lock file detected, pausing new orders")
 
             if global_blocked or news_blocked or safety_blocked or bias_blocked:
                 # 有全局阻断时，跳过本轮开仓
                 return
 
-        # ---- 交易时段检查（周末休市）----
+        # ---- 交易时段检查（周末closed）----
         if not self._is_market_open():
             return
 
@@ -1015,12 +1015,12 @@ class TradingEngine:
             if not _pc.get("enabled", False) and not _pc.get("ignore_gates", False):
                 block_reason = self._is_strategy_blocked(strategy.magic)
                 if block_reason:
-                    logger.info(f"[{strategy.name}] 跳过开仓: {block_reason}")
+                    logger.info(f"[{strategy.name}] skipopen: {block_reason}")
                     continue
             try:
                 self._run_strategy(strategy)
             except Exception as e:
-                logger.error(f"[{strategy.name}] 开仓执行异常: {e}")
+                logger.error(f"[{strategy.name}] Order execution error: {e}")
 
         # 三轨：运动员验证（每 tick 轮询 + 处理回调）
         if self._athlete:
@@ -1044,10 +1044,10 @@ class TradingEngine:
                     try:
                         strategy.mark_extreme_entry(ticket)
                     except Exception as e:
-                        logger.warning(f"[运动员回调] {strategy_name}.mark_extreme_entry({ticket}) 失败: {e}")
+                        logger.warning(f"[AthleteCallback] {strategy_name}.mark_extreme_entry({ticket}) failed: {e}")
 
     def _coordinated_exits(self, snapshot: list):
-        """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利单"""
+        """多策略协调出场：信号策略盈利时，联动关闭目标策略的同向盈利 orders"""
         coord = self._get_coordinator()
         if not coord.get("enabled", False) or not coord.get("cross_exit_enabled", False):
             return
@@ -1074,10 +1074,10 @@ class TradingEngine:
         try:
             positions = self.bridge.get_positions(settings.SYMBOL)
         except Exception as e:
-            logger.warning(f"[协调器] 获取持仓失败: {e}")
+            logger.warning(f"[Coordinator] get positions failed: {e}")
             return
 
-        # 信号策略的盈利单？
+        # 信号策略的盈利 orders？
         signal_profit = 0.0
         signal_found = False
         for pos in positions:
@@ -1096,7 +1096,7 @@ class TradingEngine:
         if not signal_found:
             return
 
-        # 联动关闭目标策略的盈利单
+        # 联动关闭目标策略的盈利 orders
         target_is_buy = target_dir == "BUY"
         closed = 0
         for pos in positions:
@@ -1110,7 +1110,7 @@ class TradingEngine:
                 continue
 
             logger.info(
-                f"[协调器] {signal_name} {signal_dir}盈利 ${signal_profit:.2f} → "
+                f"[Coordinator] {signal_name} {signal_dir}盈利 ${signal_profit:.2f} → "
                 f"平 Magic={pos.magic} {target_dir} ticket={pos.ticket} "
                 f"盈利=${net_profit:.2f}(毛={pos.profit:.2f})"
             )
@@ -1120,13 +1120,13 @@ class TradingEngine:
                 self._record_close(pos.ticket, pos.profit, pos.magic, direction)
                 closed += 1
             except Exception as e:
-                logger.error(f"[协调器] 平仓失败 ticket={pos.ticket}: {e}")
+                logger.error(f"[Coordinator] close failed ticket={pos.ticket}: {e}")
 
         if closed > 0:
-            logger.info(f"[协调器] 本轮联动平仓 {closed} 单")
+            logger.info(f"[Coordinator] coordinated closes {closed}  orders")
 
     def _check_trend_reverse_tp(self):
-        """M15 反向止盈：短周期趋势反转时平盈利单（M5 过于敏感已移除）"""
+        """M15 反向止盈：短周期趋势反转时平盈利 orders（M5 过于敏感已移除）"""
         coord = self._get_coordinator()
         if not coord.get("enabled", False):
             return
@@ -1140,7 +1140,7 @@ class TradingEngine:
         try:
             positions = self.bridge.get_positions(settings.SYMBOL)
         except Exception as e:
-            logger.warning(f"[反向止盈] 获取持仓失败: {e}")
+            logger.warning(f"[ReverseTP] get positions failed: {e}")
             return
 
         if not positions:
@@ -1158,7 +1158,7 @@ class TradingEngine:
             try:
                 candles = self._get_candles(tf, count)
             except Exception as e:
-                logger.warning(f"[反向止盈] 获取{tf}数据失败: {e}")
+                logger.warning(f"[ReverseTP] get {tf} data failed: {e}")
                 continue
             if not candles or len(candles) < count:
                 continue
@@ -1217,10 +1217,10 @@ class TradingEngine:
                 is_buy = pos.order_type in ("OP_BUY", "BUY")
                 name = strategy_names.get(pos.magic, f"Magic={pos.magic}")
 
-                # 空单但 M15/M5 趋势转多 → 止盈
+                # 空 orders但 M15/M5 趋势转多 → 止盈
                 if not is_buy and trend_up:
                     logger.info(
-                        f"[反向止盈] {name} {tf}转多 ticket={pos.ticket} "
+                        f"[ReverseTP] {name} {tf}转多 ticket={pos.ticket} "
                         f"净利=${net_profit:.2f}(毛={pos.profit:.2f}) → 平仓"
                     )
                     try:
@@ -1232,12 +1232,12 @@ class TradingEngine:
                             self._last_reverse_tp_bar[pos.magic] = {}
                         self._last_reverse_tp_bar[pos.magic][tf] = current_bar
                     except Exception as e:
-                        logger.error(f"[反向止盈] 平仓失败 ticket={pos.ticket}: {e}")
+                        logger.error(f"[ReverseTP] close failed ticket={pos.ticket}: {e}")
 
-                # 多单但 M15/M5 趋势转空 → 止盈
+                # 多 orders但 M15/M5 趋势转空 → 止盈
                 elif is_buy and trend_down:
                     logger.info(
-                        f"[反向止盈] {name} {tf}转空 ticket={pos.ticket} "
+                        f"[ReverseTP] {name} {tf}转空 ticket={pos.ticket} "
                         f"净利=${net_profit:.2f}(毛={pos.profit:.2f}) → 平仓"
                     )
                     try:
@@ -1248,7 +1248,7 @@ class TradingEngine:
                             self._last_reverse_tp_bar[pos.magic] = {}
                         self._last_reverse_tp_bar[pos.magic][tf] = current_bar
                     except Exception as e:
-                        logger.error(f"[反向止盈] 平仓失败 ticket={pos.ticket}: {e}")
+                        logger.error(f"[ReverseTP] close failed ticket={pos.ticket}: {e}")
 
     def _check_floating_loss_blocks(self):
         """检查并更新各策略浮动亏损状态（警告 + 阻断）"""
@@ -1284,7 +1284,7 @@ class TradingEngine:
         prev_count = self._known_position_count.get(strategy.magic, 0)
         now_count = len(my_positions)
         if now_count < prev_count:
-            logger.warning(f"[{strategy.name}] 检测到 {prev_count - now_count} 张持仓消失，启动成交恢复...")
+            logger.warning(f"[{strategy.name}] Detected {prev_count - now_count} positions vanished, starting trade recovery...")
             self._recover_missing_trades()
         # 同步本地持仓计数
         self._known_position_count[strategy.magic] = now_count
@@ -1308,7 +1308,7 @@ class TradingEngine:
                 pnl = (entry - ask) * self._rt('lot_size') * 100
 
             logger.info(
-                f"[平仓试算] Ticket={pos.ticket} {pos.order_type} "
+                f"[CloseTrial] Ticket={pos.ticket} {pos.order_type} "
                 f"入场={entry:.2f} 出场={exit_price:.2f} 盈亏=${pnl:.2f} "
                 f"持仓={hold_sec:.0f}秒 SL={pos.stop_loss:.2f}"
             )
@@ -1320,7 +1320,7 @@ class TradingEngine:
                     f"入场={entry:.2f} 出场={exit_price:.2f} 持仓={hold_sec:.0f}秒 亏损=${abs(pnl):.2f}"
                 )
 
-            logger.info(f"[{strategy.name}] 策略出场 Ticket={pos.ticket}")
+            logger.info(f"[{strategy.name}] Strategy exit Ticket={pos.ticket}")
             self.bridge.close_order(pos.ticket)
 
             # 从 MT4 历史成交获取开平仓时间（同源，计算持仓时间准确）
@@ -1417,26 +1417,26 @@ class TradingEngine:
         try:
             with open(SAFETY_LOCK_FILE, "w", encoding="utf-8") as f:
                 f.write(f"LOCKED {datetime.now():%Y-%m-%d %H:%M:%S}\n{reason}\n")
-            logger.error(f"[安全锁] 暂停开新仓！原因: {reason}")
+            logger.error(f"[SafetyLock] Pausing new orders! Reason: {reason}")
         except OSError:
-            logger.error(f"[安全锁] 写入锁文件失败: {reason}")
+            logger.error(f"[SafetyLock] write lock file failed: {reason}")
 
     def _is_market_open(self) -> bool:
-        """检查当前是否为交易时段（周末休市）"""
+        """检查当前是否为交易时段（周末closed）"""
         from config.settings import LOCAL_TZ
         from datetime import datetime
         now = datetime.now(LOCAL_TZ)
-        # 周六整天 (weekday=5) 休市
+        # 周六整天 (weekday=5) closed
         if now.weekday() == 5:
-            logger.info(f"[交易时段] 周六休市，跳过开仓 (UTC+8: {now.strftime('%H:%M')})")
+            logger.info(f"[Session] Saturday closed, skip open (UTC+8: {now.strftime('%H:%M')})")
             return False
-        # 周日 07:00 前休市（黄金 23:00 UTC = 07:00 UTC+8 开盘）
+        # 周日 07:00 前closed（黄金 23:00 UTC = 07:00 UTC+8 开盘）
         if now.weekday() == 6 and now.hour < 7:
-            logger.info(f"[交易时段] 周日未开盘，跳过开仓 (UTC+8: {now.strftime('%H:%M')})")
+            logger.info(f"[Session] Sunday not open, skip open (UTC+8: {now.strftime('%H:%M')})")
             return False
         # 周六 05:00 后收盘（黄金周五 21:00 UTC = 周六 05:00 UTC+8 收盘）
         if now.weekday() == 5 and now.hour < 5:
-            logger.info(f"[交易时段] 周六凌晨收市，跳过开仓 (UTC+8: {now.strftime('%H:%M')})")
+            logger.info(f"[Session] Saturday early close, skip open (UTC+8: {now.strftime('%H:%M')})")
             return False
         return True
 
@@ -1448,7 +1448,7 @@ class TradingEngine:
                 timeout = self._rt('safety_lock_timeout_minutes') * 60
                 if time.time() - mtime > timeout:
                     os.remove(SAFETY_LOCK_FILE)
-                    logger.info(f"[安全锁] 已自动清除（超过 {self._rt('safety_lock_timeout_minutes')}min）")
+                    logger.info(f"[SafetyLock] auto-cleared (over {self._rt('safety_lock_timeout_minutes')}min)")
                     return False
                 return True
         except OSError:
@@ -1456,8 +1456,8 @@ class TradingEngine:
         return False
 
     def _run_strategy(self, strategy):
-        """单个策略的一次 tick — 信号生成 + 开仓"""
-        # ── 纸面交易单策略持仓上限检查 ──
+        """ orders个策略的一次 tick — 信号生成 + 开仓"""
+        # ── 纸面交易 orders策略持仓上限检查 ──
         _pc = self._get_paper_config()
         _paper_enabled = _pc.get("enabled", False)
         _paper_ignore = _pc.get("ignore_gates", False)
@@ -1475,7 +1475,7 @@ class TradingEngine:
             if _global_max and _global_max > 0:
                 _all_positions = self.bridge.get_positions(settings.SYMBOL)
                 if len(_all_positions) >= _global_max:
-                    logger.debug(f"[{strategy.name}] 全局总持仓 {len(_all_positions)} ≥ {_global_max}，跳过开仓")
+                    logger.debug(f"[{strategy.name}] total positions {len(_all_positions)} ≥ {_global_max}, skipopen")
                     return
 
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
@@ -1495,7 +1495,7 @@ class TradingEngine:
             gb = gate_buy.get("details", {})
             log_parts.append(f"SELL:{gs.get('pos_gate','?')} {gs.get('rally_drop','?')}")
             log_parts.append(f"BUY:{gb.get('pos_gate','?')} {gb.get('rally_drop','?')}")
-            logger.info(f"[{strategy.name}] 门禁 | {' '.join(log_parts)}")
+            logger.info(f"[{strategy.name}] gate | {' '.join(log_parts)}")
 
         # 获取该策略的持仓（含 legacy magic，桥接查询 + 本地跟踪双重校验防漏）
         positions = self.bridge.get_positions(settings.SYMBOL)
@@ -1505,16 +1505,16 @@ class TradingEngine:
         n_total = max(n_bridge, n_local)  # 取较大值防止桥接漏查
         n_longs = sum(1 for p in my_positions if p.order_type in ("OP_BUY", "BUY"))
         n_shorts = sum(1 for p in my_positions if p.order_type in ("OP_SELL", "SELL"))
-        logger.info(f"[{strategy.name}] 持仓: {n_total} (多:{n_longs} 空:{n_shorts})")
+        logger.info(f"[{strategy.name}] position: {n_total} (longs:{n_longs} shorts:{n_shorts})")
 
         if n_bridge != n_local:
-            logger.warning(f"[{strategy.name}] 持仓不一致: 桥接={n_bridge} 本地={n_local}，取较大值={n_total}")
+            logger.warning(f"[{strategy.name}] position mismatch: bridge={n_bridge} local={n_local}, take max={n_total}")
 
-        # 纸面模式：使用 paper_max_positions 作为单策略上限（ignore_gates 只跳过门禁，不跳过 max_positions）
+        # 纸面模式：使用 paper_max_positions 作为 orders策略上限（ignore_gates 只跳过门禁，不跳过 max_positions）
         # 真实模式：使用 strategy.max_positions，且已有持仓则不加仓
         if _paper_enabled and _paper_max > 0:
             if n_total >= _paper_max:
-                return  # 达到纸面模式单策略上限
+                return  # 达到纸面模式 orders策略上限
         else:
             if n_total >= strategy.max_positions:
                 return  # 已达上限
@@ -1537,44 +1537,44 @@ class TradingEngine:
             if same_dir_positions:
                 total_same_pnl = sum(p.profit for p in same_dir_positions if hasattr(p, 'profit') and p.profit is not None)
                 if total_same_pnl < -0.5:  # 浮亏超过 $0.5 即阻止加仓
-                    logger.info(f"[{strategy.name}] 同向盈亏门禁 {signal_dir}: 已有{len(same_dir_positions)}笔同向浮亏${total_same_pnl:.2f}，禁止加仓")
+                    logger.info(f"[{strategy.name}] same-dir PnL gate {signal_dir}: existing {len(same_dir_positions)} same-dir floating loss${total_same_pnl:.2f}，add blocked")
                     return
                 elif total_same_pnl > 0:
-                    logger.info(f"[{strategy.name}] 同向盈亏门禁 {signal_dir}: 已有{len(same_dir_positions)}笔同向浮盈${total_same_pnl:.2f}，允许加仓")
+                    logger.info(f"[{strategy.name}] same-dir PnL gate {signal_dir}: existing {len(same_dir_positions)} same-dir floating profit${total_same_pnl:.2f}，add allowed")
 
         # ── 门禁拦截（使用顶部已计算的门禁数据） ──
         gate = gate_sell if signal_dir == "SELL" else gate_buy
         if gate["blocked"]:
-            logger.info(f"[{strategy.name}] 门禁拦截 {signal_dir}: {gate['reason']}")
+            logger.info(f"[{strategy.name}] gate blocked {signal_dir}: {gate['reason']}")
             return
 
-        # 止盈冷却检查：盈利平仓后 N 小时内不再开同向单
+        # 止盈冷却检查：盈利平仓后 N 小时内不再开同向 orders
         cool = self._profit_exit_cooldown.get(strategy.magic, {})
         if signal_dir in cool:
             elapsed = time.time() - cool[signal_dir]
             cooldown_sec = self._rt('profit_exit_cooldown_hours') * 3600
             if elapsed < cooldown_sec:
                 remain_h = (cooldown_sec - elapsed) / 3600
-                logger.info(f"[{strategy.name}] {signal_dir} 止盈冷却中（剩余 {remain_h:.1f}h），跳过开仓")
+                logger.info(f"[{strategy.name}] {signal_dir} TP cooldown (remaining {remain_h:.1f}h）, skipopen")
                 return
             else:
                 cool.pop(signal_dir, None)
 
-        logger.info(f"[{strategy.name}] 收到信号: {signal}")
+        logger.info(f"[{strategy.name}] Signal received: {signal}")
 
         # ---- 全局方向过滤器（优先级最高） ----
         dir_filter = getattr(settings, 'GLOBAL_DIRECTION_FILTER', 'BOTH')
         if dir_filter == 'SELL_ONLY' and signal_dir == 'BUY':
-            logger.info(f"[方向过滤器] {dir_filter} 模式，跳过 {signal_dir} 信号 ({strategy.name})")
+            logger.info(f"[DirectionFilter] {dir_filter} mode, skip {signal_dir} signal ({strategy.name})")
             return
         if dir_filter == 'BUY_ONLY' and signal_dir == 'SELL':
-            logger.info(f"[方向过滤器] {dir_filter} 模式，跳过 {signal_dir} 信号 ({strategy.name})")
+            logger.info(f"[DirectionFilter] {dir_filter} mode, skip {signal_dir} signal ({strategy.name})")
             return
 
         # ---- MTF 共振方向门禁检查 ----
         allowed = self._mtf_resonance_allowed(signal_dir)
         if allowed is not None and allowed not in ("BOTH", signal_dir):
-            logger.info(f"[MTF协调器] 方向限制: 当前仅允许{allowed}，跳过 {signal_dir}")
+            logger.info(f"[MTFCoordinator] direction limit: only allow{allowed}, skip {signal_dir}")
             return
 
         # 先写入信号记录（status=pending），再执行开仓
@@ -1660,7 +1660,7 @@ class TradingEngine:
                 if ticket:  # ticket 可能是 str 或 int，非空/非0 即为成功
                     db.update_signal_status(signal_id, {"status": "opened", "ticket": ticket})
                 else:
-                    db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订单发送失败"})
+                    db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订 orders发送失败"})
 
     def _execute_buy(self, strategy, signal_id=0):
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
@@ -1685,7 +1685,7 @@ class TradingEngine:
         )
         if ticket:
             self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
-            logger.info(f"[{strategy.name}] 开多仓 Magic={strategy.magic} "
+            logger.info(f"[{strategy.name}] Open long Magic={strategy.magic} "
                         f"{self._rt('lot_size')}手 @ {ask:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
             last_sig = getattr(strategy, "_last_signal", None) or {}
@@ -1738,7 +1738,7 @@ class TradingEngine:
         )
         if ticket:
             self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
-            logger.info(f"[{strategy.name}] 开空仓 Magic={strategy.magic} "
+            logger.info(f"[{strategy.name}] Open short Magic={strategy.magic} "
                         f"{self._rt('lot_size')}手 @ {bid:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
             last_sig = getattr(strategy, "_last_signal", None) or {}
@@ -1779,7 +1779,7 @@ class TradingEngine:
     def _handle_news_risk(self, snapshot: list):
         """新闻事件风控：强平窗口平所有持仓"""
         if self.news_filter.is_in_force_close():
-            logger.warning("[新闻风控] 强制平仓窗口 (事件前15min)，平所有持仓")
+            logger.warning("[NewsRisk] Force close window (15min pre-event), close all")
             for strategy in snapshot:
                 self._close_strategy_positions(strategy, "news_force_close")
 
@@ -1799,7 +1799,7 @@ class TradingEngine:
                 pnl = (entry - ask) * self._rt('lot_size') * 100
                 exit_price = ask
             logger.warning(
-                f"[新闻风控] 强制平仓 Ticket={pos.ticket} {pos.order_type} "
+                f"[NewsRisk] 强制平仓 Ticket={pos.ticket} {pos.order_type} "
                 f"入场={entry:.2f} 盈亏=${pnl:.2f} 原因={reason}"
             )
             self.bridge.close_order(pos.ticket)
@@ -1875,7 +1875,7 @@ class TradingEngine:
         """检查是否在新闻禁售期，每次主循环检查"""
         blocked, reason = self.news_filter.is_in_blackout()
         if blocked:
-            logger.info(f"[新闻过滤] 禁售时段: {reason}，跳过开仓")
+            logger.info(f"[NewsFilter] blackout period: {reason}, skipopen")
             for _ in range(3):
                 time.sleep(20)
                 self.bridge.send_heartbeat()
@@ -1917,21 +1917,21 @@ class TradingEngine:
 
             if bearish and bias.get('overall') == 'BEARISH':
                 if _m30_gap is not None and _m30_gap < _di_gap_threshold:
-                    logger.info(f"[News-Bias] M30 DI差={_m30_gap:.1f} < {_di_gap_threshold}，市场均衡，跳过看跌阻塞")
+                    logger.info(f"[NewsBias] M30 DI gap={_m30_gap:.1f} < {_di_gap_threshold}, market neutral, skip bearish block")
                 else:
-                    logger.info("[News-Bias] 看跌 → 阻止开多")
+                    logger.info("[NewsBias] Bearish -> block long")
                     return True
 
             if bullish and bias.get('overall') == 'BULLISH':
                 if _m30_gap is not None and _m30_gap < _di_gap_threshold:
-                    logger.info(f"[News-Bias] M30 DI差={_m30_gap:.1f} < {_di_gap_threshold}，市场均衡，跳过看涨阻塞")
+                    logger.info(f"[NewsBias] M30 DI gap={_m30_gap:.1f} < {_di_gap_threshold}, market neutral, skip bullish block")
                 else:
-                    logger.info("[News-Bias] 看涨 → 阻止开空")
+                    logger.info("[NewsBias] Bullish -> block short")
                     return True
             
             return False
         except Exception as e:
-            logger.error(f"[News-Bias] 方向阻塞检查异常: {e}")
+            logger.error(f"[NewsBias] Direction block check error: {e}")
             return False
 
     def _sync_market_data(self):
@@ -1957,7 +1957,7 @@ class TradingEngine:
         if not active_tfs:
             return
 
-        logger.info(f"[数据同步] 开始增量同步周期: {sorted(active_tfs)}")
+        logger.info(f"[DataSync] Starting incremental sync: {sorted(active_tfs)}")
         all_empty = True
         # 使用 MT4 服务器时间计算缺口
         mt4_now = int(time.time()) + int(self._mt4_offset)
@@ -1965,22 +1965,22 @@ class TradingEngine:
             try:
                 n = download_timeframe(self.bridge, tf, settings.SYMBOL, now_ts=mt4_now)
                 if n > 0:
-                    logger.info(f"[数据同步] {tf} 写入 {n} 条")
+                    logger.info(f"[DataSync] {tf} write {n} ")
                     all_empty = False
             except Exception as e:
-                logger.warning(f"[数据同步] {tf} 失败: {e}")
+                logger.warning(f"[DataSync] {tf} failed: {e}")
         # 如果所有周期都未写入任何数据，检查数据库是否真为空
         if all_empty:
             try:
                 stats = db.get_db_stats()
                 if not stats:
-                    logger.error(f"[数据同步] 所有周期均未写入数据，数据库可能为空或未初始化")
+                    logger.error(f"[DataSync] No data written for any timeframe, DB may be empty/uninitialized")
                 else:
-                    logger.info(f"[数据同步] 完成，已有数据: {list(stats.keys())}")
+                    logger.info(f"[DataSync] done, existing data: {list(stats.keys())}")
             except Exception as e:
-                logger.error(f"[数据同步] 数据库异常: {e}")
+                logger.error(f"[DataSync] DB error: {e}")
         else:
-            logger.info(f"[数据同步] 完成")
+            logger.info(f"[DataSync] done")
 
     def _check_status_report(self):
         now = time.time()
@@ -2034,7 +2034,7 @@ class TradingEngine:
         manual = [p for p in all_positions if p.magic not in strategy_magics]
         manual_pnl = sum(p.profit for p in manual)
         if manual:
-            report += f"  [手工单] 持仓={len(manual)} 浮动=${manual_pnl:.2f}\n"
+            report += f"  [ManualOrder] 持仓={len(manual)} 浮动=${manual_pnl:.2f}\n"
 
         report += (
             f"  ---\n"
