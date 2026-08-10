@@ -239,20 +239,20 @@ onUnmounted(() => {
       </n-space>
     </n-card>
 
-    <!-- 黄金快讯完整窗口（向左弹出） -->
-    <n-drawer :show="goldShowAll" :width="420" placement="left" @update:show="(v: boolean) => goldShowAll = v">
-      <n-drawer-content title="黄金快讯完整列表" closable>
+    <!-- 黄金快讯完整窗口（居中悬浮） -->
+    <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="'黄金快讯完整列表'" style="width:60vw;max-height:60vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
+        <n-tag v-if="goldNews?.current_bias" :bordered="false"
+          :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
+          {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
+        </n-tag>
+        <n-text depth="3" style="font-size:12px">
+          {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
+        </n-text>
+      </div>
+      <n-divider style="margin:4px 0" />
+      <div style="max-height:calc(60vh - 120px);overflow-y:auto">
         <n-space vertical size="small">
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
-            <n-tag v-if="goldNews?.current_bias" :bordered="false"
-              :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
-              {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
-            </n-tag>
-            <n-text depth="3" style="font-size:12px">
-              {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
-            </n-text>
-          </div>
-          <n-divider style="margin:4px 0" />
           <div v-for="item in goldNews?.news" :key="item.id"
             style="padding:8px;border-radius:6px;background:var(--n-color-embedded)">
             <div style="display:flex;align-items:flex-start;gap:6px">
@@ -269,8 +269,8 @@ onUnmounted(() => {
           </div>
           <div v-if="!goldNews?.news?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无快讯</div>
         </n-space>
-      </n-drawer-content>
-    </n-drawer>
+      </div>
+    </n-modal>
 
 <!-- ═══════════════ 新闻日历 ═══════════════ -->
     <n-card :title="$t('signals.news_calendar')" size="small" :bordered="true"
