@@ -121,14 +121,16 @@ def judge_with_llm(news: list[dict], llm_manager) -> list[dict]:
         try:
             # 构建 LLM 提示
             news_text = "\n".join([f"{j+1}. {item['content']}" for j, item in enumerate(batch)])
-            prompt = f"""你是一个黄金交易分析专家。请判断以下每条新闻对黄金(XAUUSD)价格的影响是利多还是利空。
+            prompt = f"""你是一个黄金交易分析专家。请判断以下每条新闻对黄金(XAUUSD)价格的影响，并翻译成英文。
 
 规则：
 - 利多黄金 = 利好金价上涨（如：美联储降息预期、通胀降温、就业恶化、地缘避险、美元走弱）
 - 利空黄金 = 利空金价下跌（如：美联储加息预期、通胀升温、就业强劲、避险消退、美元走强）
 - 中性 = 无明显影响或影响不确定
 
-请对每条新闻按序号回答，格式: "序号: 利多/利空/中性"
+请对每条新闻按序号回答，格式: "序号: 利多/利空/中性 | 英文翻译"
+
+注意：英文翻译要简洁，保持金融术语准确。
 
 新闻列表：
 {news_text}"""
@@ -144,13 +146,15 @@ def judge_with_llm(news: list[dict], llm_manager) -> list[dict]:
                     item["direction"] = _rule_based_judge(item["content"])
                     item["direction_reason"] = "规则回退"
                     item["direction_confidence"] = "low"
+                    item["content_en"] = item["content"]  # 无翻译，用原文
                     results.append(item)
                 continue
 
-            # 解析 LLM 回复
+            # 解析 LLM 回复（方向 + 英文翻译）
             for j, item in enumerate(batch):
                 line_num = j + 1
                 direction = "中性"
+                translation = ""
                 # 在 LLM 回复中找对应序号
                 for line in result.split("\n"):
                     if str(line_num) in line:
@@ -160,14 +164,19 @@ def judge_with_llm(news: list[dict], llm_manager) -> list[dict]:
                             direction = "bearish"
                         else:
                             direction = "neutral"
+                        # 提取翻译（分隔符 | 后面）
+                        if "|" in line:
+                            translation = line.split("|", 1)[1].strip()
                         break
                 else:
                     # 如果 LLM 没回答，用关键词回退
                     direction = _rule_based_judge(item["content"])
+                    translation = item["content"]
 
                 item["direction"] = direction
                 item["direction_reason"] = "LLM判断" if direction != _rule_based_judge(item["content"]) else "规则回退"
                 item["direction_confidence"] = "high" if direction != "neutral" else "low"
+                item["content_en"] = translation or item["content"]  # 无翻译用原文
                 results.append(item)
 
         except Exception as e:

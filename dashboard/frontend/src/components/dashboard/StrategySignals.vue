@@ -10,7 +10,7 @@ const signalStore = useSignalStore()
 const priceStore = usePriceStore()
 const configStore = useConfigStore()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // ── News calendar ──
 
@@ -230,7 +230,7 @@ onUnmounted(() => {
               :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
               {{ $t('signals.gold_short_up') }}
             </n-tag>
-            <n-text style="font-size:12px;line-height:1.4">{{ item.content.slice(0, 60) }}{{ item.content.length > 60 ? '...' : '' }}</n-text>
+            <n-text style="font-size:12px;line-height:1.4">{{ locale === 'en-US' && item.content_en ? item.content_en.slice(0, 60) : item.content.slice(0, 60) }}{{ (locale === 'en-US' && item.content_en ? item.content_en : item.content).length > 60 ? '...' : '' }}</n-text>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:2px">
             <n-text depth="3" style="font-size:11px">{{ $t('signals.source_huicong') }}</n-text>
@@ -266,7 +266,7 @@ onUnmounted(() => {
                 :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
                 {{ $t('signals.gold_bullish_label') }}
               </n-tag>
-              <n-text style="font-size:18px;line-height:1.6">{{ item.content }}</n-text>
+              <n-text style="font-size:18px;line-height:1.6">{{ locale === 'en-US' && item.content_en ? item.content_en : item.content }}</n-text>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
               <n-text depth="3" style="font-size:16px">{{ $t('signals.source_huicong') }}</n-text>

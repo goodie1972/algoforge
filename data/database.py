@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS gold_news (
     direction_reason TEXT DEFAULT '',
     direction_confidence TEXT DEFAULT 'low',
     news_time TEXT DEFAULT '',
+    content_en TEXT DEFAULT '',
     fetched_at REAL NOT NULL,
     label TEXT DEFAULT '',
     pre_price REAL DEFAULT 0,
@@ -1003,8 +1004,8 @@ def insert_gold_news(items: list[dict]) -> int:
             conn.execute(
                 """INSERT INTO gold_news
                    (source, content, direction, direction_reason,
-                    direction_confidence, news_time, fetched_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    direction_confidence, news_time, content_en, fetched_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     item.get("source", "huicong"),
                     item.get("content", ""),
@@ -1012,6 +1013,7 @@ def insert_gold_news(items: list[dict]) -> int:
                     item.get("direction_reason", ""),
                     item.get("direction_confidence", "low"),
                     item.get("time", ""),
+                    item.get("content_en", ""),
                     item.get("fetched_at", time.time()),
                 ),
             )
