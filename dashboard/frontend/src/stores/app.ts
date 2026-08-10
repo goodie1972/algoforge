@@ -27,6 +27,10 @@ export const useAppStore = defineStore('app', () => {
   function setLocale(lang: string) {
     locale.value = lang
     localStorage.setItem('algoforge-lang', lang)
+    // 通知后端切换日志语言（静默失败即可）
+    import('@/api/client').then(({ updateConfig }) => {
+      updateConfig({ language: lang }).catch(() => {})
+    })
   }
 
   return { theme, locale, naiveTheme, isDark, toggleTheme, setLocale }

@@ -100,6 +100,13 @@ async def update_config(req: ConfigUpdate):
         raise HTTPException(500, "配置服务未初始化")
     try:
         updated = config_service.update(req.updates)
+        # 语言切换时清除日志缓存
+        if 'language' in req.updates:
+            try:
+                from services.log_messages import clear_lang_cache
+                clear_lang_cache()
+            except ImportError:
+                pass
         return {"message": "配置已更新", "updated": updated}
     except Exception as e:
         raise HTTPException(422, f"配置更新失败: {e}")
