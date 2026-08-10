@@ -200,13 +200,13 @@ onUnmounted(() => {
 
     
     <!-- ═══════════════ 黄金快讯评估 ═══════════════ -->
-    <n-card title="黄金快讯" size="small" :bordered="true"
+    <n-card :title="$t('signals.gold_news_title')" size="small" :bordered="true"
       :style="{ borderLeft: `4px solid ${goldNews?.current_bias?.overall === 'BULLISH' ? '#0ecb81' : goldNews?.current_bias?.overall === 'BEARISH' ? '#f6465d' : '#8b8f97'}` }">
       <template #header-extra>
         <div style="display:flex;align-items:center;gap:8px">
           <n-tag v-if="goldNews?.current_bias" size="tiny" :bordered="false"
             :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
-            {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
+            {{ $t('signals.gold_bullish') }}
           </n-tag>
           <n-button size="tiny" text style="font-size:22px;font-weight:700;color:#8b8f97;cursor:pointer" @click="goldShowAll = true">⤢</n-button>
         </div>
@@ -215,10 +215,10 @@ onUnmounted(() => {
             <n-space vertical size="small">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <n-text depth="3" style="font-size:12px">
-            {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
+            {{ $t('signals.gold_summary', { b: goldNews?.summary?.bullish ?? 0, r: goldNews?.summary?.bearish ?? 0, n: goldNews?.summary?.neutral ?? 0 }) }}
           </n-text>
           <n-text v-if="goldNews?.evaluation" depth="3" style="font-size:12px">
-            准确率 {{ goldNews.evaluation.accuracy }}%
+            {{ $t('signals.accuracy') }} {{ goldNews.evaluation.accuracy }}%
           </n-text>
         </div>
 
@@ -228,12 +228,12 @@ onUnmounted(() => {
           <div style="display:flex;align-items:flex-start;gap:6px">
             <n-tag size="tiny" :bordered="false" style="margin-top:2px;flex-shrink:0"
               :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
-              {{ item.direction === 'bullish' ? '多' : item.direction === 'bearish' ? '空' : '-' }}
+              {{ $t('signals.gold_short_up') }}
             </n-tag>
             <n-text style="font-size:12px;line-height:1.4">{{ item.content.slice(0, 60) }}{{ item.content.length > 60 ? '...' : '' }}</n-text>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:2px">
-            <n-text depth="3" style="font-size:11px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
+            <n-text depth="3" style="font-size:11px">{{ $t('signals.source_huicong') }}</n-text>
             <n-text depth="3" style="font-size:11px">{{ item.news_time }}</n-text>
           </div>
         </div>
@@ -246,14 +246,14 @@ onUnmounted(() => {
     
 
     <!-- 黄金快讯完整窗口（居中悬浮） -->
-    <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="'黄金快讯完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
+    <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="$t('signals.gold_full_title')" style="width:75vw;max-height:75vh;overflow-y:auto">
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
         <n-tag v-if="goldNews?.current_bias" :bordered="false"
           :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
-          {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
+          {{ $t('signals.gold_bullish') }}
         </n-tag>
         <n-text depth="3" style="font-size:18px">
-          {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
+          {{ $t('signals.gold_summary', { b: goldNews?.summary?.bullish ?? 0, r: goldNews?.summary?.bearish ?? 0, n: goldNews?.summary?.neutral ?? 0 }) }}
         </n-text>
       </div>
       <n-divider style="margin:4px 0" />
@@ -264,16 +264,16 @@ onUnmounted(() => {
             <div style="display:flex;align-items:flex-start;gap:6px">
               <n-tag size="tiny" :bordered="false" style="margin-top:2px;flex-shrink:0"
                 :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
-                {{ item.direction === 'bullish' ? '利多' : item.direction === 'bearish' ? '利空' : '中性' }}
+                {{ $t('signals.gold_bullish_label') }}
               </n-tag>
               <n-text style="font-size:18px;line-height:1.6">{{ item.content }}</n-text>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
-              <n-text depth="3" style="font-size:16px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
+              <n-text depth="3" style="font-size:16px">{{ $t('signals.source_huicong') }}</n-text>
               <n-text depth="3" style="font-size:16px">{{ item.news_time || '' }}</n-text>
             </div>
           </div>
-          <div v-if="!goldNews?.news?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无快讯</div>
+          <div v-if="!goldNews?.news?.length" style="text-align:center;padding:30px 0;color:#8b8f97">{{ $t('signals.gold_no_news') }}</div>
         </n-space>
       </div>
     </n-modal>

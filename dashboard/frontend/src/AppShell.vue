@@ -56,6 +56,24 @@ async function fetchCalendar() {
     if (res.ok) calendarData.value = await res.json()
   } catch { /* ignore */ }
 }
+const EVT_EN: Record<string, string> = {
+  'Core CPI m/m': 'Core CPI m/m', 'Core CPI y/y': 'Core CPI y/y',
+  'CPI m/m': 'CPI m/m', 'CPI y/y': 'CPI y/y',
+  'Non-Farm Employment Change': 'NFP', 'Unemployment Rate': 'Unemployment',
+  'Average Hourly Earnings m/m': 'Avg Hourly Earnings',
+  'GDP m/m': 'GDP m/m', 'GDP q/q': 'GDP q/q',
+  'Retail Sales m/m': 'Retail Sales', 'Core Retail Sales m/m': 'Core Retail Sales',
+  'PPI m/m': 'PPI m/m', 'PPI y/y': 'PPI y/y',
+  'ISM Manufacturing PMI': 'ISM Manufacturing', 'ISM Services PMI': 'ISM Services',
+  'FOMC Statement': 'FOMC Decision', 'Fed Funds Rate': 'Fed Rate',
+  'Initial Jobless Claims': 'Jobless Claims', 'Continuing Jobless Claims': 'Continuing Claims',
+  'Consumer Sentiment': 'Consumer Sentiment', 'Consumer Confidence': 'Consumer Confidence',
+  'Trade Balance': 'Trade Balance', 'Housing Starts': 'Housing Starts',
+  'Building Permits': 'Building Permits', 'Durable Goods Orders m/m': 'Durable Goods',
+  'Industrial Production m/m': 'Industrial Production', 'Capacity Utilization': 'Capacity Util.',
+  'Treasury Budget': 'Treasury Budget', 'UoM Inflation Expectations': 'UoM Inflation Exp.',
+  'Philly Fed Manufacturing Index': 'Philly Fed Index', 'Empire State Manufacturing Index': 'Empire State Index',
+}
 const EVT_CN: Record<string, string> = {
   'Core CPI m/m': '核心CPI月率', 'Core CPI y/y': '核心CPI年率',
   'CPI m/m': 'CPI月率', 'CPI y/y': 'CPI年率',
@@ -75,7 +93,8 @@ const EVT_CN: Record<string, string> = {
   'Philly Fed Manufacturing Index': '费城联储制造业指数', 'Empire State Manufacturing Index': '纽约联储制造业指数',
 }
 function evtName(title: string) {
-  return EVT_CN[title] || title
+  const currentLocale = locale?.value || 'zh-CN'
+  return currentLocale.startsWith('en') ? (EVT_EN[title] || title) : (EVT_CN[title] || title)
 }
 
 const changelog = ref<Array<{hash: string; date: string; subject: string}>>([])
@@ -303,10 +322,10 @@ onUnmounted(() => {
                 <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
                 <span style="font-weight:600">{{ evtName(evt.title) }}</span>
                 <span style="color:#8b8f97"> {{ evt.datetime?.slice(5) }}</span>
-                <span v-if="evt.previous" style="color:#aaa"> 前{{ evt.previous }}</span>
-                <span v-if="evt.forecast" style="color:#f0b90b"> 预{{ evt.forecast }}</span>
+                <span v-if="evt.previous" style="color:#aaa"> {{ $t('signals.prev_prefix') }}{{ evt.previous }}</span>
+                <span v-if="evt.forecast" style="color:#f0b90b"> {{ $t('signals.fcast_prefix') }}{{ evt.forecast }}</span>
               </span>
-              <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
+              <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">{{ $t('signals.calendar_no_events') }}</span>
             </span>
           </div>
 <div class="header-spacer"></div>
@@ -343,7 +362,7 @@ onUnmounted(() => {
         </n-layout-content>
       
     <!-- 经济日历完整窗口 -->
-    <n-modal v-model:show="calendarShowAll" :mask-closable="true" preset="card" :title="'经济日历 - 完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
+    <n-modal v-model:show="calendarShowAll" :mask-closable="true" preset="card" :title="$t('signals.calendar_full_title')" style="width:75vw;max-height:75vh;overflow-y:auto">
       <div style="max-height:calc(75vh - 100px);overflow-y:auto">
         <n-space vertical size="small">
           <div v-for="evt in calendarData?.upcoming_events" :key="evt.datetime + evt.title"
@@ -354,10 +373,10 @@ onUnmounted(() => {
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
               <n-text depth="3" style="font-size:12px">{{ evt.country }} {{ evt.datetime }}</n-text>
-              <n-text depth="3" style="font-size:12px">前值 {{ evt.previous || '-' }} | 预测 {{ evt.forecast || '-' }}</n-text>
+              <n-text depth="3" style="font-size:12px">{{ $t('signals.previous') }} {{ evt.previous || '-' }} | {{ $t('signals.forecast') }} {{ evt.forecast || '-' }}</n-text>
             </div>
           </div>
-          <div v-if="!calendarData?.upcoming_events?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无经济日历事件</div>
+          <div v-if="!calendarData?.upcoming_events?.length" style="text-align:center;padding:30px 0;color:#8b8f97">{{ $t('signals.calendar_no_events') }}</div>
         </n-space>
       </div>
     </n-modal>
