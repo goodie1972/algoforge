@@ -182,26 +182,7 @@ export async function generateReport(type = 'daily', date?: string): Promise<any
   return data
 }
 
-// === 新闻预判报告 ===
-export async function getNewsBiasReports(params?: { date?: string; page?: number; page_size?: number }): Promise<any> {
-  const { data } = await http.get('/news-bias/reports', { params })
-  return data
-}
-
-export async function getNewsBiasReport(id: number): Promise<any> {
-  const { data } = await http.get(`/news-bias/reports/${id}`)
-  return data
-}
-
-export async function getLatestNewsBias(): Promise<any> {
-  const { data } = await http.get('/news-bias/latest')
-  return data
-}
-
-export async function generateNewsBiasReport(): Promise<any> {
-  const { data } = await http.post('/news-bias/generate')
-  return data
-}
+// === 新闻预判报告（已迁移至 gold_news 系统） ===
 
 // === 回测 ===
 export async function runBacktest(params: BacktestRequest): Promise<{ job_id: string; status: string }> {

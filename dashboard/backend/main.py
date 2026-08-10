@@ -66,12 +66,10 @@ from dashboard.backend.routes import trades as route_trades
 from dashboard.backend.routes import data as route_data
 from dashboard.backend.routes import signals as route_signals
 from dashboard.backend.routes import reports as route_reports
-from dashboard.backend.routes import news_bias as route_news_bias
 from dashboard.backend.routes import version as route_version
 from dashboard.backend.routes import strategies as route_strategies
 from dashboard.backend.routes import supervisor as route_supervisor
 from dashboard.backend.routes import paper_trading as route_paper_trading
-from dashboard.backend.routes.news_review import router as news_review_router
 from dashboard.backend.routes.llm_provider import router as llm_provider_router
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
@@ -173,46 +171,6 @@ async def report_weekly_loop():
             await asyncio.sleep(1)
 
 
-async def news_bias_loop():
-    """交易日 8:00 和 20:00 北京时间生成新闻预判报告 + 弹窗推送"""
-    from services.news_bias import NewsBiasEvaluator
-    await asyncio.sleep(60)
-    last_run_key = ""
-    while PollerState.running:
-        try:
-            now = datetime.now()
-            # 非交易日跳过
-            if now.weekday() >= 5:
-                await asyncio.sleep(3600)
-                continue
-
-            hour = now.hour
-            minute = now.minute
-
-            # 8:00-8:04 或 20:00-20:04 生成（每天两次）
-            if hour in (8, 20) and minute < 5:
-                today = now.strftime("%Y-%m-%d")
-                run_key = f"{today}-{hour}"
-                if run_key != last_run_key:
-                    last_run_key = run_key
-                    current_price = 0
-                    cached = getattr(engine_runner, "_cached_price", None)
-                    if cached:
-                        current_price = cached.get("bid", 0)
-
-                    evaluator = NewsBiasEvaluator()
-                    evaluator.verify_old_predictions(current_price=current_price)
-                    report = evaluator.generate_prediction_report(current_price=current_price)
-                    if report:
-                        await ws_manager.broadcast("news_bias_popup", report)
-                        logger.info(f"[NewsBias] 已生成并推送报告 #{report.get('id')}")
-
-            await asyncio.sleep(300)  # 每 5 分钟检查一次
-        except Exception as e:
-            logger.warning(f"[NewsBias] 循环异常: {e}")
-            await asyncio.sleep(300)
-
-
 # === FastAPI 生命周期 ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -228,7 +186,6 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(broadcast_engine_status()),
         asyncio.create_task(report_daily_loop()),
         asyncio.create_task(report_weekly_loop()),
-        asyncio.create_task(news_bias_loop()),
     ]
     yield
     PollerState.running = False
@@ -267,12 +224,10 @@ app.include_router(route_trades.router)
 app.include_router(route_data.router)
 app.include_router(route_signals.router)
 app.include_router(route_reports.router)
-app.include_router(route_news_bias.router)
 app.include_router(route_version.router)
 app.include_router(route_strategies.router)
 app.include_router(route_supervisor.router)
 app.include_router(route_paper_trading.router)
-app.include_router(news_review_router)
 app.include_router(llm_provider_router)
 
 
@@ -323,7 +278,6 @@ route_logs.log_handler = log_handler
 route_trades.engine_runner = engine_runner
 route_data.engine_runner = engine_runner
 route_reports.engine_runner = engine_runner
-route_news_bias.engine_runner = engine_runner
 route_supervisor.engine_runner = engine_runner
 route_paper_trading.engine_runner = engine_runner
 # supervisor 路由需要引擎的监督者实例（延迟绑定，引擎启动后才有）

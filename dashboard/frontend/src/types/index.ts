@@ -200,42 +200,4 @@ export interface TradeStats {
 }
 
 // 新闻预判报告
-export interface NewsBiasReport {
-  id: number
-  title: string
-  summary: string
-  news_items: Array<{
-    title: string
-    source: string
-    variable: string
-    direction: string
-    weight: string
-    chain: string
-  }>
-  variable_scores: Record<string, {
-    weight: number
-    count: number
-    bullish: number
-    bearish: number
-    score: number
-  }>
-  market_context: {
-    current_price: number
-    rsi: number
-    trend: string
-    bb_position: number
-  }
-  prediction: {
-    direction: string
-    score: number
-    tech_adjustment: number
-    confidence: number
-    reason: string
-    id?: number
-  }
-  entry_price: number
-  verify_price: number
-  verify_result: string
-  verify_at: string
-  created_at: string
-}
+// 新闻预判报告（已迁移至 gold_news 系统，此接口不再使用）

@@ -158,7 +158,6 @@ class NewsFilter:
     def try_scheduled_fetch(self):
         """每个 tick 调用，到期自动拉取。is_in_blackout 不触发 HTTP"""
         now = time.time()
-        self._run_bias_evaluation()
         self._run_gold_news_fetch()
         if now < self._retry_after:
             return
@@ -202,21 +201,6 @@ class NewsFilter:
         self._do_fetch(time.time())
 
     # ── News-Bias 评估 ──────────────────────────────────
-
-    def _read_bias_config(self) -> dict:
-        """读取最新 NEWS_BIAS 配置（每次重新加载 settings，支持运行时修改）"""
-        try:
-            importlib.reload(settings)
-        except Exception:
-            pass
-        return {
-            "enabled": getattr(settings, "NEWS_BIAS_ENABLED", True),
-            "report_hours": getattr(settings, "NEWS_BIAS_REPORT_HOURS", "0,12"),
-        }
-
-    def _run_bias_evaluation(self):
-        """执行 news-bias 事后评估（受配置控制，每 10 分钟限频一次）"""
-        cfg = self._read_bias_config()
 
     def _run_gold_news_fetch(self):
         """定时抓取汇通+金十快讯并用 LLM 判断方向（每 4 小时限频一次）"""

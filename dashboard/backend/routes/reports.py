@@ -255,47 +255,41 @@ def _build_daily_report() -> dict:
         except Exception as e:
             logger.warning("[报告] 当日成交处理失败: %s", e)
 
-    # News-Bias 评估 — 先用内存评估器，失败则回退到 DB
+    # 黄金快讯评估（新系统 — 汇通+金十+LLM）
     news_data = None
     try:
-        from services.news_bias import NewsBiasEvaluator
-        evaluator = NewsBiasEvaluator()
-        evaluator.evaluate_past_events(hours=6)
-        news_data = evaluator.get_report_data(hours=24)
+        from data import database as db
+        eval_stats = db.get_gold_news_evaluation_stats()
+        summary_stats = db.get_gold_news_summary()
+        if summary_stats.get("total", 0) > 0:
+            news_data = {
+                "enabled": True,
+                "total": summary_stats.get("total", 0),
+                "directional": summary_stats.get("bullish", 0) + summary_stats.get("bearish", 0),
+                "accuracy": eval_stats.get("accuracy", 0),
+                "correct": eval_stats.get("correct", 0),
+                "wrong": eval_stats.get("wrong", 0),
+                "neutral": summary_stats.get("neutral", 0),
+                "evaluations": [
+                    {"event_title": r.get("content", "")[:60],
+                     "expected_bias": r.get("direction", ""),
+                     "actual_move_15m": r.get("actual_move_15m", 0),
+                     "actual_move_1h": r.get("actual_move_1h", 0),
+                     "direction_match": "correct" if r.get("direction_match") == 1 else "wrong" if r.get("direction_match") == 0 else "unknown",
+                     "source": r.get("source", ""),
+                     }
+                    for r in db.get_gold_news(limit=10, direction="")
+                ],
+            }
     except Exception:
         pass
 
-    if not news_data or not news_data.get("enabled") or not news_data.get("total", 0):
-        try:
-            rows = db.get_news_bias_reports(page=1, page_size=50)
-            if rows:
-                news_data = {
-                    "enabled": True,
-                    "total": len(rows),
-                    "directional": sum(1 for r in rows if r.get("prediction")),
-                    "accuracy": 0,
-                    "correct": 0,
-                    "wrong": 0,
-                    "neutral": 0,
-                    "evaluations": [
-                        {
-                            "event_title": r.get("title", ""),
-                            "expected_bias": r.get("prediction", ""),
-                            "actual_move_15m": 0,
-                            "actual_move_1h": 0,
-                            "direction_match": "unknown",
-                        } for r in rows[:10]
-                    ],
-                }
-        except Exception:
-            pass
-
-    if news_data and news_data.get("enabled") and news_data.get("total", 0) > 0:
+    if news_data and news_data.get("total", 0) > 0:
         directional = news_data.get("directional", 0)
         accuracy = news_data.get("accuracy", 0)
         sections.append({
             "type": "news_bias",
-            "title": f"新闻评估 ({directional}笔 / {accuracy}%准确)",
+            "title": f"黄金快讯评估 ({directional}笔 / {accuracy}%准确)",
             "data": news_data,
         })
 

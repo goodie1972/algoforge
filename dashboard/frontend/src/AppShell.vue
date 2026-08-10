@@ -19,8 +19,6 @@ import { wsClient } from '@/api/websocket'
 import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog, getRemoteChangelog, updateVersion } from '@/api/client'
 import { useMessage, useDialog } from 'naive-ui'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
-import NewsBiasPopup from '@/components/NewsBiasPopup.vue'
-
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 
@@ -29,15 +27,6 @@ const menuKey = ref(0)
 watch(() => locale.value, () => { menuKey.value++ })
 // 同步 appStore locale 到 i18n
 watch(() => appStore.locale, (val) => { if (val) locale.value = val }, { immediate: true })
-
-// 新闻弹窗
-const showNewsBias = ref(false)
-const newsBiasData = ref<any>(null)
-const titleText = computed(() => newsBiasData.value?.title || t('app.news_title'))
-function closePopup() { showNewsBias.value = false }
-
-
-
 
 const router = useRouter()
 const route = useRoute()
@@ -210,11 +199,7 @@ onMounted(() => {
     engineStatus.value = msg.data?.status === 'running' ? 'running' : 'stopped'
     toggleLoading.value = false
   })
-  wsClient.on('news_bias_popup', (msg) => {
-    newsBiasData.value = msg.data || msg
-    showNewsBias.value = true
   })
-})
 
 onUnmounted(() => {
   wsClient.disconnect()
@@ -316,19 +301,6 @@ onUnmounted(() => {
       </n-layout>
     </n-layout>
   </n-layout>
-
-    <!-- 新闻预判弹窗 -->
-    <div v-if="showNewsBias" class="nb-overlay" @click.self="closePopup">
-      <div class="nb-modal">
-        <div class="nb-modal-header">
-          <span class="nb-modal-title" v-text="titleText"></span>
-          <button class="nb-close" @click="closePopup">X</button>
-        </div>
-        <div class="nb-modal-body">
-          <NewsBiasPopup v-if="newsBiasData" :data="newsBiasData" @close="closePopup"></NewsBiasPopup>
-        </div>
-      </div>
-    </div>
 
     <!-- 版本变更日志弹窗 -->
     <n-modal v-model:show="showChangelog" preset="card" class="changelog-modal"
