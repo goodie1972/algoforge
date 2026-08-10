@@ -433,4 +433,62 @@ _TEMPLATES: dict[str, dict[str, str]] = {
         'zh': '[监督者] 加载 {n} 条历史告警',
         'en': '[Supervisor] Loaded {n} history alerts',
     },
+
+    # ---- 策略 ----
+    'strategy_score': {
+        'zh': '{name} 评分: {score}/{max_score} {flags} {signal} 明细: {detail}',
+        'en': '{name} Score: {score}/{max_score} {flags} {signal} Detail: {detail}',
+    },
+    'strategy_no_signal': {
+        'zh': '无信号',
+        'en': 'No signal',
+    },
+    'strategy_gate_blocked': {
+        'zh': '[门禁] {name} {direction}: {reason}',
+        'en': '[Gate] {name} {direction}: {reason}',
+    },
+    'strategy_position_report': {
+        'zh': '{name} 持仓: {total} (多:{longs} 空:{shorts})',
+        'en': '{name} Positions: {total} (longs:{longs} shorts:{shorts})',
+    },
+    'strategy_open_signal': {
+        'zh': '{name} 开仓信号 {direction} 评分={score}',
+        'en': '{name} Open signal {direction} Score={score}',
+    },
+    'strategy_entry_scored': {
+        'zh': '{name} 入场评分 {score}/{max_score} {summary}',
+        'en': '{name} Entry score {score}/{max_score} {summary}',
+    },
+
+    # ---- 回测与路由 ----
+    'backtest_loaded': {
+        'zh': '回测 {job}: 从 {file} 加载了 {n} 条数据',
+        'en': 'Backtest {job}: Loaded {n} data rows from {file}',
+    },
+    'backtest_no_data': {
+        'zh': '回测 {job}: 无历史数据文件，使用模拟数据',
+        'en': 'Backtest {job}: No history data, using simulated data',
+    },
+    'backtest_failed': {
+        'zh': '回测 {job} 失败',
+        'en': 'Backtest {job} failed',
+    },
+    'route_indicator_failed': {
+        'zh': '[indicators] 获取指标失败: {error}',
+        'en': '[indicators] Get indicators failed: {error}',
+    },
+    'route_report_daily_done': {
+        'zh': '[报告] 日报已生成',
+        'en': '[Report] Daily report generated',
+    },
+    'route_report_daily_failed': {
+        'zh': '[报告] 日报生成失败: {error}',
+        'en': '[Report] Daily report failed: {error}',
+    },
+
+    # ---- 下载器路由 ----
+    'route_download_failed': {
+        'zh': '[{tf}] 下载失败',
+        'en': '[{tf}] Download failed',
+    },
 }
