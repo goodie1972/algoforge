@@ -873,7 +873,9 @@ class TradingEngine:
                 self._config_mtime = mtime
                 importlib.reload(settings)
                 RuntimeConfig().reload()
-                logger.info("[HotReload] RuntimeConfig reloaded，current active Config updated")
+                logger.info("[HotReload] RuntimeConfig reloaded, active config updated")
+                from services.log_messages import clear_lang_cache
+                clear_lang_cache()
                 for s in snapshot:
                     s.reload_config()
                 logger.info("[HotReload] Config updated")

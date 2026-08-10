@@ -296,5 +296,6 @@
   "rapid_exit_cooldown_seconds": 7200,
   "per_strategy_realized_loss_amount": 30,
   "max_consecutive_losses": 3,
-  "consecutive_loss_cooldown_hours": 4
+  "consecutive_loss_cooldown_hours": 4,
+  "language": "zh-CN"
 }
