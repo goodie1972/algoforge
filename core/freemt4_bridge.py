@@ -53,10 +53,10 @@ class FreeMT4Bridge(MT4BridgeBase):
                 return False
 
             name_tag = f" [{self._name}]" if self._name else ""
-            logger.info(f"[FreeMT4{name_tag}] 已连接到 {self._host}:{self._port}")
+            logger.info(f"[FreeMT4{name_tag}] Connected to {self._host}:{self._port}")
             info = self.get_account_info()
             if info:
-                logger.info(f"[FreeMT4{name_tag}] 账户 #{info.login} 余额: {info.balance} {info.currency}")
+                logger.info(f"[FreeMT4{name_tag}] Account #{info.login} Balance: {info.balance} {info.currency}")
             return True
         except Exception:
             self.disconnect()
@@ -77,10 +77,10 @@ class FreeMT4Bridge(MT4BridgeBase):
         if now - self._last_reconnect < self.RECONNECT_INTERVAL:
             return False
         self._last_reconnect = now
-        logger.info("[FreeMT4] 尝试重连...")
+        logger.info("[FreeMT4] Attempting reconnect...")
         ok = self.connect()
         if ok:
-            logger.info("[FreeMT4] 重连成功")
+            logger.info("[FreeMT4] Reconnected")
         return ok
 
     # ======================== 底层通信 ========================
@@ -132,14 +132,14 @@ class FreeMT4Bridge(MT4BridgeBase):
                     return None
                 if parts[1] != "OK":
                     error_detail = "#".join(parts[1:])[:200]
-                    logger.error(f"[FreeMT4] EA 错误: {fcode} 返回 {error_detail}")
+                    logger.error(f"[FreeMT4] EA error: {fcode} returned {error_detail}")
                     return None
 
                 return parts[2:]
 
             except Exception:
                 self.disconnect()
-                # 下一轮尝试重连
+                # 下一轮Attempting reconnect
 
         return None
 
@@ -153,7 +153,7 @@ class FreeMT4Bridge(MT4BridgeBase):
             raise ConnectionError("FreeMT4 bridge heartbeat failed")
         return result
 
-    # ======================== 账户信息 ========================
+    # ======================== Account信息 ========================
 
     def get_account_info(self) -> Optional[AccountInfo]:
         static = self._send_cmd("F001#0#")
@@ -276,7 +276,7 @@ class FreeMT4Bridge(MT4BridgeBase):
                 "volume_sma_20": float(all_fields[idx+27]),
             }
         except (ValueError, IndexError) as e:
-            logger.warning(f"[FreeMT4] F043解析失败: {e}, fields={len(all_fields)}")
+            logger.warning(f"[FreeMT4] F043parse failed: {e}, fields={len(all_fields)}")
             return {}
 
     # ======================== 持仓管理 ========================
@@ -368,15 +368,15 @@ class FreeMT4Bridge(MT4BridgeBase):
             f"F070#8#{symbol}#{type_str}#{volume}#{price}#{SLIPPAGE}#{magic}#{sl}#{tp}#{comment}#"
         )
         if not data:
-            logger.error(f"[FreeMT4] 开仓失败: {symbol} {order_type.value} magic={magic} _send_cmd 返回空")
+            logger.error(f"[FreeMT4] Open order failed: {symbol} {order_type.value} magic={magic} _send_cmd returned empty")
             return None
 
         try:
             ticket = int(data[0])
-            logger.info(f"[FreeMT4] 开仓成功: {order_type.value} {symbol} {volume}手 Ticket={ticket}")
+            logger.info(f"[FreeMT4] Open order success: {order_type.value} {symbol} {volume} lots Ticket={ticket}")
             return ticket
         except (ValueError, IndexError):
-            logger.error(f"[FreeMT4] 开仓响应解析失败: {data}")
+            logger.error(f"[FreeMT4] Open response parse failed: {data}")
             return None
 
     def close_order(self, ticket: int | str, volume: float = 0) -> bool:
@@ -387,15 +387,15 @@ class FreeMT4Bridge(MT4BridgeBase):
 
         data = self._send_cmd(cmd)
         if data:
-            logger.info(f"[FreeMT4] 平仓成功: Ticket={ticket}")
+            logger.info(f"[FreeMT4] Close order success: Ticket={ticket}")
             return True
-        logger.error(f"[FreeMT4] 平仓失败: Ticket={ticket}")
+        logger.error(f"[FreeMT4] Close order failed: Ticket={ticket}")
         return False
 
     def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
         data = self._send_cmd(f"F075#3#{ticket}#{sl}#{tp}#")
         if data:
-            logger.info(f"[FreeMT4] 修改成功: Ticket={ticket} SL={sl} TP={tp}")
+            logger.info(f"[FreeMT4] Modify success: Ticket={ticket} SL={sl} TP={tp}")
             return True
-        logger.error(f"[FreeMT4] 修改失败: Ticket={ticket}")
+        logger.error(f"[FreeMT4] Modify failed: Ticket={ticket}")
         return False

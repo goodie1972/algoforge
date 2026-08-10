@@ -54,12 +54,12 @@ def _run_backtest_job(job_id: str, params: BacktestRequest):
         if os.path.exists(data_file):
             df = pd.read_csv(data_file, parse_dates=["time"])
             df = df[(df["time"] >= params.start_date) & (df["time"] <= params.end_date)]
-            logger.info(f"回测 {job_id}: 从 {data_file} 加载了 {len(df)} 条数据")
+            logger.info(f"backtest {job_id}: loaded {len(df)} data rows from {data_file}")
         else:
             # 生成模拟数据
             with _lock:
                 _jobs[job_id]["progress"] = "生成模拟数据..."
-            logger.warning(f"回测 {job_id}: 无历史数据文件，使用模拟数据")
+            logger.warning(f"backtest {job_id}: No history data file, using simulated data")
             df = _generate_sample_data(params)
 
         if df is None or len(df) == 0:
@@ -111,7 +111,7 @@ def _run_backtest_job(job_id: str, params: BacktestRequest):
             _jobs[job_id]["progress"] = "完成"
 
     except Exception as e:
-        logger.exception(f"回测 {job_id} 失败")
+        logger.exception(f"backtest {job_id} failed")
         with _lock:
             _jobs[job_id]["status"] = "failed"
             _jobs[job_id]["error"] = str(e)

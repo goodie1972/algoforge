@@ -19,9 +19,9 @@ export const useLogStore = defineStore('logs', () => {
   function append(entry: LogEntry) {
     // 统一字段名：WebSocket 推送的是 time，数据库返回的是 timestamp
     const normalized = { ...entry, timestamp: (entry as any).time || entry.timestamp }
-    entries.value.push({ ...normalized, _id: ++idCounter })
+    entries.value.unshift({ ...normalized, _id: ++idCounter })  // 新日志在最前
     if (entries.value.length > maxEntries) {
-      entries.value.splice(0, entries.value.length - maxEntries)
+      entries.value.pop()
     }
   }
 
@@ -31,11 +31,11 @@ export const useLogStore = defineStore('logs', () => {
       const existing = new Set(entries.value.map(e => e.timestamp + e.message))
       for (const log of logs) {
         if (!existing.has(log.timestamp + log.message)) {
-          entries.value.push({ ...log, _id: ++idCounter })
+          entries.value.unshift({ ...log, _id: ++idCounter })  // 新日志在最前
         }
       }
       if (entries.value.length > maxEntries) {
-        entries.value.splice(0, entries.value.length - maxEntries)
+        entries.value.splice(maxEntries)
       }
     } catch { /* ignore */ }
   }

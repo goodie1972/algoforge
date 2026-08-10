@@ -152,9 +152,9 @@ async def report_daily_loop():
     while PollerState.running:
         try:
             _gather_daily_report()
-            logger.info("[报告] 日报已生成")
+            logger.info("[Report] daily reportgenerated")
         except Exception as e:
-            logger.warning(f"[报告] 日报生成失败: {e}")
+            logger.warning(f"[Report] daily reportgeneratedfailed: {e}")
         await asyncio.sleep(600)
 
 
@@ -163,7 +163,7 @@ async def report_weekly_loop():
     from dashboard.backend.routes.reports import _gather_weekly_report
     while PollerState.running:
         _gather_weekly_report()
-        logger.info("[报告] 快照已生成")
+        logger.info("[Report] snapshotgenerated")
         # 每 6 小时
         for _ in range(21600):
             if not PollerState.running:

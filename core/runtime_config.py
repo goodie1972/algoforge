@@ -82,7 +82,7 @@ class RuntimeConfig:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(self._overrides, f, indent=2, ensure_ascii=False)
         except OSError as e:
-            print(f"[Config] 保存配置失败: {e}")
+            print(f"[Config] Save config failed: {e}")
 
     def _get_default(self, key: str) -> Any:
         """从 settings.py 读取默认值"""

@@ -54,4 +54,4 @@ def _ensure_csv_cleared():
         with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             w.writerow(headers)
-        logger.info("已创建空纸面交易 CSV 文件")
+        logger.info("createdemptypaper trading CSV file")

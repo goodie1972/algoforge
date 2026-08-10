@@ -38,7 +38,7 @@ async def get_overview():
         data["initialized"] = True
         return data
     except Exception as e:
-        logger.error(f"获取监督概览失败: {e}")
+        logger.error(f"fetchsupervisoroverviewfailed: {e}")
         return {"error": str(e), "initialized": False}
 
 
@@ -51,7 +51,7 @@ async def get_alerts():
     try:
         return {"alerts": sv.get_alerts()}
     except Exception as e:
-        logger.error(f"获取告警失败: {e}")
+        logger.error(f"fetchalertfailed: {e}")
         return {"alerts": []}
 
 
@@ -64,7 +64,7 @@ async def get_strategy_detail(name: str):
     try:
         return sv.analyze_strategy(name)
     except Exception as e:
-        logger.error(f"分析策略 {name} 失败: {e}")
+        logger.error(f"analyzestrategy {name} failed: {e}")
         return {"error": str(e)}
 
 
@@ -79,7 +79,7 @@ async def get_history(limit: int = 100):
         events.reverse()
         return {"events": events[:limit]}
     except Exception as e:
-        logger.error(f"获取交易事件失败: {e}")
+        logger.error(f"fetchtradeeventfailed: {e}")
         return {"events": []}
 
 
@@ -93,5 +93,5 @@ async def clear_alerts():
         sv.clear_alerts()
         return {"ok": True}
     except Exception as e:
-        logger.error(f"清除告警失败: {e}")
+        logger.error(f"clearalertfailed: {e}")
         return {"ok": False}

@@ -146,39 +146,39 @@ def check_logs_dir() -> tuple[bool, str]:
 def main() -> None:
     print()
     print("=" * 50)
-    print("  XAUUSD V6 交易引擎 — 启动前检查")
+    print("  XAUUSD V6 Trading Engine — Pre-start Check")
     print("=" * 50)
     print()
 
     # ── 1 Python 版本 ────────────────────────────────────────────
-    print("[1/5] Python 版本")
+    print("[1/5] Python version")
     record("Python >= 3.10", check_python_version(), critical=True)
     print()
 
     # ── 2 核心模块 ────────────────────────────────────────────────
-    print("[2/5] 核心模块")
+    print("[2/5] coremodule")
     record("core.bridge 可导入", check_core_bridge(), critical=True)
     print()
 
     # ── 3 配置 ────────────────────────────────────────────────────
-    print("[3/5] 配置检查")
+    print("[3/5] configcheck")
     record("config.settings 有效", check_settings(), critical=True)
     print()
 
     # ── 4 MT4 连接 ───────────────────────────────────────────────
-    print("[4/5] FreeMT4 连接")
+    print("[4/5] FreeMT4 connect")
     record("FreeMT4 EA 可达", check_mt4_connection(), critical=True)
     print()
 
     # ── 5 目录 (非关键) ──────────────────────────────────────────
-    print("[5/5] 目录检查")
+    print("[5/5] directorycheck")
     record("data/ 目录", check_data_dir(), critical=False)
     record("logs/ 目录", check_logs_dir(), critical=False)
     print()
 
     # ── 摘要 ──────────────────────────────────────────────────────
     print("=" * 50)
-    print("  检查摘要")
+    print("  Check Summary")
     print("=" * 50)
     all_critical_pass = True
     for label, passed, critical, detail in results:
@@ -199,18 +199,18 @@ def main() -> None:
     # ── 启动引擎 ──────────────────────────────────────────────────
     if all_critical_pass:
         print("=" * 50)
-        print("  所有关键检查通过，启动 XAUUSD V6 交易引擎...")
+        print("  allkeycheckpassed，start XAUUSD V6 tradeengine...")
         print("=" * 50)
         try:
             from engine_standalone.main import main as engine_main
             engine_main()
         except Exception as e:
-            print(f"\n  [{RED}错误{RESET}] 引擎启动失败: {e}")
-            print(f"  请检查 MT4 连接和日志文件获取详情")
+            print(f"\n  [{RED}error{RESET}] enginestartfailed: {e}")
+            print(f"  pleasecheck MT4 connect and log filefor details")
             sys.exit(1)
     else:
         print("=" * 50)
-        print(f"  {RED}关键检查未通过，请修复上述 [FAIL] 项后重试{RESET}")
+        print(f"  {RED}Key checks failed, please fix [FAIL] items above and retry{RESET}")
         print("=" * 50)
         sys.exit(1)
 

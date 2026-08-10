@@ -253,7 +253,7 @@ def _build_daily_report() -> dict:
                     "data": day_by_strategy,
                 })
         except Exception as e:
-            logger.warning("[报告] 当日成交处理失败: %s", e)
+            logger.warning("[Report] todayfillsprocessfailed: %s", e)
 
     # 黄金快讯评估（新系统 — 汇通+金十+LLM）
     news_data = None

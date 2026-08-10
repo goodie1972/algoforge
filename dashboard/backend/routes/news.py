@@ -49,7 +49,7 @@ async def get_gold_news(limit: int = 20):
             "news": news,
         }
     except Exception as e:
-        logger.error(f"[黄金快讯API] 错误: {e}")
+        logger.error(f"[GoldNewsAPI] error: {e}")
         return {"summary": {}, "current_bias": None, "evaluation": {}, "news": []}
 
 
@@ -64,7 +64,7 @@ async def refresh_calendar():
     is_blocked, reason = nf.is_in_blackout()
     events = nf.get_upcoming_events()
     windows = nf.get_blackout_windows()
-    logger.info(f"[新闻刷新] 完成，内置 FOMC 已合并")
+    logger.info(f"[NewsRefresh] done, built-in FOMC merged")
     return {
         "status": "ok",
         "is_blackout": is_blocked,

@@ -155,7 +155,7 @@ def load_all_logics() -> dict[str, StratLogic]:
     logics = {}
     doc_dir = DOCS_DIR
     if not os.path.isdir(doc_dir):
-        logger.warning(f"策略文档目录不存在: {doc_dir}")
+        logger.warning(f"strategydocdirectorynot found: {doc_dir}")
         return logics
 
     for fname in sorted(os.listdir(doc_dir)):
@@ -168,7 +168,7 @@ def load_all_logics() -> dict[str, StratLogic]:
             name = meta.get('name', fname.replace('.md', ''))
             logics[name] = load_strategy_logic(name)
         except Exception as e:
-            logger.warning(f"解析 {fname} 失败: {e}")
+            logger.warning(f"parse {fname} failed: {e}")
 
     return {k: v for k, v in logics.items() if v is not None}
 

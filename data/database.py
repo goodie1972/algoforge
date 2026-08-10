@@ -285,11 +285,11 @@ def _migrate_ticket_to_text(conn):
     info = {r[1].upper(): r[2].upper() for r in conn.execute("PRAGMA table_info(trades)").fetchall()}
     if 'TICKET' in info and info['TICKET'] in ('INTEGER', 'INT', 'BIGINT'):
         conn.execute("ALTER TABLE trades RENAME TO trades_old_int")
-        logger.info("[DB] trades.ticket INTEGER→TEXT 迁移：旧表已重命名")
+        logger.info("[DB] trades.ticket INTEGER→TEXT migration: old table renamed")
     info2 = {r[1].upper(): r[2].upper() for r in conn.execute("PRAGMA table_info(signals)").fetchall()}
     if 'TICKET' in info2 and info2['TICKET'] in ('INTEGER', 'INT', 'BIGINT'):
         conn.execute("ALTER TABLE signals RENAME TO signals_old_int")
-        logger.info("[DB] signals.ticket INTEGER→TEXT 迁移：旧表已重命名")
+        logger.info("[DB] signals.ticket INTEGER→TEXT migration: old table renamed")
 
 
 def _restore_old_ticket_data(conn):
@@ -304,7 +304,7 @@ def _restore_old_ticket_data(conn):
             open_time, close_time, hold_seconds, exit_reason, indicator_snapshot, created_at
             FROM trades_old_int""")
         conn.execute("DROP TABLE trades_old_int")
-        logger.info("[DB] trades 旧数据恢复完成")
+        logger.info("[DB] trades  old data recovery complete")
     if 'signals_old_int' in tables:
         conn.execute("""INSERT INTO signals (id, strategy, magic, timeframe, timestamp, signal,
             score_long, score_short, threshold, factors_long, factors_short,
@@ -314,7 +314,7 @@ def _restore_old_ticket_data(conn):
             indicator_values, confidence, price_entry, CAST(ticket AS TEXT), created_at
             FROM signals_old_int""")
         conn.execute("DROP TABLE signals_old_int")
-        logger.info("[DB] signals 旧数据恢复完成")
+        logger.info("[DB] signals  old data recovery complete")
 
 
 def init_db():
@@ -329,7 +329,7 @@ def init_db():
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
         names = [r["name"] for r in tables]
-        logger.info(f"数据库初始化完成: {DB_PATH} ({len(names)} 张表: {', '.join(names)})")
+        logger.info(f"DB initialization complete: {DB_PATH} ({len(names)}  tables: {', '.join(names)})")
         migrate_signals_lifecycle()
         migrate_risk_states_exit_timestamps()
         migrate_timezone_fix()
@@ -370,7 +370,7 @@ def migrate_risk_states_exit_timestamps():
         if 'exit_timestamps' not in existing:
             conn.execute("ALTER TABLE risk_states ADD COLUMN exit_timestamps TEXT DEFAULT '[]'")
             conn.commit()
-            logger.info("迁移: risk_states 表添加 exit_timestamps 列成功")
+            logger.info("Migration: risk_states add exit_timestamps column succeeded")
     finally:
         conn.close()
 
@@ -388,7 +388,7 @@ def migrate_timezone_fix():
             "SELECT 1 FROM metadata WHERE key='timezone_migrated'"
         ).fetchone()
         if done:
-            logger.debug("时区迁移: 已完成（metadata 标记），跳过")
+            logger.debug("TZ migration: already done (metadata), skip")
             return
 
         tables = conn.execute(
@@ -419,9 +419,9 @@ def migrate_timezone_fix():
                     fixed += 1
         if fixed:
             conn.commit()
-            logger.info(f"时区迁移: 已修正 {fixed} 条记录的 created_at/updated_at (UTC → UTC+8)")
+            logger.info(f"TZ migration: fixed {fixed}  records created_at/updated_at (UTC → UTC+8)")
         else:
-            logger.info("时区迁移: 无需修正")
+            logger.info("TZ migration: no fix needed")
         # 写入迁移标记，防止下次启动重复执行
         conn.execute(
             "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
@@ -429,7 +429,7 @@ def migrate_timezone_fix():
         )
         conn.commit()
     except Exception as e:
-        logger.warning(f"时区迁移异常: {e}")
+        logger.warning(f"TZ migration exception: {e}")
     finally:
         conn.close()
 
@@ -503,7 +503,7 @@ def upsert_indicators(timeframe: str, timestamp, indicators: dict) -> bool:
         conn.commit()
         return True
     except Exception as e:
-        logger.warning(f"[DB] 写指标失败 tf={timeframe} ts={timestamp}: {e}")
+        logger.warning(f"[DB] Write indicator failed tf={timeframe} ts={timestamp}: {e}")
         return False
     finally:
         conn.close()
@@ -543,7 +543,7 @@ def upsert_tick(timestamp: int, bid: float, ask: float) -> bool:
         conn.commit()
         return True
     except Exception as e:
-        logger.warning(f"[DB] 写 tick 失败 ts={timestamp}: {e}")
+        logger.warning(f"[DB] Write tick failed ts={timestamp}: {e}")
         return False
     finally:
         conn.close()
@@ -649,7 +649,7 @@ def insert_trade(record: dict) -> int:
         conn.commit()
         return 1
     except Exception as e:
-        logger.warning(f"[DB] 写入交易失败 ticket={record.get('ticket')}: {e}")
+        logger.warning(f"[DB] Write trade failed ticket={record.get('ticket')}: {e}")
         return 0
     finally:
         conn.close()
@@ -754,7 +754,7 @@ def insert_signal(record: dict) -> int:
         conn.commit()
         return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     except Exception as e:
-        logger.warning(f"[DB] 写入信号失败 {record.get('strategy')}: {e}")
+        logger.warning(f"[DB] Write signal failed {record.get('strategy')}: {e}")
         return 0
     finally:
         conn.close()
@@ -808,7 +808,7 @@ def insert_account_snapshot(record: dict) -> int:
         conn.commit()
         return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     except Exception as e:
-        logger.warning(f"[DB] 写入账户快照失败: {e}")
+        logger.warning(f"[DB] Write account snapshot failed: {e}")
         return 0
     finally:
         conn.close()
@@ -852,7 +852,7 @@ def save_risk_state(magic: int, strategy: str, state: dict) -> int:
         conn.commit()
         return 1
     except Exception as e:
-        logger.warning(f"[DB] 保存风控状态失败 {strategy}: {e}")
+        logger.warning(f"[DB] Save risk state failed {strategy}: {e}")
         return 0
     finally:
         conn.close()
@@ -1021,7 +1021,7 @@ def insert_gold_news(items: list[dict]) -> int:
         conn.commit()
         return count
     except Exception as e:
-        logger.warning(f"[DB] 插入 gold_news 失败: {e}")
+        logger.warning(f"[DB] Insert gold_news failed: {e}")
         return 0
     finally:
         conn.close()
@@ -1126,7 +1126,7 @@ def insert_news_evaluation(record: dict) -> int:
         conn.commit()
         return 1
     except Exception as e:
-        logger.warning(f"[DB] 写入 news-evaluation 失败: {e}")
+        logger.warning(f"[DB] Write news-evaluation failed: {e}")
         return 0
     finally:
         conn.close()
@@ -1179,7 +1179,7 @@ def insert_news_bias_report(record: dict) -> int:
         conn.commit()
         return cur.lastrowid or 0
     except Exception as e:
-        logger.warning(f"[DB] 写入 news-bias 报告失败: {e}")
+        logger.warning(f"[DB] Write news-bias report failed: {e}")
         return 0
     finally:
         conn.close()
@@ -1276,7 +1276,7 @@ def insert_prediction_review(report_id, predicted, actual, is_correct, error_typ
         conn.commit()
         return cur.lastrowid or 0
     except Exception as e:
-        logger.warning(f"[DB] 插入复盘记录失败: {e}")
+        logger.warning(f"[DB] Insert review record failed: {e}")
         return 0
     finally:
         conn.close()
@@ -1335,7 +1335,7 @@ def upsert_accuracy_stats(date, total, correct, accuracy, breakdown_json):
         conn.commit()
         return cur.lastrowid or 0
     except Exception as e:
-        logger.warning(f"[DB] 写入准确率统计失败: {e}")
+        logger.warning(f"[DB] Write accuracy stats failed: {e}")
         return 0
     finally:
         conn.close()
@@ -1415,7 +1415,7 @@ def upsert_strategy_version(magic: int, strategy_name: str, version: str,
         conn.commit()
         return 1
     except Exception as e:
-        logger.warning(f"[DB] 写入策略版本失败 magic={magic}: {e}")
+        logger.warning(f"[DB] Write strategy version failed magic={magic}: {e}")
         return 0
     finally:
         conn.close()
@@ -1469,7 +1469,7 @@ def insert_report(record: dict) -> int:
         conn.commit()
         return cur.lastrowid or 0
     except Exception as e:
-        logger.warning(f"[DB] 写入报告失败: {e}")
+        logger.warning(f"[DB] Write report failed: {e}")
         return 0
     finally:
         conn.close()
@@ -1570,11 +1570,11 @@ def migrate_from_jsonl() -> int:
                 except json.JSONDecodeError:
                     pass
     except OSError as e:
-        logger.warning(f"[DB] 读取 JSONL 失败: {e}")
+        logger.warning(f"[DB] Read JSONL failed: {e}")
         return 0
 
     if records:
         n = insert_trades_batch(records)
-        logger.info(f"[DB] 从 JSONL 导入 {n} 条历史交易")
+        logger.info(f"[DB] Imported from JSONL {n}  historical trades")
         return n
     return 0

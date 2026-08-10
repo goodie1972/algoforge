@@ -5,7 +5,7 @@ MTF 共振协调器 — H1+M15 TA-Lib 形态方向门禁
       限制所有策略只能朝共振方向开仓。
 
 工作原理:
-  1. 每次 H1 K线收盘后，检测61种TA-Lib形态 + 质量过滤器
+  1. 每次 H1 candle收盘后，检测61种TA-Lib形态 + 质量过滤器
   2. 同时检查 M15 在同一时间窗口内是否有同向信号
   3. 共振 → 锁定方向（BUY/SELL），直到下一根H1K线重新评估
   4. 无共振 → BOTH（不限制）
@@ -36,7 +36,7 @@ class MTFResonanceCoordinator:
 
     def __init__(self, bridge):
         self.bridge = bridge
-        self._last_h1_ts: int = 0  # 上次处理的 H1 K线时间戳
+        self._last_h1_ts: int = 0  # 上次处理的 H1 candle时间戳
         self._allowed: str = "BOTH"  # 缓存: BUY / SELL / BOTH
 
     def get_allowed_direction(self) -> str:
@@ -48,13 +48,13 @@ class MTFResonanceCoordinator:
         if not coord_cfg.get("enabled", False) or not coord_cfg.get("mtf_resonance_enabled", False):
             return "BOTH"
 
-        # 从桥接获取最新 H1 K线
+        # 从桥接获取最新 H1 candle
         h1_raw = self.bridge.get_candles(settings.SYMBOL, "H1", 100)
         if not h1_raw or len(h1_raw) < 5:
             return "BOTH"
         h1_candles = list(reversed(h1_raw))
 
-        # 定位最后完整的 H1 K线
+        # 定位最后完整的 H1 candle
         n = len(h1_candles)
         completed_idx = n - 2  # [-1] 形成中, [-2] 最近完整收盘
         h1_ts = int(h1_candles[completed_idx].time)
@@ -67,7 +67,7 @@ class MTFResonanceCoordinator:
         # 重新评估
         self._allowed = self._evaluate(h1_candles, h1_ts)
         if self._allowed != "BOTH":
-            logger.info(f"[MTF共振协调器] 方向锁定: {self._allowed} (H1 K线 {self._fmt(h1_ts)})")
+            logger.info(f"[MTFresonancecoordinator] direction locked: {self._allowed} (H1 candle {self._fmt(h1_ts)})")
         return self._allowed
 
     # ------------------------------------------------------------------
@@ -92,7 +92,7 @@ class MTFResonanceCoordinator:
         return "BUY" if h1_dir == "bull" else "SELL"
 
     def _detect_h1(self, candles):
-        """检测最近完整 H1 K线的 TA-Lib 信号"""
+        """检测最近完整 H1 candle的 TA-Lib 信号"""
         o = np.array([c.open for c in candles], dtype=float)
         h = np.array([c.high for c in candles], dtype=float)
         l = np.array([c.low for c in candles], dtype=float)
@@ -150,7 +150,7 @@ class MTFResonanceCoordinator:
             raw = self.bridge.get_candles(settings.SYMBOL, "M15", 200)
             return list(reversed(raw))
         except Exception as e:
-            logger.warning(f"[MTF协调器] M15 获取失败: {e}")
+            logger.warning(f"[MTFcoordinator] M15 fetchfailed: {e}")
             return []
 
     # ------------------------------------------------------------------

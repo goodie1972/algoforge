@@ -78,7 +78,7 @@ async def trigger_download(
                 "total": count,
             }
         except Exception as e:
-            logger.exception(f"[{tf}] 下载失败")
+            logger.exception(f"[{tf}] downloadfailed")
             results[tf] = {"status": "error", "error": str(e)}
 
     return {
@@ -119,5 +119,5 @@ async def get_data_factory_indicators(
         return json.loads(json.dumps(result, default=float))
     except Exception as e:
         import traceback
-        logger.exception(f"[indicators] 获取指标失败: {e}")
+        logger.exception(f"[indicators] fetchindicatorsfailed: {e}")
         return {"error": f"获取指标失败: {e}", "trace": traceback.format_exc()[-500:]}

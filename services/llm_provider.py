@@ -28,7 +28,7 @@ try:
                      os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", ".env")]:
         if os.path.exists(env_path):
             load_dotenv(env_path, override=True)
-            logger.info(f"[LLMProvider] 已加载 .env: {env_path}")
+            logger.info(f"[LLMProvider] load .env: {env_path}")
             break
 except Exception:
     pass
@@ -103,7 +103,7 @@ class LLMProviderManager:
                 self._providers = DEFAULT_PROVIDERS
                 self._save()
         except Exception as e:
-            logger.warning(f"[LLMProvider] 加载失败: {e}")
+            logger.warning(f"[LLMProvider] loadfailed: {e}")
             self._providers = DEFAULT_PROVIDERS
 
         # 环境变量覆盖（优先级最高）
@@ -136,7 +136,7 @@ class LLMProviderManager:
                 for p in self._providers:
                     p["is_active"] = False
                 self._providers.append(env_provider)
-            logger.info(f"[LLMProvider] 环境变量配置生效: "
+            logger.info(f"[LLMProvider] env variable config activated: "
                         f"url={env_provider['base_url']} model={env_provider['selected_model']}")
 
     def _save(self):
@@ -146,7 +146,7 @@ class LLMProviderManager:
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(self._providers, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            logger.error(f"[LLMProvider] 保存失败: {e}")
+            logger.error(f"[LLMProvider] savefailed: {e}")
 
     # ── CRUD ────────────────────────────────────────
 
@@ -250,12 +250,12 @@ class LLMProviderManager:
             provider = self.get_active_raw()
 
         if not provider or not provider.get("api_key"):
-            logger.warning("[LLMProvider] 无可用 Provider 或 API Key 未设置")
+            logger.warning("[LLMProvider] No available Provider or API Key not set")
             return None
 
         model = provider.get("selected_model") or provider.get("models", [""])[0]
         if not model:
-            logger.warning("[LLMProvider] 未选择模型")
+            logger.warning("[LLMProvider] No model selected")
             return None
 
         base_url = provider.get("base_url", "https://api.openai.com/v1").rstrip("/")
@@ -290,7 +290,7 @@ class LLMProviderManager:
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
         except Exception as e:
-            logger.error(f"[LLMProvider] 调用失败: {e}")
+            logger.error(f"[LLMProvider] call failed: {e}")
             return None
 
     def test_connection(self, provider_id: str) -> dict:

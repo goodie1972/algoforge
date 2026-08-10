@@ -14,7 +14,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
-# 确保项目根目录在 sys.path 中
+# 确保项目 candles目录在 sys.path 中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.bridge import create_bridge
@@ -29,7 +29,7 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s"))
 logger.addHandler(handler)
 
-# 每页最多拉取多少根
+# 每页最多拉取多少 candles
 PAGE_SIZE = {
     "M1": 10000, "M5": 10000, "M15": 5000, "M30": 5000,
     "H1": 3000, "H4": 2000, "D1": 1600, "W1": 1600,
@@ -67,21 +67,21 @@ def download_timeframe(bridge, timeframe: str, symbol: str = "XAUUSD",
         # 当缺口为负（MT4 服务器时间快于 UTC）或太小，用最小保底批
         if gap <= 0:
             needed = safe_min
-            logger.info(f"[{timeframe}] 增量同步（保底）: 已有 {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}，拉取 {needed} 根")
+            logger.info(f"[{timeframe}] Incremental sync (fallback): existing {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}, fetching {needed} candles")
         else:
             needed = max(safe_min, min(default_count, gap // TF_SECONDS.get(timeframe, 3600) + 5))
-            logger.info(f"[{timeframe}] 增量同步: 已有 {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}，拉取 {needed} 根")
+            logger.info(f"[{timeframe}] Incremental sync: existing {datetime.fromtimestamp(latest, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}, fetching {needed} candles")
     else:
         needed = default_count
-        logger.info(f"[{timeframe}] 首次初始下载，拉取 {needed} 根")
+        logger.info(f"[{timeframe}] First initial download, fetching {needed}  candles")
 
     candles = bridge.get_candles(symbol, timeframe, needed)
     if not candles:
-        logger.warning(f"[{timeframe}] 未获取到数据")
+        logger.warning(f"[{timeframe}] No data fetched")
         return 0
 
     inserted = insert_candles(timeframe, candles)
-    logger.info(f"[{timeframe}] 增量写完 {inserted} 条")
+    logger.info(f"[{timeframe}] Incremental write done {inserted} ")
     return inserted
 
 
@@ -95,27 +95,27 @@ def download_timeframe_paged(bridge, timeframe: str, symbol: str = "XAUUSD",
     max_pages = 200  # 安全上限
     earliest_ts = int(time.time())
 
-    logger.info(f"[{timeframe}] 开始全量分页回填（目标: {datetime.fromtimestamp(target_ts, tz=timezone.utc).strftime('%Y-%m-%d')}）")
+    logger.info(f"[{timeframe}] Starting full pagination backfill (target: {datetime.fromtimestamp(target_ts, tz=timezone.utc).strftime('%Y-%m-%d')}）")
 
     for page in range(max_pages):
         candles = bridge.get_candles(symbol, timeframe, page_size, offset=offset)
         if not candles:
-            logger.info(f"[{timeframe}] offset={offset} → 无数据，分页结束")
+            logger.info(f"[{timeframe}] offset={offset} → No data, pagination ended")
             break
 
-        # 找本页最老的那根
+        # 找本页最老的那 candles
         for c in candles:
             ts = int(c.time)
             if ts < earliest_ts:
                 earliest_ts = ts
 
         total_fetched += len(candles)
-        logger.info(f"[{timeframe}] 第{page+1}页 offset={offset} 获取 {len(candles)} 根 "
+        logger.info(f"[{timeframe}] Page {page+1} offset={offset} fetched {len(candles)} candles "
                     f"(最老: {datetime.fromtimestamp(earliest_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')})")
 
         # 如果最老的已经覆盖到目标时间，停止
         if earliest_ts <= target_ts:
-            logger.info(f"[{timeframe}] 已覆盖到 {datetime.fromtimestamp(earliest_ts, tz=timezone.utc).strftime('%Y-%m-%d')}，完成回填")
+            logger.info(f"[{timeframe}] Covered up to {datetime.fromtimestamp(earliest_ts, tz=timezone.utc).strftime('%Y-%m-%d')}, backfill complete")
             break
 
         # 下移 offset
@@ -123,14 +123,14 @@ def download_timeframe_paged(bridge, timeframe: str, symbol: str = "XAUUSD",
         time.sleep(0.2)  # 不要打爆 EA
 
     if total_fetched == 0:
-        logger.warning(f"[{timeframe}] 分页下载未获取到任何数据")
+        logger.warning(f"[{timeframe}] Pagination: no data fetched")
         return 0
 
     # 全部插入（INSERT OR IGNORE 去重）
     # 注意：要做一次全量重新获取，因为上面的循环只向后翻没存
     # 重新拉取所有数据并插入
     inserted = _fetch_and_insert_all_pages(bridge, timeframe, symbol, page_size, target_ts)
-    logger.info(f"[{timeframe}] 全量回填完成: 总计获取 ~{total_fetched}+ 根，写入 {inserted} 条")
+    logger.info(f"[{timeframe}] Full backfill complete: total fetched ~{total_fetched}+  candles, wrote {inserted} ")
     return inserted
 
 
@@ -150,8 +150,8 @@ def _fetch_and_insert_all_pages(bridge, timeframe: str, symbol: str,
         total_inserted += inserted
 
         earliest_ts = min(int(c.time) for c in candles)
-        logger.info(f"[{timeframe}] 第{page+1}页 offset={offset} → 获取{len(candles)}根 "
-                    f"写入{inserted}条 最老:{datetime.fromtimestamp(earliest_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}")
+        logger.info(f"[{timeframe}] Page {page+1} offset={offset} → fetched {len(candles)} candles "
+                    f"写入{inserted} 最老:{datetime.fromtimestamp(earliest_ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')}")
 
         if earliest_ts <= target_ts:
             break
@@ -169,9 +169,9 @@ def download_all(symbol: str = "XAUUSD", timeframes: list[str] | None = None) ->
 
     init_db()
     bridge = create_bridge()
-    logger.info("连接 MT4...")
+    logger.info("Connecting to MT4...")
     if not bridge.connect():
-        logger.error("无法连接 MT4，下载失败")
+        logger.error("Cannot connect to MT4, download failed")
         return {"error": "MT4 未连接"}
 
     results = {}
@@ -180,16 +180,16 @@ def download_all(symbol: str = "XAUUSD", timeframes: list[str] | None = None) ->
             n = download_timeframe(bridge, tf, symbol)
             results[tf] = n
         except Exception as e:
-            logger.error(f"[{tf}] 下载失败: {e}")
+            logger.error(f"[{tf}] Download failed: {e}")
             results[tf] = 0
 
     bridge.disconnect()
 
-    logger.info("\n=== 下载完成 ===")
+    logger.info("\n=== Download complete ===")
     stats = get_db_stats()
     for tf, info in stats.items():
         if info["count"] > 0:
-            logger.info(f"  {tf}: {info['count']} 条 ({info['from']} ~ {info['to']})")
+            logger.info(f"  {tf}: {info['count']}  ({info['from']} ~ {info['to']})")
 
     return {"results": results, "stats": stats}
 
@@ -204,9 +204,9 @@ def download_all_paged(symbol: str = "XAUUSD",
 
     init_db()
     bridge = create_bridge()
-    logger.info("连接 MT4...")
+    logger.info("Connecting to MT4...")
     if not bridge.connect():
-        logger.error("无法连接 MT4，下载失败（引擎可能正占用桥接）")
+        logger.error("Cannot connect to MT4, download failed (engine may be using bridge)")
         return {"error": "MT4 未连接，请先停止引擎"}
 
     results = {}
@@ -215,16 +215,16 @@ def download_all_paged(symbol: str = "XAUUSD",
             n = download_timeframe_paged(bridge, tf, symbol, target_ts)
             results[tf] = n
         except Exception as e:
-            logger.error(f"[{tf}] 分页下载失败: {e}")
+            logger.error(f"[{tf}] Pagination download failed: {e}")
             results[tf] = 0
 
     bridge.disconnect()
 
-    logger.info("\n=== 全量回填完成 ===")
+    logger.info("\n=== Full backfill complete ===")
     stats = get_db_stats()
     for tf, info in stats.items():
         if info["count"] > 0:
-            logger.info(f"  {tf}: {info['count']} 条 ({info['from']} ~ {info['to']})")
+            logger.info(f"  {tf}: {info['count']}  ({info['from']} ~ {info['to']})")
 
     return {"results": results, "stats": stats}
 

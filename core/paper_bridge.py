@@ -65,7 +65,7 @@ class PaperBridge(MT4BridgeBase):
         with open(str(CSV_TRADES), "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             w.writerow(CSV_HEADERS)
-        logger.info(f"[PaperBridge] 已重置: 清除 {closed_count} 笔历史, {positions_count} 张持仓")
+        logger.info(f"[PaperBridge] Reset: cleared {closed_count}  history, {positions_count}  positions")
         return {"closed": closed_count, "positions": positions_count}
 
     def _init_ticket_seq(self):
@@ -182,9 +182,9 @@ class PaperBridge(MT4BridgeBase):
                 )
                 count += 1
             if count:
-                logger.info(f"[PaperBridge] 重启恢复 {count} 张未平仓持仓")
+                logger.info(f"[PaperBridge] Restart recovery {count}  open positions")
         except Exception as e:
-            logger.warning(f"[PaperBridge] 恢复持仓失败: {e}")
+            logger.warning(f"[PaperBridge] Position recovery failed: {e}")
 
     def _generate_ticket(self) -> str:
         """生成 9 位纯数字票号: YYMMDDSEQ (260720000)，每天重置，每天最多 1000 张"""
@@ -218,7 +218,7 @@ class PaperBridge(MT4BridgeBase):
                 self._balance = info.balance
                 self._equity = info.equity
                 self._start_balance = info.balance
-                logger.info(f"[PaperBridge] 启动，初始余额=${self._balance:.2f}")
+                logger.info(f"[PaperBridge] Started, initial balance=${self._balance:.2f}")
             self._connected = True
         return ok
 
@@ -318,7 +318,7 @@ class PaperBridge(MT4BridgeBase):
         if price > 0:
             open_price = price
         if bid <= 0:
-            logger.error(f"[PaperBridge] 无法开仓：无行情数据")
+            logger.error(f"[PaperBridge] Cannot open: no market data")
             return None
 
         ticket = self._generate_ticket()
@@ -340,7 +340,7 @@ class PaperBridge(MT4BridgeBase):
             open_time=str(int(time.time())),
         )
 
-        logger.info(f"[PaperBridge] 模拟开仓: {order_type.value} {symbol} "
+        logger.info(f"[PaperBridge] Simulated open: {order_type.value} {symbol} "
                     f"{volume}手 @ {open_price:.2f} "
                     f"SL={sl:.2f} TP={tp:.2f} Ticket={ticket} "
                     f"策略={comment} Magic={magic}")
@@ -375,7 +375,7 @@ class PaperBridge(MT4BridgeBase):
             if _ticket in self._positions:
                 ticket = _ticket
             else:
-                logger.warning(f"[PaperBridge] 平仓失败：Ticket={ticket} 不存在")
+                logger.warning(f"[PaperBridge] Close failed: Ticket={ticket} not found")
                 return False
 
         pos = self._positions.pop(ticket)
@@ -412,7 +412,7 @@ class PaperBridge(MT4BridgeBase):
         }
         self._closed.append(record)
 
-        logger.info(f"[PaperBridge] 模拟平仓: Ticket={ticket} "
+        logger.info(f"[PaperBridge] Simulated close: Ticket={ticket} "
                     f"{pos.order_type} {pos.comment} "
                     f"入场={pos.open_price:.2f} 出场={exit_price:.2f} "
                     f"盈亏=${pnl:.2f} 净=${net_pnl:.2f}")
@@ -450,12 +450,12 @@ class PaperBridge(MT4BridgeBase):
                 return False
         self._positions[ticket].stop_loss = sl
         self._positions[ticket].take_profit = tp
-        logger.info(f"[PaperBridge] 修改 Ticket={ticket} SL={sl:.2f} TP={tp:.2f}")
+        logger.info(f"[PaperBridge] Modified Ticket={ticket} SL={sl:.2f} TP={tp:.2f}")
         return True
 
     def takeover_existing_positions(self, symbol: str = None, magic: int = 0) -> list[Position]:
         """纸面模式无真实持仓需要接管，返回空"""
-        logger.info(f"[PaperBridge] 纸面模式：跳过真实持仓接管")
+        logger.info(f"[PaperBridge] Paper mode: skip live position takeover")
         return []
 
     # ═══════════════ 内部 ═══════════════

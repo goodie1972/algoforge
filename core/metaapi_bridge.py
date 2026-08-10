@@ -34,10 +34,10 @@ class MetaApiBridge(MT4BridgeBase):
             connected = loop.run_until_complete(self._wait_connected())
             if connected:
                 self._connected = True
-                logger.info("[MetaApi] 连接成功")
+                logger.info("[MetaApi] Connected")
             return connected
         except Exception as e:
-            logger.error(f"[MetaApi] 连接失败: {e}")
+            logger.error(f"[MetaApi] Connection failed: {e}")
             return False
 
     async def _wait_connected(self):
@@ -73,7 +73,7 @@ class MetaApiBridge(MT4BridgeBase):
                 leverage=int(info.leverage),
             )
         except Exception as e:
-            logger.error(f"[MetaApi] 获取账户信息失败: {e}")
+            logger.error(f"[MetaApi] Get account info failed: {e}")
             return None
 
     def get_positions(self, symbol: str = None) -> list[Position]:
@@ -106,7 +106,7 @@ class MetaApiBridge(MT4BridgeBase):
                 ))
             return result
         except Exception as e:
-            logger.error(f"[MetaApi] 获取持仓失败: {e}")
+            logger.error(f"[MetaApi] Get positions failed: {e}")
             return []
 
     def get_candles(self, symbol: str, timeframe: str, count: int) -> list[Candle]:
@@ -132,7 +132,7 @@ class MetaApiBridge(MT4BridgeBase):
                 for c in candles
             ]
         except Exception as e:
-            logger.error(f"[MetaApi] 获取K线失败: {e}")
+            logger.error(f"[MetaApi] Get candles failed: {e}")
             return []
 
     def get_tick_price(self, symbol: str) -> tuple[float, float]:
@@ -151,13 +151,13 @@ class MetaApiBridge(MT4BridgeBase):
                    price: float = 0, sl: float = 0, tp: float = 0,
                    comment: str = "", magic: int = 0) -> int | str | None:
         # MetaApi 下单实现略，需根据 MetaApi SDK 文档适配
-        logger.warning("[MetaApi] open_order 需根据 MetaApi SDK 文档适配")
+        logger.warning("[MetaApi] open_order needs MetaApi SDK adaptation")
         return None
 
     def close_order(self, ticket: int | str, volume: float = 0) -> bool:
-        logger.warning("[MetaApi] close_order 需根据 MetaApi SDK 文档适配")
+        logger.warning("[MetaApi] close_order needs MetaApi SDK adaptation")
         return False
 
     def modify_order(self, ticket: int | str, sl: float = 0, tp: float = 0) -> bool:
-        logger.warning("[MetaApi] modify_order 需根据 MetaApi SDK 文档适配")
+        logger.warning("[MetaApi] modify_order needs MetaApi SDK adaptation")
         return False

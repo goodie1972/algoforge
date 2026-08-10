@@ -131,7 +131,7 @@ class MT4BridgeBase(abc.ABC):
         positions = self.get_positions(symbol)
         if magic:
             positions = [p for p in positions if p.magic == magic]
-        logger.info(f"[持仓接管] Magic={magic} 发现 {len(positions)} 个现有持仓:")
+        logger.info(f"[positiontakeover] Magic={magic} found {len(positions)}  existing positions:")
         for pos in positions:
             logger.info(
                 f"  Ticket={pos.ticket} {pos.order_type} "
@@ -153,7 +153,7 @@ def create_bridge() -> MT4BridgeBase:
             if paper_cfg.get("enabled", False):
                 from core.paper_bridge import PaperBridge
                 bridge = PaperBridge(bridge)
-                logger.info("[桥接] 纸面模式：PaperBridge 包装单桥接")
+                logger.info("[bridge] Paper mode: PaperBridge wraps single bridge")
         except (ImportError, AttributeError):
             pass
         return bridge
@@ -180,7 +180,7 @@ def create_bridge_pair():
         if paper_cfg.get("enabled", False):
             from core.paper_bridge import PaperBridge
             exec_bridge = PaperBridge(real_exec)
-            logger.info("[桥接] 纸面模式：PaperBridge 包装执行桥接")
+            logger.info("[bridge] Paper mode: PaperBridge wraps exec bridge")
         else:
             exec_bridge = real_exec
     except (ImportError, AttributeError):
