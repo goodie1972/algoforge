@@ -1,4 +1,4 @@
-# XAUUSD 量化交易系统 v2.7.4 — CLAUDE.md
+# XAUUSD 量化交易系统 v2.7.7 — CLAUDE.md
 
 ## 项目
 
@@ -8,7 +8,7 @@ XAUUSD 黄金自动化交易系统，基于 Python + MetaTrader 4。
 - **技术栈:** Python 3.10+ / FastAPI / Vue 3 + TypeScript + Vite + Naive UI / SQLite / lightweight-charts
 - **桥接:** FreeMT4Bridge EA (MQL4, TCP Socket :23232) 或 MetaApi 云端
 - **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals 表)
-- **版本:** 2.7.4 (VERSION)
+- **版本:** 2.7.7 (VERSION)
 
 ## 回测系统
 
@@ -215,3 +215,5 @@ dt_local(ts)
 - 引擎操作：发现引擎停止后自动重启（参照 memory：feedback_auto_restart_engine.md）
 - 提交代码前：双轮测试（编译验证 + Playwright 实际页面测试）
 - 代码修改只改必要行，不添加无意义注释
+- **先确认再说话**：涉及配置数据、运行时状态等事实性问题，必须先读取实际数据再回答，严禁凭记忆或猜测作答（参照 memory：verify-before-speaking）
+- **版本号每次提交前更新**：小改动 +0.01，大改动 +0.1，同步更新 VERSION、package.json、CLAUDE.md、CHANGELOG.md
