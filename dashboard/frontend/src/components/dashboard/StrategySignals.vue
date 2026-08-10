@@ -208,16 +208,16 @@ onUnmounted(() => {
             :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
             {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
           </n-tag>
-          <n-button size="tiny" text style="font-size:18px;font-weight:700;color:#8b8f97;cursor:pointer" @click="goldShowAll = true">⤢</n-button>
+          <n-button size="tiny" text style="font-size:22px;font-weight:700;color:#8b8f97;cursor:pointer" @click="goldShowAll = true">⤢</n-button>
         </div>
       </template>
 
             <n-space vertical size="small">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <n-text depth="3" style="font-size:11px">
+          <n-text depth="3" style="font-size:12px">
             {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
           </n-text>
-          <n-text v-if="goldNews?.evaluation" depth="3" style="font-size:11px">
+          <n-text v-if="goldNews?.evaluation" depth="3" style="font-size:12px">
             准确率 {{ goldNews.evaluation.accuracy }}%
           </n-text>
         </div>
@@ -230,11 +230,11 @@ onUnmounted(() => {
               :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
               {{ item.direction === 'bullish' ? '多' : item.direction === 'bearish' ? '空' : '-' }}
             </n-tag>
-            <n-text style="font-size:11px;line-height:1.4">{{ item.content.slice(0, 60) }}{{ item.content.length > 60 ? '...' : '' }}</n-text>
+            <n-text style="font-size:12px;line-height:1.4">{{ item.content.slice(0, 60) }}{{ item.content.length > 60 ? '...' : '' }}</n-text>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:2px">
-            <n-text depth="3" style="font-size:10px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
-            <n-text depth="3" style="font-size:10px">{{ item.news_time }}</n-text>
+            <n-text depth="3" style="font-size:11px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
+            <n-text depth="3" style="font-size:11px">{{ item.news_time }}</n-text>
           </div>
         </div>
         <div v-if="loadingGold" style="text-align:center;padding:8px">
