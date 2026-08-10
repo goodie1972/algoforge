@@ -161,7 +161,18 @@ onUnmounted(() => {
 <template>
   <n-space vertical size="small">
 
-    <!-- ═══════════════ 实盘信号 ═══════════════ -->
+    <!-- ═══════════════ 经济日历跑马灯（独立） ═══════════════ -->
+    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;padding:6px 10px;border-radius:6px;border:1px solid var(--n-border-color);font-size:12px;line-height:1.6">
+      <span class="marquee-inner">
+        <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:50px">
+          <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
+          {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
+        </span>
+        <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
+      </span>
+    </div>
+
+<!-- ═══════════════ 实盘信号 ═══════════════ -->
     <n-card size="small" :bordered="true"
       :style="{
         borderLeft: `4px solid ${
@@ -195,18 +206,7 @@ onUnmounted(() => {
       </n-space>
     </n-card>
 
-    <!-- ═══════════════ 经济日历跑马灯（独立） ═══════════════ -->
-    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;padding:6px 10px;border-radius:6px;border:1px solid var(--n-border-color);font-size:12px;line-height:1.6">
-      <span class="marquee-inner">
-        <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:50px">
-          <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
-          {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
-        </span>
-        <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
-      </span>
-    </div>
-
-
+    
 
     
     <!-- ═══════════════ 黄金快讯评估 ═══════════════ -->
