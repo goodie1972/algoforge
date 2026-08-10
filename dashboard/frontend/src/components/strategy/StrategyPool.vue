@@ -4,7 +4,7 @@ import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
-import { translateFactor, translateMethod, translateDetail } from '@/utils/strategyTranslations'
+import { translateFactor, translateMethod, translateDetail, translateDisplay } from '@/utils/strategyTranslations'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -182,7 +182,7 @@ async function save() {
           <div style="display: flex; align-items: center; gap: 10px;">
             <n-switch :value="pool[meta.id]?.enabled"
               @update:value="toggleStrategy(meta.id)" size="small" />
-            <n-text strong style="font-size: 14px;">{{ meta.display }}</n-text>
+            <n-text strong style="font-size: 14px;">{{ locale === 'en-US' ? translateDisplay(meta.display) : meta.display }}</n-text>
             <n-tag :color="{ color: getColor(meta.name), textColor: getStrategyTextColor(meta.name) }" size="tiny" style="font-weight: 600; font-size: 14px; padding: 2px 7px;">
               {{ meta.name }}
             </n-tag>

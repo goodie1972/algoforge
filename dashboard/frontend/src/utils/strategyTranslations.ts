@@ -401,3 +401,40 @@ const detailTranslations: Record<string, string> = {
 export function translateDetail(cn: string): string {
   return detailTranslations[cn] || cn
 }
+
+// 策略显示名 display 中文→英文映射
+const displayTranslations: Record<string, string> = {
+  "BAKOME Gold Scalper Original — 完整 ICT strategy（原始版移植）": "BAKOME Gold Scalper Original — Full ICT Strategy (Original Port)",
+  "BAKOME GoldScalper optimize版 (v2_optimized) — ICT FVG + OB + Silver Bullet": "BAKOME GoldScalper Optimized (v2_optimized) — ICT FVG + OB + Silver Bullet",
+  "BAKOME GoldScalper — 后备strategy": "BAKOME GoldScalper — Backup Strategy",
+  "BAKOME Trinity EA Original — 多资产趋-trendtrailing系统（原始版移植）": "BAKOME Trinity EA Original — Multi-Asset Trend Trailing System (Original Port)",
+  "Entry Score PRO — 5因子加权Score + 结构/临近/动量/波动": "Entry Score PRO — 5-Factor Weighted Score + Structure/Proximity/Momentum/Volatility",
+  "Gold-AutoResearch — H1 实盘strategy": "Gold-AutoResearch — H1 Live Trading Strategy",
+  "H1 突破趋-trendstrategy — v1.0": "H1 Breakout Trend Strategy — v1.0",
+  "M30 BB DeepReturn Optimized — 超跌reboundstrategyoptimize版": "M30 BB DeepReturn Optimized — Oversold Rebound Strategy Optimized",
+  "M30 BB DeepReturn — 超跌reboundstrategy": "M30 BB DeepReturn — Oversold Rebound Strategy",
+  "M30 MFI + BB Upgraded v8 — 超跌rebound升级版": "M30 MFI + BB Upgraded v8 — Oversold Rebound Upgraded",
+  "M30 MFI + 布林带均值回归 (optimize版) — 均值回归strategy": "M30 MFI + Bollinger Bands Mean Reversion (Optimized) — Mean Reversion Strategy",
+  "M30 MFI + 布林带均值回归 — 均值回归strategy": "M30 MFI + Bollinger Bands Mean Reversion — Mean Reversion Strategy",
+  "M30 RSI + 布林带均值回归 — 7因子Score系统": "M30 RSI + Bollinger Bands Mean Reversion — 7-Factor Score System",
+  "M30 RSI分级Score — MA14 + BB + ADX>28 趋-trendGate": "M30 RSI Tiered Score — MA14 + BB + ADX>28 Trend Gate",
+  "M30 RSI分级Scoreoptimize版 v3_optimized — RSI+MA14+BBoptimize": "M30 RSI Tiered Score Optimized v3_optimized — RSI+MA14+BB Optimized",
+  "M30 RSI分级Score升级版 v5_upgraded — RSI+MA14+BB升级": "M30 RSI Tiered Score Upgraded v5_upgraded — RSI+MA14+BB Upgraded",
+  "M30 volatility均值回归strategy — v1.0": "M30 Volatility Mean Reversion Strategy — v1.0",
+  "Momentum Pulse PRO — 7维度多因子Score + 三层TP出场": "Momentum Pulse PRO — 7-Dimension Multi-Factor Score + Three-Layer TP Exit",
+  "Multi-Confluence Quant — 14因子综合Score": "Multi-Confluence Quant — 14-Factor Comprehensive Score",
+  "SanQing EA v1 原始版 — H1 纯原版": "SanQing EA v1 Original — H1 Pure Original",
+  "SanQing EA v9_upgraded — H1 实盘strategy升级版": "SanQing EA v9_upgraded — H1 Live Trading Strategy Upgraded",
+  "SanQing EA — H1 实盘strategy": "SanQing EA — H1 Live Trading Strategy",
+  "Sanqing Original — 三清 M5 4strategyschedule器（原始版移植）": "Sanqing Original — SanQing M5 4-Strategy Scheduler (Original Port)",
+  "Stoch KDJ w期strategy (v12)": "Stoch KDJ Wave Strategy (v12)",
+  "Stoch 回调with-trendstrategy (v6)": "Stoch Pullback Trend-Following Strategy (v6)",
+  "Stoch 回调with-trendstrategy (v7_optimized)": "Stoch Pullback Trend-Following Strategy (v7_optimized)",
+  "TimeProfit EA — H2趋-trend + M5Entry + 整数关口箱体（原始版移植）": "TimeProfit EA — H2 Trend + M5 Entry + Round Number Box (Original Port)",
+  "Viprasol Sniper — 7因子共识 + 多级RR出场": "Viprasol Sniper — 7-Factor Consensus + Multi-Level RR Exit",
+  "xaubot-ai — XGBoost ML 后备strategy": "xaubot-ai — XGBoost ML Backup Strategy",
+}
+
+export function translateDisplay(cn: string): string {
+  return displayTranslations[cn] || cn
+}
