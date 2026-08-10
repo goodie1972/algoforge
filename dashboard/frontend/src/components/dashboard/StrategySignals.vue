@@ -228,7 +228,7 @@ onUnmounted(() => {
           <div style="display:flex;align-items:flex-start;gap:6px">
             <n-tag size="tiny" :bordered="false" style="margin-top:2px;flex-shrink:0"
               :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
-              {{ $t('signals.gold_short_up') }}
+              {{ item.direction === 'bullish' ? $t('signals.gold_short_up') : item.direction === 'bearish' ? $t('signals.gold_short_down') : $t('signals.gold_short_neutral') }}
             </n-tag>
             <n-text style="font-size:12px;line-height:1.4">{{ locale === 'en-US' && item.content_en ? item.content_en.slice(0, 60) : item.content.slice(0, 60) }}{{ (locale === 'en-US' && item.content_en ? item.content_en : item.content).length > 60 ? '...' : '' }}</n-text>
           </div>
@@ -250,7 +250,11 @@ onUnmounted(() => {
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
         <n-tag v-if="goldNews?.current_bias" :bordered="false"
           :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
-          {{ $t('signals.gold_bullish') }}
+          {{
+            goldNews.current_bias.overall === 'BULLISH' ? $t('signals.gold_bullish')
+            : goldNews.current_bias.overall === 'BEARISH' ? $t('signals.gold_bearish')
+            : $t('signals.gold_neutral')
+          }}
         </n-tag>
         <n-text depth="3" style="font-size:18px">
           {{ $t('signals.gold_summary', { b: goldNews?.summary?.bullish ?? 0, r: goldNews?.summary?.bearish ?? 0, n: goldNews?.summary?.neutral ?? 0 }) }}
@@ -264,7 +268,7 @@ onUnmounted(() => {
             <div style="display:flex;align-items:flex-start;gap:6px">
               <n-tag size="tiny" :bordered="false" style="margin-top:2px;flex-shrink:0"
                 :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
-                {{ $t('signals.gold_bullish_label') }}
+                {{ item.direction === 'bullish' ? $t('signals.gold_bullish_label') : item.direction === 'bearish' ? $t('signals.gold_bearish_label') : $t('signals.gold_neutral_label') }}
               </n-tag>
               <n-text style="font-size:18px;line-height:1.6">{{ locale === 'en-US' && item.content_en ? item.content_en : item.content }}</n-text>
             </div>
