@@ -119,6 +119,7 @@ interface GoldNewsData {
 
 const goldNews = ref<GoldNewsData | null>(null)
 const goldShowAll = ref(false)
+const calendarShowAll = ref(false)
 const loadingGold = ref(false)
 
 async function fetchGoldNews() {
@@ -208,7 +209,18 @@ onUnmounted(() => {
         </div>
       </template>
 
-      <n-space vertical size="small">
+            <!-- 经济日历跑马灯 -->
+      <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;padding:4px 0;margin-bottom:4px;border-radius:4px;background:var(--n-color-embedded);font-size:12px;line-height:1.6">
+        <span class="marquee-inner">
+          <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:40px">
+            <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
+            {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
+          </span>
+          <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
+        </span>
+      </div>
+
+<n-space vertical size="small">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <n-text depth="3" style="font-size:11px">
             {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
@@ -219,7 +231,7 @@ onUnmounted(() => {
         </div>
 
         <!-- 最近快讯列表（前4条） -->
-        <div v-for="item in goldNews?.news?.slice(0, 4)" :key="item.id"
+        <div v-for="item in goldNews?.news?.slice(0, 5)" :key="item.id"
           style="padding:4px 8px;border-radius:4px;background:var(--n-color-embedded)">
           <div style="display:flex;align-items:flex-start;gap:6px">
             <n-tag size="tiny" :bordered="false" style="margin-top:2px;flex-shrink:0"
@@ -239,8 +251,28 @@ onUnmounted(() => {
       </n-space>
     </n-card>
 
+    <!-- 经济日历完整窗口（居中悬浮） -->
+    <n-modal v-model:show="calendarShowAll" :mask-closable="true" preset="card" :title="'经济日历 - 完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
+      <div style="max-height:calc(75vh - 100px);overflow-y:auto">
+        <n-space vertical size="small">
+          <div v-for="evt in calendarData?.upcoming_events" :key="evt.datetime + evt.title"
+            style="padding:8px;border-radius:6px;background:var(--n-color-embedded)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <n-text style="font-size:13px;font-weight:600">{{ evtName(evt.title) }}</n-text>
+              <n-tag size="tiny" :color="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }" text-color="#fff">{{ evt.impact }}</n-tag>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+              <n-text depth="3" style="font-size:12px">{{ evt.country }} {{ evt.datetime }}</n-text>
+              <n-text depth="3" style="font-size:12px">前值 {{ evt.previous || '-' }} | 预测 {{ evt.forecast || '-' }}</n-text>
+            </div>
+          </div>
+          <div v-if="!calendarData?.upcoming_events?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无经济日历事件</div>
+        </n-space>
+      </div>
+    </n-modal>
+
     <!-- 黄金快讯完整窗口（居中悬浮） -->
-    <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="'黄金快讯完整列表'" style="width:60vw;max-height:60vh;overflow-y:auto">
+    <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="'黄金快讯完整列表'" style="width:75vw;max-height:75vh;overflow-y:auto">
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
         <n-tag v-if="goldNews?.current_bias" :bordered="false"
           :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
@@ -251,7 +283,7 @@ onUnmounted(() => {
         </n-text>
       </div>
       <n-divider style="margin:4px 0" />
-      <div style="max-height:calc(60vh - 120px);overflow-y:auto">
+      <div style="max-height:calc(75vh - 120px);overflow-y:auto">
         <n-space vertical size="small">
           <div v-for="item in goldNews?.news" :key="item.id"
             style="padding:8px;border-radius:6px;background:var(--n-color-embedded)">
@@ -272,89 +304,7 @@ onUnmounted(() => {
       </div>
     </n-modal>
 
-<!-- ═══════════════ 新闻日历 ═══════════════ -->
-    <n-card :title="$t('signals.news_calendar')" size="small" :bordered="true"
-      :segmented="{ content: true }"
-      :style="{
-        borderLeft: `4px solid ${
-          calendarData?.is_blackout ? '#f6465d' : '#8b8f97'
-        }`,
-      }">
-      <template #header-extra>
-        <n-button size="tiny" text
-          style="font-size: 20px; font-weight: 700; color: #8b8f97; cursor: pointer;"
-          @click="newsExpanded = !newsExpanded">
-          {{ newsExpanded ? '−' : '+' }}
-        </n-button>
-      </template>
 
-      <n-space vertical size="small">
-        <!-- 状态 + 下一事件 -->
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <n-space align="center" size="small">
-            <n-tag
-              v-if="calendarData?.is_blackout"
-              type="error" size="tiny" :bordered="false">{{ $t('signals.blackout') }}</n-tag>
-            <n-tag v-else size="tiny" :bordered="false"
-              style="background: #8b8f9720; color: #8b8f97;">{{ $t('signals.normal_trading') }}</n-tag>
-            <n-text v-if="calendarData?.is_blackout" depth="2" style="font-size: 12px;">
-              {{ calendarData.blackout_reason }}
-            </n-text>
-          </n-space>
-          <n-text v-if="calendarData?.upcoming_events?.length" depth="3" style="font-size: 11px;">
-            {{ $t('signals.pending', { count: calendarData.upcoming_events.length }) }}
-          </n-text>
-        </div>
-
-        <!-- 下一事件 -->
-        <div v-if="nextEvent" :style="{
-          padding: '6px 10px', borderRadius: '4px',
-          background: calendarData?.is_blackout ? '#f6465d10' : 'var(--n-color-embedded)',
-        }">
-          <n-text depth="3" style="font-size: 10px;">{{ $t('signals.next_event') }}</n-text>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-            <n-text style="font-size: 13px; font-weight: 600;">{{ evtName(nextEvent.title) }}</n-text>
-            <n-tag size="tiny" :color="{ color: impactColor(nextEvent.impact) }" text-color="#fff">
-              {{ nextEvent.impact }}
-            </n-tag>
-          </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 4px;">
-            <n-text depth="3" style="font-size: 11px;">{{ nextEvent.datetime }}</n-text>
-            <n-text depth="3" style="font-size: 11px;">
-              {{ nextEvent.previous ? $t('signals.previous') + ' ' + nextEvent.previous : '' }}
-              {{ nextEvent.forecast ? ' | ' + $t('signals.forecast') + ' ' + nextEvent.forecast : '' }}
-            </n-text>
-          </div>
-        </div>
-
-        <!-- 展开日历列表 -->
-        <n-collapse-transition :show="newsExpanded">
-          <n-space vertical size="small">
-            <div v-for="evt in calendarData?.upcoming_events" :key="evt.datetime + evt.title"
-              :style="{
-                padding: '8px 10px', borderRadius: '4px',
-                background: 'var(--n-color-embedded)',
-              }">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <n-text style="font-size: 12px; font-weight: 600;">{{ evtName(evt.title) }}</n-text>
-                <n-tag size="tiny" :color="{ color: impactColor(evt.impact) }" text-color="#fff">
-                  {{ evt.impact }}
-                </n-tag>
-              </div>
-              <div style="display: flex; justify-content: space-between; margin-top: 4px;">
-                <n-text depth="3" style="font-size: 11px;">{{ evt.datetime }}</n-text>
-                <n-text depth="3" style="font-size: 11px;">
-                  {{ $t('signals.previous') }} {{ evt.previous || '-' }} | {{ $t('signals.forecast') }} {{ evt.forecast || '-' }}
-                </n-text>
-              </div>
-            </div>
-            <div v-if="!calendarData?.upcoming_events?.length" style="text-align: center; padding: 8px;">
-              <n-empty :description="$t('signals.no_high_impact')" />
-            </div>
-          </n-space>
-        </n-collapse-transition>
-      </n-space>
-    </n-card>
 
     <!-- ═══════════════ 实盘策略 ═══════════════ -->
     <n-card size="small" :bordered="true">
