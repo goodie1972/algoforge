@@ -7,7 +7,7 @@ import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 
 const store = useConfigStore()
 const message = useMessage()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const saving = ref(false)
 
 interface StrategyMeta {
@@ -50,6 +50,7 @@ interface ExitRow {
 // 策略进出场逻辑 (与交易终端一致)
 interface StratLogic {
   desc: string
+  desc_en?: string
   exitWiden?: boolean
   exitNote?: string
   long: { entry: EntryFactor[]; exit: ExitRow[] }
@@ -223,7 +224,7 @@ async function save() {
           <!-- 进出场逻辑 (双栏: 左做多右做空, 上入场下出场) -->
           <template v-if="getLogic(meta.name)">
             <n-text depth="2" style="font-size: 12px; display: block; margin-bottom: 8px;">
-              {{ getLogic(meta.name)!.desc }}
+              {{ locale === 'en-US' ? (getLogic(meta.name)!.desc_en || getLogic(meta.name)!.desc) : getLogic(meta.name)!.desc }}
             </n-text>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">

@@ -34,7 +34,7 @@ class StratLogic(TypedDict, total=False):
 
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
     """解析 YAML frontmatter，返回 (meta, body)"""
-    m = re.match(r'^---\s*\n(.*?)\n---\s*\n(.*)', text, re.DOTALL)
+    m = re.match(r'^---\s*\n?(.*?)\n---\s*\n(.*)', text, re.DOTALL)
     if not m:
         return {}, text
     yaml_text = m.group(1)
@@ -135,6 +135,7 @@ def load_strategy_logic(name: str) -> StratLogic | None:
 
     result: StratLogic = {
         "desc": meta.get('desc', ''),
+        "desc_en": meta.get('desc_en') or meta.get('desc', ''),
         "exitWiden": has_exit_widen,
         "exitNote": exit_note,
     }
