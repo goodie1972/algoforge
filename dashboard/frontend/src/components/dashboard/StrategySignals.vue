@@ -34,6 +34,7 @@ const calendarData = ref<CalendarData | null>(null)
 const loadingNews = ref(false)
 const newsExpanded = ref(false)
 let refreshTimer: number | null = null
+let refreshTimer2: number | null = null
 
 async function fetchCalendar() {
   loadingNews.value = true
@@ -98,19 +99,60 @@ async function fetchLogics() {
 
 const expandedStratKeys = ref<string[]>([])
 
+
+interface GoldNewsItem {
+  id: number
+  source: string
+  content: string
+  direction: string
+  direction_confidence: string
+  news_time: string
+  fetched_at: number
+}
+
+interface GoldNewsData {
+  summary: { total: number; bullish: number; bearish: number; neutral: number; last_fetch: number }
+  current_bias: { overall: string; bullish_score: number; bearish_score: number } | null
+  evaluation: { evaluated: number; correct: number; wrong: number; pending: number; accuracy: number }
+  news: GoldNewsItem[]
+}
+
+const goldNews = ref<GoldNewsData | null>(null)
+const loadingGold = ref(false)
+
+async function fetchGoldNews() {
+  loadingGold.value = true
+  try {
+    const res = await fetch('/api/news/gold')
+    if (res.ok) goldNews.value = await res.json()
+  } catch { /* ignore */ }
+  finally { loadingGold.value = false }
+}
+
+function goldDirColor(dir: string): string {
+  return dir === 'bullish' ? '#0ecb81' : dir === 'bearish' ? '#f6465d' : '#8b8f97'
+}
+
+function goldDirLabel(dir: string): string {
+  return dir === 'bullish' ? '利多' : dir === 'bearish' ? '利空' : '中性'
+}
+
 function impactColor(impact: string) {
   return impact === 'High' ? '#f6465d' : impact === 'Medium' ? '#f0a020' : '#8b8f97'
 }
 
 onMounted(() => {
+  fetchGoldNews()
   configStore.fetch()
   fetchCalendar()
   fetchLogics()
   refreshTimer = window.setInterval(fetchCalendar, 300000)
+  refreshTimer2 = window.setInterval(fetchGoldNews, 300000)
 })
 
 onUnmounted(() => {
   if (refreshTimer !== null) clearInterval(refreshTimer)
+  if (refreshTimer2 !== null) clearInterval(refreshTimer2)
 })
 </script>
 
@@ -151,7 +193,49 @@ onUnmounted(() => {
       </n-space>
     </n-card>
 
-    <!-- ═══════════════ 新闻日历 ═══════════════ -->
+    
+    <!-- ═══════════════ 黄金快讯评估 ═══════════════ -->
+    <n-card title="黄金快讯" size="small" :bordered="true"
+      :style="{ borderLeft: `4px solid ${goldNews?.current_bias?.overall === 'BULLISH' ? '#0ecb81' : goldNews?.current_bias?.overall === 'BEARISH' ? '#f6465d' : '#8b8f97'}` }">
+      <n-space vertical size="small">
+        <!-- 当前偏向 -->
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <n-space align="center" size="small">
+            <n-tag v-if="goldNews?.current_bias" size="tiny" :bordered="false"
+              :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
+              {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
+            </n-tag>
+            <n-text depth="3" style="font-size:11px">
+              {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
+            </n-text>
+          </n-space>
+          <n-text v-if="goldNews?.evaluation" depth="3" style="font-size:11px">
+            准确率 {{ goldNews.evaluation.accuracy }}%
+          </n-text>
+        </div>
+
+        <!-- 最近快讯列表 -->
+        <div v-for="item in goldNews?.news?.slice(0, 4)" :key="item.id"
+          style="padding:4px 8px;border-radius:4px;background:var(--n-color-embedded)">
+          <div style="display:flex;align-items:flex-start;gap:6px">
+            <n-tag size="tiny" :bordered="false" style="margin-top:2px;flex-shrink:0"
+              :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
+              {{ item.direction === 'bullish' ? '多' : item.direction === 'bearish' ? '空' : '-' }}
+            </n-tag>
+            <n-text style="font-size:11px;line-height:1.4">{{ item.content.slice(0, 60) }}{{ item.content.length > 60 ? '...' : '' }}</n-text>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:2px">
+            <n-text depth="3" style="font-size:10px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
+            <n-text depth="3" style="font-size:10px">{{ item.news_time }}</n-text>
+          </div>
+        </div>
+        <div v-if="loadingGold" style="text-align:center;padding:8px">
+          <n-spin size="small" />
+        </div>
+      </n-space>
+    </n-card>
+
+<!-- ═══════════════ 新闻日历 ═══════════════ -->
     <n-card :title="$t('signals.news_calendar')" size="small" :bordered="true"
       :segmented="{ content: true }"
       :style="{
