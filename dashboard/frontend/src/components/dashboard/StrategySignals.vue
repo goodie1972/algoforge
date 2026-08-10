@@ -195,6 +195,19 @@ onUnmounted(() => {
       </n-space>
     </n-card>
 
+    <!-- ═══════════════ 经济日历跑马灯（独立） ═══════════════ -->
+    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;padding:6px 10px;border-radius:6px;border:1px solid var(--n-border-color);font-size:12px;line-height:1.6">
+      <span class="marquee-inner">
+        <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:50px">
+          <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
+          {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
+        </span>
+        <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
+      </span>
+    </div>
+
+
+
     
     <!-- ═══════════════ 黄金快讯评估 ═══════════════ -->
     <n-card title="黄金快讯" size="small" :bordered="true"
@@ -209,18 +222,7 @@ onUnmounted(() => {
         </div>
       </template>
 
-            <!-- 经济日历跑马灯 -->
-      <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;padding:4px 0;margin-bottom:4px;border-radius:4px;background:var(--n-color-embedded);font-size:12px;line-height:1.6">
-        <span class="marquee-inner">
-          <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:40px">
-            <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
-            {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
-          </span>
-          <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
-        </span>
-      </div>
-
-<n-space vertical size="small">
+            <n-space vertical size="small">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <n-text depth="3" style="font-size:11px">
             {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
