@@ -4,6 +4,7 @@ import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
+import { translateFactor, translateMethod } from '@/utils/strategyTranslations'
 
 const store = useConfigStore()
 const message = useMessage()
@@ -243,7 +244,7 @@ async function save() {
                   <tbody>
                     <tr v-for="(f, i) in getLogic(meta.name)!.long.entry" :key="'le'+i">
                       <td style="text-align: center; color: #8b8f97;">{{ i+1 }}</td>
-                      <td>{{ f.name }}</td>
+                      <td>{{ locale === 'en-US' ? translateFactor(f.name) : f.name }}</td>
                       <td style="text-align: center;">
                         <span v-if="f.score" style="display:inline-block; padding:0 3px; background:#f0a020; color:#fff; font-weight:700; font-size:10px; border-radius:2px;">{{ f.score }}</span>
                       </td>
@@ -263,7 +264,7 @@ async function save() {
                   <tbody>
                     <tr v-for="(ex, i) in getLogic(meta.name)!.long.exit" :key="'lx'+i">
                       <td style="text-align:center;color:#8b8f97;">{{ i+1 }}</td>
-                      <td>{{ ex.method }}</td>
+                      <td>{{ locale === 'en-US' ? translateMethod(ex.method) : ex.method }}</td>
                       <td>{{ ex.normal }}</td>
                       <td v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ ex.widen || '—' }}</td>
                     </tr>
@@ -289,7 +290,7 @@ async function save() {
                   <tbody>
                     <tr v-for="(f, i) in getLogic(meta.name)!.short.entry" :key="'se'+i">
                       <td style="text-align: center; color: #8b8f97;">{{ i+1 }}</td>
-                      <td>{{ f.name }}</td>
+                      <td>{{ locale === 'en-US' ? translateFactor(f.name) : f.name }}</td>
                       <td style="text-align: center;">
                         <span v-if="f.score" style="display:inline-block; padding:0 3px; background:#f0a020; color:#fff; font-weight:700; font-size:10px; border-radius:2px;">{{ f.score }}</span>
                       </td>
@@ -309,7 +310,7 @@ async function save() {
                   <tbody>
                     <tr v-for="(ex, i) in getLogic(meta.name)!.short.exit" :key="'sx'+i">
                       <td style="text-align:center;color:#8b8f97;">{{ i+1 }}</td>
-                      <td>{{ ex.method }}</td>
+                      <td>{{ locale === 'en-US' ? translateMethod(ex.method) : ex.method }}</td>
                       <td>{{ ex.normal }}</td>
                       <td v-if="getLogic(meta.name)!.exitWiden" style="text-align:center;">{{ ex.widen || '—' }}</td>
                     </tr>
