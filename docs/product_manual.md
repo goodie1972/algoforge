@@ -136,7 +136,7 @@ xauusd/
 │   └── STRATEGY_VERSIONING.md   # 版本管理规范文档
 ├── services/
 │   ├── news_filter.py           # ForexFactory 新闻过滤
-│   └── news_evaluator.py        # 新闻影响评估
+│   └── huicong_news.py, llm_provider.py        # 新闻影响评估
 ├── data/
 │   ├── database.py              # SQLite 存储（OHLCV + signals + versions）
 │   ├── downloader.py            # 历史数据下载
@@ -695,7 +695,7 @@ npx vite build
 
 版本 badge 显示当前版本号，功能定位为"检查 GitHub 更新"：
 
-- **`v0.7.8 ✓`** — 绿色勾，表示已是最新版本
+- **`v2.7.4 ✓`** — 绿色勾，表示已是最新版本
 - **`v0.7.8 ● (3)`** — 红点亮起，数字为落后 commit 数
 - **点击** → 弹窗显示待拉取的 commits + "版本更新"按钮
 - **一键更新** → 执行 `git pull --ff-only`（仅增量拉取）

@@ -69,7 +69,7 @@ python -m pytest tests/
 xauusd/
 ├── config/              # 配置 (settings.py, runtime_config.py)
 ├── core/                # 桥接层 (bridge.py, freemt4_bridge.py, metaapi_bridge.py, paper_bridge.py)
-├── services/            # 服务层 (data_factory.py, news_filter.py, supervisor.py, mtf_coordinator.py)
+├── services/            # 服务层 (data_factory.py, news_filter.py, huicong_news.py, llm_provider.py, supervisor.py)
 ├── engine_standalone/   # 引擎主循环 (main.py, athlete.py, run.py)
 ├── strategies/          # 策略文件 (base.py + 各策略实现)
 ├── dashboard/           # Web 管理面板

@@ -1,6 +1,6 @@
 # XAUUSD 量化交易系统 — 策略手册（MD 备份）
 
-> 版本: 20260711 | 系统: v2.1.0 三轨架构 | 周期: M30/H1 混合 | 双桥接(exec+data)
+> 版本: 20260809 | 系统: v2.7.4 三轨架构 | 周期: M30/H1 混合 | 双桥接(exec+data)
 >
 > **最新 HTML 主文档**: `strategies/strategy_manual_20260630.html`
 >

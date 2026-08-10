@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js" alt="Vue 3">
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi" alt="FastAPI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.3.0-gold" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.7.4-gold" alt="Version">
 </p>
 
 ---
@@ -82,6 +82,12 @@
 - **RiskManager**：单笔风险固定、总敞口限制、最大持仓数
 - **TradeManager**：订单管理、滑点处理、Magic Number 隔离
 
+### 多源新闻预判
+- 汇通网 7×24 黄金快讯 + 金十数据双源抓取
+- LLM 驱动方向判断（利多/利空/中性），自动翻译中英文
+- 经济日历跑马灯滚动展示，点击放大查看完整列表
+- 4 小时自动刷新，历史准确性复盘评估
+
 ### 数据驱动
 - **DataFactory**：唯一指标来源，F043 MT4 值优先，TA-Lib 本地回退
 - 26 个通用指标跨策略共享（RSI, MFI, BB, ATR, ADX, MACD, Stoch 等）
@@ -103,15 +109,17 @@
 
 | 策略 | 类型 | 周期 | Magic | 状态 |
 |:-----|:----|:----:|:-----:|:----:|
-| mfi_bb_m30_optimized | 反转 | M30 | 661002 | ✅ 运行中 |
-| rsi_grading_m30_upgraded | 评分 | M30 | 660903 | ✅ 运行中 |
-| m30_bb_deepreturn | 反转 | M30 | 661100 | ✅ 运行中 |
-| mfi_bb_m30 | 反转 | M30 | 661000 | ✅ 运行中 |
+| gold_auto_research | 评分 | H1 | 880306 | ✅ 运行中 |
+| h1_breakout | 突破 | H1 | 880301 | ✅ 运行中 |
+| M30_rsi_bb | 评分 | M30 | 660706 | ✅ 运行中 |
 | m30_bb_deepreturn_optimized | 反转 | M30 | 661102 | ✅ 运行中 |
-| momentum_pulse_pro | 趋势 | M30 | 880101 | ✅ 运行中 |
-| rsi_grading_m30 | 评分 | M30 | 660900 | ✅ 运行中 |
+| mfi_bb_m30_upgraded | 反转 | M30 | 661003 | ✅ 运行中 |
+| rsi_grading_m30_upgraded | 评分 | M30 | 660904 | ✅ 运行中 |
+| sanqing_h1 | 趋势 | H1 | 880107 | ✅ 运行中 |
+| sanqing_h1_upgraded | 趋势 | H1 | 880108 | ✅ 运行中 |
+| stoch_trend_h1_optimized | 趋势 | H1 | 661202 | ✅ 运行中 |
 
-> 基于 3 个月回测，以上 7 个策略 PnL 为正。其余策略因回测亏损已禁用。
+> 基于 3 个月回测，以上 9 个策略 PnL 为正。其余策略因回测亏损或表现不佳已禁用。
 
 ---
 
