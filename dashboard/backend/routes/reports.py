@@ -25,6 +25,46 @@ def _sec_to_hms(seconds: float) -> str:
     return f"{m}m"
 
 
+def _report_lang() -> str:
+    """获取当前报表语言（zh/en）"""
+    try:
+        from core.runtime_config import RuntimeConfig
+        lang = RuntimeConfig().get('language') or 'zh-CN'
+        return 'zh' if str(lang).lower().startswith('zh') else 'en'
+    except Exception:
+        return 'zh'
+
+
+def _report_t(section: str, lang: str = '') -> str:
+    """报表章节标题翻译"""
+    if not lang:
+        lang = _report_lang()
+    if lang == 'en':
+        return {
+            "运行状态": "Engine Status",
+            "账户概况": "Account Overview",
+            "持仓": "Positions",
+            "策略信号": "Strategy Signals",
+            "风控状态": "Risk Status",
+            "行情快照": "Market Snapshot",
+            "当日成交": "Today's Trades",
+            "今日交易汇总": "Today's Summary",
+            "按策略分组": "By Strategy",
+            "黄金快讯评估": "Gold News Evaluation",
+            "运行中": "Running",
+            "已停止": "Stopped",
+            "已连接": "Connected",
+            "断开": "Disconnected",
+            "运行正常": "Running normally",
+            "引擎异常": "Engine error",
+            "余额": "Balance",
+            "张": "positions",
+            "笔": "trades",
+            "单": "orders",
+        }.get(section, section)
+    return section
+
+
 def _build_daily_report() -> dict:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     status = engine_runner.get_status() if engine_runner else {}
@@ -142,9 +182,9 @@ def _build_daily_report() -> dict:
     # 汇总摘要文本
     pnl_str = f"+${daily_pnl:.2f}" if daily_pnl >= 0 else f"-${abs(daily_pnl):.2f}"
     summary_parts = [
-        f"运行正常" if engine_ok else "引擎异常",
-        f"余额 ${account.get('balance', 0):.2f}",
-        f"持仓 {len(positions)} 单",
+        _report_t('运行正常', _report_lang()) if engine_ok else _report_t('引擎异常', _report_lang()),
+        f"{_report_t('余额', _report_lang())} ${account.get('balance', 0):.2f}",
+        f"{_report_t('持仓', _report_lang())} {len(positions)} {_report_t('单', _report_lang())}",
         pnl_str,
     ]
     summary = " · ".join(summary_parts)
@@ -152,18 +192,18 @@ def _build_daily_report() -> dict:
     sections = [
         {
             "type": "engine",
-            "title": "运行状态",
+            'title': _report_t('运行状态', _report_lang()),
             "data": {
                 "verdict": verdict,
-                "status": "运行中" if engine_ok else "已停止",
-                "bridge": "已连接" if bridge_ok else "断开",
+                'status': _report_t('运行中', _report_lang()) if engine_ok else _report_t('已停止', _report_lang()),
+                'bridge': _report_t('已连接', _report_lang()) if bridge_ok else _report_t('断开', _report_lang()),
                 "uptime": uptime,
                 "started_at": status.get("started_at", ""),
             },
         },
         {
             "type": "account",
-            "title": "账户概况",
+            'title': _report_t('账户概况', _report_lang()),
             "data": {
                 "balance": account.get("balance", 0),
                 "equity": account.get("equity", 0),
@@ -176,18 +216,18 @@ def _build_daily_report() -> dict:
         },
         {
             "type": "positions",
-            "title": f"持仓 ({len(positions)} 张)",
+            'title': f"{_report_t('持仓', _report_lang())} ({len(positions)} {_report_t('张', _report_lang())})",
             "data": positions,
             "by_strategy": positions_by_strategy,
         },
         {
             "type": "signals",
-            "title": "策略信号",
+            'title': _report_t('策略信号', _report_lang()),
             "data": signals_data,
         },
         {
             "type": "risk",
-            "title": "风控状态",
+            'title': _report_t('风控状态', _report_lang()),
             "data": {
                 "daily_pnl": round(daily_pnl, 2),
                 "daily_drawdown": 0,
@@ -196,7 +236,7 @@ def _build_daily_report() -> dict:
         },
         {
             "type": "market",
-            "title": "行情快照",
+            'title': _report_t('行情快照', _report_lang()),
             "data": {
                 "bid": price.get("bid", 0),
                 "ask": price.get("ask", 0),
@@ -210,7 +250,7 @@ def _build_daily_report() -> dict:
         try:
             sections.append({
                 "type": "trades",
-                "title": f"当日成交 ({len(day_trades)} 笔)",
+                'title': f"{_report_t('当日成交', _report_lang())} ({len(day_trades)} {_report_t('笔', _report_lang())})",
                 "data": day_trades,
             })
             day_wins = sum(1 for t in day_trades if t.get("pnl", 0) > 0)
@@ -234,7 +274,7 @@ def _build_daily_report() -> dict:
                 s["pnl"] = round(s["pnl"], 2)
             sections.append({
                 "type": "weekly_summary",
-                "title": f"今日交易汇总",
+                'title': _report_t('今日交易汇总', _report_lang()),
                 "data": {
                     "date": today_str,
                     "total_pnl": round(day_total_pnl, 2),
@@ -249,7 +289,7 @@ def _build_daily_report() -> dict:
             if day_by_strategy:
                 sections.append({
                     "type": "by_strategy",
-                    "title": "按策略分组",
+                    'title': _report_t('按策略分组', _report_lang()),
                     "data": day_by_strategy,
                 })
         except Exception as e:
@@ -271,7 +311,7 @@ def _build_daily_report() -> dict:
                 "wrong": eval_stats.get("wrong", 0),
                 "neutral": summary_stats.get("neutral", 0),
                 "evaluations": [
-                    {"event_title": r.get("content", "")[:60],
+                    {"event_title": (r.get("content_en") or r.get("content", ""))[:60],
                      "expected_bias": r.get("direction", ""),
                      "actual_move_15m": r.get("actual_move_15m", 0),
                      "actual_move_1h": r.get("actual_move_1h", 0),
@@ -289,7 +329,7 @@ def _build_daily_report() -> dict:
         accuracy = news_data.get("accuracy", 0)
         sections.append({
             "type": "news_bias",
-            "title": f"黄金快讯评估 ({directional}笔 / {accuracy}%准确)",
+            'title': f"{_report_t('黄金快讯评估', _report_lang())} ({directional} {_report_t('笔', _report_lang())} / {accuracy}%)",
             "data": news_data,
         })
 
@@ -362,7 +402,7 @@ def _build_weekly_report(target_date: str = "") -> dict:
         },
         {
             "type": "by_strategy",
-            "title": "按策略分组",
+            'title': _report_t('按策略分组', _report_lang()),
             "data": by_strategy,
         },
     ]
