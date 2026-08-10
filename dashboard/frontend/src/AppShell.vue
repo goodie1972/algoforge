@@ -299,7 +299,7 @@ onUnmounted(() => {
             <template #icon>
               <n-icon><LanguageOutline /></n-icon>
             </template>
-            <span v-if="!collapsed">{{ locale === 'zh-CN' ? t('lang.en') : t('lang.zh') }}</span>
+            <span v-if="!collapsed">{{ locale === 'zh-CN' ? 'EN' : '中文' }}</span>
           </n-button>
         </div>
       </n-layout-sider>
