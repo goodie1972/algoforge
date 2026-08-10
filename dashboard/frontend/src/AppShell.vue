@@ -56,10 +56,26 @@ async function fetchCalendar() {
     if (res.ok) calendarData.value = await res.json()
   } catch { /* ignore */ }
 }
+const EVT_CN: Record<string, string> = {
+  'Core CPI m/m': '核心CPI月率', 'Core CPI y/y': '核心CPI年率',
+  'CPI m/m': 'CPI月率', 'CPI y/y': 'CPI年率',
+  'Non-Farm Employment Change': '非农就业人数', 'Unemployment Rate': '失业率',
+  'Average Hourly Earnings m/m': '平均时薪月率', 'Average Hourly Earnings y/y': '平均时薪年率',
+  'GDP m/m': 'GDP月率', 'GDP q/q': 'GDP季率',
+  'Retail Sales m/m': '零售销售月率', 'Core Retail Sales m/m': '核心零售销售月率',
+  'PPI m/m': 'PPI月率', 'PPI y/y': 'PPI年率',
+  'ISM Manufacturing PMI': 'ISM制造业PMI', 'ISM Services PMI': 'ISM服务业PMI',
+  'FOMC Statement': '美联储利率决议', 'Fed Funds Rate': '美联储利率',
+  'Initial Jobless Claims': '初请失业金', 'Continuing Jobless Claims': '续请失业金',
+  'Consumer Sentiment': '消费者信心指数', 'Consumer Confidence': '消费者信心指数',
+  'Trade Balance': '贸易帐', 'Housing Starts': '新屋开工',
+  'Building Permits': '营建许可', 'Durable Goods Orders m/m': '耐用品订单月率',
+  'Industrial Production m/m': '工业产出月率', 'Capacity Utilization': '产能利用率',
+  'Treasury Budget': '财政部预算', 'UoM Inflation Expectations': '密歇根通胀预期',
+  'Philly Fed Manufacturing Index': '费城联储制造业指数', 'Empire State Manufacturing Index': '纽约联储制造业指数',
+}
 function evtName(title: string) {
-  const key = `signals.news.${title}`
-  const cn = t(key)
-  return cn !== key ? cn : title
+  return EVT_CN[title] || title
 }
 
 const changelog = ref<Array<{hash: string; date: string; subject: string}>>([])
@@ -281,11 +297,14 @@ onUnmounted(() => {
             <n-breadcrumb-item>{{ t('app.breadcrumb') }}</n-breadcrumb-item>
             <n-breadcrumb-item>{{ route.name === 'config' ? t('common.config') : route.name === 'positions' ? t('common.positions') : route.name === 'strategies' ? t('common.strategies') : route.name === 'logs' ? t('common.logs') : route.name === 'patrol' ? t('common.patrol') : t('common.dashboard') }}</n-breadcrumb-item>
           </n-breadcrumb>
-                    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;flex:1;margin:0 12px;font-size:12px;line-height:1.6;padding:2px 8px;border-radius:4px;background:var(--n-color-embedded)">
+                    <div @click="calendarShowAll = true" style="cursor:pointer;overflow:hidden;white-space:nowrap;flex:2;margin:0 12px;font-size:12px;line-height:1.6;padding:2px 8px;border-radius:4px;background:var(--n-color-embedded)">
             <span class="marquee-inner">
-              <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:50px">
+              <span v-for="evt in calendarData?.upcoming_events?.slice(0, 5)" :key="evt.datetime + evt.title" style="margin-right:60px">
                 <span :style="{ color: evt.impact === 'High' ? '#f6465d' : evt.impact === 'Medium' ? '#f0a020' : '#8b8f97' }">●</span>
-                {{ evtName(evt.title) }} {{ evt.datetime?.slice(5) }} <span style="color:#8b8f97">{{ evt.forecast ? '预'+evt.forecast : '' }}</span>
+                <span style="font-weight:600">{{ evtName(evt.title) }}</span>
+                <span style="color:#8b8f97"> {{ evt.datetime?.slice(5) }}</span>
+                <span v-if="evt.previous" style="color:#aaa"> 前{{ evt.previous }}</span>
+                <span v-if="evt.forecast" style="color:#f0b90b"> 预{{ evt.forecast }}</span>
               </span>
               <span v-if="!calendarData?.upcoming_events?.length" style="color:#8b8f97">暂无经济日历事件</span>
             </span>
