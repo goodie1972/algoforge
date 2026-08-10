@@ -252,7 +252,7 @@ onUnmounted(() => {
           :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
           {{ goldNews.current_bias.overall === 'BULLISH' ? '看多' : goldNews.current_bias.overall === 'BEARISH' ? '看空' : '中性' }}
         </n-tag>
-        <n-text depth="3" style="font-size:12px">
+        <n-text depth="3" style="font-size:18px">
           {{ goldNews?.summary?.bullish ?? 0 }}利多 / {{ goldNews?.summary?.bearish ?? 0 }}利空 / {{ goldNews?.summary?.neutral ?? 0 }}中性
         </n-text>
       </div>
@@ -266,11 +266,11 @@ onUnmounted(() => {
                 :type="item.direction === 'bullish' ? 'success' : item.direction === 'bearish' ? 'error' : 'default'">
                 {{ item.direction === 'bullish' ? '利多' : item.direction === 'bearish' ? '利空' : '中性' }}
               </n-tag>
-              <n-text style="font-size:12px;line-height:1.5">{{ item.content }}</n-text>
+              <n-text style="font-size:18px;line-height:1.6">{{ item.content }}</n-text>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
-              <n-text depth="3" style="font-size:11px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
-              <n-text depth="3" style="font-size:11px">{{ item.news_time || '' }}</n-text>
+              <n-text depth="3" style="font-size:16px">{{ item.source === 'huicong' ? '汇通' : '金十' }}</n-text>
+              <n-text depth="3" style="font-size:16px">{{ item.news_time || '' }}</n-text>
             </div>
           </div>
           <div v-if="!goldNews?.news?.length" style="text-align:center;padding:30px 0;color:#8b8f97">暂无快讯</div>
