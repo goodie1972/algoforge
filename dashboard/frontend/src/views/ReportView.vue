@@ -187,7 +187,7 @@ function fmtPnlColor(v: number): string {
   return v >= 0 ? '#0ecb81' : '#f6465d'
 }
 
-// ── News-bias 辅助函数 ────────────────────────────────
+// -- News-bias 辅助函数 --------------------------------
 function nbTagType(dir: string): 'success' | 'error' | 'warning' | 'default' {
   if (dir === 'bullish') return 'success'
   if (dir === 'bearish') return 'error'
