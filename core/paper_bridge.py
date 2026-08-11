@@ -388,9 +388,10 @@ class PaperBridge(MT4BridgeBase):
             exit_price = ask
             pnl = (pos.open_price - ask) * pos.volume * self.LOT_SCALE
 
-        commission = 0.5 * 2  # 开仓+平仓，0.5/张
+        commission = 0.5  # 单边手续费
         net_pnl = pnl - commission
         self._balance += net_pnl
+        pos.commission = commission  # 更新 Position 的 commission，确保写入 trades 表正确
 
         record = {
             "ticket": ticket,
