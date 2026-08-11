@@ -86,7 +86,10 @@ const generating = ref(false)
 const cachedNewsSection = ref<any>(null)  // 从日报缓存的新闻评估段
 
 function fmtDate(ts: number): string {
-  return new Date(ts).toISOString().slice(0, 10)
+  const d = new Date(ts)
+  const offset = d.getTimezoneOffset()  // 本地时区偏移（分钟）
+  const local = new Date(d.getTime() - offset * 60000)
+  return local.toISOString().slice(0, 10)
 }
 
 function fmtTime(dt: string): string {
