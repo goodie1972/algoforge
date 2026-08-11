@@ -137,6 +137,18 @@ const columns = [
     }
   },
   {
+    title: 'TF', key: 'timeframe', width: 50, sortable: true,
+    render(row: any) {
+      const s = row.strategy?.toLowerCase() || ''
+      if (s.includes('h4')) return 'H4'
+      if (s.includes('h1')) return 'H1'
+      if (s.includes('m30')) return 'M30'
+      if (s.includes('m15')) return 'M15'
+      if (s.includes('m5')) return 'M5'
+      return row.timeframe || ''
+    }
+  },
+  {
     title: t('trades.direction'), key: 'order_type', width: 40, sortable: true,
     render(row: any) {
       const isBuy = row.order_type?.includes('BUY')
@@ -272,6 +284,19 @@ const voidedColumns = [
   }},
   { title: t('trades.void_signal_id'), key: 'id', width: 70 },
   { title: t('trades.strategy'), key: 'strategy', width: 100 },
+  { title: 'TF', key: 'timeframe', width: 50,
+    render(row: any) {
+      const s = row.strategy?.toLowerCase() || ''
+      if (s.includes('h4')) return 'H4'
+      if (s.includes('h1')) return 'H1'
+      if (s.includes('m30')) return 'M30'
+      if (s.includes('m15')) return 'M15'
+      if (s.includes('m5')) return 'M5'
+      // 策略名无时间后缀时的 fallback 映射
+      const tfMap: Record<string, string> = { 'gold_auto_research': 'H1', 'h1_breakout': 'H1' }
+      return tfMap[s] || row.timeframe || ''
+    }
+  },
   { title: t('trades.direction'), key: 'signal', width: 60,
     render(row: any) { return h('span', { style: { color: row.signal?.includes('BUY') ? '#0ecb81' : '#f6465d' } }, row.signal) }
   },
