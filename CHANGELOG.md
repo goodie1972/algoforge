@@ -3,6 +3,21 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.7.8] - 2026-08-11 — 策略出场优化 + 高位追高拦截 + 纸面持仓修复
+
+### 新增
+- **高位/低位追高拦截**：gold_auto_research 和 sanqing_h1_upgraded 新增 `price_position>0.88 且 偏离EMA21>4×ATR` 条件，禁 BUY 追高（允许 SELL）；对称低位禁 SELL 抄底（允许 BUY）
+- **利润回撤止盈动态阈值**：5 个策略统一，盈利>10 时回撤 35% 强制止盈（原 50%），保护大盈利
+
+### 修复
+- **纸面模式忽略策略级 max_positions**：纸面模式用 `_paper_max=10` 覆盖了 `strategy.max_positions=1`，导致 gold_auto 和 sanqing 连续开 4 张同向单（max_positions 失效）
+- **mfi_bb_m30_upgraded 中线出场改用固定参照+穿越跟踪**：原用动态 `bb["mid"]`，价格涨后中线被拉高，导致过早出场；改为用固定入场中线 + 穿越跟踪
+
+### 策略优化
+- **mfi_bb_m30_upgraded v16**：条件②中线出场改用 `entry_bb_mid`（固定入场中线）+ `has_crossed_mid` 穿越跟踪
+- **sanqing_h1_upgraded v11**：趋势保护下强制止盈改为动态阈值（盈利>10 时 35%）
+- **gold_auto_research / m30_rsi_bb / m30_bb_deepreturn 系列**：ADX>25 趋势强放宽回撤从 50% 降为动态 35%
+
 ## [2.7.7] - 2026-08-10 — 日志双语化 + 策略全英文化 + 黄金快讯修复
 
 ### 新增
