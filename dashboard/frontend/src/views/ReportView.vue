@@ -59,14 +59,33 @@ function renderAccuracyChart() {
 async function loadReviewData() {
   reviewLoading.value = true
   try {
-    const [revRes, statsRes] = await Promise.all([
-      fetch('/api/news-review/reviews?limit=10'),
-      fetch('/api/news-review/stats?days=7'),
-    ])
-    const revData = await revRes.json()
-    const statsData = await statsRes.json()
-    if (revData.success) reviews.value = revData.data
-    if (statsData.success) reviewStats.value = statsData.data
+    const res = await fetch('/api/news/gold')
+    const data = await res.json()
+    const evaluation = data.evaluation || {}
+    const summary = data.summary || {}
+    const news = data.news || []
+    // 整理成与原复盘兼容的格式
+    reviews.value = news.slice(0, 10).map((n: any) => ({
+      id: n.id,
+      report_id: n.id,
+      title: n.content?.substring(0, 40) || n.content_en?.substring(0, 40) || '',
+      created_at: n.news_time || '',
+      predicted_direction: n.direction === 'bullish' ? 'bullish' : n.direction === 'bearish' ? 'bearish' : 'neutral',
+      actual_direction: n.direction_match === 1 ? n.direction : n.direction_match === 0 ? (n.direction === 'bullish' ? 'bearish' : 'bullish') : 'unknown',
+      is_correct: n.direction_match === 1,
+      error_type: n.direction_match === 0 ? 'unknown' : '',
+      suggestion: '',
+    }))
+    reviewStats.value = {
+      errorDistribution: {},
+      suggestions: [],
+      accuracy_trend: evaluation.accuracy ? [{ accuracy: evaluation.accuracy, date: '' }] : [],
+      accuracy: evaluation.accuracy || 0,
+      correct: evaluation.correct || 0,
+      wrong: evaluation.wrong || 0,
+      total: summary.total || 0,
+      directional: summary.bullish + summary.bearish || 0,
+    }
   } catch (e) {
     console.error('加载复盘数据失败', e)
   } finally {
