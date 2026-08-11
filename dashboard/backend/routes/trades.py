@@ -99,7 +99,7 @@ def _calc_stats(trades: list[dict]) -> dict:
 
     gross_profit = round(sum(t["pnl"] for t in profit_list), 2)
     gross_loss = round(sum(t["pnl"] for t in loss_list), 2)
-    total_net_profit = round(sum(t.get("pnl", 0) for t in trades), 2)
+    total_net_profit = round(sum(t.get("pnl", 0) + t.get("swap", 0) - abs(t.get("commission", 0)) for t in trades), 2)
 
     # Profit Factor
     abs_gross_loss = abs(gross_loss)
