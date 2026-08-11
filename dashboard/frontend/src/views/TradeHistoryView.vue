@@ -26,6 +26,11 @@ const filteredData = computed(() => {
   )
 })
 
+// 全部成交的总盈亏
+const totalPnl = computed(() => {
+  return store.items.reduce((sum: number, t: any) => sum + (Number(t.pnl) || 0), 0)
+})
+
 // ── 成交明细标签页（原代码）────────────────────────────
 
 onMounted(() => store.fetch())
@@ -435,6 +440,7 @@ const statsColumns = [
       <n-h2 class="history-title">{{ t('trades.title') }}</n-h2>
       <n-space size="small">
         <n-tag :bordered="false" type="info">{{ t('trades.total_count', { count: store.items.length }) }}</n-tag>
+        <n-tag :bordered="false" :type="totalPnl >= 0 ? 'success' : 'error'">{{ t('trades.total_pnl') }}: {{ totalPnl >= 0 ? '+' : '' }}${{ Math.abs(totalPnl).toFixed(2) }}</n-tag>
         <n-button size="small" secondary :loading="refreshLoading" @click="refresh">
           {{ t('trades.refresh') }}
         </n-button>
