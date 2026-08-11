@@ -206,7 +206,7 @@ onUnmounted(() => {
         <div style="display:flex;align-items:center;gap:8px">
           <n-tag v-if="goldNews?.current_bias" size="tiny" :bordered="false"
             :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
-            {{ $t('signals.gold_bullish') }}
+            {{ goldNews.current_bias.overall === 'BULLISH' ? $t('signals.gold_bullish') : goldNews.current_bias.overall === 'BEARISH' ? $t('signals.gold_bearish') : $t('signals.gold_neutral') }}
           </n-tag>
           <n-button size="tiny" text style="font-size:22px;font-weight:700;color:#8b8f97;cursor:pointer" @click="goldShowAll = true">⤢</n-button>
         </div>
