@@ -204,8 +204,9 @@ onUnmounted(() => {
       :style="{ borderLeft: `4px solid ${goldNews?.current_bias?.overall === 'BULLISH' ? '#0ecb81' : goldNews?.current_bias?.overall === 'BEARISH' ? '#f6465d' : '#8b8f97'}` }">
       <template #header-extra>
         <div style="display:flex;align-items:center;gap:8px">
-          <n-tag v-if="goldNews?.current_bias" size="tiny" :bordered="false"
-            :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
+          <n-tag v-if="goldNews?.current_bias" size="small" :bordered="false"
+            :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'"
+            style="font-weight:700;font-size:14px;padding:2px 8px;">
             {{ goldNews.current_bias.overall === 'BULLISH' ? $t('signals.gold_bullish') : goldNews.current_bias.overall === 'BEARISH' ? $t('signals.gold_bearish') : $t('signals.gold_neutral') }}
           </n-tag>
           <n-button size="tiny" text style="font-size:22px;font-weight:700;color:#8b8f97;cursor:pointer" @click="goldShowAll = true">⤢</n-button>
@@ -249,7 +250,8 @@ onUnmounted(() => {
     <n-modal v-model:show="goldShowAll" :mask-closable="true" preset="card" :title="$t('signals.gold_full_title')" style="width:75vw;max-height:75vh;overflow-y:auto">
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
         <n-tag v-if="goldNews?.current_bias" :bordered="false"
-          :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'">
+          :type="goldNews.current_bias.overall === 'BULLISH' ? 'success' : goldNews.current_bias.overall === 'BEARISH' ? 'error' : 'default'"
+          style="font-weight:700;font-size:16px;padding:4px 12px;">
           {{
             goldNews.current_bias.overall === 'BULLISH' ? $t('signals.gold_bullish')
             : goldNews.current_bias.overall === 'BEARISH' ? $t('signals.gold_bearish')
