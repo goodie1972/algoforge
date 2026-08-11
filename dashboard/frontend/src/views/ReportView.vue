@@ -259,48 +259,42 @@ function nbVarArrow(score: number): string {
       <!-- 时间轴 -->
       <div style="flex: 1; overflow-y: auto;">
         <!-- 日报/周报时间轴 -->
-        <template>
-          <div v-if="timelineItems.length === 0 && !loading" style="padding: 16px;">
-            <n-empty :description="$t('report.no_report')">
-              <template #extra>
-                <n-button size="small" secondary :loading="generating" @click="handleGenerate">
-                  {{ $t('report.manual_generate') }}
-                </n-button>
-              </template>
-            </n-empty>
+        <div v-if="timelineItems.length === 0 && !loading" style="padding: 16px;">
+          <n-empty :description="$t('report.no_report')">
+            <template #extra>
+              <n-button size="small" secondary :loading="generating" @click="handleGenerate">
+                {{ $t('report.manual_generate') }}
+              </n-button>
+            </template>
+          </n-empty>
+        </div>
+        <div v-for="item in timelineItems" :key="item.id"
+          :style="{
+            padding: '4px 8px',
+            cursor: 'pointer',
+            background: currentReport?.id === item.id ? '#1a1a2e' : 'transparent',
+            borderRadius: '4px',
+            fontWeight: currentReport?.id === item.id ? 700 : 400,
+          }"
+          @click="selectTimeline(item)">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <n-tag :type="activeTab === 'daily' ? 'info' : 'success'"
+              size="tiny" :bordered="false">
+              {{ activeTab === 'daily' ? fmtTime(item.created_at) : item.created_at?.slice(0, 10) }}
+            </n-tag>
+            <n-tag v-if="item.floating_pnl < -10"
+              size="tiny" type="error" :bordered="false">{{ $t('report.floating_loss') }}</n-tag>
           </div>
-          <n-thing v-for="item in timelineItems" :key="item.id"
-            :style="{
-              padding: '4px 8px',
-              cursor: 'pointer',
-              background: currentReport?.id === item.id ? '#1a1a2e' : 'transparent',
-              borderRadius: '4px',
-              fontWeight: currentReport?.id === item.id ? 700 : 400,
-            }"
-            @click="selectTimeline(item)">
-            <template #header>
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <n-tag :type="activeTab === 'daily' ? 'info' : 'success'"
-                  size="tiny" :bordered="false">
-                  {{ activeTab === 'daily' ? fmtTime(item.created_at) : item.created_at?.slice(0, 10) }}
-                </n-tag>
-                <n-tag v-if="item.floating_pnl < -10"
-                  size="tiny" type="error" :bordered="false">{{ $t('report.floating_loss') }}</n-tag>
-              </div>
-            </template>
-            <template #description>
-              <div style="font-size: 12px; color: #888; line-height: 1.4;">
-                <div>{{ $t('report.balance') }} ${{ (item.account_balance ?? 0).toFixed(2) }}</div>
-                <div>
-                  {{ $t('report.positions') }} {{ item.position_count ?? 0 }} {{ $t('report.orders') }}
-                  <span :style="{ color: fmtPnlColor(item.daily_pnl) }">
-                    {{ fmtPnl(item.daily_pnl) }}
-                  </span>
-                </div>
-              </div>
-            </template>
-          </n-thing>
-        </template>
+          <div style="font-size: 12px; color: #888; line-height: 1.4;">
+            <div>{{ $t('report.balance') }} ${{ (item.account_balance ?? 0).toFixed(2) }}</div>
+            <div>
+              {{ $t('report.positions') }} {{ item.position_count ?? 0 }} {{ $t('report.orders') }}
+              <span :style="{ color: fmtPnlColor(item.daily_pnl) }">
+                {{ fmtPnl(item.daily_pnl) }}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
