@@ -1515,8 +1515,10 @@ class TradingEngine:
         # 纸面模式：使用 paper_max_positions 作为 orders策略上限（ignore_gates 只跳过门禁，不跳过 max_positions）
         # 真实模式：使用 strategy.max_positions，且已有持仓则不加仓
         if _paper_enabled and _paper_max > 0:
-            if n_total >= _paper_max:
-                return  # 达到纸面模式 orders策略上限
+            # 纸面上限与策略级 max_positions 取较小值，策略级限制始终生效
+            _limit = min(_paper_max, strategy.max_positions)
+            if n_total >= _limit:
+                return  # 达到 orders策略持仓上限
         else:
             if n_total >= strategy.max_positions:
                 return  # 已达上限
