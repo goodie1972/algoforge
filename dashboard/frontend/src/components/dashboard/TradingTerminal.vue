@@ -12,6 +12,7 @@ function scheduleAutoScroll() {
   }, 10000)
 }
 import { usePriceStore } from '@/stores/prices'
+import { useAppStore } from '@/stores/app'
 import { useFlashOnChange } from '@/composables/useFlashOnChange'
 import { createChart, ColorType, type UTCTimestamp } from 'lightweight-charts'
 import {
@@ -266,23 +267,24 @@ function syncAllChartsFrom(source: any) {
 }
 
 function makeChartOptions(width: number, height: number, showTimeScale: boolean): any {
+  const isDark = useAppStore().isDark
   return {
     layout: {
-      background: { type: ColorType.Solid, color: '#1a1d23' },
-      textColor: '#8b8f97',
+      background: { type: ColorType.Solid, color: isDark ? '#1a1d23' : '#ffffff' },
+      textColor: isDark ? '#8b8f97' : '#555555',
     },
     grid: {
-      vertLines: { color: '#2d3139' },
-      horzLines: { color: '#2d3139' },
+      vertLines: { color: isDark ? '#2d3139' : '#e8e8e8' },
+      horzLines: { color: isDark ? '#2d3139' : '#e8e8e8' },
     },
     width,
     height,
     timeScale: {
       timeVisible: false,
-      borderColor: '#2d3139',
+      borderColor: isDark ? '#2d3139' : '#d0d0d0',
       visible: showTimeScale,
     },
-    rightPriceScale: { borderColor: '#2d3139' },
+    rightPriceScale: { borderColor: isDark ? '#2d3139' : '#d0d0d0' },
     crosshair: { mode: 0 },
   }
 }
@@ -1117,10 +1119,10 @@ function clearAllPanes() {
 
     <!-- 主图 + 加载/空态覆盖 -->
     <div ref="chartContainer" style="width: 100%; height: 420px; position: relative;">
-      <div v-if="store.loading" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a1d23; z-index: 1;">
+      <div v-if="store.loading" :style="{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: useAppStore().isDark ? '#1a1d23' : '#f5f5f5', zIndex: 1 }">
         <n-spin size="large" />
       </div>
-      <div v-else-if="!store.loading && store.candles.length === 0" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a1d23; z-index: 1;">
+      <div v-else-if="!store.loading && store.candles.length === 0" :style="{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: useAppStore().isDark ? '#1a1d23' : '#f5f5f5', zIndex: 1 }">
         <n-result status="info" :title="$t('terminal.no_data')" :description="$t('terminal.no_data_desc')" size="small" />
       </div>
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { IconChevronUp, IconChevronDown } from '@tabler/icons-vue'
+import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{
   value: number | null
@@ -16,6 +17,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:value': [value: number | null]
 }>()
+
+const isDark = computed(() => useAppStore().isDark)
 
 const displayVal = ref('')
 
@@ -71,7 +74,7 @@ function getBtnSize(): number {
 </script>
 
 <template>
-  <div class="cnum" :class="[size ?? 'tiny']">
+  <div class="cnum" :class="[size ?? 'tiny', isDark ? 'dark' : 'light']">
     <button class="cnum-btn cnum-up" :disabled="disabled" @click="inc" tabindex="-1">
       <IconChevronUp :size="getBtnSize()" />
     </button>
@@ -153,6 +156,28 @@ function getBtnSize(): number {
 }
 .cnum-input::placeholder {
   color: #555;
+}
+/* 浅色模式 */
+.cnum.light .cnum-btn {
+  border-color: #d0d0d0;
+  background: #f0f0f0;
+  color: #333;
+}
+.cnum.light .cnum-btn:hover:not(:disabled) {
+  background: #e0e0e0;
+  color: #f0b90b;
+}
+.cnum.light .cnum-btn:active:not(:disabled) {
+  background: #d0d0d0;
+}
+.cnum.light .cnum-input {
+  border-color: #d0d0d0;
+  background: #ffffff;
+  color: #333;
+}
+.cnum.light .cnum-input:focus {
+  border-color: #f0b90b;
+  background: #fafafa;
 }
 .cnum.tiny .cnum-btn { height: 12px; }
 .cnum.tiny .cnum-input { height: 20px; font-size: 10px; }
