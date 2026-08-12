@@ -563,11 +563,22 @@ function applyStoch() {
       const dSeries = pc.addLineSeries({
         color: '#e88b37', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
       })
-      paneSeries['stoch'] = { k: kSeries, d: dSeries }
+      const stochOb = pc.addLineSeries({
+        color: '#f6465d', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+      })
+      const stochOs = pc.addLineSeries({
+        color: '#0ecb81', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+      })
+      paneSeries['stoch'] = { k: kSeries, d: dSeries, ob: stochOb, os: stochOs }
     }
 
     paneSeries['stoch'].k.setData(castTime(stochKData))
     paneSeries['stoch'].d.setData(castTime(stochDData))
+    // 80/20 参考线（常量数据，与 K 线等长）
+    const stochRefData = data.map(d => ({ time: d.time, value: 80 }))
+    const stochRefData20 = data.map(d => ({ time: d.time, value: 20 }))
+    paneSeries['stoch'].ob.setData(castTime(stochRefData))
+    paneSeries['stoch'].os.setData(castTime(stochRefData20))
     syncPaneRange('stoch')
     requestAnimationFrame(() => syncAllPriceScaleWidths())
   })
@@ -701,9 +712,18 @@ function applyADX() {
         color: '#f0b90b', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
+      // ADX 25 参考线（趋势强度阈值）
+      const adx25 = pc.addLineSeries({
+        color: '#8b8f97', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+      })
+      paneSeries['adx25'] = adx25
     }
 
     paneSeries['adx'].setData(castTime(adxData))
+    // ADX 25 线（常量数据）
+    const adx25Data = data.map(d => ({ time: d.time, value: 25 }))
+    paneSeries['adx25'].setData(castTime(adx25Data))
     syncPaneRange('adx')
     requestAnimationFrame(() => syncAllPriceScaleWidths())
   })
@@ -1107,31 +1127,31 @@ function clearAllPanes() {
 
     <!-- 副图区域（按需渲染） -->
     <div v-if="showRSI" ref="rsiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">{{ $t('terminal.rsi_label', {period: rsiPeriod, ob: rsiOb, os: rsiOs}) }}</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">{{ $t('terminal.rsi_label', {period: rsiPeriod, ob: rsiOb, os: rsiOs}) }}</n-text>
     </div>
     <div v-if="showStoch" ref="stochRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">Stoch ({{ stochK }},{{ stochKSmooth }},{{ stochDSmooth }})</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">Stoch ({{ stochK }},{{ stochKSmooth }},{{ stochDSmooth }})</n-text>
     </div>
     <div v-if="showMACD" ref="macdRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">MACD ({{ macdFast }},{{ macdSlow }},{{ macdSignal }})</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">MACD ({{ macdFast }},{{ macdSlow }},{{ macdSignal }})</n-text>
     </div>
     <div v-if="showATR" ref="atrRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">ATR ({{ atrPeriod }})</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">ATR ({{ atrPeriod }})</n-text>
     </div>
     <div v-if="showVolume" ref="volRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">Volume</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">Volume</n-text>
     </div>
     <div v-if="showADX" ref="adxRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">ADX ({{ adxPeriod }})</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">ADX ({{ adxPeriod }})</n-text>
     </div>
     <div v-if="showDI" ref="diRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">DI ({{ diPeriod }})</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">DI ({{ diPeriod }})</n-text>
     </div>
     <div v-if="showMFI" ref="mfiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">MFI ({{ mfiPeriod }})</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">MFI ({{ mfiPeriod }})</n-text>
     </div>
     <div v-if="showBBI" ref="bbiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 10px; z-index: 2;">BBI</n-text>
+      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">BBI</n-text>
     </div>
   </n-card>
 </template>
