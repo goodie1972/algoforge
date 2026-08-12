@@ -108,17 +108,17 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
             <n-form-item :label="$t('config.news_filter_enable')">
               <n-switch :value="local.news_filter_enabled" @update:value="(v: boolean) => local.news_filter_enabled = v" />
             </n-form-item>
-            <n-grid :cols="2" :x-gap="12">
+            <n-grid :cols="2" :x-gap="8">
               <n-grid-item>
-                <n-form-item label-placement="left" :label="$t('config.before_release')">
+                <n-form-item label-placement="left" :label="$t('config.before_release')" :label-width="50">
                   <n-select :value="local.news_before_minutes" :options="commonMinOpts" size="tiny"
-                    @update:value="(v: any) => v !== null && (local.news_before_minutes = v)" style="width: 80px;" />
+                    @update:value="(v: any) => v !== null && (local.news_before_minutes = v)" style="width: 70px;" />
                 </n-form-item>
               </n-grid-item>
               <n-grid-item>
-                <n-form-item label-placement="left" :label="$t('config.after_release')">
+                <n-form-item label-placement="left" :label="$t('config.after_release')" :label-width="50">
                   <n-select :value="local.news_after_minutes" :options="commonMinOpts" size="tiny"
-                    @update:value="(v: any) => v !== null && (local.news_after_minutes = v)" style="width: 80px;" />
+                    @update:value="(v: any) => v !== null && (local.news_after_minutes = v)" style="width: 70px;" />
                 </n-form-item>
               </n-grid-item>
             </n-grid>
