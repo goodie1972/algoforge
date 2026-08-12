@@ -100,7 +100,7 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
               <div style="display:flex;align-items:center;gap:6px;width:100%;">
                 <span>{{ $t('config.news_filter') }}</span>
                 <n-popover trigger="hover" placement="right">
-                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <template #trigger><n-button text circle size="tiny" filterable tag class="help-btn">?</n-button></template>
                   <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_news_filter_help') }}</div>
                 </n-popover>
               </div>
@@ -111,13 +111,13 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
             <n-grid :cols="2" :x-gap="12">
               <n-grid-item>
                 <n-form-item label-placement="left" :label="$t('config.before_release')">
-                  <n-select :value="local.news_before_minutes" :options="commonMinOpts" size="tiny"
+                  <n-select :value="local.news_before_minutes" :options="commonMinOpts" size="tiny" filterable tag
                     @update:value="(v: any) => v !== null && (local.news_before_minutes = v)" style="width: 80px;" />
                 </n-form-item>
               </n-grid-item>
               <n-grid-item>
                 <n-form-item label-placement="left" :label="$t('config.after_release')">
-                  <n-select :value="local.news_after_minutes" :options="commonMinOpts" size="tiny"
+                  <n-select :value="local.news_after_minutes" :options="commonMinOpts" size="tiny" filterable tag
                     @update:value="(v: any) => v !== null && (local.news_after_minutes = v)" style="width: 80px;" />
                 </n-form-item>
               </n-grid-item>
@@ -130,7 +130,7 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
               <div style="display:flex;align-items:center;gap:6px;width:100%;">
                 <span>{{ $t('config.news_bias') }}</span>
                 <n-popover trigger="hover" placement="right">
-                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <template #trigger><n-button text circle size="tiny" filterable tag class="help-btn">?</n-button></template>
                   <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_news_bias_help') }}</div>
                 </n-popover>
               </div>
@@ -142,7 +142,7 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
             <n-grid :cols="2" :x-gap="12">
               <n-grid-item>
                 <n-form-item label-placement="left" :label="$t('config.report_time_utc')">
-                  <n-select :value="local.news_bias_report_hours" :options="reportHourOpts" size="tiny"
+                  <n-select :value="local.news_bias_report_hours" :options="reportHourOpts" size="tiny" filterable tag
                     @update:value="(v: string) => local.news_bias_report_hours = v" style="width: 80px;" />
                   <template #feedback>{{ $t('config.report_time_desc') }}</template>
                 </n-form-item>
@@ -166,7 +166,7 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
               <BiasStateIndicator />
             </n-form-item>
             <n-form-item label-placement="left" v-if="local.block_long_when_bias_bearish || local.block_short_when_bias_bullish" :label="$t('config.di_gap_threshold')">
-              <n-select :value="local.news_bias_di_gap" :options="diGapOpts" size="tiny"
+              <n-select :value="local.news_bias_di_gap" :options="diGapOpts" size="tiny" filterable tag
                 @update:value="(v: number) => local.news_bias_di_gap = v" style="width: 80px;" />
               <template #feedback>{{ $t('config.di_gap_desc') }}</template>
             </n-form-item>
@@ -187,7 +187,7 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
               <div style="display:flex;align-items:center;gap:6px;width:100%;">
                 <span>{{ $t('config.event_filter') }}</span>
                 <n-popover trigger="hover" placement="right">
-                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <template #trigger><n-button text circle size="tiny" filterable tag class="help-btn">?</n-button></template>
                   <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_event_filter_help') }}</div>
                 </n-popover>
               </div>
@@ -195,13 +195,13 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
             <n-grid :cols="2" :x-gap="12">
               <n-grid-item>
                 <n-form-item :label="$t('config.impact_level')">
-                  <n-select :value="local.news_impact_filter" :options="impactOptions" size="tiny"
+                  <n-select :value="local.news_impact_filter" :options="impactOptions" size="tiny" filterable tag
                     @update:value="(v: string) => local.news_impact_filter = v" style="width: 100px;" />
                 </n-form-item>
               </n-grid-item>
               <n-grid-item>
                 <n-form-item :label="$t('config.currency')">
-                  <n-select :value="local.news_currency_filter" :options="currencyOpts" size="tiny"
+                  <n-select :value="local.news_currency_filter" :options="currencyOpts" size="tiny" filterable tag
                     @update:value="(v: string) => local.news_currency_filter = v" style="width: 100px;" />
                   <template #feedback>{{ $t('config.currency_desc') }}</template>
                 </n-form-item>
@@ -227,7 +227,7 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
                 <n-text depth="3" style="margin-left:6px;">{{ evt.country }}</n-text>
               </div>
               <div style="text-align:right;">
-                <n-tag :type="evt.impact === 'High' ? 'error' : 'warning'" size="tiny">{{ evt.impact }}</n-tag>
+                <n-tag :type="evt.impact === 'High' ? 'error' : 'warning'" size="tiny" filterable tag>{{ evt.impact }}</n-tag>
                 <n-text depth="3" style="margin-left:6px;font-size:11px;">{{ evt.datetime }}</n-text>
               </div>
             </div>

@@ -82,21 +82,21 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
       <n-grid :cols="3" :x-gap="12" :y-gap="8">
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.lot_size')">
-            <n-select :value="local.lot_size" :options="lotSizeOpts" size="tiny"
+            <n-select :value="local.lot_size" :options="lotSizeOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.lot_size = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.lot_size_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.max_positions_label')">
-            <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny"
+            <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.max_positions_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.abs_loss_limit')">
-            <n-select :value="local.per_strategy_realized_loss_amount" :options="lossLimitOpts" size="tiny"
+            <n-select :value="local.per_strategy_realized_loss_amount" :options="lossLimitOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.abs_loss_limit_desc') }}</template>
           </n-form-item>
@@ -120,35 +120,35 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
       <n-grid :cols="3" :x-gap="12" :y-gap="8">
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.default_sl')">
-            <n-select :value="local.stop_loss_pips" :options="slOpts" size="tiny"
+            <n-select :value="local.stop_loss_pips" :options="slOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.stop_loss_pips = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.default_sl_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.default_tp')">
-            <n-select :value="local.take_profit_pips" :options="tpOpts" size="tiny"
+            <n-select :value="local.take_profit_pips" :options="tpOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.take_profit_pips = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.default_tp_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.slippage')">
-            <n-select :value="local.slippage" :options="slippageOpts" size="tiny"
+            <n-select :value="local.slippage" :options="slippageOpts" size="tiny" filterable tag
               @update:value="(v: any) => v !== null && (local.slippage = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.slippage_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.tp_cooldown')">
-            <n-select :value="local.profit_exit_cooldown_hours" :options="cooldownOpts" size="tiny"
+            <n-select :value="local.profit_exit_cooldown_hours" :options="cooldownOpts" size="tiny" filterable tag
               @update:value="(v: any) => v !== null && (local.profit_exit_cooldown_hours = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.tp_cooldown_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.safety_lock_expire')">
-            <n-select :value="local.safety_lock_timeout_minutes" :options="safetyLockOpts" size="tiny"
+            <n-select :value="local.safety_lock_timeout_minutes" :options="safetyLockOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.safety_lock_timeout_minutes = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.safety_lock_desc') }}</template>
           </n-form-item>
@@ -172,63 +172,63 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
       <n-grid :cols="3" :x-gap="12" :y-gap="8">
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.warning_line')">
-            <n-select :value="local.floating_loss_warn_pct" :options="pctOpts" size="tiny"
+            <n-select :value="local.floating_loss_warn_pct" :options="pctOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.floating_loss_warn_pct = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.warning_line_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.block_line')">
-            <n-select :value="local.floating_loss_block_pct" :options="pctOpts" size="tiny"
+            <n-select :value="local.floating_loss_block_pct" :options="pctOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.floating_loss_block_pct = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.block_line_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.realized_loss_pct')">
-            <n-select :value="local.per_strategy_realized_loss_pct" :options="pctOpts" size="tiny"
+            <n-select :value="local.per_strategy_realized_loss_pct" :options="pctOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_pct = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.realized_loss_pct_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.block_duration')">
-            <n-select :value="local.per_strategy_loss_block_hours" :options="blockHrOpts" size="tiny"
+            <n-select :value="local.per_strategy_loss_block_hours" :options="blockHrOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.per_strategy_loss_block_hours = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.block_duration_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.max_rapid_exits')">
-            <n-select :value="local.max_rapid_exits" :options="rapidExitOpts" size="tiny"
+            <n-select :value="local.max_rapid_exits" :options="rapidExitOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.max_rapid_exits = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.max_rapid_exits_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.rapid_exit_window')">
-            <n-select :value="local.rapid_exit_window_seconds" :options="rapidWinOpts" size="tiny"
+            <n-select :value="local.rapid_exit_window_seconds" :options="rapidWinOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.rapid_exit_window_seconds = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.rapid_exit_window_desc', { n: Math.round(local.rapid_exit_window_seconds / 60) }) }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.rapid_exit_cooldown')">
-            <n-select :value="local.rapid_exit_cooldown_seconds" :options="rapidCoolOpts" size="tiny"
+            <n-select :value="local.rapid_exit_cooldown_seconds" :options="rapidCoolOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.rapid_exit_cooldown_seconds = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.rapid_exit_cooldown_desc', { n: Math.round(local.rapid_exit_cooldown_seconds / 60) }) }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.consec_loss_limit')">
-            <n-select :value="local.max_consecutive_losses" :options="consecLossOpts" size="tiny"
+            <n-select :value="local.max_consecutive_losses" :options="consecLossOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.max_consecutive_losses = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.consec_loss_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.consec_loss_cooldown')">
-            <n-select :value="local.consecutive_loss_cooldown_hours" :options="consecCoolOpts" size="tiny"
+            <n-select :value="local.consecutive_loss_cooldown_hours" :options="consecCoolOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.consecutive_loss_cooldown_hours = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.consec_loss_cooldown_desc') }}</template>
           </n-form-item>

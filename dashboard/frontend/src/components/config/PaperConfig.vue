@@ -64,7 +64,7 @@ function confirmReset() {
               <div style="display:flex;align-items:center;gap:6px;width:100%;">
                 <span>{{ $t('config.paper_enable') }}</span>
                 <n-popover trigger="hover" placement="right">
-                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <template #trigger><n-button text circle size="tiny" filterable tag class="help-btn">?</n-button></template>
                   <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_paper_enable_help') }}</div>
                 </n-popover>
               </div>
@@ -81,7 +81,7 @@ function confirmReset() {
               <div style="display:flex;align-items:center;gap:6px;width:100%;">
                 <span>{{ $t('config.trade_settings') }}</span>
                 <n-popover trigger="hover" placement="right">
-                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <template #trigger><n-button text circle size="tiny" filterable tag class="help-btn">?</n-button></template>
                   <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_paper_trade_help') }}</div>
                 </n-popover>
               </div>
@@ -90,14 +90,14 @@ function confirmReset() {
             <n-grid :cols="2" :x-gap="12">
               <n-grid-item>
                 <n-form-item label-placement="top" :label="$t('config.max_positions')">
-                  <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny"
+                  <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny" filterable tag
                     @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 110px;" />
                 </n-form-item>
                 <n-text depth="3" style="font-size:11px;">{{ $t('config.max_positions_desc') }}</n-text>
               </n-grid-item>
               <n-grid-item>
                 <n-form-item label-placement="top" :label="$t('config.init_balance')">
-                  <n-input-number :value="local.initial_balance" :min="0" :max="100000" :step="100" size="tiny"
+                  <n-input-number :value="local.initial_balance" :min="0" :max="100000" :step="100" size="tiny" filterable tag
                     @update:value="(v: any) => v != null && (local.initial_balance = v)" style="width: 110px;" />
                 </n-form-item>
                 <n-text depth="3" style="font-size:11px;">{{ $t('config.init_balance_desc') }}</n-text>
