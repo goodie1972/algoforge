@@ -75,7 +75,8 @@ const columns = [
   {
     title: t('positions.net_pnl'), key: 'net_pnl', width: 70,
     render(row: any) {
-      const val = (row.pnl ?? 0) + (row.swap ?? 0) + (row.commission ?? 0)
+      // 净盈亏 = 盈亏 - 手续费 - 过夜费（用绝对值，兼容正负存储）
+      const val = (row.pnl ?? 0) - Math.abs(row.swap ?? 0) - Math.abs(row.commission ?? 0)
       return h('span', { style: { color: val >= 0 ? '#0ecb81' : '#f6465d', fontWeight: 700 } },
         `${val >= 0 ? '+' : ''}$${val.toFixed(2)}`
       )
