@@ -522,7 +522,7 @@
   "config.paper_desc": "开启后所有交易通过 PaperBridge 本地模拟，不影响真实 MT4 账户",
   "config.position_limit": "持仓限制",
   "config.max_positions": "最大同时持仓数",
-  "config.max_positions_desc": "纸面模式下单策略最大同时持仓数",
+  "config.max_positions_desc": "纸面模式下该策略允许的最大同时持仓数",
   "config.virtual_balance": "虚拟余额",
   "config.init_balance": "初始虚拟余额 ($)",
   "config.init_balance_desc": "0=从真实桥接获取余额，>0=使用指定虚拟余额",
@@ -574,7 +574,7 @@
   "config.consec_loss": "连续亏损冷却",
   "config.consec_loss_limit": "连续亏损上限 (次)",
   "config.consec_loss_desc": "连续亏损达到此次数后触发冷却",
-  "config.consec_loss_cooldown": "冷却时长 (小时)",
+  "config.consec_loss_cooldown": "连续亏损冷却时长 (小时)",
   "config.consec_loss_cooldown_desc": "冷却到期后自动恢复",
   "config.save_risk": "保存风控配置",
   "config.tab_ai": "AI Agent",
@@ -590,7 +590,7 @@
   "config.realized_loss_pct": "亏损上限 (%)",
   "config.max_rapid_exits": "窗口内最大出场次数",
   "config.rapid_exit_window": "检测窗口 (秒)",
-  "config.rapid_exit_cooldown": "冷却时长 (秒)",
+  "config.rapid_exit_cooldown": "快速出场冷却时长 (秒)",
   "config.max_daily_loss_desc": "超过此比例后所有策略暂停开仓",
   "config.realized_loss_pct_desc": "单策略累计已实现亏损超过此比例时触发阻断",
   "config.rapid_exit_window_desc": "{n} 分钟内出场超过上限则触发",
@@ -980,6 +980,11 @@
     "strategy_title": "实盘策略",
     "accuracy": "准确率"
   },
-  "config.section.risk_control": "风控",
-  "config.account_sltp": "账户级止盈止损"
+  "config.section.risk_control": "单策略风控",
+  "config.account_sltp": "账户级止盈止损",
+  "config.lot_size_desc": "纸面模式下每次开仓的固定手数",
+  "config.default_sl_desc": "新建订单时自动设置的默认止损点数",
+  "config.default_tp_desc": "新建订单时自动设置的默认止盈点数",
+  "config.slippage_desc": "允许的最大滑点点数，超过则不成交",
+  "config.max_rapid_exits_desc": "快速出场检测窗口内允许的最大出场次数，超出后触发阻断"
 }

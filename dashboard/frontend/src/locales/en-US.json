@@ -522,7 +522,7 @@
   "config.paper_desc": "When enabled, all trades go through PaperBridge local simulation without affecting real MT4 account",
   "config.position_limit": "Position Limits",
   "config.max_positions": "Max Simultaneous Positions",
-  "config.max_positions_desc": "Max simultaneous positions per strategy in paper mode",
+  "config.max_positions_desc": "Max simultaneous positions for this strategy in paper mode",
   "config.virtual_balance": "Virtual Balance",
   "config.init_balance": "Initial Virtual Balance ($)",
   "config.init_balance_desc": "0=Use real bridge balance, >0=Use specified virtual balance",
@@ -574,7 +574,7 @@
   "config.consec_loss": "Consecutive Loss Cooldown",
   "config.consec_loss_limit": "Consecutive Loss Limit",
   "config.consec_loss_desc": "Trigger cooldown after this many consecutive losses",
-  "config.consec_loss_cooldown": "Cooldown Duration (hours)",
+  "config.consec_loss_cooldown": "Consecutive Loss Cooldown (h)",
   "config.consec_loss_cooldown_desc": "Auto-resume after cooldown expires",
   "config.save_risk": "Save Risk Config",
   "config.tab_ai": "AI Agent",
@@ -590,7 +590,7 @@
   "config.realized_loss_pct": "Loss Limit (%)",
   "config.max_rapid_exits": "Max Exits in Window",
   "config.rapid_exit_window": "Detection Window (seconds)",
-  "config.rapid_exit_cooldown": "Cooldown (seconds)",
+  "config.rapid_exit_cooldown": "Rapid Exit Cooldown (s)",
   "config.max_daily_loss_desc": "All strategies pause when this limit is exceeded",
   "config.realized_loss_pct_desc": "Blocks trading when strategy realized loss exceeds this %",
   "config.rapid_exit_window_desc": "Triggers if {n} exits exceed limit within window",
@@ -980,6 +980,11 @@
     "strategy_title": "Strategies",
     "accuracy": "Accuracy"
   },
-  "config.section.risk_control": "Risk Control",
-  "config.account_sltp": "Account SL/TP"
+  "config.section.risk_control": "Per-Strategy Risk",
+  "config.account_sltp": "Account SL/TP",
+  "config.lot_size_desc": "Fixed lot size for each order in paper mode",
+  "config.default_sl_desc": "Default stop loss in pips for new orders",
+  "config.default_tp_desc": "Default take profit in pips for new orders",
+  "config.slippage_desc": "Max allowed slippage in points",
+  "config.max_rapid_exits_desc": "Max exits within rapid exit window before blocking"
 }

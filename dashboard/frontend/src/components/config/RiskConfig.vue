@@ -47,13 +47,13 @@ function opts(values: number[]): { label: string; value: number }[] {
 }
 
 // 离散参数下拉选项
-const lotSizeOpts = opts([0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0])
+const lotSizeOpts = opts([0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0])
 const maxPosOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20])
 const slOpts = opts([10,20,30,40,50,60,70,80,90,100,120,150,200,300,500])
 const tpOpts = opts([20,30,50,60,80,100,120,150,200,300,400,500,600,800,1000])
-const slippageOpts = opts([0,5,10,15,20,30,50,100])
+const slippageOpts = opts([0,1,2,3,4,5,6,7,8,9,10])
 const cooldownOpts = opts([0,0.5,1,2,3,4,6,8,12,24,48])
-const lossLimitOpts = opts([5,10,15,20,25,30,40,50,60,80,100,150,200,300,500])
+const lossLimitOpts = opts([5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100])
 const blockHrOpts = opts([1,2,3,4,6,8,12,16,24,36,48,72])
 const rapidExitOpts = opts([1,2,3,4,5,6,8,10,15,20])
 const rapidWinOpts = opts([60,120,180,300,600,900,1800,3600])
@@ -75,12 +75,14 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
           <n-form-item label-placement="left" :label="$t('config.lot_size')">
             <n-select :value="local.lot_size" :options="lotSizeOpts" size="tiny"
               @update:value="(v: any) => v != null && (local.lot_size = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.lot_size_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.max_positions_label')">
             <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny"
               @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.max_positions_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
@@ -100,18 +102,21 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
           <n-form-item label-placement="left" :label="$t('config.default_sl')">
             <n-select :value="local.stop_loss_pips" :options="slOpts" size="tiny"
               @update:value="(v: any) => v != null && (local.stop_loss_pips = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.default_sl_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.default_tp')">
             <n-select :value="local.take_profit_pips" :options="tpOpts" size="tiny"
               @update:value="(v: any) => v != null && (local.take_profit_pips = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.default_tp_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.slippage')">
             <n-select :value="local.slippage" :options="slippageOpts" size="tiny"
               @update:value="(v: any) => v !== null && (local.slippage = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.slippage_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
@@ -166,6 +171,7 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
           <n-form-item label-placement="left" :label="$t('config.max_rapid_exits')">
             <n-select :value="local.max_rapid_exits" :options="rapidExitOpts" size="tiny"
               @update:value="(v: any) => v != null && (local.max_rapid_exits = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.max_rapid_exits_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
