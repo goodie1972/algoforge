@@ -979,5 +979,6 @@
     "signal_title": "实盘信号",
     "strategy_title": "实盘策略",
     "accuracy": "准确率"
-  }
+  },
+  "config.section.risk_control": "风控"
 }

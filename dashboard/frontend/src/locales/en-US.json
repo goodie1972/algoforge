@@ -979,5 +979,6 @@
     "signal_title": "Live Signals",
     "strategy_title": "Strategies",
     "accuracy": "Accuracy"
-  }
+  },
+  "config.section.risk_control": "Risk Control"
 }

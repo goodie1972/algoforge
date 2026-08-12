@@ -109,11 +109,11 @@ async function save() {
       </n-grid>
     </n-grid-item>
 
-    <!-- 右列 -->
+    <!-- 右列：风控合并 -->
     <n-grid-item>
       <n-grid :cols="3" :x-gap="12" :y-gap="12">
         <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.section.floating_loss') }}</n-divider>
+          <n-divider title-position="left">{{ $t('config.section.risk_control') }}</n-divider>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.warning_line')">
@@ -129,10 +129,6 @@ async function save() {
             <template #feedback>{{ $t('config.block_line_desc') }}</template>
           </n-form-item>
         </n-grid-item>
-
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.section.realized_loss') }}</n-divider>
-        </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.realized_loss_pct')">
             <app-input-number :value="local.per_strategy_realized_loss_pct" :min="1" :max="50" :step="0.5"
@@ -146,10 +142,6 @@ async function save() {
               @update:value="(v: any) => v != null && (local.per_strategy_loss_block_hours = v)" style="width: 30px;" />
             <template #feedback>{{ $t('config.block_duration_desc') }}</template>
           </n-form-item>
-        </n-grid-item>
-
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.section.rapid_exit') }}</n-divider>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.max_rapid_exits')">
@@ -170,10 +162,6 @@ async function save() {
               @update:value="(v: any) => v != null && (local.rapid_exit_cooldown_seconds = v)" style="width: 30px;" />
             <template #feedback>{{ $t('config.rapid_exit_cooldown_desc', { n: Math.round(local.rapid_exit_cooldown_seconds / 60) }) }}</template>
           </n-form-item>
-        </n-grid-item>
-
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.consec_loss') }}</n-divider>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.consec_loss_limit')">
