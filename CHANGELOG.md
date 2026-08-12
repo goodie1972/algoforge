@@ -8,9 +8,13 @@
 ### 新增
 - **高位/低位追高拦截**：gold_auto_research 和 sanqing_h1_upgraded 新增 `price_position>0.88 且 偏离EMA21>4×ATR` 条件，禁 BUY 追高（允许 SELL）；对称低位禁 SELL 抄底（允许 BUY）
 - **利润回撤止盈动态阈值**：5 个策略统一，盈利>10 时回撤 35% 强制止盈（原 50%），保护大盈利
+- **TF 周期栏**：持仓/成交列表增加 TF 栏（方向栏前），从策略名自动解析周期
+- **副图优化**：指标标签加大加粗（13px/700/白），Stoch 新增 80/20 参考线，ADX 新增 25 参考线，副图显示当前值
 
 ### 修复
 - **纸面模式忽略策略级 max_positions**：纸面模式用 `_paper_max=10` 覆盖了 `strategy.max_positions=1`，导致 gold_auto 和 sanqing 连续开 4 张同向单（max_positions 失效）
+- **净盈亏计算**：`净盈亏 = pnl - |手续费| - |过夜费|`，纸面 commission 统一 0.5 并写入 Position，修复旧公式对正数 commission 算错
+- **黄金快讯标签**：卡片标签硬编码"看多"，与 Modal 动态标签不一致，改为根据 current_bias.overall 显示
 - **mfi_bb_m30_upgraded 中线出场改用固定参照+穿越跟踪**：原用动态 `bb["mid"]`，价格涨后中线被拉高，导致过早出场；改为用固定入场中线 + 穿越跟踪
 
 ### 策略优化
