@@ -980,5 +980,6 @@
     "strategy_title": "实盘策略",
     "accuracy": "准确率"
   },
-  "config.section.risk_control": "风控"
+  "config.section.risk_control": "风控",
+  "config.account_sltp": "账户级止盈止损"
 }

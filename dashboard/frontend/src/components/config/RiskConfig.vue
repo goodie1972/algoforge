@@ -44,13 +44,12 @@ async function save() {
 </script>
 
 <template>
-  <n-grid :cols="2" :x-gap="24" :y-gap="12">
+  <n-space vertical size="large">
+    <n-divider title-position="left">{{ $t('config.section.position_mgmt') }}</n-divider>
+    <n-grid :cols="2" :x-gap="24" :y-gap="12">
     <!-- 左列 -->
     <n-grid-item>
       <n-grid :cols="3" :x-gap="12" :y-gap="12">
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.section.position_mgmt') }}</n-divider>
-        </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.lot_size')">
             <app-input-number :value="local.lot_size" :min="0.01" :max="10" :step="0.01"
@@ -112,9 +111,6 @@ async function save() {
     <!-- 右列：风控合并 -->
     <n-grid-item>
       <n-grid :cols="3" :x-gap="12" :y-gap="12">
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.section.risk_control') }}</n-divider>
-        </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.warning_line')">
             <app-input-number :value="local.floating_loss_warn_pct" :min="1" :max="50" :step="0.5"
@@ -180,6 +176,7 @@ async function save() {
       </n-grid>
     </n-grid-item>
   </n-grid>
+  </n-space>
 
   <div style="margin-top: 16px;">
     <n-button type="primary" :disabled="!changed" @click="save" block>

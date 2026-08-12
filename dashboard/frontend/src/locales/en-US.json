@@ -980,5 +980,6 @@
     "strategy_title": "Strategies",
     "accuracy": "Accuracy"
   },
-  "config.section.risk_control": "Risk Control"
+  "config.section.risk_control": "Risk Control",
+  "config.account_sltp": "Account SL/TP"
 }
