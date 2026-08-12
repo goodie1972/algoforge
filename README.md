@@ -221,6 +221,7 @@ AlgoForge/
 | 文档 | 说明 |
 |:----|:------|
 | [CLAUDE.md](CLAUDE.md) | AI 开发助手配置 |
+| [策略开发规范](docs/strategy_dev_guide.md) | 策略开发全流程 + BaseStrategy 参考 + MQL4 移植指南 |
 | [策略文档](/docs/strategies/) | 各策略详细逻辑 |
 | [回测分析](/docs/strategy_analysis.md) | 策略分类 + 回测分析 |
 | [评测方案](/docs/evaluation_plan.md) | 7 天纸面评测方案 |
