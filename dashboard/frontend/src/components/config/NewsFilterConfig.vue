@@ -108,17 +108,17 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
             <n-form-item :label="$t('config.news_filter_enable')">
               <n-switch :value="local.news_filter_enabled" @update:value="(v: boolean) => local.news_filter_enabled = v" />
             </n-form-item>
-            <n-grid :cols="2" :x-gap="8">
+            <n-grid :cols="2" :x-gap="12">
               <n-grid-item>
-                <n-form-item label-placement="left" :label="$t('config.before_release')" :label-width="50">
+                <n-form-item label-placement="left" :label="$t('config.before_release')">
                   <n-select :value="local.news_before_minutes" :options="commonMinOpts" size="tiny"
-                    @update:value="(v: any) => v !== null && (local.news_before_minutes = v)" style="width: 70px;" />
+                    @update:value="(v: any) => v !== null && (local.news_before_minutes = v)" style="width: 80px;" />
                 </n-form-item>
               </n-grid-item>
               <n-grid-item>
-                <n-form-item label-placement="left" :label="$t('config.after_release')" :label-width="50">
+                <n-form-item label-placement="left" :label="$t('config.after_release')">
                   <n-select :value="local.news_after_minutes" :options="commonMinOpts" size="tiny"
-                    @update:value="(v: any) => v !== null && (local.news_after_minutes = v)" style="width: 70px;" />
+                    @update:value="(v: any) => v !== null && (local.news_after_minutes = v)" style="width: 80px;" />
                 </n-form-item>
               </n-grid-item>
             </n-grid>
@@ -192,15 +192,21 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
                 </n-popover>
               </div>
             </template>
-            <n-form-item :label="$t('config.impact_level')">
-              <n-select :value="local.news_impact_filter" :options="impactOptions" size="tiny"
-                @update:value="(v: string) => local.news_impact_filter = v" style="width: 120px;" />
-            </n-form-item>
-            <n-form-item :label="$t('config.currency')">
-              <n-select :value="local.news_currency_filter" :options="currencyOpts" size="tiny"
-                @update:value="(v: string) => local.news_currency_filter = v" style="width: 120px;" />
-              <template #feedback>{{ $t('config.currency_desc') }}</template>
-            </n-form-item>
+            <n-grid :cols="2" :x-gap="12">
+              <n-grid-item>
+                <n-form-item :label="$t('config.impact_level')">
+                  <n-select :value="local.news_impact_filter" :options="impactOptions" size="tiny"
+                    @update:value="(v: string) => local.news_impact_filter = v" style="width: 100px;" />
+                </n-form-item>
+              </n-grid-item>
+              <n-grid-item>
+                <n-form-item :label="$t('config.currency')">
+                  <n-select :value="local.news_currency_filter" :options="currencyOpts" size="tiny"
+                    @update:value="(v: string) => local.news_currency_filter = v" style="width: 100px;" />
+                  <template #feedback>{{ $t('config.currency_desc') }}</template>
+                </n-form-item>
+              </n-grid-item>
+            </n-grid>
           </n-card>
 
           <!-- 当前状态 -->
