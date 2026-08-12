@@ -66,10 +66,19 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
 
 <template>
   <n-space vertical size="large">
-    <n-divider title-position="left">{{ $t('config.section.position_mgmt') }}</n-divider>
-
     <!-- 卡片1: 仓位管理 -->
-    <n-card size="small" :title="$t('config.section.position_mgmt')" :bordered="true">
+    <n-card size="small" :bordered="true">
+      <template #header>
+        <div style="display:flex;align-items:center;gap:6px;width:100%;">
+          <span>{{ $t('config.section.position_mgmt') }}</span>
+          <n-popover trigger="hover" placement="right">
+            <template #trigger>
+              <n-button text circle size="tiny" class="help-btn">?</n-button>
+            </template>
+            <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_pos_mgmt_help') }}</div>
+          </n-popover>
+        </div>
+      </template>
       <n-grid :cols="3" :x-gap="12" :y-gap="8">
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.lot_size')">
@@ -96,7 +105,18 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
     </n-card>
 
     <!-- 卡片2: 账户级止盈止损 -->
-    <n-card size="small" :title="$t('config.account_sltp')" :bordered="true">
+    <n-card size="small" :bordered="true">
+      <template #header>
+        <div style="display:flex;align-items:center;gap:6px;width:100%;">
+          <span>{{ $t('config.account_sltp') }}</span>
+          <n-popover trigger="hover" placement="right">
+            <template #trigger>
+              <n-button text circle size="tiny" class="help-btn">?</n-button>
+            </template>
+            <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_sltp_help') }}</div>
+          </n-popover>
+        </div>
+      </template>
       <n-grid :cols="3" :x-gap="12" :y-gap="8">
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.default_sl')">
@@ -136,8 +156,19 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
       </n-grid>
     </n-card>
 
-    <!-- 卡片3: 风控 -->
-    <n-card size="small" :title="$t('config.section.risk_control')" :bordered="true">
+    <!-- 卡片3: 单策略风控 -->
+    <n-card size="small" :bordered="true">
+      <template #header>
+        <div style="display:flex;align-items:center;gap:6px;width:100%;">
+          <span>{{ $t('config.section.risk_control') }}</span>
+          <n-popover trigger="hover" placement="right">
+            <template #trigger>
+              <n-button text circle size="tiny" class="help-btn">?</n-button>
+            </template>
+            <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_risk_help') }}</div>
+          </n-popover>
+        </div>
+      </template>
       <n-grid :cols="3" :x-gap="12" :y-gap="8">
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.warning_line')">
@@ -212,3 +243,26 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
     </div>
   </n-space>
 </template>
+
+<style scoped>
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #8b8f97;
+  color: #8b8f97;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  line-height: 1;
+  transition: border-color 0.2s, color 0.2s;
+}
+.help-btn:hover {
+  border-color: #f0b90b;
+  color: #f0b90b;
+}
+</style>

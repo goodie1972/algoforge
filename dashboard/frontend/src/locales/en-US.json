@@ -986,5 +986,8 @@
   "config.default_sl_desc": "Default stop loss in pips for new orders",
   "config.default_tp_desc": "Default take profit in pips for new orders",
   "config.slippage_desc": "Max allowed slippage in points",
-  "config.max_rapid_exits_desc": "Max exits within rapid exit window before blocking"
+  "config.max_rapid_exits_desc": "Max exits within rapid exit window before blocking",
+  "config.card_pos_mgmt_help": "Position Mgmt:\n• Lot size: fixed volume per order\n• Max positions: max concurrent orders for this strategy\n• Loss limit: realized loss threshold triggering cooldown",
+  "config.card_sltp_help": "Account SL/TP:\n• Default SL/TP: auto-set points for new orders\n• Slippage: max allowed points\n• TP cooldown: hours before same-direction re-entry\n• Lock expiry: auto-clear safety lock after minutes",
+  "config.card_risk_help": "Per-Strategy Risk:\n• Warn/Block lines: floating loss thresholds\n• Loss limit: realized loss ratio\n• Block duration: pause hours\n• Rapid exit: exit count cooldown\n• Consecutive loss: streak cooldown"
 }
