@@ -10,6 +10,7 @@ const store = useConfigStore()
 const message = useMessage()
 const { t, locale } = useI18n()
 const saving = ref(false)
+const fileInput = ref<HTMLInputElement>()
 
 interface StrategyMeta {
   id: string
@@ -159,6 +160,43 @@ async function save() {
   }
   saving.value = false
 }
+
+async function handleUpload() {
+  const input = fileInput.value
+  if (!input || !input.files?.length) return
+  const file = input.files[0]
+  if (!file.name.endsWith('.py')) {
+    message.error(t('strategy.only_py') || '只支持 .py 文件')
+    return
+  }
+  const form = new FormData()
+  form.append('file', file)
+  try {
+    const res = await fetch('/api/strategies/upload', { method: 'POST', body: form })
+    const data = await res.json()
+    if (res.ok) {
+      message.success(data.message || '上传成功')
+      input.value = ''
+      window.location.reload()
+    } else {
+      message.error(data.detail || '上传失败')
+    }
+  } catch { message.error('上传失败') }
+}
+
+async function handleRemove(name: string) {
+  if (!confirm(t('strategy.confirm_remove') + ' ' + name + '?')) return
+  try {
+    const res = await fetch(`/api/strategies/${name}/remove`, { method: 'POST' })
+    const data = await res.json()
+    if (res.ok) {
+      message.success(data.message)
+      window.location.reload()
+    } else {
+      message.error(data.detail || '删除失败')
+    }
+  } catch { message.error('删除失败') }
+}
 </script>
 
 <template>
@@ -167,6 +205,11 @@ async function save() {
       {{ $t('strategy.pool_summary', { total: allStrategies.length, enabled: enabledCount }) }}
       {{ $t('strategy.pool_hint') }}
     </n-alert>
+
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <input ref="fileInput" type="file" accept=".py" style="display:none" @change="handleUpload" />
+      <n-button size="small" secondary @click="fileInput?.click()">{{ $t('strategy.import_strategy') }}</n-button>
+    </div>
 
     <n-spin :show="loading">
       <n-empty v-if="!loading && !allStrategies.length" :description="$t('strategy.no_strategies')" />
@@ -205,6 +248,8 @@ async function save() {
               @click.stop="toggleExpand(meta.id)">
               {{ expanded.has(meta.id) ? '▼' : '▶' }}
             </n-button>
+            <n-button text size="tiny" style="color:#f6465d;font-size:12px;width:20px;"
+              @click.stop="handleRemove(meta.name)">✕</n-button>
           </div>
         </div>
 

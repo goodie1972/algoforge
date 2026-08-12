@@ -996,5 +996,6 @@
   "config.news_filter": "News Filter",
   "config.card_paper_enable_help": "Paper Trading:\n• Enable: simulate orders locally, no real trades\n• Initial balance: starting virtual balance",
   "config.card_paper_trade_help": "Trade Settings:\n• Max positions: max concurrent paper orders\n• Initial balance: starting virtual balance",
-  "config.trade_settings": "Trade Settings"
+  "config.trade_settings": "Trade Settings",
+  "strategy.import_strategy": "Import Strategy"
 }
