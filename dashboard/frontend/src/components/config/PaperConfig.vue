@@ -9,6 +9,9 @@ const message = useMessage()
 const dialog = useDialog()
 const { t } = useI18n()
 
+// 持仓数下拉选项
+const maxPosOpts = [1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50].map(v => ({ label: String(v), value: v }))
+
 function defaults() {
   const pt = store.items.paper_trading
   return {
@@ -50,62 +53,103 @@ function confirmReset() {
 </script>
 
 <template>
-  <n-grid :cols="2" :x-gap="24" :y-gap="12">
-    <!-- 左列 -->
-    <n-grid-item>
-      <n-space vertical size="medium">
-        <n-divider title-position="left">{{ $t('config.paper_enable') }}</n-divider>
-        <n-form-item :label="$t('config.paper')">
-          <n-switch :value="local.enabled"
-            @update:value="(v: any) => v != null && (local.enabled = v)" />
-          <template #feedback>{{ $t('config.paper_desc') }}</template>
-        </n-form-item>
+  <n-space vertical size="large">
+    <n-grid :cols="2" :x-gap="24">
+      <!-- 左列 -->
+      <n-grid-item>
+        <n-space vertical size="medium">
+          <!-- 卡片1: 纸面交易 -->
+          <n-card size="small" :bordered="true">
+            <template #header>
+              <div style="display:flex;align-items:center;gap:6px;width:100%;">
+                <span>{{ $t('config.paper_enable') }}</span>
+                <n-popover trigger="hover" placement="right">
+                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_paper_enable_help') }}</div>
+                </n-popover>
+              </div>
+            </template>
+            <n-form-item :label="$t('config.paper')">
+              <n-switch :value="local.enabled" @update:value="(v: any) => v != null && (local.enabled = v)" />
+              <template #feedback>{{ $t('config.paper_desc') }}</template>
+            </n-form-item>
+          </n-card>
 
-        <n-divider title-position="left">{{ $t('config.position_limit') }}</n-divider>
-        <n-form-item label-placement="left" :label="$t('config.max_positions')">
-          <app-input-number :value="local.max_positions" :min="1" :max="50"
-            @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 30px;" />
-          <template #feedback>{{ $t('config.max_positions_desc') }}</template>
-        </n-form-item>
+          <!-- 卡片2: 交易设置 -->
+          <n-card size="small" :bordered="true">
+            <template #header>
+              <div style="display:flex;align-items:center;gap:6px;width:100%;">
+                <span>{{ $t('config.trade_settings') }}</span>
+                <n-popover trigger="hover" placement="right">
+                  <template #trigger><n-button text circle size="tiny" class="help-btn">?</n-button></template>
+                  <div style="max-width:280px;font-size:12px;line-height:1.7;white-space:pre-line;">{{ $t('config.card_paper_trade_help') }}</div>
+                </n-popover>
+              </div>
+            </template>
+            <!-- 持仓数 + 余额 同一行 -->
+            <n-grid :cols="2" :x-gap="12">
+              <n-grid-item>
+                <n-form-item label-placement="top" :label="$t('config.max_positions')">
+                  <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny"
+                    @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 110px;" />
+                </n-form-item>
+                <n-text depth="3" style="font-size:11px;">{{ $t('config.max_positions_desc') }}</n-text>
+              </n-grid-item>
+              <n-grid-item>
+                <n-form-item label-placement="top" :label="$t('config.init_balance')">
+                  <n-input-number :value="local.initial_balance" :min="0" :max="100000" :step="100" size="tiny"
+                    @update:value="(v: any) => v != null && (local.initial_balance = v)" style="width: 110px;" />
+                </n-form-item>
+                <n-text depth="3" style="font-size:11px;">{{ $t('config.init_balance_desc') }}</n-text>
+              </n-grid-item>
+            </n-grid>
+          </n-card>
 
-        <n-divider title-position="left">{{ $t('config.virtual_balance') }}</n-divider>
-        <n-form-item label-placement="left" :label="$t('config.init_balance')">
-          <app-input-number :value="local.initial_balance" :min="0" :max="100000"
-            @update:value="(v: any) => v != null && (local.initial_balance = v)" style="width: 30px;" />
-          <template #feedback>{{ $t('config.init_balance_desc') }}</template>
-        </n-form-item>
-      </n-space>
-    </n-grid-item>
+          <!-- 门禁控制 -->
+          <n-card size="small" :bordered="true" :title="$t('config.gate_control')">
+            <n-form-item :label="$t('config.ignore_gates')">
+              <n-switch :value="local.ignore_gates" @update:value="(v: any) => v != null && (local.ignore_gates = v)" />
+              <template #feedback>{{ $t('config.ignore_gates_desc') }}</template>
+            </n-form-item>
+          </n-card>
+        </n-space>
+      </n-grid-item>
 
-    <!-- 右列 -->
-    <n-grid-item>
-      <n-space vertical size="medium">
-        <n-divider title-position="left">{{ $t('config.gate_control') }}</n-divider>
-        <n-form-item :label="$t('config.ignore_gates')">
-          <n-switch :value="local.ignore_gates"
-            @update:value="(v: any) => v != null && (local.ignore_gates = v)" />
-          <template #feedback>{{ $t('config.ignore_gates_desc') }}</template>
-        </n-form-item>
+      <!-- 右列 -->
+      <n-grid-item>
+        <n-space vertical size="medium">
+          <!-- 风险提示 -->
+          <n-card size="small" :bordered="true" :title="$t('config.risk_note')">
+            <n-alert type="warning">{{ $t('config.risk_note_desc') }}</n-alert>
+          </n-card>
 
-        <n-divider title-position="left">{{ $t('config.risk_note') }}</n-divider>
-        <n-alert type="warning">
-          {{ $t('config.risk_note_desc') }}
-        </n-alert>
+          <!-- 重置纸面数据 -->
+          <n-card size="small" :bordered="true" :title="$t('config.reset_paper')">
+            <n-button type="warning" secondary block @click="confirmReset">
+              {{ $t('config.reset_paper_action') }}
+            </n-button>
+            <n-text depth="3" style="font-size:12px;display:block;margin-top:8px;">
+              {{ $t('config.reset_paper_desc') }}
+            </n-text>
+          </n-card>
+        </n-space>
+      </n-grid-item>
+    </n-grid>
 
-        <n-divider title-position="left">{{ $t('config.reset_paper') }}</n-divider>
-        <n-button type="warning" secondary block @click="confirmReset">
-          {{ $t('config.reset_paper_action') }}
-        </n-button>
-        <n-text depth="3" style="font-size: 12px;">
-          {{ $t('config.reset_paper_desc') }}
-        </n-text>
-      </n-space>
-    </n-grid-item>
-  </n-grid>
-
-  <div style="margin-top: 16px;">
     <n-button type="primary" :disabled="!changed" @click="save" block>
       {{ $t('config.save_paper') }}
     </n-button>
-  </div>
+  </n-space>
 </template>
+
+<style scoped>
+.help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid #8b8f97; color: #8b8f97;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  background: transparent; line-height: 1;
+  transition: border-color 0.2s, color 0.2s;
+}
+.help-btn:hover { border-color: #f0b90b; color: #f0b90b; }
+</style>

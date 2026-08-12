@@ -993,5 +993,8 @@
   "config.card_news_filter_help": "News Filter:\n• Enable: toggle news-based safety filter\n• Blackout window: no-open period around events (min)\n• Before/After: minutes before/after event",
   "config.card_news_bias_help": "News Bias:\n• Enable bias: toggle LLM bull/bear judgment\n• Report time: UTC hours for bias reports\n• Bearish block long / Bullish block short\n• DI gap threshold",
   "config.card_event_filter_help": "Event Filter:\n• Impact level: which impact tiers to track\n• Currency: which currency events to follow",
-  "config.news_filter": "News Filter"
+  "config.news_filter": "News Filter",
+  "config.card_paper_enable_help": "Paper Trading:\n• Enable: simulate orders locally, no real trades\n• Initial balance: starting virtual balance",
+  "config.card_paper_trade_help": "Trade Settings:\n• Max positions: max concurrent paper orders\n• Initial balance: starting virtual balance",
+  "config.trade_settings": "Trade Settings"
 }
