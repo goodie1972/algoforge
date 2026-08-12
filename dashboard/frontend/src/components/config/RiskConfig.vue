@@ -16,7 +16,6 @@ function defaults() {
     take_profit_pips: store.items.take_profit_pips ?? 100,
     slippage: store.items.slippage ?? 30,
     profit_exit_cooldown_hours: store.items.profit_exit_cooldown_hours ?? 2,
-    max_daily_loss_pct: store.items.max_daily_loss_pct ?? 12.0,
     floating_loss_warn_pct: store.items.floating_loss_warn_pct ?? 5.0,
     floating_loss_block_pct: store.items.floating_loss_block_pct ?? 10.0,
     per_strategy_realized_loss_pct: store.items.per_strategy_realized_loss_pct ?? 5.0,
@@ -64,9 +63,16 @@ async function save() {
               @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 30px;" />
           </n-form-item>
         </n-grid-item>
+        <n-grid-item>
+          <n-form-item label-placement="left" :label="$t('config.abs_loss_limit')">
+            <app-input-number :value="local.per_strategy_realized_loss_amount" :min="5" :max="500" :step="5"
+              @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width: 30px;" />
+            <template #feedback>{{ $t('config.abs_loss_limit_desc') }}</template>
+          </n-form-item>
+        </n-grid-item>
 
         <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.sltp') }}</n-divider>
+          <n-divider title-position="left">{{ $t('config.account_sltp') }}</n-divider>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.default_sl')">
@@ -92,21 +98,6 @@ async function save() {
               @update:value="(v: any) => v !== null && (local.profit_exit_cooldown_hours = v)" style="width: 30px;" />
             <template #feedback>{{ $t('config.tp_cooldown_desc') }}</template>
           </n-form-item>
-        </n-grid-item>
-
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.account_hard_stop') }}</n-divider>
-        </n-grid-item>
-        <n-grid-item>
-          <n-form-item label-placement="left" :label="$t('config.max_daily_loss_pct')">
-            <app-input-number :value="local.max_daily_loss_pct" :min="1" :max="100" :step="0.5"
-              @update:value="(v: any) => v != null && (local.max_daily_loss_pct = v)" style="width: 30px;" />
-            <template #feedback>{{ $t('config.max_daily_loss_desc') }}</template>
-          </n-form-item>
-        </n-grid-item>
-
-        <n-grid-item :span="3">
-          <n-divider title-position="left">{{ $t('config.safety_lock') }}</n-divider>
         </n-grid-item>
         <n-grid-item>
           <n-form-item label-placement="left" :label="$t('config.safety_lock_expire')">
@@ -154,13 +145,6 @@ async function save() {
             <app-input-number :value="local.per_strategy_loss_block_hours" :min="1" :max="72"
               @update:value="(v: any) => v != null && (local.per_strategy_loss_block_hours = v)" style="width: 30px;" />
             <template #feedback>{{ $t('config.block_duration_desc') }}</template>
-          </n-form-item>
-        </n-grid-item>
-        <n-grid-item>
-          <n-form-item label-placement="left" :label="$t('config.abs_loss_limit')">
-            <app-input-number :value="local.per_strategy_realized_loss_amount" :min="5" :max="500" :step="5"
-              @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width: 30px;" />
-            <template #feedback>{{ $t('config.abs_loss_limit_desc') }}</template>
           </n-form-item>
         </n-grid-item>
 
