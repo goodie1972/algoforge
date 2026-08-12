@@ -997,5 +997,7 @@
   "config.card_paper_enable_help": "纸面交易：\n• 启用纸面交易：开启后所有开仓在本地模拟，不发送真实订单\n• 原始资金：初始虚拟余额",
   "config.card_paper_trade_help": "交易设置：\n• 最大持仓：纸面模式允许同时持有的最大订单数\n• 原始资金：初始虚拟余额（填空）",
   "config.trade_settings": "交易设置",
-  "strategy.import_strategy": "导入策略"
+  "strategy.import_strategy": "导入策略",
+  "strategy.delete_strategy": "删除策略",
+  "strategy.confirm_delete": "确认删除"
 }

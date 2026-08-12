@@ -48,35 +48,43 @@ async def upload_strategy(file: UploadFile = File(...)):
     return {"message": f"策略 {safe_name} 已上传，重启引擎后生效"}
 
 
-@router.post("/{name}/remove")
-async def remove_strategy(name: str):
-    """删除策略：将 .py 和文档 .md 移动到 strategies/backup/ 目录"""
-    os.makedirs(BACKUP_DIR, exist_ok=True)
+@router.post("/batch-remove")
+async def batch_remove_strategies(req: dict):
+    """批量删除策略：检查在线状态，移至 backup"""
+    names = req.get("names", [])
+    if not names:
+        raise HTTPException(400, "未指定策略")
+    from dashboard.backend.routes.engine import engine_runner
+    # 检查在线策略
+    online = []
+    if engine_runner:
+        status = engine_runner.get_status()
+        enabled_strats = set()
+        if status:
+            pool = status.get("strategy_pool", {})
+            for name, cfg in pool.items():
+                if cfg.get("enabled"):
+                    enabled_strats.add(name)
+        for n in names:
+            if n in enabled_strats:
+                online.append(n)
+    if online:
+        return {"online": online, "need_confirm": True}
+    # 执行删除
     moved = []
-    # 匹配策略 .py 文件（策略名 + 任意日期后缀）
-    for fname in os.listdir(STRATEGIES_DIR):
-        if fname.startswith(name + "_") and fname.endswith(".py"):
-            src = os.path.join(STRATEGIES_DIR, fname)
-            dst = os.path.join(BACKUP_DIR, fname)
-            try:
-                shutil.move(src, dst)
+    for name in names:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        for fname in os.listdir(STRATEGIES_DIR):
+            if fname.startswith(name + "_") and fname.endswith(".py"):
+                shutil.move(os.path.join(STRATEGIES_DIR, fname), os.path.join(BACKUP_DIR, fname))
                 moved.append(fname)
-            except Exception as e:
-                raise HTTPException(500, f"移动 {fname} 失败: {e}")
-    # 匹配策略文档 .md
-    if os.path.isdir(DOCS_DIR):
-        for fname in os.listdir(DOCS_DIR):
-            if fname.startswith(name) and fname.endswith(".md"):
-                src = os.path.join(DOCS_DIR, fname)
-                dst = os.path.join(BACKUP_DIR, fname)
-                try:
-                    shutil.move(src, dst)
-                    moved.append(fname)
-                except Exception as e:
-                    raise HTTPException(500, f"移动 {fname} 失败: {e}")
-    if not moved:
-        raise HTTPException(404, f"未找到策略 {name} 的文件")
-    return {"message": f"策略 {name} 已删除（移至 backup）", "moved": moved}
+        # 移动说明文档
+        for dname in os.listdir(DOCS_DIR):
+            if dname.startswith(name) and dname.endswith(".md"):
+                os.makedirs(os.path.join(BACKUP_DIR, "docs"), exist_ok=True)
+                shutil.move(os.path.join(DOCS_DIR, dname), os.path.join(BACKUP_DIR, "docs", dname))
+                moved.append(dname)
+    return {"message": f"已删除 {len(names)} 个策略", "moved": moved}
 
 
 @router.get("/{name}/logic")

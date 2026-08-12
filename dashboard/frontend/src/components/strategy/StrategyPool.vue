@@ -11,6 +11,11 @@ const message = useMessage()
 const { t, locale } = useI18n()
 const saving = ref(false)
 const fileInput = ref<HTMLInputElement>()
+const deleteMode = ref(false)
+const selectedForDelete = ref<Set<string>>(new Set())
+const showDeleteModal = ref(false)
+const deleteConfirmLoading = ref(false)
+const deleteOnlineWarnings = ref<string[]>([])
 
 interface StrategyMeta {
   id: string
@@ -165,32 +170,101 @@ async function handleUpload() {
   const input = fileInput.value
   if (!input || !input.files?.length) return
   const file = input.files[0]
-  if (!file.name.endsWith('.py')) {
+  let name = file.name
+  if (!name.endsWith('.py')) {
     message.error(t('strategy.only_py') || '只支持 .py 文件')
     return
   }
-  const form = new FormData()
-  form.append('file', file)
-  try {
-    const res = await fetch('/api/strategies/upload', { method: 'POST', body: form })
-    const data = await res.json()
-    if (res.ok) {
-      message.success(data.message || '上传成功')
-      input.value = ''
-      window.location.reload()
-    } else {
-      message.error(data.detail || '上传失败')
-    }
-  } catch { message.error('上传失败') }
+  // 自动规范命名: YYYYMMDD_name_v1.py
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const base = name.replace(/\.py$/i, '')
+  // 如果不符合 年月日_name_vN 格式，自动重命名
+  if (!/^\d{8}_/.test(base)) {
+    // 提取纯策略名（去掉已有版本号）
+    const cleanName = base.replace(/_\d{8}|_v\d+.*$/ig, '').replace(/[^a-zA-Z0-9_]/g, '_')
+    const newName = `${date}_${cleanName}_v1.py`
+    message.info(`文件名已自动规范为: ${newName}`)
+    // 用 Blob 重命名文件
+    const renamed = new File([file], newName, { type: file.type })
+    const form = new FormData()
+    form.append('file', renamed)
+    try {
+      const res = await fetch('/api/strategies/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (res.ok) { message.success(data.message); input.value = ''; window.location.reload() }
+      else { message.error(data.detail || '上传失败') }
+    } catch { message.error('上传失败') }
+  } else {
+    const form = new FormData()
+    form.append('file', file)
+    try {
+      const res = await fetch('/api/strategies/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (res.ok) { message.success(data.message); input.value = ''; window.location.reload() }
+      else { message.error(data.detail || '上传失败') }
+    } catch { message.error('上传失败') }
+  }
 }
 
-async function handleRemove(name: string) {
-  if (!confirm(t('strategy.confirm_remove') + ' ' + name + '?')) return
+function cancelDelete() {
+  deleteMode.value = false
+  selectedForDelete.value = new Set()
+  showDeleteModal.value = false
+  deleteOnlineWarnings.value = []
+}
+
+async function confirmDelete() {
+  const names = [...selectedForDelete.value]
+  if (names.length === 0) { message.warning('请选择要删除的策略'); return }
+  deleteConfirmLoading.value = true
   try {
-    const res = await fetch(`/api/strategies/${name}/remove`, { method: 'POST' })
+    const res = await fetch('/api/strategies/batch-remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ names }),
+    })
     const data = await res.json()
     if (res.ok) {
       message.success(data.message)
+      cancelDelete()
+      window.location.reload()
+    } else {
+      message.error(data.detail || '删除失败')
+    }
+  } catch { message.error('删除失败') }
+  deleteConfirmLoading.value = false
+}
+
+function toggleSelect(name: string) {
+  const s = new Set(selectedForDelete.value)
+  if (s.has(name)) s.delete(name); else s.add(name)
+  selectedForDelete.value = s
+}
+
+function startDelete() {
+  deleteMode.value = true
+  selectedForDelete.value = new Set()
+}
+
+async function confirmDeleteClick() {
+  const names = [...selectedForDelete.value]
+  if (names.length === 0) { message.warning('请选择要删除的策略'); return }
+  // 先检查在线
+  try {
+    const res = await fetch('/api/strategies/batch-remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ names }),
+    })
+    const data = await res.json()
+    if (data.online && data.online.length > 0) {
+      deleteOnlineWarnings.value = data.online
+      showDeleteModal.value = true
+      return
+    }
+    if (res.ok) {
+      message.success(data.message)
+      cancelDelete()
       window.location.reload()
     } else {
       message.error(data.detail || '删除失败')
@@ -206,9 +280,17 @@ async function handleRemove(name: string) {
       {{ $t('strategy.pool_hint') }}
     </n-alert>
 
-    <div style="display:flex;gap:8px;margin-bottom:4px;">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:4px;">
       <input ref="fileInput" type="file" accept=".py" style="display:none" @change="handleUpload" />
-      <n-button size="small" secondary @click="fileInput?.click()">{{ $t('strategy.import_strategy') }}</n-button>
+      <template v-if="!deleteMode">
+        <n-button size="small" secondary @click="fileInput?.click()">{{ $t('strategy.import_strategy') }}</n-button>
+        <n-button size="small" secondary @click="startDelete">{{ $t('strategy.delete_strategy') }}</n-button>
+      </template>
+      <template v-else>
+        <n-button size="small" secondary @click="cancelDelete">{{ $t('common.cancel') }}</n-button>
+        <n-button size="small" type="warning" :disabled="selectedForDelete.size === 0"
+          @click="confirmDeleteClick">{{ $t('strategy.confirm_delete') }}</n-button>
+      </template>
     </div>
 
     <n-spin :show="loading">
@@ -223,6 +305,8 @@ async function handleRemove(name: string) {
         <!-- 顶栏: 开关 + 名称 + 标签 + Magic + TF -->
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 10px;">
+            <n-checkbox v-if="deleteMode" :checked="selectedForDelete.has(meta.name)"
+              @update:checked="() => toggleSelect(meta.name)" @click.stop />
             <n-switch :value="pool[meta.id]?.enabled"
               @update:value="toggleStrategy(meta.id)" size="small" />
             <n-text strong style="font-size: 14px;">{{ locale === 'en-US' ? translateDisplay(meta.display) : meta.display }}</n-text>
@@ -248,8 +332,6 @@ async function handleRemove(name: string) {
               @click.stop="toggleExpand(meta.id)">
               {{ expanded.has(meta.id) ? '▼' : '▶' }}
             </n-button>
-            <n-button text size="tiny" style="color:#f6465d;font-size:12px;width:20px;"
-              @click.stop="handleRemove(meta.name)">✕</n-button>
           </div>
         </div>
 
@@ -376,5 +458,20 @@ async function handleRemove(name: string) {
         {{ $t('strategy.save') }}
       </n-button>
     </n-spin>
+
+    <!-- 删除确认弹窗 -->
+    <n-modal v-model:show="showDeleteModal" preset="card" :title="$t('strategy.confirm_delete')" style="width:420px">
+      <div v-if="deleteOnlineWarnings.length > 0" style="margin-bottom:12px;color:#f0b90b;">
+        <n-icon size="20" color="#f0b90b" style="vertical-align:middle;margin-right:4px;">⚠</n-icon>
+        <span v-for="n in deleteOnlineWarnings" :key="n" style="display:block;margin:4px 0;">{{ n }} 策略现在在线，请去除在线状态后删除</span>
+      </div>
+      <n-text depth="3">确认删除 {{ selectedForDelete.size }} 个策略？文件将移至 backup 目录，可恢复。</n-text>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showDeleteModal = false; cancelDelete()">{{ $t('common.cancel') }}</n-button>
+          <n-button type="warning" :loading="deleteConfirmLoading" @click="confirmDelete">{{ $t('strategy.confirm_delete') }}</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </n-space>
 </template>
