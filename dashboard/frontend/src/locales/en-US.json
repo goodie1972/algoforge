@@ -989,5 +989,9 @@
   "config.max_rapid_exits_desc": "Max exits within rapid exit window before blocking",
   "config.card_pos_mgmt_help": "Position Mgmt:\n• Lot size: fixed volume per order\n• Max positions: max concurrent orders for this strategy\n• Loss limit: realized loss threshold triggering cooldown",
   "config.card_sltp_help": "Account SL/TP:\n• Default SL/TP: auto-set points for new orders\n• Slippage: max allowed points\n• TP cooldown: hours before same-direction re-entry\n• Lock expiry: auto-clear safety lock after minutes",
-  "config.card_risk_help": "Per-Strategy Risk:\n• Warn/Block lines: floating loss thresholds\n• Loss limit: realized loss ratio\n• Block duration: pause hours\n• Rapid exit: exit count cooldown\n• Consecutive loss: streak cooldown"
+  "config.card_risk_help": "Per-Strategy Risk:\n• Warn/Block lines: floating loss thresholds\n• Loss limit: realized loss ratio\n• Block duration: pause hours\n• Rapid exit: exit count cooldown\n• Consecutive loss: streak cooldown",
+  "config.card_news_filter_help": "News Filter:\n• Enable: toggle news-based safety filter\n• Blackout window: no-open period around events (min)\n• Before/After: minutes before/after event",
+  "config.card_news_bias_help": "News Bias:\n• Enable bias: toggle LLM bull/bear judgment\n• Report time: UTC hours for bias reports\n• Bearish block long / Bullish block short\n• DI gap threshold",
+  "config.card_event_filter_help": "Event Filter:\n• Impact level: which impact tiers to track\n• Currency: which currency events to follow",
+  "config.news_filter": "News Filter"
 }
