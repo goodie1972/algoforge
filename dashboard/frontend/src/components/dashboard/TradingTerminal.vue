@@ -513,7 +513,7 @@ function applyRSI() {
 
     if (!paneSeries['rsi']) {
       const series = pc.addLineSeries({
-        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
         priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
       })
       const overbought = pc.addLineSeries({
@@ -558,10 +558,10 @@ function applyStoch() {
 
     if (!paneSeries['stoch']) {
       const kSeries = pc.addLineSeries({
-        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
       })
       const dSeries = pc.addLineSeries({
-        color: '#e88b37', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#e88b37', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
       })
       const stochOb = pc.addLineSeries({
         color: '#f6465d', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
@@ -607,13 +607,13 @@ function applyMACD() {
 
     if (!paneSeries['macd']) {
       const macdSeries = pc.addLineSeries({
-        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
       })
       const signalSeries = pc.addLineSeries({
-        color: '#e88b37', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#e88b37', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
       })
       const histSeries = pc.addHistogramSeries({
-        priceLineVisible: false, lastValueVisible: false,
+        priceLineVisible: false, lastValueVisible: true,
       })
       paneSeries['macd'] = { macd: macdSeries, signal: signalSeries, histogram: histSeries }
     }
@@ -646,7 +646,7 @@ function applyATR() {
 
     if (!paneSeries['atr']) {
       paneSeries['atr'] = pc.addLineSeries({
-        color: '#0ecb81', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#0ecb81', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
       })
     }
 
@@ -676,7 +676,7 @@ function applyVolume() {
 
     if (!paneSeries['volume']) {
       paneSeries['volume'] = pc.addHistogramSeries({
-        priceLineVisible: false, lastValueVisible: false,
+        priceLineVisible: false, lastValueVisible: true,
       })
     }
 
@@ -709,7 +709,7 @@ function applyADX() {
 
     if (!paneSeries['adx']) {
       paneSeries['adx'] = pc.addLineSeries({
-        color: '#f0b90b', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        color: '#f0b90b', lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
       // ADX 25 参考线（趋势强度阈值）
@@ -753,13 +753,13 @@ function applyDI() {
 
     if (!paneSeries['pdi']) {
       paneSeries['pdi'] = pc.addHistogramSeries({
-        color: '#0ecb81', priceLineVisible: false, lastValueVisible: false,
+        color: '#0ecb81', priceLineVisible: false, lastValueVisible: true,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
     }
     if (!paneSeries['ndi']) {
       paneSeries['ndi'] = pc.addHistogramSeries({
-        color: '#f6465d', priceLineVisible: false, lastValueVisible: false,
+        color: '#f6465d', priceLineVisible: false, lastValueVisible: true,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
     }
@@ -792,7 +792,7 @@ function applyMFI() {
 
     if (!paneSeries['mfi']) {
       paneSeries['mfi'] = pc.addLineSeries({
-        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+        color: '#f0b90b', lineWidth: 1, priceLineVisible: false, lastValueVisible: true,
         priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
       })
       // Add 80/20 reference lines
@@ -854,7 +854,7 @@ function applyBBI() {
 
     if (!paneSeries['bbi']) {
       const bbiLine = pc.addLineSeries({
-        color: '#8b5cf6', lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+        color: '#8b5cf6', lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
         priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
       })
       const priceLine = pc.addLineSeries({
