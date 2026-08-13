@@ -58,17 +58,16 @@ async def batch_remove_strategies(req: dict):
     from dashboard.backend.routes.engine import engine_runner
     # 检查在线策略（force=true 时跳过）
     online = []
-    if not force and engine_runner:
-        status = engine_runner.get_status()
-        enabled_strats = set()
-        if status:
-            pool = status.get("strategy_pool", {})
-            for name, cfg in pool.items():
-                if cfg.get("enabled"):
-                    enabled_strats.add(name)
-        for n in names:
-            if n in enabled_strats:
-                online.append(n)
+    if not force:
+        try:
+            import json
+            rt = json.load(open(os.path.join(os.path.dirname(__file__), "../../../dashboard/runtime_config.json"), encoding='utf-8'))
+            pool = rt.get("strategy_pool", {})
+            for n in names:
+                if pool.get(n, {}).get("enabled", False):
+                    online.append(n)
+        except Exception:
+            pass
     if online:
         return {"online": online, "need_confirm": True}
     # 获取策略注册表，找到文件名
@@ -81,6 +80,15 @@ async def batch_remove_strategies(req: dict):
         if not meta:
             continue
         fname = meta.get("file", "")
+        # 先禁用策略（更新 runtime_config，防止引擎热加载后仍尝试运行）
+        try:
+            rt_path = os.path.join(os.path.dirname(__file__), "../../../dashboard/runtime_config.json")
+            rt = json.load(open(rt_path, encoding='utf-8'))
+            if rt.get("strategy_pool", {}).get(name, {}).get("enabled", False):
+                rt["strategy_pool"][name]["enabled"] = False
+                json.dump(rt, open(rt_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+        except Exception:
+            pass
         # 移动 .py 文件
         if fname:
             src = os.path.join(STRATEGIES_DIR, fname)
