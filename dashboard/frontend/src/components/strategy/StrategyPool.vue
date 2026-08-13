@@ -221,7 +221,7 @@ async function confirmDelete() {
     const res = await fetch('/api/strategies/batch-remove', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ names }),
+      body: JSON.stringify({ names, force: true }),
     })
     const data = await res.json()
     if (res.ok) {

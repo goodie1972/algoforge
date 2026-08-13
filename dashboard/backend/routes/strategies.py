@@ -50,14 +50,15 @@ async def upload_strategy(file: UploadFile = File(...)):
 
 @router.post("/batch-remove")
 async def batch_remove_strategies(req: dict):
-    """批量删除策略：检查在线状态，移至 backup"""
+    """批量删除策略：检查在线状态，移至 backup。force=true 跳过在线检查"""
     names = req.get("names", [])
+    force = req.get("force", False)
     if not names:
         raise HTTPException(400, "未指定策略")
     from dashboard.backend.routes.engine import engine_runner
-    # 检查在线策略
+    # 检查在线策略（force=true 时跳过）
     online = []
-    if engine_runner:
+    if not force and engine_runner:
         status = engine_runner.get_status()
         enabled_strats = set()
         if status:
@@ -70,20 +71,34 @@ async def batch_remove_strategies(req: dict):
                 online.append(n)
     if online:
         return {"online": online, "need_confirm": True}
+    # 获取策略注册表，找到文件名
+    from dashboard.backend.strategy_registry import get_available_strategies
+    all_strats = {s["name"]: s for s in get_available_strategies()}
     # 执行删除
     moved = []
     for name in names:
-        os.makedirs(BACKUP_DIR, exist_ok=True)
-        for fname in os.listdir(STRATEGIES_DIR):
-            if fname.startswith(name + "_") and fname.endswith(".py"):
-                shutil.move(os.path.join(STRATEGIES_DIR, fname), os.path.join(BACKUP_DIR, fname))
+        meta = all_strats.get(name)
+        if not meta:
+            continue
+        fname = meta.get("file", "")
+        # 移动 .py 文件
+        if fname:
+            src = os.path.join(STRATEGIES_DIR, fname)
+            dst = os.path.join(BACKUP_DIR, fname)
+            if os.path.exists(src):
+                os.makedirs(BACKUP_DIR, exist_ok=True)
+                shutil.move(src, dst)
                 moved.append(fname)
-        # 移动说明文档
-        for dname in os.listdir(DOCS_DIR):
-            if dname.startswith(name) and dname.endswith(".md"):
-                os.makedirs(os.path.join(BACKUP_DIR, "docs"), exist_ok=True)
-                shutil.move(os.path.join(DOCS_DIR, dname), os.path.join(BACKUP_DIR, "docs", dname))
-                moved.append(dname)
+        # 移动说明文档 .md（从 strategies/docs/ 查找）
+        doc_dir = os.path.join(STRATEGIES_DIR, "docs")
+        if os.path.isdir(doc_dir):
+            md_name = fname.replace(".py", ".md")
+            src_md = os.path.join(doc_dir, md_name)
+            doc_backup = os.path.join(BACKUP_DIR, "docs")
+            if os.path.exists(src_md):
+                os.makedirs(doc_backup, exist_ok=True)
+                shutil.move(src_md, doc_backup)
+                moved.append(md_name)
     return {"message": f"已删除 {len(names)} 个策略", "moved": moved}
 
 
