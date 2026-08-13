@@ -3,6 +3,23 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.8.0] - 2026-08-13 — 策略与系统仓库分离
+
+### 重大变更
+- **仓库分离**：策略文件（`strategies/`）+ 策略文档（`docs/strategies/`）从 algoforge 仓库移除，迁移至独立仓库 [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies.git)
+- **历史重写**：`git filter-repo` 从全部历史中移除策略文件，algoforge 仅保留系统代码
+- 2026-08-13 之前的 commit hash 已全部改变
+
+### 新仓库
+- `https://github.com/goodie1972/algoforge-strategies.git`
+- 策略文件命名规范：`YYYYMMDD_name_vN.py`
+- 策略说明文档：`docs/strategies/{name}.md`
+
+### 修改
+- `CLAUDE.md` 移除策略编写规范/注册流程，增加策略仓库引用
+- 删除策略相关文档（`docs/strategy_analysis.md`、`docs/strategy_dev_guide.md` 等 7 个文件）
+- 策略缓存预热改为后台异步任务，不阻塞服务器启动
+
 ## [2.7.9] - 2026-08-11 — 配置页面全面优化（卡片分组+下拉+问号帮助）
 
 ### 新增
