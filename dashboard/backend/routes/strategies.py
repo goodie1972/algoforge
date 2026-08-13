@@ -41,6 +41,15 @@ async def upload_strategy(file: UploadFile = File(...)):
         raise HTTPException(409, f"策略文件 {safe_name} 已存在，请先删除或改名")
     try:
         content = await file.read()
+        # 验证文件内容：必须是有效的 Python 文件
+        try:
+            compile(content, safe_name, 'exec')
+        except SyntaxError as e:
+            raise HTTPException(400, f"策略文件语法错误: {e}")
+        # 验证文件包含策略类定义
+        text = content.decode('utf-8', errors='replace')
+        if 'class ' not in text or 'Strategy' not in text:
+            raise HTTPException(400, "策略文件必须包含 Strategy 类")
         with open(dest, "wb") as f:
             f.write(content)
     except Exception as e:
@@ -57,16 +66,19 @@ async def batch_remove_strategies(req: dict):
     if not names:
         raise HTTPException(400, "未指定策略")
     from dashboard.backend.routes.engine import engine_runner
-    # 检查在线策略（force=true 时跳过）
+    # 检查引擎实际运行的策略（不依赖 runtime_config）
     online = []
     if not force:
         try:
-            import json
-            rt = json.load(open(os.path.join(os.path.dirname(__file__), "../../../dashboard/runtime_config.json"), encoding='utf-8'))
-            pool = rt.get("strategy_pool", {})
-            for n in names:
-                if pool.get(n, {}).get("enabled", False):
-                    online.append(n)
+            eng_status = engine_runner.get_status()
+            # get_status 返回 { status, ... } 但没有 strategies 列表
+            # 直接从 engine_runner._engine 读取
+            if engine_runner._engine:
+                with engine_runner._engine._strategies_lock:
+                    eng_running = {s.name for s in engine_runner._engine.strategies}
+                for n in names:
+                    if n in eng_running:
+                        online.append(n)
         except Exception:
             pass
     if online:
