@@ -225,34 +225,6 @@ class NewsFilter:
                 logger.info(f"[GoldNews] Scheduled fetch done: {len(results)}, bullish{bullish}/bearish{bearish}")
         except Exception as e:
             logger.warning(f"[GoldNews] Scheduled fetch exception: {e}")
-        if not cfg["enabled"]:
-            return
-
-        now = time.time()
-        if now - getattr(self, '_last_bias_eval', 0) < 600:
-            return
-        self._last_bias_eval = now
-
-        try:
-            from services.news_bias import NewsBiasEvaluator
-            evaluator = NewsBiasEvaluator()
-            results = evaluator.evaluate_past_events(hours=6)
-            if results:
-                # 检查是否在报告时间点
-                current_hour = datetime.now().hour
-                report_hours = [
-                    int(h.strip()) for h in cfg["report_hours"].split(",")
-                    if h.strip().isdigit()
-                ]
-                is_report_time = current_hour in report_hours
-                summary = f"[NewsBias] 评估 {len(results)} 条事件"
-                if is_report_time:
-                    report = evaluator.get_report_data(hours=24)
-                    summary += (f", 报告: {report['directional']}笔方向性 "
-                                f"准确率{report['accuracy']}%")
-                logger.info(summary)
-        except Exception as e:
-            logger.warning(f"[NewsBias] evaluateexception: {e}")
 
     def get_blackout_windows(self) -> list[tuple[datetime, datetime, str]]:
         """返回当前应生效的禁售窗口列表"""
