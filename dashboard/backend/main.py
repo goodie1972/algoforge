@@ -174,7 +174,17 @@ async def report_weekly_loop():
 # === FastAPI 生命周期 ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动/关闭事件 — 自动启动引擎线程"""
+    """启动/关闭事件 — 自动启动引擎线程 + 后台预热策略缓存"""
+    # 后台任务：预热策略缓存（不阻塞服务器启动）
+    async def _warm_cache():
+        t0 = datetime.now()
+        try:
+            from strategies.scanner import scan_strategy_metadata
+            await asyncio.to_thread(scan_strategy_metadata)
+            logger.info(f"策略缓存预热完成: {(datetime.now()-t0).total_seconds():.2f}s")
+        except Exception as e:
+            logger.warning(f"策略缓存预热失败: {e}")
+    asyncio.create_task(_warm_cache())
     # 在后台线程启动引擎（不阻塞 asyncio 事件循环）
     await asyncio.to_thread(engine_runner.start)
     PollerState.running = True
