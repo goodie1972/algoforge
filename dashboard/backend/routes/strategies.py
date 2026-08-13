@@ -107,6 +107,7 @@ async def batch_remove_strategies(req: dict):
                 os.makedirs(doc_backup, exist_ok=True)
                 shutil.move(src_md, doc_backup)
                 moved.append(md_name)
+    logger.info(f"[StrategyDelete] 已删除策略 {names}: 文件 {moved} 移至 backup")
     return {"message": f"已删除 {len(names)} 个策略", "moved": moved}
 
 
