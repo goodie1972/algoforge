@@ -1,0 +1,3 @@
+[submodule "strategies"]
+	path = strategies
+	url = https://github.com/goodie1972/algoforge-strategies.git
