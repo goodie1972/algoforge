@@ -999,5 +999,6 @@
   "config.trade_settings": "Trade Settings",
   "strategy.import_strategy": "Import Strategy",
   "strategy.delete_strategy": "Delete Strategy",
-  "strategy.confirm_delete": "Confirm Delete"
+  "strategy.confirm_delete": "Confirm Delete",
+  "strategy.running": "Running"
 }

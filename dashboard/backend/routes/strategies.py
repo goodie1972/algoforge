@@ -45,6 +45,7 @@ async def upload_strategy(file: UploadFile = File(...)):
             f.write(content)
     except Exception as e:
         raise HTTPException(500, f"保存策略文件失败: {e}")
+    logger.info(f"[StrategyUpload] 策略 {safe_name} 已上传")
     return {"message": f"策略 {safe_name} 已上传，重启引擎后生效"}
 
 

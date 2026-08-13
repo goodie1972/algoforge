@@ -37,6 +37,7 @@ interface PoolEntry {
 
 const allStrategies = ref<StrategyMeta[]>([])
 const pool = ref<Record<string, PoolEntry>>({})
+const runningStrategies = ref<Set<string>>(new Set())
 const expanded = ref<Set<string>>(new Set())
 const loading = ref(true)
 
@@ -88,6 +89,9 @@ const enabledCount = computed(() =>
   Object.values(pool.value).filter(p => p.enabled).length
 )
 
+// 引擎中运行的策略数
+const runningCount = computed(() => runningStrategies.value.size)
+
 onMounted(async () => {
   let fetched: StrategyMeta[] = []
   try {
@@ -97,6 +101,14 @@ onMounted(async () => {
   } catch (e) {
     console.error('获取策略清单失败', e)
   }
+  // 获取引擎运行中的策略列表
+  try {
+    const eng = await fetch('/api/engine/strategies')
+    const engData = await eng.json()
+    if (engData.running) {
+      runningStrategies.value = new Set(engData.running.map((s: any) => s.name))
+    }
+  } catch { /* ignore */ }
   fetchLogics()
 
   await store.fetch()
@@ -276,7 +288,7 @@ async function confirmDeleteClick() {
 <template>
   <n-space vertical size="medium">
     <n-alert type="info" :bordered="false" closable>
-      {{ $t('strategy.pool_summary', { total: allStrategies.length, enabled: enabledCount }) }}
+      {{ $t('strategy.pool_summary', { total: allStrategies.length, enabled: runningCount }) }}
       {{ $t('strategy.pool_hint') }}
     </n-alert>
 
@@ -313,6 +325,7 @@ async function confirmDeleteClick() {
             <n-tag :color="{ color: getColor(meta.name), textColor: getStrategyTextColor(meta.name) }" size="tiny" style="font-weight: 600; font-size: 14px; padding: 2px 7px;">
               {{ meta.name }}
             </n-tag>
+            <n-tag v-if="runningStrategies.has(meta.name)" size="tiny" type="success" :bordered="false" style="font-weight:600;">{{ $t('strategy.running') }}</n-tag>
             <n-tag v-if="meta.backup_file" size="tiny" :bordered="false" type="info">
               {{ meta.backup_file }}
             </n-tag>

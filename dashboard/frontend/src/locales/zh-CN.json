@@ -999,5 +999,6 @@
   "config.trade_settings": "交易设置",
   "strategy.import_strategy": "导入策略",
   "strategy.delete_strategy": "删除策略",
-  "strategy.confirm_delete": "确认删除"
+  "strategy.confirm_delete": "确认删除",
+  "strategy.running": "运行中"
 }
