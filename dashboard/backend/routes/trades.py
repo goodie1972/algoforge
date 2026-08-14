@@ -10,6 +10,19 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException
 from data import database as db
 
+def _to_unix_ts(time_str: str) -> int | None:
+    """将字符��时间转换为 Unix 时间��(秒)，失败返回 None"""
+    if not time_str:
+        return None
+    try:
+        # ��据库存��格式: "YYYY-MM-DD HH:MM:SS" 或 "YYYY-MM-DDTHH:MM:SS"
+        if isinstance(time_str, (int, float)):
+            return int(time_str)
+        dt = datetime.strptime(str(time_str)[:19], "%Y-%m-%d %H:%M:%S")
+        return int(dt.timestamp())
+    except Exception:
+        return None
+
 router = APIRouter(prefix="/api/trades", tags=["trades"])
 
 engine_runner = None
@@ -181,18 +194,35 @@ def _calc_stats(trades: list[dict]) -> dict:
 
 # ── 历史成交 ──────────────────────────────────────────
 
+def _add_ts_fields(trade: dict) -> dict:
+    """为交易记录增加 _ts 后��的 Unix 时间��字段"""
+    result = dict(trade)
+    for key in ("open_time", "close_time", "created_at"):
+        val = trade.get(key)
+        if val:
+            try:
+                if isinstance(val, str):
+                    # Unix 时间戳字符串（纯数字）直接转 int
+                    if val.strip().isdigit():
+                        result[f"{key}_ts"] = int(val)
+                    else:
+                        dt = datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
+                        result[f"{key}_ts"] = int(dt.timestamp())
+                elif isinstance(val, (int, float)):
+                    result[f"{key}_ts"] = int(val)
+            except Exception:
+                pass
+    return result
+
 @router.get("/history")
 async def get_trade_history(limit: int = 100):
-    """获取最近 N 条已平仓记录（从 SQLite 读取，按平仓时间倒序）"""
+    """获取最近 N 条已平��记录（从 SQLite 读取，按平��时间倒序）"""
     try:
         trades = db.get_trades(limit=limit)
+        trades = [_add_ts_fields(t) for t in trades]
         return trades
     except Exception as e:
         raise HTTPException(502, f"获取历史成交失败: {e}")
-
-
-# ── 策略收益统计（MT4 标准报表格式）────────────────────
-
 @router.get("/stats")
 async def get_trade_stats(strategies: str = "", from_date: str = "", to_date: str = ""):
     """策略收益统计（透视表），从 SQLite 读取"""

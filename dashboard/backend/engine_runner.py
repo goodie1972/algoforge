@@ -328,6 +328,8 @@ class EngineRunner:
         try:
             info = self.bridge.get_account_info()
             if info:
+                import time
+                current_ts = int(time.time())
                 self._cached_account = {
                     "login": info.login,
                     "balance": info.balance,
@@ -336,6 +338,7 @@ class EngineRunner:
                     "free_margin": info.free_margin,
                     "currency": info.currency,
                     "leverage": info.leverage,
+                    "timestamp": current_ts,
                 }
         except Exception:
             pass

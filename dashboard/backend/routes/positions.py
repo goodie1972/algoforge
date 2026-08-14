@@ -41,12 +41,35 @@ def _pos_to_dict(pos):
     }
 
 
+def _add_ts_fields(pos: dict) -> dict:
+    result = dict(pos)
+    for key in ("open_time", "created_at", "updated_at"):
+        val = pos.get(key)
+        if val:
+            try:
+                if isinstance(val, str):
+                    # Unix 时间戳字符串（纯数字）直接转 int
+                    if val.strip().isdigit():
+                        result[f"{key}_ts"] = int(val)
+                    else:
+                        dt = datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
+                        result[f"{key}_ts"] = int(dt.timestamp())
+                elif isinstance(val, (int, float)):
+                    result[f"{key}_ts"] = int(val)
+            except Exception:
+                pass
+    return result
+
+
 @router.get("")
 async def get_positions(symbol: Optional[str] = None):
-    """获取当前持仓（用最新价格刷新 current_price）"""
+    """获取当前持��（用最新价格��新 current_price）"""
     if not engine_runner:
         return []
-    return engine_runner._fresh_positions()
+    positions = engine_runner._fresh_positions()
+    # ���加 _ts 后��的 Unix 时间��字段
+    positions = [_add_ts_fields(p) for p in positions]
+    return positions
 
 
 @router.post("/{ticket}/close")

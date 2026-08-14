@@ -3,6 +3,18 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.9.0] - 2026-08-14 — 时间格式化统一 (A+B)
+
+### 新增
+- **后端**：核心 API（`/api/trades/history`、`/api/positions`、`/api/account`）新增 `_ts` 后缀 Unix 时间戳字段（秒级整数），前端可直接用 
+- **后端**：`core/time_utils.py` 新增 `fmt_ts()` LRU 缓存格式化工具（10000 条上限 + 命中率统计）
+- **前端**：`src/utils/timeFormat.ts` 新增统一时间格式化工具（`smartTs` / `formatDateTime` / `formatTimestamp`，基于 date-fns，UTC+8 时区无关）
+
+### 修复
+- `/api/account` 返回 422（`@router.get("")` 装饰器误挂在 `_add_ts_fields` 上）— 已修复
+- `/api/positions` 未生成 `open_time_ts`（`open_time` 为 Unix 时间戳字符串，`_add_ts_fields` 只解析日期字符串）— 已兼容纯数字时间戳
+- 持仓/成交/历史视图时间列改用 `_ts` 字段，修复旧代码对 ISO 字符串 `parseInt` 导致的 1970 年错误日期
+
 ## [2.8.0] - 2026-08-13 — 策略与系统仓库分离
 
 ### 重大变更

@@ -3,6 +3,7 @@ import { h } from 'vue'
 import { NTag, NDataTable, NEmpty, NText, NAlert } from 'naive-ui'
 import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 import { useI18n } from 'vue-i18n'
+import { fmtRowTime } from '@/utils/timeFormat'
 
 const { t } = useI18n()
 
@@ -101,14 +102,14 @@ const columns = [
   },
   { title: t('positions.entry_time'), key: 'open_time', width: 125,
     render(row: any) {
-      if (!row.open_time) return '-'
-      if (typeof row.open_time === 'string') return row.open_time
-      const ts = typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)
-      if (isNaN(ts)) return row.open_time
-      return new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false })
+      return fmtRowTime(row, 'open_time_ts', 'open_time')
     }
   },
-  { title: t('positions.exit_time'), key: 'close_time', width: 130 },
+  { title: t('positions.exit_time'), key: 'close_time', width: 130,
+    render(row: any) {
+      return fmtRowTime(row, 'close_time_ts', 'close_time')
+    }
+  },
 ]
 </script>
 

@@ -5,6 +5,7 @@ import { useMessage, useDialog, NButton, NTag, NSpace, NInputNumber, NDataTable,
 import { closePosition, modifyPosition } from '@/api/client'
 import { getStrategyColor, textColorForBg } from '@/utils/strategyColors'
 import { useI18n } from 'vue-i18n'
+import { fmtRowTime } from '@/utils/timeFormat'
 
 const { t } = useI18n()
 const store = usePositionStore()
@@ -25,7 +26,7 @@ function renderPosExpand(row: any) {
       h('div', { style: 'font-weight: 700; margin-bottom: 8px; color: #0ecb81;' }, t('positions.open_info')),
       h('div', {}, t('positions.magic_label') + ': ' + (row.magic || '-')),
       h('div', {}, t('positions.strategy_label') + ': ' + (row.comment || row._strategy_name || '-')),
-      h('div', {}, t('positions.open_time_label') + ': ' + (row.open_time ? new Date((typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)) * 1000).toLocaleString() : '-')),
+      h('div', {}, t('positions.open_time_label') + ': ' + fmtRowTime(row, 'open_time_ts', 'open_time')),
       row.stop_loss ? h('div', {}, t('positions.sl_distance') + ': ' + (Math.abs(row.open_price - row.stop_loss)).toFixed(2)) : null,
       row.take_profit ? h('div', {}, t('positions.tp_distance') + ': ' + (Math.abs(row.take_profit - row.open_price)).toFixed(2)) : null,
     ]),
@@ -105,10 +106,7 @@ const columns = [
   },
   { title: t('positions.open_time'), key: 'open_time', width: 120,
     render(row: any) {
-      if (!row.open_time) return '-'
-      const ts = typeof row.open_time === 'number' ? row.open_time : parseInt(row.open_time)
-      if (isNaN(ts)) return row.open_time
-      return new Date(ts * 1000).toLocaleString('zh-CN', { hour12: false })
+      return fmtRowTime(row, 'open_time_ts', 'open_time')
     }
   },
   {

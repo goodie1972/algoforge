@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, ref, computed, onMounted, watch, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { fmtRowTime } from '@/utils/timeFormat'
 import { useTradeStore } from '@/stores/trades'
 import { getTradeStats, getTradeAnalysis } from '@/api/client'
 import type { TradeStats } from '@/types'
@@ -199,8 +200,16 @@ const columns = [
       return h(NTag, { size: 'small', type }, { default: () => label })
     }
   },
-  { title: t('trades.open_time'), key: 'open_time', width: 150 },
-  { title: t('trades.close_time'), key: 'close_time', width: 150 },
+  { title: t('trades.open_time'), key: 'open_time', width: 150,
+    render(row: any) {
+      return fmtRowTime(row, 'open_time_ts', 'open_time')
+    }
+  },
+  { title: t('trades.close_time'), key: 'close_time', width: 150,
+    render(row: any) {
+      return fmtRowTime(row, 'close_time_ts', 'close_time')
+    }
+  },
 ]
 
 // ── 策略统计标签页 ──────────────────────────────────────
