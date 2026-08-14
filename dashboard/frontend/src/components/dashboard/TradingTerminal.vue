@@ -269,6 +269,25 @@ function syncAllChartsFrom(source: any) {
 // ---- 十字光标跨图联动：任一动图同步所有图竖线 + 显示时间标签 ----
 let _crosshairTime: number | null = null
 
+// 构建 series 的 time → value 索引（供跨图同步取真实指标值）
+function indexSeriesValues(series: any): Map<number, number> {
+  const m = new Map<number, number>()
+  try {
+    const raw = (series as any).data() as any[]
+    if (Array.isArray(raw)) {
+      for (const pt of raw) {
+        if (pt?.time == null) continue
+        const t = Number(pt.time)
+        let v = pt.close ?? pt.value ?? pt.macd ?? pt.histogram ?? pt.k ?? pt.d ?? pt.pdi ?? pt.ndi
+        // stoch/histogram 可能存在多字段：优先主值
+        if (v == null && pt.value != null) v = pt.value
+        if (v != null) m.set(t, Number(v))
+      }
+    }
+  } catch { /* ignore */ }
+  return m
+}
+
 function getPaneSeriesList(name: string): any[] {
   const ps = (paneSeries as any)[name]
   if (!ps) return []
@@ -293,7 +312,20 @@ function syncCrosshairToAll(tc: any, t: number) {
     }
     for (const { chart: c2, series } of targets) {
       if (!c2 || series.length === 0) continue
-      try { c2.setCrosshairPosition(0, t as any, series[0]) } catch { /* ignore */ }
+      // 用该 series 在 t 时刻的真实值（找不到则先取最近可用值，再回退 0）
+      let price = 0
+      for (const s of series) {
+        const map = indexSeriesValues(s)
+        if (map.has(t)) { price = map.get(t)!; break }
+        // 最近点（<= t）
+        let nearest: number | null = null
+        for (const [tt, vv] of map) {
+          if (tt <= t) nearest = vv
+          else break
+        }
+        if (nearest != null) { price = nearest; break }
+      }
+      try { c2.setCrosshairPosition(price, t as any, series[0]) } catch { /* ignore */ }
     }
   } finally {
     _syncLock = false

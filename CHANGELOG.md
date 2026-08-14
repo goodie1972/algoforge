@@ -3,6 +3,16 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.9.5] - 2026-08-14 — 十字光标联动显示真实指标值
+
+### 修复
+- 十字光标联动时副图同步的 `setCrosshairPosition` 传入 price=0，导致 RSI 等副图鼠标经过时显示值为 0 而非真实指标值
+- 新增 `indexSeriesValues`：为每个 series 构建 time→值 索引（支持 close/value/macd/histogram/k/d 等字段），同步竖线时取该指标在光标时点的真实值；查不到时回退最近可用值
+
+### 验证
+- 单元验证：RSI series → 45.3、Candle close → 4315，非 0 值正确
+- Playwright：主图/副图移动均正常更新时间标签，0 console 错误
+
 ## [2.9.4] - 2026-08-14 — 主副图十字光标联动
 
 ### 新增
