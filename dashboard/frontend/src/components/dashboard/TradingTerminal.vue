@@ -266,6 +266,83 @@ function syncAllChartsFrom(source: any) {
   _syncLock = false
 }
 
+// ---- 十字光标跨图联动：任一动图同步所有图竖线 + 显示时间标签 ----
+let _crosshairTime: number | null = null
+
+function getPaneSeriesList(name: string): any[] {
+  const ps = (paneSeries as any)[name]
+  if (!ps) return []
+  if (Array.isArray(ps)) return ps
+  if (ps.line && ps.price) return [ps.line, ps.price]
+  if (ps.k && ps.d) return [ps.k, ps.d]
+  if (ps.macd && ps.signal) return [ps.macd, ps.signal]
+  if (ps.line) return [ps.line]
+  if (ps.k) return [ps.k]
+  return [ps]
+}
+
+function syncCrosshairToAll(tc: any, t: number) {
+  if (_syncLock) return
+  _syncLock = true
+  try {
+    const targets: Array<{ chart: any; series: any[] }> = []
+    if (chart && chart !== tc) targets.push({ chart, series: [candleSeries] })
+    for (const name of Object.keys(paneCharts)) {
+      const pc = paneCharts[name]
+      if (pc && pc !== tc) targets.push({ chart: pc, series: getPaneSeriesList(name) })
+    }
+    for (const { chart: c2, series } of targets) {
+      if (!c2 || series.length === 0) continue
+      try { c2.setCrosshairPosition(0, t as any, series[0]) } catch { /* ignore */ }
+    }
+  } finally {
+    _syncLock = false
+  }
+}
+
+function clearCrosshairAll(tc: any) {
+  if (_syncLock) return
+  if (chart && chart !== tc) { try { chart.clearCrosshairPosition() } catch {} }
+  for (const name of Object.keys(paneCharts)) {
+    const pc = paneCharts[name]
+    if (pc && pc !== tc) { try { pc.clearCrosshairPosition() } catch {} }
+  }
+  const el = document.getElementById('tc-crosshair-time')
+  if (el) el.remove()
+}
+
+function updateCrosshairTimeLabel(t: number) {
+  if (!chartContainer.value) return
+  let el = document.getElementById('tc-crosshair-time') as HTMLDivElement | null
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'tc-crosshair-time'
+    el.style.cssText = 'position:absolute;top:2px;right:30px;z-index:20;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;pointer-events:none;'
+    chartContainer.value.appendChild(el)
+  }
+  const isDark = document.documentElement.classList.contains('dark')
+  el.style.color = isDark ? '#e5e7eb' : '#1f2937'
+  el.style.background = isDark ? 'rgba(31,41,55,0.85)' : 'rgba(255,255,255,0.9)'
+  el.style.border = isDark ? '1px solid #4b5563' : '1px solid #d1d5db'
+  const d = new Date(t * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  el.textContent = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+}
+
+function onCrosshairMove(tc: any, param: any) {
+  const t = param?.time
+  if (t != null) {
+    _crosshairTime = Number(t)
+    updateCrosshairTimeLabel(_crosshairTime)
+    syncCrosshairToAll(tc, _crosshairTime)
+  } else if (param && !param.point) {
+    // 移出图表
+    _crosshairTime = null
+    clearCrosshairAll(tc)
+  }
+}
+
+
 function makeChartOptions(width: number, height: number, showTimeScale: boolean): any {
   const isDark = useAppStore().isDark
   return {
@@ -324,8 +401,9 @@ onMounted(() => {
     syncAllChartsFrom(chart!)
     scheduleAutoScroll()
   })
-  chart.subscribeCrosshairMove(() => {
+  chart.subscribeCrosshairMove((param: any) => {
     syncAllChartsFrom(chart!)
+    onCrosshairMove(chart!, param)
     scheduleAutoScroll()
   })
 
@@ -510,6 +588,7 @@ function applyRSI() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['rsi'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -555,6 +634,7 @@ function applyStoch() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['stoch'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -604,6 +684,7 @@ function applyMACD() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['macd'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -643,6 +724,7 @@ function applyATR() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['atr'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -673,6 +755,7 @@ function applyVolume() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['volume'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -706,6 +789,7 @@ function applyADX() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['adx'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -750,6 +834,7 @@ function applyDI() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['di'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -789,6 +874,7 @@ function applyMFI() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['mfi'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 
@@ -851,6 +937,7 @@ function applyBBI() {
     if (!pc) {
       pc = createChart(container, makeChartOptions(w, paneHeight, false))
       paneCharts['bbi'] = pc
+      pc.subscribeCrosshairMove((param: any) => onCrosshairMove(pc, param))
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc) })
     }
 

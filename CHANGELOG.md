@@ -3,6 +3,14 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.9.4] - 2026-08-14 — 主副图十字光标联动
+
+### 新增
+- **十字光标跨图联动**：鼠标在任一图表（主图/K线 + RSI/Stoch/MACD/ATR/成交量/ADX/DI/MFI/BBI 副图）移动时，所有图表的竖线同步对齐到同一时间点，方便对照同一时刻主图与各副图指标
+- **时间标签**：图表右上角显示光标对应时间，`YYYY-MM-DD HH:mm` 精确到分钟；移出图表自动清除
+- 技术：基于 lightweight-charts 4.1 `setCrosshairPosition` / `clearCrosshairPosition` 双向同步，`_syncLock` 防循环触发
+- Playwright 验证：主图、副图移动均更新时间标签（如 2026-08-12 02:00），0 console 错误
+
 ## [2.9.3] - 2026-08-14 — 手工平仓反馈修复
 
 ### 修复
