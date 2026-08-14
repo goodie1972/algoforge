@@ -3,6 +3,14 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.9.2] - 2026-08-14 — 修复重启后持仓入场时间丢失
+
+### 修复
+- **"可疑秒平" SafetyLock 误报**：引擎重启后恢复持仓时 `_entry_times` 用 `time.time()` 填充（或纸面模式完全未填充），导致持仓时长计算为 0 → 平仓瞬间被误判为"可疑秒平"并暂停新单
+  - `dashboard/backend/engine_runner.py`：接管持仓改用 `_pos_open_time` 真实开仓时间；纸面模式（`takeover_existing_positions` 返回空）用 `get_positions` 遍历兜底填充 `_entry_times`
+  - `engine_standalone/main.py`：同逻辑同步（备用路径）
+- 实测：重启后 `260814000→1786637573`、`260814007→1786686674` 正确填充，0 次 SafetyLock 误报
+
 ## [2.9.1] - 2026-08-14 — 修复纸面止损失效
 
 ### 修复

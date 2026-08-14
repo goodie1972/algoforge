@@ -474,7 +474,8 @@ class TradingEngine:
             self._init_risk_state(name, magic)
             existing = self.bridge.takeover_existing_positions(settings.SYMBOL, magic)
             for pos in existing:
-                self._entry_times[pos.ticket] = time.time()
+                _, _open_ts = self._pos_open_time(pos)
+                self._entry_times[pos.ticket] = _open_ts or time.time()
             logger.info(f"[StrategyAdd] {name} Magic={magic} TF={cfg.get('timeframe','H1')}")
             return True
 
@@ -817,8 +818,21 @@ class TradingEngine:
                 existing.extend(self.bridge.takeover_existing_positions(settings.SYMBOL, magic))
             self._known_position_count[s.magic] = len(existing)
             for pos in existing:
-                self._entry_times[pos.ticket] = time.time()
-                logger.info(f"[Takeover] {s.name} Ticket={pos.ticket}(Magic={pos.magic}) entry time recorded")
+                _, _open_ts = self._pos_open_time(pos)
+                self._entry_times[pos.ticket] = _open_ts or time.time()
+                logger.info(f"[Takeover] {s.name} Ticket={pos.ticket}(Magic={pos.magic}) entry time recorded ts={_open_ts}")
+
+        # 纸面模式兜底：takeover_existing_positions 返回空，但 PaperBridge 已从 CSV 恢复持仓
+        # → 直接遍历 get_positions 填充 _entry_times，避免 hold_sec=0 触发"可疑秒平"误报
+        try:
+            _all_pos = self.bridge.get_positions(settings.SYMBOL)
+            for pos in _all_pos:
+                if pos.ticket not in self._entry_times:
+                    _, _open_ts = self._pos_open_time(pos)
+                    self._entry_times[pos.ticket] = _open_ts or time.time()
+                    logger.info(f"[EntryTimeFallback] Ticket={pos.ticket} ts={self._entry_times[pos.ticket]}")
+        except Exception as e:
+            logger.warning(f"[EntryTimeFallback] failed: {e}")
 
         self._daily_start_balance = self._get_balance()
         self.running = True

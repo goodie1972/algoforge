@@ -606,7 +606,20 @@ class EngineRunner:
                 _cfg.SYMBOL, s.magic
             )
             for pos in existing:
-                engine._entry_times[pos.ticket] = time.time()
+                _, _open_ts = engine._pos_open_time(pos)
+                engine._entry_times[pos.ticket] = _open_ts or time.time()
+
+        # 纸面模式兜底：takeover 返回空但 PaperBridge 已从 CSV 恢复持仓
+        # → 直接用真实开仓时间填充 _entry_times，避免 hold_sec=0 触发"可疑秒平"
+        try:
+            _all_pos = engine.bridge.get_positions(_cfg.SYMBOL)
+            for pos in _all_pos:
+                if pos.ticket not in engine._entry_times:
+                    _, _open_ts = engine._pos_open_time(pos)
+                    engine._entry_times[pos.ticket] = _open_ts or time.time()
+                    self.logger.info(f"[EntryTimeFallback] Ticket={pos.ticket} ts={engine._entry_times[pos.ticket]}")
+        except Exception as e:
+            self.logger.warning(f"[EntryTimeFallback] failed: {e}")
 
         engine._daily_start_balance = engine._get_balance()
         engine.running = True
