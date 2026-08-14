@@ -751,7 +751,8 @@
     "summary": "Summary",
     "empty": "No positions",
     "open_time": "Open Time",
-    "direction": "Direction"
+    "direction": "Direction",
+    "close_not_found": "Position already closed or not found"
   },
   "backtest": {
     "archived": "Archived",

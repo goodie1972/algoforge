@@ -2,7 +2,7 @@
 import { h, ref, computed } from 'vue'
 import { usePositionStore } from '@/stores/positions'
 import { useMessage, useDialog, NButton, NTag, NSpace, NInputNumber, NDataTable, NEmpty, NText, NAlert, NDrawer, NDrawerContent, NFormItem } from 'naive-ui'
-import { closePosition, modifyPosition } from '@/api/client'
+import { modifyPosition } from '@/api/client'
 import { getStrategyColor, textColorForBg } from '@/utils/strategyColors'
 import { useI18n } from 'vue-i18n'
 import { fmtRowTime } from '@/utils/timeFormat'
@@ -143,11 +143,14 @@ const columns = [
                 onPositiveClick: async () => {
                   loadingClose.value = row.ticket
                   try {
-                    await closePosition(row.ticket)
+                    await store.close(row.ticket)
                     message.success(t('positions.close_success', { ticket: '#' + row.ticket }))
-                    await store.fetch()
                   } catch (e: any) {
-                    message.error(e?.message || t('positions.close_failed'))
+                    if (e?.notFound) {
+                      message.warning(t('positions.close_not_found', { ticket: '#' + row.ticket }))
+                    } else {
+                      message.error(e?.message || t('positions.close_failed'))
+                    }
                   }
                   loadingClose.value = null
                 }

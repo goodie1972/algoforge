@@ -751,7 +751,8 @@
     "summary": "合计",
     "empty": "暂无持仓",
     "open_time": "开仓时间",
-    "direction": "方向"
+    "direction": "方向",
+    "close_not_found": "该单已平仓或不存在"
   },
   "backtest": {
     "archived": "已归档",

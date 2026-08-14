@@ -112,6 +112,12 @@ class EngineRunner:
         if not ok:
             return False
 
+        # 立即从持仓缓存移除该票，避免下一次 WS 广播（5s 轮询）仍推送旧持仓
+        self._cached_positions = [
+            p for p in self._cached_positions
+            if str(p.get("ticket", "")) != str(ticket)
+        ]
+
         # 从 bridge 的已平仓列表（_closed 是 list）中查找刚平仓的记录
         closed_list = getattr(self.bridge, '_closed', [])
         closed_record = None

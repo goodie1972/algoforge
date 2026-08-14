@@ -30,8 +30,20 @@ export const usePositionStore = defineStore('positions', () => {
   }
 
   async function close(ticket: number) {
-    await closePosition(ticket)
-    await fetch()
+    try {
+      await closePosition(ticket)
+      // 立即本地移除，不等 WS/5s 轮询（消除"平仓后仍显示旧持仓"的错觉）
+      items.value = items.value.filter(p => String(p.ticket) !== String(ticket))
+      await fetch()
+    } catch (e: any) {
+      const status = e?.response?.status
+      if (status === 404) {
+        // 订单已不存在：本地同步移除 + 抛出标记错误，由调用方提示友好文案
+        items.value = items.value.filter(p => String(p.ticket) !== String(ticket))
+        throw Object.assign(new Error('NOT_FOUND'), { notFound: true })
+      }
+      throw e
+    }
   }
 
   async function modify(ticket: number, sl?: number, tp?: number) {

@@ -3,6 +3,15 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.9.3] - 2026-08-14 — 手工平仓反馈修复
+
+### 修复
+- **手工平仓看似无反应**：平仓 API 成功后 `_cached_positions` 未立即更新（WS 每 5s 轮询仍推送旧持仓），用户误以为没平掉再次点击 → 404 被静默吞掉
+  - 后端 `engine_runner.close_position`：平仓成功后立即从 `_cached_positions` 移除该票
+  - 前端 `positions.ts` store：`close()` 成功后立即本地移除该行（不等 WS/轮询）；404 时抛 `notFound` 标记
+  - 前端 `PositionsTableBase.vue` / `PositionsTable.vue`：404 时提示"该单已平仓或不存在"（新增 i18n key `positions.close_not_found`），而非无声失败
+- Playwright 验证：模拟 404 时提示正确弹出、持仓行立即移除
+
 ## [2.9.2] - 2026-08-14 — 修复重启后持仓入场时间丢失
 
 ### 修复
