@@ -82,27 +82,10 @@ PAPER_MODE = True
 PAPER_TRADING_ENABLED = False
 
 STRATEGY_POOL = {
+    # === 核心实盘策略 ===
     "M30_rsi_bb": {
         "magic": 660706,
         "timeframe": "M30",
-        "double_first": False,
-        "max_positions": 1,
-    },
-    # === v6_hybrid 已下架 (2026-06-18) ===
-    # 回测发现: 602 笔交易总盈亏 -$166, 胜率 31.1%, 盈亏比 0.75
-    # 4 个超卖因子 (BB-BOT, KDJ-OS, RSI-OS, KC-BOT) 全部亏钱
-    # DIVERG 底背离是唯一赚钱因子但被噪音淹没
-    # 详见 backtest/factor_attribution.py + memory/project_v6_hybrid_deprecated.md
-    # "H1_v6_hybrid": {
-    #     "magic": 660607,
-    #     "timeframe": "H1",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
-    # === 新增实盘策略 (来自 GitHub 开源回测) ===
-    "sanqing_h1": {
-        "magic": 880107,
-        "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
@@ -112,70 +95,98 @@ STRATEGY_POOL = {
         "double_first": False,
         "max_positions": 1,
     },
-    # === 共振策略：H1+M15 TA-Lib 形态共振开仓（已移至 backup） ===
-    # "mtf_resonance_h1": {
-    #     "magic": 660801,
-    #     "timeframe": "H1",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
-    # === 后备策略 (随时可启用) ===
-    # "bakome_backup": {
-    #     "magic": 777004,
-    #     "timeframe": "H1",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
-    # "xaubot_backup": {
-    #     "magic": 777005,
-    #     "timeframe": "H1",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
-    # === M30 均值回归新策略 (v13 回测验证) ===
-    # "stoch_m30": {
-    #     "magic": 660901,
-    #     "timeframe": "M30",
-    #     "double_first": False,
-    #     "max_positions": 1,
-    # },
-    "stoch_trend_h1": {
-        "magic": 661201,
+    "sanqing_h1": {
+        "magic": 880107,
         "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
-    "rsi_grading_m30": {
-        "magic": 660902,
-        "timeframe": "M30",
+    "h1_breakout": {
+        "magic": 880301,
+        "timeframe": "H1",
         "double_first": False,
         "max_positions": 1,
     },
-    "mfi_bb_m30": {
-        "magic": 661001,
+    "m30_bb_deepreturn_optimized": {
+        "magic": 661102,
         "timeframe": "M30",
-        "double_first": False,
-        "max_positions": 1,
-    },
-    "m30_bb_deepreturn": {
-        "magic": 661101,
-        "timeframe": "M30",
-        "double_first": False,
-        "max_positions": 1,
-    },
-    # === 移植原始策略 (来自 GitHub caoruihua/sanqing-ea) ===
-    "sanqing_original": {
-        "magic": 880201,
-        "timeframe": "M5",
         "double_first": False,
         "max_positions": 5,
     },
+    "mfi_bb_m30_upgraded": {
+        "magic": 661003,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "rsi_grading_m30_upgraded": {
+        "magic": 660904,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "sanqing_h1_upgraded": {
+        "magic": 880108,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "stoch_trend_h1_optimized": {
+        "magic": 661202,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    # === 备选/历史策略 (disabled by default) ===
+    # "stoch_trend_h1": {  # 旧版本，已被 stoch_trend_h1_optimized 替代
+    #     "magic": 661201,
+    #     "timeframe": "H1",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "rsi_grading_m30": {  # 旧版本，已被 rsi_grading_m30_upgraded 替代
+    #     "magic": 660902,
+    #     "timeframe": "M30",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "mfi_bb_m30": {  # 旧版本，已被 mfi_bb_m30_upgraded 替代
+    #     "magic": 661001,
+    #     "timeframe": "M30",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "m30_bb_deepreturn": {  # 旧版本，已被 m30_bb_deepreturn_optimized 替代
+    #     "magic": 661101,
+    #     "timeframe": "M30",
+    #     "double_first": False,
+    #     "max_positions": 1,
+    # },
+    # "sanqing_original": {  # 原版 sanqing，已被 sanqing_h1_upgraded 替代
+    #     "magic": 880201,
+    #     "timeframe": "M5",
+    #     "double_first": False,
+    #     "max_positions": 5,
+    # },
     "timeprofit_ea": {
         "magic": 880202,
         "timeframe": "M5",
         "double_first": False,
         "max_positions": 5,
     },
+    # === 其他可选策略 ===
+    # "entry_score_pro": { "magic": 661501, "timeframe": "M30", "double_first": False, "max_positions": 1 },
+    # "mfi_bb_m30_optimized": { "magic": 661002, "timeframe": "M30", "double_first": False, "max_positions": 1 },
+    # "m30_vol_return": { "magic": 880302, "timeframe": "M30", "double_first": False, "max_positions": 1 },
+    # "momentum_pulse_pro": { "magic": 661301, "timeframe": "M30", "double_first": False, "max_positions": 1 },
+    # "multi_confluence_quant": { "magic": 661601, "timeframe": "M30", "double_first": False, "max_positions": 1 },
+    # "viprasol_sniper": { "magic": 661401, "timeframe": "M30", "double_first": False, "max_positions": 1 },
+    # "bakome_gold_scalper_original": { "magic": 880303, "timeframe": "M5", "double_first": False, "max_positions": 1 },
+    # "bakome_trinity_ea_original": { "magic": 880304, "timeframe": "M5", "double_first": False, "max_positions": 1 },
+    # "xaubot_backup": { "magic": 777005, "timeframe": "H1", "double_first": False, "max_positions": 1 },
+    # "bakome_backup": { "magic": 777004, "timeframe": "H1", "double_first": False, "max_positions": 1 },
+    # "bakome_backup_optimized": { "magic": 777006, "timeframe": "H1", "double_first": False, "max_positions": 1 },
+    # "stoch_trend_h1_upgraded": { "magic": 661204, "timeframe": "H1", "double_first": False, "max_positions": 1 },
 }
 
 # 全局最大持仓 = 策略数量 × 1.5 四舍五入
