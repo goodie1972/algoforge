@@ -1280,6 +1280,11 @@ class TradingEngine:
 
     def _run_exits(self, strategy):
         """止损平仓 — 不受风控/新闻禁售限制，但记录试算日志"""
+        # ★ 先刷新策略指标缓存（否则持仓中 on_tick 被 max_positions 挡住 → ATR=None → 永不触发出场）
+        try:
+            strategy.refresh_data()
+        except Exception:
+            pass
         positions = self.bridge.get_positions(settings.SYMBOL)
         my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
         # 检测 MT4 硬止损平仓（桥接消失但引擎没记录）

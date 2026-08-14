@@ -53,6 +53,7 @@ class PaperBridge(MT4BridgeBase):
         self._tick_cache: tuple[float, float] = (0.0, 0.0)  # (bid, ask)
         self._tick_time: float = 0
         self._equity: float = 0.0
+        self._checking_sl_tp: bool = False  # 防重入 guard（close_order → get_tick_price → _check_sl_tp_triggers）
 
     def reset_all(self) -> dict:
         """重置所有纸面交易数据 — 清空持仓、历史、余额归零"""
@@ -148,6 +149,8 @@ class PaperBridge(MT4BridgeBase):
                                 "entry_bid": float(row.get("entry_bid", 0) or 0),
                                 "entry_ask": float(row.get("entry_ask", 0) or 0),
                                 "entry_time": str(row.get("entry_time", "")),
+                                "stop_loss": float(row.get("stop_loss", 0) or 0),
+                                "take_profit": float(row.get("take_profit", 0) or 0),
                             }
             # 重建 Position 对象
             count = 0
@@ -171,8 +174,8 @@ class PaperBridge(MT4BridgeBase):
                     volume=data["volume"],
                     open_price=data["entry_price"],
                     current_price=data["entry_price"],
-                    stop_loss=0.0,
-                    take_profit=0.0,
+                    stop_loss=data["stop_loss"],
+                    take_profit=data["take_profit"],
                     profit=0.0,
                     swap=0.0,
                     commission=0.0,
@@ -235,14 +238,44 @@ class PaperBridge(MT4BridgeBase):
     # ═══════════════ 数据操作 → 委托真实桥接 ═══════════════
 
     def get_tick_price(self, symbol: str) -> tuple[float, float]:
-        """从真实桥接获取最新行情"""
+        """从真实桥接获取最新行情（同时检查 SL/TP 触发，模拟真实 MT4 自动止损止盈）"""
         bid, ask = self._real.get_tick_price(symbol)
         if bid > 0:
             self._tick_cache = (bid, ask)
             self._tick_time = time.time()
         elif self._tick_cache[0] > 0:
             bid, ask = self._tick_cache
+        # 模拟真实券商：价格触及 SL/TP 时自动平仓（不依赖策略 on_tick / 指标缓存）
+        self._check_sl_tp_triggers(bid, ask)
         return bid, ask
+
+    def _check_sl_tp_triggers(self, bid: float, ask: float):
+        """检查所有持仓是否触及 SL/TP，触及则自动平仓（exit_reason 分别标记 sl_triggered / tp_triggered）"""
+        if bid <= 0 or ask <= 0 or self._checking_sl_tp:
+            return
+        self._checking_sl_tp = True
+        try:
+            for ticket, pos in list(self._positions.items()):
+                sl = pos.stop_loss or 0.0
+                tp = pos.take_profit or 0.0
+                triggered = False
+                reason = ""
+                if pos.order_type in ("OP_BUY", "BUY"):
+                    if sl > 0 and bid <= sl:
+                        triggered, reason = True, "sl_triggered"
+                    elif tp > 0 and bid >= tp:
+                        triggered, reason = True, "tp_triggered"
+                else:  # SELL
+                    if sl > 0 and ask >= sl:
+                        triggered, reason = True, "sl_triggered"
+                    elif tp > 0 and ask <= tp:
+                        triggered, reason = True, "tp_triggered"
+                if triggered:
+                    logger.info(f"[PaperBridge] Auto-close {reason} Ticket={ticket} "
+                                f"{pos.order_type} SL={sl:.2f} TP={tp:.2f} price={bid:.2f}/{ask:.2f}")
+                    self.close_order(ticket)
+        finally:
+            self._checking_sl_tp = False
 
     def get_candles(self, symbol: str, timeframe: str, count: int, offset: int = 0) -> list[Candle]:
         return self._real.get_candles(symbol, timeframe, count, offset)

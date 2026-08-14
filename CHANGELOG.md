@@ -3,6 +3,18 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [2.9.1] - 2026-08-14 — 修复纸面止损失效
+
+### 修复
+- **纸面交易止损失效（严重）**：持仓中策略 `on_tick` 被 `max_positions` 上限挡住 → 指标缓存不刷新 → `get_indicator("atr")` 返回 None → `check_ema20_exit` 永远 `return False` → 单子永不平仓（13015 跌破 SL 18 点仍挂着）
+  - A：`_run_exits` 出场检查前强制 `strategy.refresh_data()`，恢复 ATR 移动止损/盈利回撤/保本/硬止损判定
+  - B：`PaperBridge.get_tick_price` 模拟真实 MT4 自动触发 SL/TP（触及价格即平仓，不依赖策略指标），带防重入 guard
+  - C：`_restore_open_positions` 恢复 CSV 中 `stop_loss / take_profit`（原硬编码 0，重启后 SL/TP 全丢）
+- 实测：13015（BUY 4379.37 / SL 4341.67）重启后自动止损平仓，持仓 3→2
+
+### 其他
+- 注意：自动平仓瞬时持仓时长为 0（重启后 `_entry_times` 未恢复）可能触发"可疑秒平" SafetyLock 误报，后续可优化
+
 ## [2.9.0] - 2026-08-14 — 时间格式化统一 (A+B)
 
 ### 新增
