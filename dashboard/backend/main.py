@@ -185,8 +185,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"策略缓存预热失败: {e}")
     asyncio.create_task(_warm_cache())
-    # 在后台线程启动引擎（不阻塞 asyncio 事件循环）
-    await asyncio.to_thread(engine_runner.start)
+    # 在后台线程启动引擎（不阻塞 asyncio 事件循环，也不阻塞 lifespan 完成）
+    asyncio.create_task(asyncio.to_thread(engine_runner.start))
+    # 后台延迟检查远程更新（默认 15s 后，避免启动同步 fetch 网络）
+    try:
+        from core.version import start_background_update_check
+        start_background_update_check()
+    except Exception:
+        pass
     PollerState.running = True
     tasks = [
         asyncio.create_task(broadcast_prices()),
