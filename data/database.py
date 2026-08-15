@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Optional
@@ -272,11 +273,26 @@ CREATE TABLE IF NOT EXISTS indicator_snapshots (
 """
 
 
+import threading
+
+
+import threading
+
+
+_db_lock = threading.Lock()
+
+
 def get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    """获取数据库连接（线程安全，WAL 模式）。
+
+    每次返回新连接但共享一个线程锁，保证 WAL 模式下读写安全。
+    调用方需在 finally 中 close()。
+    """
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 

@@ -22,4 +22,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-charts': ['lightweight-charts'],
+          'vendor-naive': ['naive-ui'],
+          'vendor-i18n': ['vue-i18n'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
 })

@@ -30,13 +30,29 @@ from data.downloader import download_timeframe
 from data import database as db
 from strategies.scanner import scan_strategies
 
+# 渐进式拆分：StrategyRiskState 从 risk_mgr 导入
+from engine_standalone.risk_mgr import StrategyRiskState as _StrategyRiskStateBase
+
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
 if not logging.getLogger().handlers:
+    from logging.handlers import RotatingFileHandler
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL),
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
         handlers=[
-            logging.FileHandler(f"{settings.LOG_DIR}/trading_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log", encoding="utf-8"),
+            RotatingFileHandler(
+                f"{settings.LOG_DIR}/trading.log",
+                maxBytes=10_000_000,  # 10 MB 轮转
+                backupCount=7,         # 保留 7 个历史文件
+                encoding="utf-8",
+            ),
+            RotatingFileHandler(
+                f"{settings.LOG_DIR}/error.log",
+                maxBytes=5_000_000,   # 5 MB 轮转
+                backupCount=3,
+                encoding="utf-8",
+                level="ERROR",        # 只记录 ERROR+
+            ),
             logging.StreamHandler(sys.stdout),
         ],
     )
@@ -47,23 +63,9 @@ MIN_HOLD_SECONDS = 30  # 持仓小于此时间被平仓视为可疑
 
 
 @dataclass
-class StrategyRiskState:
-    """ orders策略风控状态"""
-    name: str
-    magic: int
-    realized_pnl: float = 0.0                     # 累计已实现盈亏
-    floating_pnl: float = 0.0                     # 当前浮动盈亏
-    exit_timestamps: deque = field(default_factory=deque)  # 快速出场检测窗口
-    realized_loss_blocked: bool = False            # 已实现亏损阻断（百分比）
-    floating_loss_blocked: bool = False            # 浮动亏损阻断
-    rapid_exit_blocked: bool = False               # 快速出场阻断
-    realized_loss_amount_blocked: bool = False     # 已实现亏损 ≥$30 阻断
-    realized_loss_amount_blocked_at: float = 0.0
-    consecutive_losses: int = 0                    # 连续亏损次数
-    consecutive_loss_blocked: bool = False         # 连续亏损阻断
-    consecutive_loss_blocked_at: float = 0.0
-    realized_loss_blocked_at: float = 0.0          # 阻断时间戳
-    rapid_exit_blocked_at: float = 0.0
+class StrategyRiskState(_StrategyRiskStateBase):
+    """策略风控状态 — 从 risk_mgr.py 继承，保持向后兼容"""
+    pass
 
 
 def create_strategies(bridge, pool=None):

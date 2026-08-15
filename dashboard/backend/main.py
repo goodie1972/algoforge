@@ -28,10 +28,12 @@ from dashboard.backend.config_service import RuntimeConfig
 from dashboard.backend.engine_runner import EngineRunner
 from dashboard.backend.web_manager import WebSocketManager
 from dashboard.backend.log_service import LogCaptureHandler
+from dashboard.backend.broadcast_hub import BroadcastHub
 
 config_service = RuntimeConfig()
 ws_manager = WebSocketManager()
 log_handler = LogCaptureHandler()
+broadcast_hub = BroadcastHub()
 
 logger = logging.getLogger("dashboard")
 
@@ -87,27 +89,31 @@ class PollerState:
 
 
 async def broadcast_prices():
-    """每 0.3 秒推送一次价格（引擎高速采样缓存，使前端 K 线实时跳动）"""
+    """每 0.3 秒推送一次价格 — 通过 BroadcastHub 背压控制"""
     while PollerState.running:
         try:
             cached = engine_runner._cached_price
             if cached:
-                await ws_manager.broadcast("prices", {
+                data = {
                     "bid": cached["bid"],
                     "ask": cached["ask"],
                     "spread": round(cached["ask"] - cached["bid"], 2),
-                })
+                }
+                await broadcast_hub.publish("prices", data)
+                # 同时推送给未升级的 WebSocket 客户端（兼容）
+                await ws_manager.broadcast("prices", data)
         except Exception:
             pass
         await asyncio.sleep(0.3)
 
 
 async def broadcast_positions():
-    """每 5 秒推送一次持仓（用最新价格刷新 current_price）"""
+    """每 5 秒推送一次持仓 — 通过 BroadcastHub 背压控制"""
     while PollerState.running:
         try:
             positions = engine_runner._fresh_positions()
             if positions:
+                await broadcast_hub.publish("positions", positions)
                 await ws_manager.broadcast("positions", positions)
         except Exception:
             pass
@@ -115,11 +121,12 @@ async def broadcast_positions():
 
 
 async def broadcast_account():
-    """每 10 秒推送一次账户信息（从引擎线程缓存读取）"""
+    """每 10 秒推送一次账户信息 — 通过 BroadcastHub 背压控制"""
     while PollerState.running:
         try:
             account = engine_runner._cached_account
             if account:
+                await broadcast_hub.publish("account", account)
                 await ws_manager.broadcast("account", account)
         except Exception:
             pass
