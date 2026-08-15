@@ -181,7 +181,10 @@ async def report_weekly_loop():
 # === FastAPI 生命周期 ===
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动/关闭事件 — 自动启动引擎线程 + 后台预热策略缓存"""
+    """启动/关闭事件 — 自动启动引擎线程 + 后台预热策略缓存
+    
+    Shutdown 时完整释放：引擎、桥接、WebSocket、后台任务、日志句柄。
+    """
     # 后台任务：预热策略缓存（不阻塞服务器启动）
     async def _warm_cache():
         t0 = datetime.now()
@@ -211,11 +214,47 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(report_weekly_loop()),
     ]
     yield
+    # === Shutdown: 完整释放资源 ===
+    logger.info("[Shutdown] 开始清理资源...")
     PollerState.running = False
+    # 1. 取消所有后台任务
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
-    engine_runner.stop()
+    logger.info("[Shutdown] 后台任务已取消")
+    # 2. 停止引擎（含策略线程、桥接心跳）
+    try:
+        engine_runner.stop()
+        logger.info("[Shutdown] 引擎已停止")
+    except Exception as e:
+        logger.warning(f"[Shutdown] 引擎停止异常: {e}")
+    # 3. 断开所有 WebSocket 连接
+    try:
+        await ws_manager.disconnect_all()
+        logger.info("[Shutdown] WebSocket 连接已断开")
+    except Exception:
+        pass
+    # 4. 关闭桥接连接
+    try:
+        if hasattr(engine_runner, '_engine') and engine_runner._engine:
+            bridge = getattr(engine_runner._engine, 'bridge', None)
+            if bridge and hasattr(bridge, 'disconnect'):
+                bridge.disconnect()
+                logger.info("[Shutdown] 桥接已断开")
+    except Exception:
+        pass
+    # 5. 关闭日志文件句柄
+    try:
+        for handler in logging.getLogger().handlers:
+            if hasattr(handler, 'close'):
+                handler.close()
+        logger.info("[Shutdown] 日志句柄已关闭")
+    except Exception:
+        pass
+    # 6. 强制 GC
+    import gc
+    gc.collect()
+    logger.info("[Shutdown] 资源清理完成")
 
 
 

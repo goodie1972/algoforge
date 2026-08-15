@@ -44,3 +44,13 @@ class WebSocketManager:
     @property
     def connection_count(self) -> int:
         return len(self._connections)
+
+    async def disconnect_all(self):
+        """关闭所有 WebSocket 连接（用于 shutdown）"""
+        async with self._lock:
+            for ws in list(self._connections):
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+            self._connections.clear()
