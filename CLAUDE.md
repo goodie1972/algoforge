@@ -31,9 +31,14 @@ xauusd/                    # 系统代码（algoforge）
 └── start.bat              # Windows 菜单启动
 ```
 
-**策略文件已分离到独立仓库：** `https://github.com/goodie1972/algoforge-strategies.git`
+**策略文件在主仓库 `strategies/` 目录中（普通目录，非 submodule）：**
 - 策略文件 → `strategies/YYYYMMDD_name_vN.py`
-- 策略说明 → `docs/strategies/{name}.md`
+- 策略说明 → `strategies/docs/strategies/{name}.md`
+- 基类 → `strategies/base.py`
+- 扫描器 → `strategies/scanner.py`（自动发现策略类）
+- 命名规范 → `strategies/STRATEGY_VERSIONING.md`
+- 策略手册 → `strategies/strategy_manual.md`
+- 历史备份 → `strategies/backup/`
 - 开发指南 → `docs/strategy_dev_guide.md`
 
 ## 三轨架构
