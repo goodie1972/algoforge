@@ -250,6 +250,7 @@ class PositionMgrMixin:
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
+            self._trim_closed_trades()
             if hasattr(self, 'supervisor'):
                 self.supervisor.on_trade_close(record, reason)
             try:

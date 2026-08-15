@@ -139,7 +139,15 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         self._entry_signal_data: dict[int | str, dict] = {}  # ticket → 开仓时信号数据
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
-        self._closed_trades: list[dict] = []               # 已平仓记录（内存）
+        self._closed_trades: list[dict] = []               # 已平仓记录（内存，上限200条）
+        self._MAX_CLOSED_TRADES = 200
+
+    def _trim_closed_trades(self):
+        """内存中只保留最近 N 条，超出部分已写入 JSONL + 数据库，可安全丢弃"""
+        if len(self._closed_trades) > self._MAX_CLOSED_TRADES:
+            removed = len(self._closed_trades) - self._MAX_CLOSED_TRADES
+            self._closed_trades = self._closed_trades[-self._MAX_CLOSED_TRADES:]
+            logger.debug(f"[Memory] Trimmed closed_trades: removed {removed}, kept {self._MAX_CLOSED_TRADES}")
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
         self._load_closed_trades()
@@ -401,6 +409,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             self._closed_trades.append(record)
 
         # 追加到 JSONL 文件 + 数据库
+        # 内存上限保护
+        self._trim_closed_trades()
         try:
             with open(self._trades_file, "a", encoding="utf-8") as f:
                 for r in records:
@@ -1417,6 +1427,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
+            self._trim_closed_trades()
             # 通知监督者
             if hasattr(self, 'supervisor'):
                 exit_type = exit_detail.get("exit_type", "strategy_exit")
@@ -1889,6 +1900,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
             )
             self._closed_trades.append(record)
+            self._trim_closed_trades()
             # 通知监督者
             if hasattr(self, 'supervisor'):
                 self.supervisor.on_trade_close(record, reason)
