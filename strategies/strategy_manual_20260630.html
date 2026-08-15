@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAUUSD 量化交易系统 — 策略手册</title>
+<style>
+:root {
+  --bg: #f8f9fa; --fg: #1a1a2e; --accent: #0d6efd;
+  --card: #ffffff; --border: #dee2e6; --muted: #6c757d;
+  --green: #198754; --red: #dc3545; --yellow: #ffc107;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --card: #16213e;
+          --border: #2a2a4a; --muted: #9ca3af; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       background: var(--bg); color: var(--fg); line-height: 1.7; padding: 0; }
+nav { position: fixed; left: 0; top: 0; bottom: 0; width: 280px;
+      overflow-y: auto; background: var(--card); border-right: 1px solid var(--border);
+      padding: 1rem; z-index: 100; font-size: 0.9rem; }
+nav h2 { font-size: 1rem; margin: 1rem 0 0.5rem; color: var(--accent); }
+nav ul { list-style: none; padding: 0; }
+nav li a { display: block; padding: 0.2rem 0.5rem; color: var(--fg);
+           text-decoration: none; border-radius: 4px; }
+nav li a:hover { background: var(--accent); color: #fff; }
+nav .sub a { padding-left: 1.2rem; font-size: 0.85rem; color: var(--muted); }
+main { margin-left: 300px; padding: 2rem; max-width: 1000px; }
+h1 { font-size: 2rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; }
+h2 { font-size: 1.5rem; margin-top: 2.5rem; color: var(--accent);
+     border-left: 4px solid var(--accent); padding-left: 0.75rem; }
+h3 { font-size: 1.1rem; margin-top: 1.5rem; color: var(--fg); }
+h4 { font-size: 1rem; margin-top: 1rem; color: var(--muted); }
+p, li { margin: 0.5rem 0; }
+table { width: 100%; border-collapse: collapse; margin: 1rem 0;
+        background: var(--card); border: 1px solid var(--border); }
+th, td { padding: 0.5rem 0.75rem; text-align: left; border: 1px solid var(--border); }
+th { background: var(--accent); color: #fff; }
+code { background: var(--card); padding: 0.15rem 0.4rem; border-radius: 3px;
+       font-size: 0.85rem; border: 1px solid var(--border); }
+pre { background: var(--card); padding: 1rem; overflow-x: auto; border-radius: 6px;
+      border: 1px solid var(--border); font-size: 0.85rem; }
+.tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 12px;
+       font-size: 0.75rem; font-weight: 600; margin: 0.1rem; }
+.tag-on { background: var(--green); color: #fff; }
+.tag-off { background: var(--muted); color: #fff; }
+.tag-mid { background: var(--yellow); color: #000; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+        padding: 1.25rem; margin: 1rem 0; }
+.section-ref { font-size: 0.85rem; color: var(--muted); }
+.factor-grid { display: grid; grid-template-columns: auto auto auto 1fr; gap: 0.3rem 1rem; }
+.factor-grid .h { font-weight: 700; }
+</style>
+</head>
+<body>
+
+<nav>
+  <h2>📋 目录</h2>
+  <ul>
+    <li><a href="#global">全局系统规则</a></li>
+    <li class="sub"><a href="#global-base">基类 BaseStrategy</a></li>
+    <li class="sub"><a href="#global-gate">门禁系统</a></li>
+    <li class="sub"><a href="#global-exit">通用出场系统</a></li>
+    <li class="sub"><a href="#global-indicators">指标计算标准</a></li>
+    <li><a href="#changelog">全局变更日志</a></li>
+  </ul>
+  <h2>📊 策略</h2>
+  <ul>
+    <li><a href="#s-m30-rsi">1. M30 RSI+BB (v11)</a></li>
+    <li><a href="#s-gold">2. Gold Auto Research (v6)</a></li>
+    <li><a href="#s-stoch-trend">3. Stoch Trend H1 (v6)</a></li>
+    <li><a href="#s-mfi-bb">4. M30 MFI+BB (v1)</a></li>
+    <li><a href="#s-bb-deep">5. M30 BB DeepReturn (v1)</a></li>
+    <li><a href="#s-rsi-grading">6. RSI Grading M30 (v5)</a></li>
+    <li><a href="#s-sanqing">7. SanQing H1 (v7)</a></li>
+    <li><a href="#s-entry-score">8. Entry Score Pro (v1)</a></li>
+    <li><a href="#s-momentum">9. Momentum Pulse Pro (v1)</a></li>
+    <li><a href="#s-confluence">10. Multi Confluence Quant (v1)</a></li>
+    <li><a href="#s-viprasol">11. Viprasol Sniper (v1)</a></li>
+  </ul>
+  <h2>🔧 维护</h2>
+  <ul>
+    <li><a href="#update-guide">更新指南</a></li>
+  </ul>
+</nav>
+
+<main>
+<h1>XAUUSD 量化交易系统 — 策略手册</h1>
+<p style="color:var(--muted);">版本: 20260630 | 系统: V6 多策略引擎 | 周期: M30/H1 混合</p>
+
+<!-- ============================================================ -->
+<section id="global">
+<h2>1. 全局系统规则</h2>
+
+<div class="card" id="global-base">
+<h3>1.1 基类 BaseStrategy</h3>
+<p>所有策略继承 <code>strategies/base.py</code>，统一提供以下能力：</p>
+<ul>
+  <li><strong>桥接</strong>: MT4BridgeBase 封装，get_candles/get_positions/send_order</li>
+  <li><strong>门禁</strong>: 预置位置门禁、急跌急涨惩罚、News-Bias 阻塞，引擎层统一调用 <code>calc_gate_state()</code></li>
+  <li><strong>信号格式</strong>: <code>generate_signal()</code> 返回 <code>(signal, score_long, score_short, factors_long[], factors_short[], indicator_values{})</code></li>
+  <li><strong>指标工具</strong>: <code>calc_adx_wilder(candles, period)</code> — 标准 Wilder ADX/+DI/-DI，与 TA-Lib 完全一致
+    <br><code>calc_atr_wilder(candles, period)</code> — 标准 Wilder ATR，与 TA-Lib 完全一致</li>
+  <li><strong>冷却系统</strong>: <code>_last_profit_exit_time</code> / <code>_exit_cooldown_seconds</code> — 盈利出场后同方向 30 分钟冷却</li>
+  <li><strong>保本出场</strong>: <code>_check_breakeven_exit()</code> — MFE ≥ 0.3ATR 后利润回到成本 ±0.05ATR 时平仓（2026-06-30 新增）</li>
+</ul>
+</div>
+
+<div class="card" id="global-gate">
+<h3>1.2 门禁系统</h3>
+<p>引擎每 tick 调用 <code>calc_gate_state()</code> 检查三个关卡，任一 blocked 则策略信号被拦截不开仓：</p>
+
+<h4>① 位置门禁（position_gate）</h4>
+<table>
+  <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+  <tr><td>position_gate_enabled</td><td>True</td><td>全局开关</td></tr>
+  <tr><td>position_gate_m30_lookback</td><td>40</td><td>用 M30 最近 40 根算位置区间</td></tr>
+  <tr><td>position_gate_bottom</td><td>0.10</td><td>区间底部 10% → 禁空</td></tr>
+  <tr><td>position_gate_top</td><td>0.90</td><td>区间顶部 90% → 禁多</td></tr>
+  <tr><td>di_gate_skip_threshold</td><td>20</td><td>DI 差值 > 20 时跳过位置门禁（强单边势不拦）</td></tr>
+</table>
+
+<h4>② 急跌急涨惩罚（rally_drop）</h4>
+<p>M30 最近 lookback=30 根内，价格从最高点回落超过 threshold=1.5% → 禁空；从最低点上涨超过 1.5% → 禁多。</p>
+<p>ADX > 25 时跳过急跌急涨检查（强趋势不做回调判断）。</p>
+
+<h4>③ News-Bias 阻塞</h4>
+<p>从 <code>core.bias_state</code> 读取新闻情绪方向：偏空时禁 BUY，偏多时禁 SELL。</p>
+</div>
+
+<div class="card" id="global-exit">
+<h3>1.3 通用出场系统</h3>
+<p>出场贯穿三层，优先级由高到低：</p>
+
+<h4>第一层：Broker 挂单 SL/TP（开仓时设置）</h4>
+<p><code>get_dynamic_sl_tp()</code> 写入 MT4 订单，作为网络断线兜底。各策略自行决定倍率。</p>
+
+<h4>第二层：运行时出场（每 tick 检查）</h4>
+<table>
+  <tr><th>优先级</th><th>出场类型</th><th>触发条件</th><th>策略通用</th></tr>
+  <tr><td>1</td><td>保本出场</td><td>MFE ≥ 0.3×ATR 后利润回到成本 ±0.05×ATR</td><td>✅（base 基类提供，子类调用）</td></tr>
+  <tr><td>2</td><td>利润回撤止盈</td><td>current_profit/peak_profit < (1-pdd)，pdd 默认 0.25，ADX>25 放宽到 0.5<br>需 peak_profit > 0.5×ATR 才激活</td><td>✅（各策略独立实现）</td></tr>
+  <tr><td>3</td><td>ATR 移动追踪</td><td>从峰值回撤/从谷值反弹 > ATR × trail_mult</td><td>✅（参数各异）</td></tr>
+  <tr><td>4</td><td>DI 跳过止盈</td><td>移动追踪触发时 +DI- -DI > 10（BUY）或 -DI- +DI > 10（SELL）且 current_profit > 0 时忽略止盈</td><td>⚠️ m30_rsi/m30_mfi_bb 特有</td></tr>
+  <tr><td>5</td><td>硬止损</td><td>亏损 > ATR × hard_mult</td><td>✅（各策略独立参数）</td></tr>
+</table>
+
+<h4>第三层：MT4 Broker 断线兜底</h4>
+<p>引擎进程崩溃时，MT4 端的挂单 SL/TP 仍在运行，确保最大亏损可控。</p>
+</div>
+
+<div class="card" id="global-indicators">
+<h3>1.4 指标计算标准</h3>
+<table>
+  <tr><th>指标</th><th>标准</th><th>实现</th></tr>
+  <tr><td>RSI</td><td>Wilder RMA</td><td>SMA(period) 种子 + (prev*(p-1)+gain)/p 递推</td></tr>
+  <tr><td>ADX/+DI/-DI</td><td>Wilder DMI</td><td>分别 RMA(+DM)、RMA(-DM)、RMA(TR) → +DI=100×RMA(+DM)/RMA(TR) → DX → RMA(DX)=ADX</td></tr>
+  <tr><td>ATR</td><td>Wilder RMA</td><td>SMA(TR,period) 种子 + RMA 递推</td></tr>
+  <tr><td>布林带</td><td>SMA(20) ± 2σ 总体方差</td><td>population variance（÷N，与 MT4 iBands 一致）</td></tr>
+  <tr><td>EMA</td><td>SMA(N) 种子 + alpha=2/(N+1) 递推</td><td>首根 closes[0] 替代 SMA 种子（短周期影响可忽略）</td></tr>
+  <tr><td>Stochastic</td><td>%K(14) SMA(3)</td><td>%K=14 根窗口（含当前），%D=3 根 SMA(%K)</td></tr>
+  <tr><td>MACD</td><td>EMA12-EMA26, Signal=EMA9</td><td>标准跨周期计算</td></tr>
+</table>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="changelog">
+<h2>2. 全局变更日志</h2>
+<p>每次策略更新时，在此表追加条目，同时在对应策略的 changelog 追加版本记录。</p>
+<table>
+  <tr><th>日期</th><th>变更</th><th>影响策略</th></tr>
+  <tr><td>2026-06-30</td><td>阈值 3→4；BB 因子从精确触轨改为 90% 区间触发</td><td>m30_rsi (v11)</td></tr>
+  <tr><td>2026-06-30</td><td>动量因子 OR→consensus，MACD 与 Stoch 打架时都不加分</td><td>gold_autoresearch_h1 (v6)</td></tr>
+  <tr><td>2026-06-30</td><td>保本出场：MFE≥0.3ATR 后回到成本 ±0.05ATR 时平仓</td><td>所有策略（base 基类）</td></tr>
+  <tr><td>2026-06-30</td><td>ADX/+DI/-DI 统一为标准 Wilder（修复 ratio-RMA bug）</td><td>全部 11 策略 + base</td></tr>
+  <tr><td>2026-06-30</td><td>ATR 统一为标准 Wilder（修复简单平均 bug）</td><td>momentum_pulse/multi_confluence/viprasol/entry_score</td></tr>
+  <tr><td>2026-06-30</td><td>DI 跳过止盈限定 current_profit>0，亏损时强制追踪</td><td>m30_rsi, m30_mfi_bb</td></tr>
+  <tr><td>2026-06-30</td><td>peak_profit 移除 10×ATR 冻结限制</td><td>m30_rsi, m30_mfi_bb, m30_bb_deepreturn, rsi_grading</td></tr>
+  <tr><td>2026-06-30</td><td>RR 出场锁定入场时 ATR（TP 不再随波动率漂移）</td><td>viprasol_sniper</td></tr>
+  <tr><td>2026-06-30</td><td>gold _calc_adx 映射修正（_get_adx_at 不再恒 None）</td><td>gold_autoresearch_h1</td></tr>
+  <tr><td>2026-06-30</td><td>Stoch %K 窗口 15→14 根，与 %D 一致</td><td>gold_autoresearch_h1</td></tr>
+  <tr><td>2026-06-30</td><td>波动因子真实现（ATR 比率质量分）</td><td>entry_score_pro</td></tr>
+  <tr><td>2026-06-30</td><td>硬止损统一 0.55 ATR（移除冗余 ×2）</td><td>entry_score_pro</td></tr>
+  <tr><td>2026-06-30</td><td>文件头/注释更新为实际阈值 ADX>20→4/≤20→3</td><td>sanqing_h1</td></tr>
+  <tr><td>2026-06-30</td><td>移除 4 个失效策略导入（v6_hybrid/mtf_resonance/stoch_m30/stoch_trend_m30）</td><td>engine_standalone/main.py</td></tr>
+  <tr><td>2026-06-30</td><td>策略文件名加日期后缀 _20260630</td><td>全部 11 策略</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 1: M30 RSI+BB -->
+<section id="s-m30-rsi">
+<h2>3. M30 RSI+BB <span class="tag tag-on">活跃</span></h2>
+<table class="meta-table">
+  <tr><td>文件名</td><td><code>m30_rsi_20260630.py</code></td><td>策略名</td><td><code>M30_rsi_bb</code></td></tr>
+  <tr><td>当前版本</td><td>v11</td><td>Magic</td><td>660707（接管旧 660705/660706）</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>✅ 启用</td></tr>
+</table>
+
+<h3>3.1 入场逻辑：7 因子评分</h3>
+<p>阈值 <strong>≥4</strong>（2026-06-30 从 3 提升至 4）。</p>
+<table>
+  <tr><th>#</th><th>因子</th><th>计算方式</th><th>加分方向</th></tr>
+  <tr><td>①</td><td>M30 趋势</td><td>close > MA14 → UP；close < MA14 → DOWN</td><td>同侧 +1</td></tr>
+  <tr><td>②</td><td>BB 位置</td><td>价格进入布林带上/下轨 10% 区间</td><td>同侧 +1</td></tr>
+  <tr><td>③</td><td>RSI 分层</td><td><strong>+2</strong>(&lt;25) / +1(&lt;35) 多；<strong>+2</strong>(&gt;75) / +1(&gt;65) 空（不叠加）</td><td>同侧 +1~+2</td></tr>
+  <tr><td>④</td><td>RSI 方向</td><td>连续 3 根 RSI 递升→up；递降→down（3 根确认）</td><td>同侧 +1</td></tr>
+  <tr><td>⑤</td><td>DI 强度</td><td>|+DI − -DI| > 10 确认单边势</td><td>同侧 +1</td></tr>
+  <tr><td>⑥</td><td>成交量</td><td>当根 volume > SMA20×1.3 且 K 线方向一致</td><td>同侧 +1</td></tr>
+  <tr><td>⑦</td><td>K 线形态</td><td>TA-Lib 强反转：晨星/暮星/锤子/刺透/射击/乌云/吞没/吊人</td><td>同侧 +1</td></tr>
+</table>
+
+<h4>决策流程</h4>
+<pre>7 因子评分 → 冷却检查（盈利出场同方向 30 分钟扣分）
+→ ≥4 直接开仓（不检查 diff）
+→ =3 需 |long_score - short_score| ≥ 2 才开
+（ADX>28 趋势门禁已于 2026-06-30 移除）</pre>
+
+<h3>3.2 出场逻辑</h3>
+<table>
+  <tr><th>出场层</th><th>类型</th><th>参数</th></tr>
+  <tr><td>Broker SL/TP</td><td>三档固定倍率（依据趋势方向）</td><td>顺 trend=2.5/4.0 逆 trend=1.0/2.0 震荡=1.5/3.0 (SL/TP ×ATR)</td></tr>
+  <tr><td>保本出场</td><td>base 基类</td><td>MFE≥0.3ATR 后回到成本 ±0.05ATR</td></tr>
+  <tr><td>利润回撤</td><td>peak 回撤 25%（ADX>25 放宽 50%）</td><td>需 peak_profit > 0.5ATR</td></tr>
+  <tr><td>ATR 追踪</td><td>trail_mult 因趋势方向锁定于开仓时</td><td>顺 1.5 / 逆 1.0 / 震荡 1.2</td></tr>
+  <tr><td>DI 跳过</td><td>仓位盈利且趋势强（DI 差>10）时忽略追踪</td><td>仅 current_profit>0 时跳过</td></tr>
+  <tr><td>硬止损</td><td>亏损 > hard_mult × ATR</td><td>顺 3.0 / 逆 2.0 / 震荡 2.5</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 2: Gold Auto Research H1 -->
+<section id="s-gold">
+<h2>4. Gold Auto Research H1 <span class="tag tag-on">活跃</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>gold_autoresearch_h1_20260630.py</code></td><td>策略名</td><td><code>gold_auto_research</code></td></tr>
+  <tr><td>当前版本</td><td>v6</td><td>Magic</td><td>880306</td></tr>
+  <tr><td>周期</td><td>H1</td><td>引擎状态</td><td>✅ 启用</td></tr>
+</table>
+
+<h3>4.1 入场逻辑：四因子共识（4/4 必须全过）</h3>
+<table>
+  <tr><th>#</th><th>因子</th><th>计算方式</th><th>说明</th></tr>
+  <tr><td>①</td><td>趋势</td><td>EMA10 > EMA20 → UP；反之 DOWN</td><td>方向确定</td></tr>
+  <tr><td>②</td><td>动量</td><td>MACD + Stoch 两个动量指标<strong>一致</strong>才给方向（2026-06-30 由 OR→consensus 修复）</td><td>打架时不表态</td></tr>
+  <tr><td>③</td><td>波动</td><td>ADX > 20，或 ATR 高于 20 根 SMA</td><td>方向无关，波动活跃才交易</td></tr>
+  <tr><td>④</td><td>安全</td><td>RSI(10) + BB(20,2)：RSI≥70+close≥上轨→禁 BUY；RSI≤35→禁 SELL</td><td>价格极端时拦</td></tr>
+</table>
+
+<p><strong>决策方式</strong>：非评分制，必须四因子方向完全一致才触发信号：<br>
+<code>if trend_up and mom_up and vol_active and safe_up → BUY</code><br>
+<code>if trend_dn and mom_dn and vol_active and safe_dn → SELL</code></p>
+
+<h3>4.2 出场逻辑</h3>
+<table>
+  <tr><th>出场</th><th>参数</th></tr>
+  <tr><td>Broker SL/TP</td><td>SL=ATR×hard_mult (3.0/2.0/2.5 依据趋势方向)，TP 占位符</td></tr>
+  <tr><td>保本</td><td>base 基类</td></tr>
+  <tr><td>利润回撤</td><td>peak 回撤 25%（ADX>25 放宽 50%）</td></tr>
+  <tr><td>ATR 追踪</td><td>顺/逆 trend 设定 trail_mult=1.5/1.0</td></tr>
+  <tr><td>硬止损</td><td>hard_mult=3.0/2.0/2.5 依据趋势</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 3: Stoch Trend H1 -->
+<section id="s-stoch-trend">
+<h2>5. Stoch Trend H1 <span class="tag tag-on">活跃</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>stoch_trend_h1_20260630.py</code></td><td>策略名</td><td><code>stoch_trend_h1</code></td></tr>
+  <tr><td>当前版本</td><td>v6</td><td>Magic</td><td>661201</td></tr>
+  <tr><td>周期</td><td>H1</td><td>引擎状态</td><td>✅ 启用</td></tr>
+</table>
+
+<h3>5.1 入场逻辑：ADX 分权 + Stochastic</h3>
+<p>ADX ≤ 25（震荡模式）→ 双向评分，Stoch 超卖/超买信号：K<20 超卖→LONG=3，K>80 超买→SHORT=3</p>
+<p>ADX > 25（趋势模式）→ 仅顺趋势方向：H1 EMA21 定方向，Stoch 回调确认再给信号</p>
+<p>阈值：ADX>25 时直接触发（满分为 3）；ADX≤25 时评分 ≥3 触发。</p>
+
+<h3>5.2 出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>SL=2.0×ATR（固定），TP 占位符</td></tr>
+  <tr><td>保本</td><td>内联实现（2026-06-30 新增）</td></tr>
+  <tr><td>利润回撤</td><td>标准 25%（ADX>25 放宽 50%）</td></tr>
+  <tr><td>ATR 追踪</td><td>1.5×ATR</td></tr>
+  <tr><td>硬止损</td><td>2.0×ATR</td></tr>
+  <tr><td>DI 反转出场</td><td>-DI > +DI 时平多；+DI > -DI 时平空（无门槛/无确认根数）</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 4: M30 MFI+BB -->
+<section id="s-mfi-bb">
+<h2>6. M30 MFI+BB <span class="tag tag-on">活跃</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>m30_mfi_bb_20260630.py</code></td><td>策略名</td><td><code>mfi_bb_m30</code></td></tr>
+  <tr><td>当前版本</td><td>v1</td><td>Magic</td><td>661001</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>✅ 启用</td></tr>
+</table>
+
+<h3>6.1 入场逻辑：双模（趋势/震荡）评分</h3>
+<table>
+  <tr><th>模式</th><th>条件</th><th>因子</th></tr>
+  <tr><td><strong>趋势模式</strong> (ADX≥25)</td><td>仅顺 DI 方向单侧开仓</td><td>MA20 方向 + MFI 方向 + BB 位置 + ADX 强度<br>最高 4 分，阈值≥3</td></tr>
+  <tr><td><strong>震荡模式</strong> (ADX&lt;25)</td><td>多空双侧评分</td><td>MA20 方向 + MFI 极值方向 + BB 位置 + ADX 强度<br>最高 4 分，阈值≥3</td></tr>
+</table>
+
+<p>MFI 参数：周期 14，超卖 20，超买 80。MFI 上升→LONG，下降→SHORT（震荡模式双边平分）。</p>
+
+<h3>6.2 出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>SL=2.0×ATR（固定），TP 占位符</td></tr>
+  <tr><td>保本</td><td>base 基类</td></tr>
+  <tr><td>利润回撤</td><td>标准 25%（ADX>25 放宽 50%）</td></tr>
+  <tr><td>ATR 追踪</td><td>trail=1.0×ATR</td></tr>
+  <tr><td>DI 跳过</td><td>current_profit>0 时 DI 差>10 跳过追踪</td></tr>
+  <tr><td>硬止损</td><td>2.0×ATR</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 5: M30 BB DeepReturn -->
+<section id="s-bb-deep">
+<h2>7. M30 BB DeepReturn <span class="tag tag-on">活跃</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>m30_bb_deepreturn_20260630.py</code></td><td>策略名</td><td><code>m30_bb_deepreturn</code></td></tr>
+  <tr><td>当前版本</td><td>v1</td><td>Magic</td><td>661101</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>✅ 启用</td></tr>
+</table>
+
+<h3>7.1 入场逻辑：极值超跌反弹</h3>
+<ul>
+  <li><strong>条件</strong>: close ≤ BB下轨×1.005 且 MFI ≤ 20（超卖） → LONG 信号</li>
+  <li><strong>条件</strong>: close ≥ BB上轨×0.995 且 MFI ≥ 80（超买） → SELL 信号</li>
+  <li>极值进场标记（is_extreme）影响分支出场逻辑</li>
+</ul>
+
+<h3>7.2 出场逻辑</h3>
+<p>极值进场后分两支出场：</p>
+<table>
+  <tr><th>分支</th><th>条件</th><th>止盈通道</th></tr>
+  <tr><td><strong>A: BB 反向</strong>（弱反弹）</td><td>K 线方向与 BB 开口不一致</td><td>① 0.5 BB 带宽反弹→止盈 ② MFI 回超卖/超买线 ③ 30% 利润回撤</td></tr>
+  <tr><td><strong>B: BB 同向</strong>（有动量）</td><td>K 线方向与 BB 开口一致</td><td>① BB 对侧轨止盈 ② MFI 反向 15% ③ ATR 追踪（bull=1.5×ATR）</td></tr>
+</table>
+<p>所有极值进场最后兜底：非极值/硬止损（2.0×ATR）。保本出场已接入（2026-06-30）。</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 6: RSI Grading M30 -->
+<section id="s-rsi-grading">
+<h2>8. RSI Grading M30 <span class="tag tag-off">禁用</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>rsi_grading_m30_20260630.py</code></td><td>策略名</td><td><code>rsi_grading_m30</code></td></tr>
+  <tr><td>当前版本</td><td>v5</td><td>Magic</td><td>660902</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>❌ 禁用</td></tr>
+</table>
+
+<h3>8.1 入场逻辑：RSI 分层评分 + ADX 门禁</h3>
+<table>
+  <tr><th>#</th><th>因子</th><th>加分</th></tr>
+  <tr><td>①</td><td>MA14 方向</td><td>同侧 +1</td></tr>
+  <tr><td>②</td><td>BB 触轨</td><td>同侧 +1</td></tr>
+  <tr><td>③</td><td>RSI 分层</td><td>RSI≤20→LONG+2；20<RSI≤30→LONG+1<br>RSI≥80→SHORT+2；70≤RSI<80→SHORT+1</td></tr>
+</table>
+<p>阈值 <strong>≥2</strong>。<br>
+ADX>28 + EMA9/21 门禁（同 m30_rsi 门禁逻辑）。</p>
+
+<h3>8.2 出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>ATR×hard_mult（趋势感知）×50（占位符）</td></tr>
+  <tr><td>保本</td><td>base 基类</td></tr>
+  <tr><td>利润回撤</td><td>标准 25%</td></tr>
+  <tr><td>ATR 追踪</td><td>趋势感知 trail_mult（无 DI 跳过）</td></tr>
+  <tr><td>硬止损</td><td>趋势感知 hard_mult</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 7: SanQing H1 -->
+<section id="s-sanqing">
+<h2>9. SanQing H1 <span class="tag tag-off">禁用</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>sanqing_h1_20260630.py</code></td><td>策略名</td><td><code>sanqing_h1</code></td></tr>
+  <tr><td>当前版本</td><td>v7</td><td>Magic</td><td>880106</td></tr>
+  <tr><td>周期</td><td>H1</td><td>引擎状态</td><td>❌ 禁用</td></tr>
+</table>
+
+<h3>9.1 入场逻辑：6 因子评分</h3>
+<p>阈值：ADX>20 时 = 4，否则 = 3（文件头/注释已与代码一致，v7 原为 ≥5 现已修正）。</p>
+<table>
+  <tr><th>因子</th><th>计算</th><th>最高分</th></tr>
+  <tr><td>趋势</td><td>EMA9/21 定方向</td><td>2</td></tr>
+  <tr><td>EMA9 触及</td><td>价格回踩 EMA9</td><td>2</td></tr>
+  <tr><td>K 线实体</td><td>body/range 比率 >1.0/1.3/1.5</td><td>1</td></tr>
+  <tr><td>成交量</td><td>volume > avg×1.3</td><td>1</td></tr>
+  <tr><td>趋势线</td><td>连续的 higher high / lower low</td><td>1</td></tr>
+  <tr><td>吞噬形态</td><td>强实体范围比</td><td>1</td></tr>
+</table>
+<p>最高 8 分，ADX>20 阈值 4，否则 3。</p>
+
+<h3>9.2 出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>ATR×hard_mult ×50（占位符）</td></tr>
+  <tr><td>保本</td><td>base 基类</td></tr>
+  <tr><td>利润回撤</td><td>标准 25%（ADX>25 放宽 50%）</td></tr>
+  <tr><td>ATR 追踪</td><td>trail_mult=1.5/1.0 依趋势</td></tr>
+  <tr><td>硬止损</td><td>hard_mult=2.0（固定）</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 策略 8-11: 未启用策略 -->
+<section id="s-entry-score">
+<h2>10. Entry Score Pro <span class="tag tag-off">未注册</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>entry_score_pro_20260630.py</code></td><td>策略名</td><td><code>entry_score_pro</code></td></tr>
+  <tr><td>当前版本</td><td>v1</td><td>Magic</td><td>661501</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>🔴 未注册（不在 STRATEGY_MAP）</td></tr>
+</table>
+
+<h3>入场逻辑：5 因子加权评分</h3>
+<table>
+  <tr><th>因子</th><th>权重</th><th>说明</th></tr>
+  <tr><td>结构 (Structure)</td><td>30%</td><td>摆动点识别：swing high/low 突破状态</td></tr>
+  <tr><td>临近 (Proximity)</td><td>25%</td><td>距摆动点的价格距离</td></tr>
+  <tr><td>动量 (Momentum)</td><td>15%</td><td>当根 K 线 body/range 比率</td></tr>
+  <tr><td>波动 (Volatility)</td><td>10%</td><td>ATR 比率质量分（2026-06-30 修复死代码）</td></tr>
+  <tr><td>趋势 (Trend)</td><td>20%</td><td>MA14 + RSI(50)</td></tr>
+</table>
+<p>阈值：≥80 = PRIME（最优），≥75 = ENTRY。多空分别评分，高者胜出。</p>
+
+<h3>出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>SL=0.55×ATR，TP=3×SL（1.65×ATR，2026-06-30 硬止损统一为此值）</td></tr>
+  <tr><td>移动追踪</td><td>1.5×ATR</td></tr>
+  <tr><td>硬止损</td><td>0.55×ATR（与挂单一致）</td></tr>
+</table>
+</section>
+
+<!-- 策略 9 -->
+<section id="s-momentum">
+<h2>11. Momentum Pulse Pro <span class="tag tag-off">未注册</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>momentum_pulse_pro_20260630.py</code></td><td>策略名</td><td><code>momentum_pulse_pro</code></td></tr>
+  <tr><td>当前版本</td><td>v1</td><td>Magic</td><td>661301</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>🔴 未注册</td></tr>
+</table>
+
+<h3>入场逻辑：7 维度评分 ≥6</h3>
+<table>
+  <tr><th>#</th><th>维度</th><th>说明</th></tr>
+  <tr><td>①</td><td>AMC（RSI+MACD+ROC 聚合动量）</td><td>三指标合成趋势可靠性评分</td></tr>
+  <tr><td>②</td><td>MACD 信号对齐</td><td>MACD>0 或 <0</td></tr>
+  <tr><td>③</td><td>RSI 动能</td><td>RSI>50（多）或 <50（空）</td></tr>
+  <tr><td>④</td><td>H1 多周期</td><td>H1 EMA20 方向</td></tr>
+  <tr><td>⑤</td><td>成交量确认</td><td>volume > 均值</td></tr>
+  <tr><td>⑥</td><td>ADX 强度确认</td><td>ADX>20 时加分</td></tr>
+  <tr><td>⑦</td><td>安全过滤</td><td>布林带位置不极端</td></tr>
+</table>
+<p>阈值 6/7，且多空分数必须明显分离。</p>
+
+<h3>出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>三层 TP（1.5/3.0/5.0 ATR），SL=1.5 ATR</td></tr>
+  <tr><td>ATR 追踪</td><td>1.5×ATR</td></tr>
+  <tr><td>硬止损</td><td>1.5×ATR</td></tr>
+</table>
+</section>
+
+<!-- 策略 10 -->
+<section id="s-confluence">
+<h2>12. Multi Confluence Quant <span class="tag tag-off">未注册</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>multi_confluence_quant_20260630.py</code></td><td>策略名</td><td><code>multi_confluence_quant</code></td></tr>
+  <tr><td>当前版本</td><td>v1</td><td>Magic</td><td>661601</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>🔴 未注册</td></tr>
+</table>
+
+<h3>入场逻辑：14 因子共振评分 ≥10</h3>
+<p>14 个因子覆盖：EMA20/50 排列、EMA200 方向、RSI 倾向、ADX>20、线性回归斜率、成交量、H1 方向、StochRSI K/D 关系、MACD 位置、DI 方向、价格创 N 日新高/新低、波动扩张。</p>
+<p>阈值 ≥10/14。仅当 long_score > short_score 时开多，反之开空。</p>
+</section>
+
+<!-- 策略 11 -->
+<section id="s-viprasol">
+<h2>13. Viprasol Sniper <span class="tag tag-off">未注册</span></h2>
+<table>
+  <tr><td>文件名</td><td><code>viprasol_sniper_20260630.py</code></td><td>策略名</td><td><code>viprasol_sniper</code></td></tr>
+  <tr><td>当前版本</td><td>v1</td><td>Magic</td><td>661401</td></tr>
+  <tr><td>周期</td><td>M30</td><td>引擎状态</td><td>🔴 未注册</td></tr>
+</table>
+
+<h3>入场逻辑：7 因子评分 ≥4</h3>
+<table>
+  <tr><th>#</th><th>因子</th></tr>
+  <tr><td>①</td><td>EMA9/21 排列</td></tr>
+  <tr><td>②</td><td>RSI 方向（>50/<50）</td></tr>
+  <tr><td>③</td><td>MACD>0/<0</td></tr>
+  <tr><td>④</td><td>EMA9>21（与①联合）</td></tr>
+  <tr><td>⑤</td><td>DI 强度</td></tr>
+  <tr><td>⑥</td><td>成交量</td></tr>
+  <tr><td>⑦</td><td>M15-RSI 共振</td></tr>
+</table>
+<p>阈值 ≥4 且分数>对手方。</p>
+
+<h3>出场逻辑</h3>
+<table>
+  <tr><td>Broker SL/TP</td><td>SL=1.5 ATR，无固定 TP（运行时多级 RR）</td></tr>
+  <tr><td>保本</td><td>TP1(1R) 命中后 SL 移到入场价</td></tr>
+  <tr><td>多级 TP</td><td>1R/2R/3R/4R/5R 逐级检查</td></tr>
+  <tr><td>ATR 追踪</td><td>1.0×ATR（需 peak>0.5 ATR）</td></tr>
+  <tr><td>硬止损</td><td>SL=1.5 ATR</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 更新指南 -->
+<section id="update-guide">
+<h2>14. 策略更新指南</h2>
+<p>每次修改策略后，必须同步更新以下文档。以下清单确保一致性：</p>
+
+<h3>步骤清单</h3>
+<ol>
+  <li><strong>改代码</strong>：修改 <code>strategies/&lt;name&gt;_20260630.py</code></li>
+  <li><strong>记录版本</strong>：在文件末尾（或 <code>STRATEGY_CHANGELOG</code>）追加版本记录：<br>
+    <code>{ "version": "v下一版", "magic": MMM, "date": "YYYY-MM-DD", "desc": "变更说明" }</code></li>
+  <li><strong>更新此 HTML</strong>：按以下规则更新对应策略章节：
+    <ul>
+      <li>因子评分表：新因子加行、改因子改行</li>
+      <li>参数表：修改的阈值同步更新</li>
+      <li>出场逻辑表：新增/修改出场行为</li>
+      <li>全局变更日志（§2）追加一行</li>
+    </ul>
+  </li>
+  <li><strong>同步 MD 备份</strong>：将 HTML 对应策略章节复制到 <code>docs/strategies/&lt;name&gt;.md</code></li>
+  <li><strong>编译验证</strong>：<code>python -m py_compile strategies/&lt;name&gt;_20260630.py</code></li>
+</ol>
+
+<h3>文档存放位置</h3>
+<table>
+  <tr><th>文件</th><th>位置</th><th>格式</th><th>用途</th></tr>
+  <tr><td>策略手册</td><td><code>strategies/strategy_manual_20260630.html</code></td><td>HTML</td><td>主文档，含全局规则和各策略完整逻辑</td></tr>
+  <tr><td>MD 备份</td><td><code>docs/strategies/</code></td><td>Markdown</td><td>Git 友好，便于 git diff 追踪文档变更</td></tr>
+  <tr><td>策略代码</td><td><code>strategies/&lt;name&gt;_20260630.py</code></td><td>Python</td><td>执行代码，含 STRATEGY_CHANGELOG</td></tr>
+</table>
+
+<h3>注册新策略流程</h3>
+<ol>
+  <li>创建 <code>strategies/&lt;name&gt;_YYYYMMDD.py</code>（继承 BaseStrategy）</li>
+  <li>在 <code>engine_standalone/main.py</code> 添加 import + STRATEGY_MAP 条目</li>
+  <li>在 <code>dashboard/backend/engine_runner.py</code> 添加版本同步条目</li>
+  <li>在 <code>dashboard/runtime_config.json</code> 的 <code>strategy_pool</code> 添加（enabled=false）</li>
+  <li>可选：在 <code>config/settings.py</code> 的 <code>STRATEGY_POOL</code> 添加（RuntimeConfig 回退）</li>
+  <li>在策略中心 UI 手动启用后重启引擎生效</li>
+</ol>
+</section>
+
+</main>
+</body>
+</html>

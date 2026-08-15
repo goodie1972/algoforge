@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAUUSD 量化交易系统 — 策略手册</title>
+<style>
+:root { --bg: #f8f9fa; --fg: #1a1a2e; --accent: #0d6efd; --card: #fff; --border: #dee2e6; --muted: #6c757d; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --card: #16213e; --border: #2a2a4a; --muted: #9ca3af; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background: var(--bg); color: var(--fg); line-height: 1.7; padding: 2rem; max-width: 1000px; margin: 0 auto; }
+h1 { font-size: 2rem; border-bottom: 3px solid var(--accent); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+h2 { font-size: 1.5rem; margin-top: 2rem; color: var(--accent); border-left: 4px solid var(--accent); padding-left: 0.75rem; }
+h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+p { margin: 0.5rem 0; }
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: var(--card); border: 1px solid var(--border); }
+th, td { padding: 0.5rem 0.75rem; text-align: left; border: 1px solid var(--border); }
+th { background: var(--accent); color: #fff; }
+code { background: var(--card); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.85rem; border: 1px solid var(--border); }
+hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<h1>XAUUSD 量化交易系统 — 策略手册</h1>
+<p>版本: 2026-08-11 | 系统: v2.7.9</p>
+<hr>
+
+<h2>1. 全局系统规则</h2>
+
+<h3>1.1 三轨架构</h3>
+<ul>
+<li>轨1 DataFactory：独立线程，增量拉取 K 线，TA-Lib 统一计算 26 个指标</li>
+<li>轨2 策略员：主引擎循环，get_indicator(key) 读缓存，评分达标出门票</li>
+<li>轨3 运动员：tick 验证层，_verify_entry 实时重算入场条件，10 秒过期作废</li>
+</ul>
+
+<h3>1.2 数据源铁律</h3>
+<p>DataFactory + TA-Lib 是唯一数据来源。所有策略指标通过 get_indicator(key) 读取，禁止自算 RSI/MFI/BB/EMA/ATR/ADX/Stoch/MACD 等指标。</p>
+
+<h3>1.3 出场逻辑体系</h3>
+<pre>
+check_ema20_exit()
+  1. 趋势出场（穿轨后回抽 + MFI 确认）
+  2. 中线出场（价格先越过中线再返回）
+  3. 半宽出场（逆势走了入场时 BB 宽度的一半）
+</pre>
+<p>通用出场：保本出场、利润回撤止盈（动态阈值）、ATR 移动止盈、硬止损。</p>
+
+<h3>1.4 策略命名规范</h3>
+<p>strategies/{YYYYMMDD}_{策略名}_v{版本号}.py</p>
+<p>修改策略 → 原文件移入 strategies/backup/，生成新版本号文件。</p>
+
+<h3>1.5 策略说明文档</h3>
+<p>strategies/docs/{YYYYMMDD}_{策略名}_v{版本号}.md，和策略 .py 同目录。</p>
+
+<hr>
+
+<h2>2. 策略总览（30 个）</h2>
+
+<h3>2.1 启用策略（9 个）</h3>
+<table>
+<tr><th>Magic</th><th>策略</th><th>周期</th><th>说明</th></tr>
+<tr><td>660707</td><td>M30_rsi_bb</td><td>M30</td><td>M30 RSI+布林带均值回归，7因子评分系统，动态利润回撤止盈</td></tr>
+<tr><td>660904</td><td>rsi_grading_m30_upgraded</td><td>M30</td><td>RSI极端+2/边界+1/正常0，固定阈值3分，BB扩张+MFI方向过滤</td></tr>
+<tr><td>661003</td><td>mfi_bb_m30_upgraded</td><td>M30</td><td>超跌反弹，收盘穿轨入场，BB扩张保护，中线出场固定参照</td></tr>
+<tr><td>661102</td><td>m30_bb_deepreturn_optimized</td><td>M30</td><td>BB均值回归+MFI确认+方向感知动态阈值</td></tr>
+<tr><td>661202</td><td>stoch_trend_h1_optimized</td><td>H1</td><td>多周期 Stoch 评分系统，ADX>20，Stoch(14,3,3)</td></tr>
+<tr><td>880107</td><td>sanqing_h1</td><td>H1</td><td>EMA9/21趋势+ATR14评分+双重止盈</td></tr>
+<tr><td>880108</td><td>sanqing_h1_upgraded</td><td>H1</td><td>EMA9/21趋势评分+高位拦截+动态利润回撤止盈</td></tr>
+<tr><td>880301</td><td>h1_breakout</td><td>H1</td><td>区间突破+ADX确认，EMA20追踪止损，6分制评分</td></tr>
+<tr><td>880306</td><td>gold_auto_research</td><td>H1</td><td>4因子共识投票+高位拦截(price_position>0.88且偏离EMA21>4xATR禁BUY)</td></tr>
+</table>
+
+<h3>2.2 禁用策略（21 个）</h3>
+<table>
+<tr><th>Magic</th><th>策略</th><th>周期</th><th>说明</th></tr>
+<tr><td>660902</td><td>rsi_grading_m30</td><td>M30</td><td>RSI分级评分，ADX>28趋势门禁（原版）</td></tr>
+<tr><td>660903</td><td>rsi_grading_m30_optimized</td><td>M30</td><td>RSI分级评分优化版</td></tr>
+<tr><td>661001</td><td>mfi_bb_m30</td><td>M30</td><td>MFI极端值+BB触轨均值回归（原版）</td></tr>
+<tr><td>661002</td><td>mfi_bb_m30_optimized</td><td>M30</td><td>MFI阈值收紧至85/15</td></tr>
+<tr><td>661101</td><td>m30_bb_deepreturn</td><td>M30</td><td>BB极值+MFI极值超跌反弹（原版）</td></tr>
+<tr><td>661201</td><td>stoch_trend_h1</td><td>M30</td><td>多周期 Stoch 回调顺势（原版）</td></tr>
+<tr><td>661204</td><td>stoch_trend_h1_upgraded</td><td>H1</td><td>ADX>25过滤+Stoch极值反转+BBI方向确认</td></tr>
+<tr><td>661301</td><td>momentum_pulse_pro</td><td>M30</td><td>7维度多因子评分，三层TP</td></tr>
+<tr><td>661401</td><td>viprasol_sniper</td><td>M30</td><td>7因子评分，多级RR出场</td></tr>
+<tr><td>661501</td><td>entry_score_pro</td><td>M30</td><td>5因子加权评分0-100</td></tr>
+<tr><td>661601</td><td>multi_confluence_quant</td><td>M30</td><td>14因子综合评分</td></tr>
+<tr><td>777004</td><td>bakome_backup</td><td>M30</td><td>ICT FVG+OB+Silver Bullet（原版）</td></tr>
+<tr><td>777005</td><td>xaubot_backup</td><td>M30</td><td>XGBoost ML 模型</td></tr>
+<tr><td>777006</td><td>bakome_backup_optimized</td><td>M30</td><td>ICT FVG+OB+Silver Bullet 优化版</td></tr>
+<tr><td>880101</td><td>sanqing_h1_original</td><td>H1</td><td>6因子评分+ATR追踪止损（原版）</td></tr>
+<tr><td>880201</td><td>sanqing_original</td><td>M5</td><td>M5 4策略优先级调度</td></tr>
+<tr><td>880202</td><td>timeprofit_ea</td><td>M5</td><td>H2趋势+整数关口箱体</td></tr>
+<tr><td>880302</td><td>m30_vol_return</td><td>M30</td><td>BB触及+ATR扩张+RSI背离</td></tr>
+<tr><td>880303</td><td>bakome_gold_scalper_original</td><td>M5</td><td>完整ICT策略</td></tr>
+<tr><td>880304</td><td>bakome_trinity_ea_original</td><td>M5</td><td>多资产趋势追踪</td></tr>
+<tr><td>880305</td><td>gold_auto_research_original</td><td>H1</td><td>4因子共识投票（原版，无高位拦截）</td></tr>
+</table>
+
+<hr>
+
+<h2>3. 策略分类</h2>
+
+<h3>趋势策略</h3>
+<p>sanqing_h1 / sanqing_h1_upgraded / h1_breakout / stoch_trend_h1_optimized / gold_auto_research</p>
+
+<h3>反转策略</h3>
+<p>M30_rsi_bb / mfi_bb_m30_upgraded / m30_bb_deepreturn_optimized / rsi_grading_m30_upgraded</p>
+
+<h3>评分模型</h3>
+<p>entry_score_pro / momentum_pulse_pro / multi_confluence_quant / viprasol_sniper</p>
+
+<h3>ML 策略</h3>
+<p>xaubot_backup（XGBoost）</p>
+
+<h3>移植策略</h3>
+<p>sanqing_original / timeprofit_ea / bakome 系列（MQL4 移植）</p>
+
+<hr>
+
+<h2>4. 版本管理</h2>
+<p>详细规范见 strategies/STRATEGY_VERSIONING.md：Magic Number 编号规则、文件命名规范、说明文档规范、删除规则、导入规则、CHANGELOG 规范。</p>
+
+<hr>
+
+<h2>5. 策略更新指南</h2>
+<ol>
+<li>修改策略 .py → 原文件移入 strategies/backup/</li>
+<li>生成新版本号文件（如 v11 → v12）</li>
+<li>更新 STRATEGY_CHANGELOG</li>
+<li>更新 strategies/docs/ 下的说明文档</li>
+<li>重启引擎生效</li>
+</ol>
+
+<hr>
+<p>数据源: 全部指标从 DataFactory TA-Lib 读取</p>
+</body>
+</html>
