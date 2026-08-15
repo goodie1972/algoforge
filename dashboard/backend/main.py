@@ -203,6 +203,34 @@ async def lifespan(app: FastAPI):
         start_background_update_check()
     except Exception:
         pass
+
+    # 自动更新：冷启动检查 + 后台轮询
+    async def _auto_update_init():
+        try:
+            from dashboard.backend import auto_update
+            # 冷启动：如果有预下载的 pending，立即应用
+            result = auto_update.check_cold_update()
+            if result:
+                logger.warning(f"[AutoUpdate] 冷更新自动应用: {result.get('message','')}")
+            # 启动后 15s 执行首次预下载检查
+            await asyncio.sleep(15)
+            while PollerState.running:
+                try:
+                    cfg = auto_update.get_config()
+                    if cfg.get("auto_update_enabled"):
+                        state = auto_update.fetch_remote()
+                        if state.get("state") == "pending":
+                            logger.warning(f"[AutoUpdate] 新版本待应用: {state.get('message')}")
+                    interval_h = cfg.get("update_interval_hours", 1)
+                    await asyncio.sleep(interval_h * 3600)
+                except Exception as e:
+                    logger.warning(f"[AutoUpdate] 轮询异常: {e}")
+                    await asyncio.sleep(60)
+        except Exception as e:
+            logger.warning(f"[AutoUpdate] 初始化失败: {e}")
+
+    asyncio.create_task(_auto_update_init())
+
     PollerState.running = True
     tasks = [
         asyncio.create_task(broadcast_prices()),

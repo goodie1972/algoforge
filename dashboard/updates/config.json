@@ -1,0 +1,5 @@
+{
+  "auto_update_enabled": true,
+  "update_interval_hours": 1,
+  "health_check_timeout_seconds": 60
+}

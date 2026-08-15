@@ -58,9 +58,49 @@ async def get_remote_changelog(limit: int = 20):
 
 @router.post("/update")
 async def update_version():
-    """执行 git pull 更新代码（仅工作区干净时允许）"""
-    from core.version import do_update
-    return do_update()
+    """触发更新应用（当前页面自动关闭后生效）"""
+    from dashboard.backend.auto_update import apply_update
+    return apply_update()
+
+
+@router.post("/rollback")
+async def rollback_version():
+    """回滚到上一个版本"""
+    from dashboard.backend.auto_update import rollback
+    return rollback()
+
+
+@router.get("/update-config")
+async def get_update_config():
+    """获取/设置自动更新配置"""
+    from dashboard.backend.auto_update import get_config
+    return get_config()
+
+
+@router.post("/update-config")
+async def set_update_config(data: dict):
+    """更新自动更新配置（前端拨动键写入）"""
+    from dashboard.backend.auto_update import save_config, get_config
+    config = get_config()
+    for k in ("auto_update_enabled", "update_interval_hours"):
+        if k in data:
+            config[k] = data[k]
+    save_config(config)
+    return config
+
+
+@router.get("/update-state")
+async def get_update_state():
+    """获取当前更新状态"""
+    from dashboard.backend.auto_update import get_state
+    return get_state()
+
+
+@router.post("/update/health")
+async def run_health_check():
+    """手动触发一次健康检查"""
+    from dashboard.backend.auto_update import health_check
+    return {"healthy": health_check()}
 
 
 @router.get("/bias-state")

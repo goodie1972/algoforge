@@ -1,6 +1,6 @@
 {
   "name": "xauusd-dashboard",
-  "version": "2.9.5",
+  "version": "3.2.2",
   "private": true,
   "type": "module",
   "scripts": {

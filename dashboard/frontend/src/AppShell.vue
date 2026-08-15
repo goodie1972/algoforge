@@ -16,7 +16,7 @@ import { usePriceStore } from '@/stores/prices'
 import { useLogStore } from '@/stores/logs'
 import { usePatrolStore } from '@/stores/patrol'
 import { wsClient } from '@/api/websocket'
-import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog, getRemoteChangelog, updateVersion } from '@/api/client'
+import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog, getRemoteChangelog, updateVersion, getUpdateConfig, setUpdateConfig, getUpdateState, rollbackVersion } from '@/api/client'
 import { useMessage, useDialog } from 'naive-ui'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
 const { t, locale } = useI18n()
@@ -101,6 +101,65 @@ const changelog = ref<Array<{hash: string; date: string; subject: string}>>([])
 const updating = ref(false)
 const updateResult = ref<string>('')
 const updateOk = ref(false)
+
+// 自动更新状态
+const autoUpdateEnabled = ref(false)
+const updateState = ref<{state: string; remote_version: string | null; remote_commit: string | null; remote_ahead: number; message: string | null; error: string | null}>({
+  state: 'idle', remote_version: null, remote_commit: null, remote_ahead: 0, message: null, error: null,
+})
+let updateStateTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadUpdateConfig() {
+  try {
+    const cfg = await getUpdateConfig()
+    autoUpdateEnabled.value = cfg.auto_update_enabled
+  } catch { /* ignore */ }
+}
+async function toggleAutoUpdate(enabled: boolean) {
+  try {
+    await setUpdateConfig({ auto_update_enabled: enabled })
+  } catch { /* ignore */ }
+}
+async function loadUpdateState() {
+  try {
+    const st = await getUpdateState()
+    updateState.value = st
+    return st
+  } catch { return null }
+}
+async function confirmHotUpdate() {
+  if (updateState.value.state !== 'pending') return
+  try {
+    const confirm = await dialog.warning({
+      title: t('version.update_confirm_btn'),
+      content: t('version.update_confirm', { version: updateState.value.remote_version || '?' }),
+      positiveText: t('version.update_confirm_btn'),
+      negativeText: t('version.update_cancel'),
+    })
+  } catch { /* cancelled */ return }
+  try {
+    await updateVersion()
+    // 后端已应用更新并准备重启，前端开始轮询直到后端重新上线
+    message.info(t('version.update_applying'))
+    let retries = 0
+    const poll = async () => {
+      retries++
+      try {
+        await getVersionInfo()
+        location.reload()
+      } catch {
+        if (retries < 30) {
+          await new Promise(r => setTimeout(r, 3000))
+          poll()
+        } else {
+          message.error(t('version.update_fail'))
+        }
+      }
+    }
+    poll()
+  } catch { /* ignore */ }
+}
+
 async function loadChangelog() {
   try {
     const r = await getChangelog(20)
@@ -234,11 +293,20 @@ onMounted(() => {
   accountStore.fetch()
   logStore.fetchHistory()
   getVersionInfo().then((v) => { versionInfo.value = v as any }).catch(() => { /* keep default */ })
+  loadUpdateConfig()
   fetchCalendar()
   // 每 5 分钟检查远程更新
   updateCheckTimer = setInterval(() => {
     getVersionInfo().then((v) => { versionInfo.value = v as any }).catch(() => {})
+    loadUpdateState()
   }, 300000)
+  // 冷更新提示：检查 state 是否为 healthy（启动后自动应用）
+  loadUpdateState().then((s) => {
+    if (s?.state === 'healthy' && s?.message) {
+      message.success(s.message)
+    }
+  })
+  loadUpdateState()
 
   wsClient.connect()
   wsClient.on('prices', (msg) => { priceStore.updateTick(msg.data.bid, msg.data.ask); triggerPulse() })
@@ -334,18 +402,30 @@ onUnmounted(() => {
               <div class="version-badge" @click="openChangelog">
                 <span class="version-dot">●</span>
                 <span>v{{ versionInfo.version }}</span>
-                <span v-if="versionInfo.has_update" class="version-dot-update">●</span>
-                <span v-if="versionInfo.behind_count > 0" class="version-behind">({{ versionInfo.behind_count }})</span>
+                <span v-if="updateState.state === 'pending'" class="version-up-arrow" @click.stop="confirmHotUpdate" title="$t('version.update_downloaded')">⬆</span>
+                <span v-if="versionInfo.behind_count > 0 && updateState.state !== 'pending'" class="version-behind">({{ versionInfo.behind_count }})</span>
+                <span v-else-if="updateState.state === 'pending'" class="version-behind">(●)</span>
                 <span v-else class="version-current">✓</span>
               </div>
             </template>
             <div class="version-tooltip">
               <div><b>{{ t('version.branch') }}:</b> {{ versionInfo.branch }}</div>
               <div><b>{{ t('version.commit') }}:</b> {{ versionInfo.commit }}</div>
+              <div v-if="updateState.state === 'pending'" class="version-update-available">⬆ {{ t('version.update_downloaded') }} — v{{ updateState.remote_version || '?' }}</div>
               <div v-if="versionInfo.has_update" class="version-update-available">⬆ {{ t('version.update_available', {count: versionInfo.behind_count}) }}</div>
               <div v-else class="version-up-to-date">✓ {{ t('version.latest') }}</div>
               <div v-if="versionInfo.dirty" class="version-dirty">* {{ t('version.local_dirty') }}</div>
               <div class="version-click-hint">{{ t('version.click_hint') }}</div>
+            </div>
+          </n-tooltip>
+          <n-tooltip trigger="hover" placement="bottom">
+            <template #trigger>
+              <n-switch v-model:value="autoUpdateEnabled" size="small" :round="true"
+                @update:value="toggleAutoUpdate" />
+            </template>
+            <div>
+              <div style="font-size:12px;font-weight:600">{{ t('version.auto_update') }}</div>
+              <div style="font-size:11px;color:#8b8f97;margin-top:2px">{{ autoUpdateEnabled ? 'ON' : 'OFF' }}</div>
             </div>
           </n-tooltip>
           <PatrolIndicator />
@@ -538,6 +618,18 @@ onUnmounted(() => {
 .version-current {
   color: #22c55e;
   font-size: 10px;
+}
+.version-up-arrow {
+  color: #f6465d;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 2px;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; transform: translateY(0); }
+  50% { opacity: 0.6; transform: translateY(-2px); }
 }
 
 /* ── 版本 tooltip ── */

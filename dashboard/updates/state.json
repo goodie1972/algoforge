@@ -1,0 +1,12 @@
+{
+  "state": "idle",
+  "current_version": "3.2.2",
+  "remote_version": null,
+  "remote_commit": null,
+  "remote_ahead": 0,
+  "last_check_at": null,
+  "pending_path": null,
+  "message": "已是最新版本",
+  "error": null,
+  "updated_at": "2026-08-15T05:06:15.715161+00:00"
+}

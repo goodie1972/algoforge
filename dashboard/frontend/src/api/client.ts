@@ -241,6 +241,41 @@ export async function updateVersion(): Promise<{ success: boolean; message: stri
   return data
 }
 
+export async function rollbackVersion(): Promise<{ success: boolean; message: string }> {
+  const { data } = await http.post('/version/rollback')
+  return data
+}
+
+export interface UpdateConfig {
+  auto_update_enabled: boolean
+  update_interval_hours: number
+}
+
+export async function getUpdateConfig(): Promise<UpdateConfig> {
+  const { data } = await http.get('/version/update-config')
+  return data
+}
+
+export async function setUpdateConfig(config: { auto_update_enabled?: boolean; update_interval_hours?: number }): Promise<UpdateConfig> {
+  const { data } = await http.post('/version/update-config', config)
+  return data
+}
+
+export interface UpdateState {
+  state: 'idle' | 'fetching' | 'pending' | 'applying' | 'restarting' | 'healthy' | 'rolling_back'
+  current_version: string
+  remote_version: string | null
+  remote_commit: string | null
+  remote_ahead: number
+  message: string | null
+  error: string | null
+}
+
+export async function getUpdateState(): Promise<UpdateState> {
+  const { data } = await http.get('/version/update-state')
+  return data
+}
+
 export interface BiasState {
   direction: 'bullish' | 'bearish' | 'neutral' | null
   score: number
