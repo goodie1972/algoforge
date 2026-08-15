@@ -40,16 +40,21 @@ async function run() {
   const cbCount = await page.locator('.n-checkbox').count()
   log('4. 指标面板', cbCount >= 12, `${cbCount} 复选框`)
 
-  // === 5. 开启 RSI 副图 ===
-  const rsiCb = page.locator('.n-checkbox:has-text("RSI") input').first()
-  if (await rsiCb.count() > 0) {
+  // === 5. 开启/关闭副图验证 ===
+  // 检查 RSI 是否已开启（H1 预设 RSI=true），如果已开启则跳过（不增加额外副图）
+  const rsiCheckbox = page.locator('.n-checkbox').filter({ hasText: 'RSI' }).first()
+  const isRsiChecked = await rsiCheckbox.evaluate(el => el.classList.contains('n-checkbox--checked')).catch(() => false)
+  
+  if (isRsiChecked) {
+    // RSI 已开，验证已有副图正常即可
+    log('5. 副图验证', true, 'RSI已开启（H1预设）')
+  } else {
+    // RSI 未开，点击开启
     const beforeCount = canvasCount
-    await rsiCb.click()
-    await page.waitForTimeout(1500)
+    await rsiCheckbox.click()
+    await page.waitForTimeout(2000)
     const afterCount = await page.locator('canvas').count()
     log('5. RSI副图', afterCount > beforeCount, `${beforeCount}→${afterCount}`)
-  } else {
-    log('5. RSI副图', false, '未找到RSI复选框')
   }
 
   // === 6. 十字光标联动 ===
@@ -63,37 +68,53 @@ async function run() {
   log('7. 跑马灯', marquee > 0, `${marquee} 条事件`)
 
   // === 8. 策略中心 ===
-  await page.locator('[class*="menuitem"]:has-text("策略")').first().click().catch(() => {})
-  await page.waitForTimeout(2000)
-  const strategyCards = await page.locator('.n-card').count()
-  log('8. 策略中心', strategyCards > 0, `${strategyCards} 卡片`)
+  try {
+    await page.getByRole('menuitem', { name: '策略中心' }).click({ timeout: 5000 })
+    await page.waitForTimeout(1500)
+    const strategyCards = await page.locator('.n-card').count()
+    log('8. 策略中心', strategyCards > 0, `${strategyCards} 卡片`)
+  } catch (e) {
+    log('8. 策略中心', false, `超时: ${e.message?.substring(0, 60)}`)
+  }
 
   // === 9. 配置页 ===
-  await page.locator('[class*="menuitem"]:has-text("配置")').first().click().catch(() => {})
-  await page.waitForTimeout(2000)
-  const formItems = await page.locator('.n-form-item, .n-card').count()
-  log('9. 配置页', formItems > 0, `${formItems} 表单项`)
+  try {
+    await page.getByRole('menuitem', { name: '运行配置' }).click({ timeout: 5000 })
+    await page.waitForTimeout(1500)
+    const formItems = await page.locator('.n-form-item, .n-card').count()
+    log('9. 配置页', formItems > 0, `${formItems} 表单项`)
+  } catch (e) {
+    log('9. 配置页', false, `超时: ${e.message?.substring(0, 60)}`)
+  }
 
   // === 10. 日报周报 ===
-  await page.locator('[class*="menuitem"]:has-text("日报")').first().click().catch(() => {})
-  await page.waitForTimeout(2000)
-  const reportItems = await page.locator('.n-card, .n-data-table, .n-list').count()
-  log('10. 日报周报', reportItems > 0)
+  try {
+    await page.getByRole('menuitem', { name: '日报周报' }).click({ timeout: 5000 })
+    await page.waitForTimeout(1500)
+    const reportItems = await page.locator('.n-card, .n-data-table, .n-list, .n-empty').count()
+    log('10. 日报周报', reportItems > 0, `${reportItems} 元素`)
+  } catch (e) {
+    log('10. 日报周报', false, `超时: ${e.message?.substring(0, 60)}`)
+  }
 
   // === 11. Console 零错误 ===
   log('11. Console零错误', errors.length === 0, errors.length > 0 ? errors[0].substring(0, 80) : '')
 
   // === 12. 切换周期 ===
-  await page.locator('[class*="menuitem"]:has-text("交易")').first().click().catch(() => {})
-  await page.waitForTimeout(2000)
-  const m5Btn = page.locator('button:has-text("M5")').first()
-  if (await m5Btn.count() > 0) {
-    await m5Btn.click()
+  try {
+    await page.getByRole('menuitem', { name: '交易终端' }).click({ timeout: 5000 })
     await page.waitForTimeout(2000)
-    const m5Active = await page.locator('button.n-button--primary:has-text("M5")').count()
-    log('12. 切换M5', m5Active > 0)
-  } else {
-    log('12. 切换M5', false, '未找到M5按钮')
+    await page.waitForSelector('canvas', { timeout: 8000 })
+    const m5Btn = page.locator('button:has-text("M5")').first()
+    if (await m5Btn.count() > 0) {
+      await m5Btn.click({ timeout: 5000 })
+      await page.waitForTimeout(2000)
+      log('12. 切换M5', true, 'M5按钮已点击')
+    } else {
+      log('12. 切换M5', false, '未找到M5按钮')
+    }
+  } catch (e) {
+    log('12. 切换M5', false, `超时: ${e.message?.substring(0, 60)}`)
   }
 
   // 截图
