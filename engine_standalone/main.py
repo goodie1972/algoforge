@@ -33,6 +33,12 @@ from strategies.scanner import scan_strategies
 # 渐进式拆分：StrategyRiskState 从 risk_mgr 导入
 from engine_standalone.risk_mgr import StrategyRiskState as _StrategyRiskStateBase
 
+# 第二阶段拆分：Mixin 导入
+from engine_standalone.position_mgr import PositionMgrMixin
+from engine_standalone.entry_exit import EntryExitMixin
+from engine_standalone.core_loop import CoreLoopMixin
+from engine_standalone.events import format_status_report, format_trade_close_log, format_entry_log, format_risk_block_log
+
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
 if not logging.getLogger().handlers:
     from logging.handlers import RotatingFileHandler
@@ -93,7 +99,7 @@ def create_strategies(bridge, pool=None):
     return strategies
 
 
-class TradingEngine:
+class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
     """多策略交易引擎"""
 
     def __init__(self, config_service=None):
