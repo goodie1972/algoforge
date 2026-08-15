@@ -43,9 +43,11 @@ _SYNC_ERRORS_MAX = 20
 # EA(F043) 可提供的指标字段：_sync_indicators 用 EA 值覆盖这些；_sync_tf 重建缓存时保留 EA 值不被 TA-Lib 覆盖
 _EA_CACHE_KEYS = frozenset({
     "rsi", "rsi_5", "rsi_10", "mfi", "bb", "bb_width",
-    "ema_9", "ema_21", "sma_14", "sma_20", "sma_50",
+    "ema_9", "ema_21", "ema_34", "ema_50", "ema_200",
+    "sma_14", "sma_20", "sma_50",
     "atr", "atr_20", "adx", "pdi", "ndi",
-    "macd", "stoch_5_3_3", "volume_sma_20", "close",
+    "macd", "stoch_5_3_3", "stoch_rsi", "linear_reg_slope",
+    "volume_sma_20", "close",
 })
 
 def get_health() -> dict:
@@ -154,8 +156,8 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     except Exception:
         pass
 
-    # EMA(9/21)
-    for p in [9, 21]:
+    # EMA(9/21/34/50/200)
+    for p in [9, 21, 34, 50, 200]:
         try:
             e = talib.EMA(closes, timeperiod=p)
             for i, c in enumerate(candles):
@@ -227,6 +229,24 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
         for i, c in enumerate(candles):
             if s20[i] == s20[i]:
                 result[c.time]["volume_sma_20"] = float(s20[i])
+    except Exception:
+        pass
+
+    # StochRSI(14,14,3,3)
+    try:
+        fastk, fastd = talib.STOCHRSI(closes, timeperiod=14, fastk_period=14, fastd_period=3, fastd_matype=0)
+        for i, c in enumerate(candles):
+            if fastk[i] == fastk[i]:
+                result[c.time]["stoch_rsi"] = {"k": float(fastk[i]), "d": float(fastd[i])}
+    except Exception:
+        pass
+
+    # 线性回归斜率(20)
+    try:
+        slope = talib.LINEARREG_SLOPE(closes, timeperiod=20)
+        for i, c in enumerate(candles):
+            if slope[i] == slope[i]:
+                result[c.time]["linear_reg_slope"] = float(slope[i])
     except Exception:
         pass
 

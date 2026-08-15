@@ -3,6 +3,39 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.3.1] - 2026-08-15 — 回滚历史序列改动，策略改用 talib 直接计算
+
+### 修正
+- **回滚 DataFactory 中的 `*_list` 历史序列改动**：删除 `_build_indicator_lists`、`_LIST_INDICATOR_KEYS`，`_sync_tf` 和 `_init_indicators_from_db` 恢复原版只存最新一根扁平指标——保持 DataFactory 原有设计不变
+- **回滚 base.py**：`_steep_ma_direction` 恢复用 `talib.EMA` 从 `self.candles` 计算的原版逻辑；fallback 路径恢复原版 `_ta_only_indicators` 调用
+- **策略中需要历史序列的场景改为用 talib 在 `self.candles` 上直接计算**（而非依赖 DataFactory 缓存提供序列）：
+  - `mfi_bb_m30_v1` / `mfi_bb_m30_optimized_v1` — 3 根容差检测改为只用当前 K 线 BB/MFI 扁平值判断（参照 `mfi_bb_m30_upgraded_v16` 的方式）
+  - `M30_rsi_bb_v1` — `_get_m30_rsi_direction` 改用 `talib.RSI` 在 candles 上算 3 根方向
+  - `entry_score_pro_v1` — 波动因子改用 `talib.ATR` 在 candles 上算 30 根前 ATR 比较
+  - `gold_auto_research_v1` — ATR SMA(20) 改用 `talib.ATR` 在 candles 上算
+  - `m30_vol_return_v1` — ATR 扩张检测改用 `talib.ATR` 在 candles 上算 5 根均值
+- **保留的新增基础指标**：`ema_34`/`ema_50`/`ema_200`/`stoch_rsi`/`linear_reg_slope`（TA-Lib 计算，策略之前手算的，改为从 DF 缓存读取）
+
+## [3.3.0] - 2026-08-15 — 指标计算统一收归 DataFactory + TA-Lib
+
+### 重构
+- **所有基础指标计算统一收归 DataFactory，全部基于 TA-Lib**，策略和基类中不再有任何手算指标
+- **DataFactory 缓存新增历史指标序列**（`*_list`）：`rsi_list`、`mfi_list`、`bb_list`、`atr_list`、`adx_list`、`macd_list`、`stoch_5_3_3_list`、`ema_9_list`、`ema_21_list`、`ema_50_list`、`ema_200_list`、`sma_14_list`、`sma_20_list`、`sma_50_list`、`close_list`、`volume_sma_20_list` 等 28 个序列字段，供策略读取多根 K 线历史指标值
+- **DataFactory 新增基础指标**：`ema_34`、`ema_50`、`ema_200`（TA-Lib EMA）、`stoch_rsi`（TA-Lib STOCHRSI）、`linear_reg_slope`（TA-Lib LINEARREG_SLOPE）
+- **base.py 删除手算方法**：`calc_atr_wilder`、`calc_adx_wilder`、`_calc_m30_adx` 三个手算 Wilder 指标方法；`_steep_ma_direction` 改用缓存 `ema_{period}_list` 序列；`calc_gate_state` 中 DI diff 和 ADX 回退改用 `get_indicator`
+- **8 个策略清除手算指标**：
+  - `20260630_mfi_bb_m30_v1.py` — 删除 `_calc_stddev`/`_calc_bb_at`/`_calc_mfi_at`，改用缓存 `bb_list`/`mfi_list`
+  - `20260711_mfi_bb_m30_optimized_v1.py` — 同上
+  - `20260811_xaubot_backup_v1.py` — `_FeatureEngineer` 类从 Polars `ewm_mean` 手算改为 TA-Lib 计算 RSI/ATR/MACD/BB/EMA/Volume；删除 `_calc_atr_values`/`_calc_atr`
+  - `20260630_M30_rsi_bb_v1.py` — 删除 `_calc_rsi`，`_get_m30_rsi_direction` 改用缓存 `rsi_list`
+  - `20260630_entry_score_pro_v1.py` — 删除 `_calc_ema`/`_calc_atr`，改用缓存 `ema_50`/`ema_200`/`atr_list`/`sma_14`
+  - `20260630_gold_auto_research_v1.py` — 删除 `_calc_ema`/`_calc_stddev`/`_calc_rsi`/`_calc_atr_values`/`_calc_atr`/`_calc_adx`/`_get_adx_at`/`_get_macd`/`_get_stoch` 全套手算，改用缓存
+  - `20260630_multi_confluence_quant_v1.py` — 删除 `_calc_ema`/`_calc_rsi`/`_calc_macd`/`_calc_stoch_rsi`/`_calc_linear_reg_slope`，改用缓存 `ema_21`/`ema_50`/`ema_200`/`macd`/`stoch_rsi`/`linear_reg_slope`；H1 EMA 也改为从 DataFactory H1 缓存读取
+  - `20260630_momentum_pulse_pro_v1.py` — 删除 `_calc_roc`，改用 `talib.ROC`
+
+### 修复
+- 修复 `atr_list`/`close_list` 等历史序列在 DataFactory 缓存中不存在的隐性 bug（多个策略已引用但缓存未提供）
+
 ## [2.9.5] - 2026-08-14 — 十字光标联动显示真实指标值
 
 ### 修复
