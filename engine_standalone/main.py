@@ -139,18 +139,11 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         self._entry_signal_data: dict[int | str, dict] = {}  # ticket → 开仓时信号数据
         self._risk_states: dict[int, StrategyRiskState] = {}  # magic → 风控状态
         self._known_position_count: dict[int, int] = {}    # magic → 本地跟踪持仓数（防桥接漏查）
-        self._closed_trades: list[dict] = []               # 已平仓记录（内存，上限200条）
+        self._closed_trades: list[dict] = []               # 已平仓记录（内存缓存，按需加载）
+        self._closed_trades_loaded = False                  # 是否已从 JSONL 加载
         self._MAX_CLOSED_TRADES = 200
-
-    def _trim_closed_trades(self):
-        """内存中只保留最近 N 条，超出部分已写入 JSONL + 数据库，可安全丢弃"""
-        if len(self._closed_trades) > self._MAX_CLOSED_TRADES:
-            removed = len(self._closed_trades) - self._MAX_CLOSED_TRADES
-            self._closed_trades = self._closed_trades[-self._MAX_CLOSED_TRADES:]
-            logger.debug(f"[Memory] Trimmed closed_trades: removed {removed}, kept {self._MAX_CLOSED_TRADES}")
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
-        self._load_closed_trades()
         # 监督者系统
         self.supervisor = TradeSupervisor()
         db.init_db()  # 确保所有表存在
@@ -249,6 +242,9 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
 
     @property
     def closed_trades(self) -> list[dict]:
+        """按需加载：首次访问时才从 JSONL 读入内存，后续使用缓存"""
+        if not self._closed_trades_loaded:
+            self._load_closed_trades()
         return list(self._closed_trades)
 
     # ── K 线获取（桥接优先 → 数据库补充）─────────────────────────
@@ -349,9 +345,12 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         return db_candles + candles
 
     def _load_closed_trades(self):
-        """启动时从 JSONL 加载历史已平仓记录"""
+        """按需加载：首次访问 closed_trades 属性时才从 JSONL 读入内存"""
+        if self._closed_trades_loaded:
+            return
         try:
             if os.path.exists(self._trades_file) and os.path.getsize(self._trades_file) > 0:
+                self._closed_trades = []  # 重置，JSONL 是唯一来源
                 with open(self._trades_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
@@ -360,9 +359,10 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                                 self._closed_trades.append(json.loads(line))
                             except json.JSONDecodeError:
                                 continue
-                logger.info(f"Loaded historical trades {len(self._closed_trades)} ")
+                logger.info(f"[ClosedTrades] Lazy loaded {len(self._closed_trades)} from JSONL")
+                self._closed_trades_loaded = True
         except Exception as e:
-            logger.warning(f"Loaded historical tradesfailed: {e}")
+            logger.warning(f"[ClosedTrades] Lazy load failed: {e}")
 
     def _recover_missing_trades(self):
         """启动时从 MT4 补充遗漏的历史成交记录"""
@@ -374,7 +374,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         if not orders:
             return
 
-        existing_tickets = {t["ticket"] for t in self._closed_trades}
+        existing_tickets = {t["ticket"] for t in self.closed_trades}
         missing = [o for o in orders if o["ticket"] not in existing_tickets]
         if not missing:
             logger.info(f"[TradeRecovery] No backfill needed, already up-to-date")
