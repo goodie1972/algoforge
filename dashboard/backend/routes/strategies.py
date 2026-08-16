@@ -3,11 +3,13 @@
 """
 import os
 import shutil
+import logging
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from dashboard.backend.strategy_registry import get_available_strategies
 from dashboard.backend.strategy_logics import get_strategy_logics, get_strategy_logic
 
 router = APIRouter(prefix="/api/strategies", tags=["strategies"])
+logger = logging.getLogger("dashboard.backend.routes.strategies")
 
 STRATEGIES_DIR = os.path.join(os.path.dirname(__file__), "../../../strategies")
 DOCS_DIR = os.path.join(os.path.dirname(__file__), "../../../docs/strategies")

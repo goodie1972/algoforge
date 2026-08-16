@@ -3,6 +3,17 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.3.2] - 2026-08-16 — 删除策略 bug 修复 + 策略说明文档补全
+
+### 修正
+- **修复删除策略 API 500 错误**：`dashboard/backend/routes/strategies.py` 第 123 行调用了 `logger.info()` 但文件中从未定义 logger，导致 `NameError`。已添加 `import logging` 和 `logger = logging.getLogger(...)` 定义
+
+### 文档
+- **补全 5 个活跃策略缺失的说明文档**：m30_bb_deepreturn_optimized、mfi_bb_m30_optimized、stoch_trend_h1_optimized、mfi_bb_m30_upgraded、rsi_grading_m30_upgraded
+- **新建 backup 策略说明文档目录** `strategies/docs/strategies/backup/`，为所有后备策略创建说明文档（27 个），含同名历史版本
+- **xaubot_backup.md 从活跃目录移至 backup 目录**（对应策略已在 backup 中）
+- 活跃策略 18 个 = 活跃文档 18 个（完全一一对应）
+
 ## [3.3.1] - 2026-08-15 — 回滚历史序列改动，策略改用 talib 直接计算
 
 ### 修正
