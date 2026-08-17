@@ -1435,8 +1435,9 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             try:
                 with open(self._trades_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            except OSError:
-                pass
+            except (OSError, TypeError, ValueError, OverflowError) as e:
+                # 即使 JSONL 写入失败（如文件损坏），也不影响 trades 表写入
+                logger.warning(f"[Close] Write to closed_trades.jsonl failed ticket={pos.ticket}: {e}")
             try:
                 db.insert_trade(record)
                 try:
@@ -1449,8 +1450,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                         })
                 except Exception:
                     pass
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[Close] DB insert trade failed ticket={pos.ticket}: {e}")
 
     def _lock_new_entries(self, reason: str):
         """安全锁：暂停开新仓，已持仓仍可正常平仓"""
@@ -1462,21 +1463,25 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             logger.error(f"[SafetyLock] write lock file failed: {reason}")
 
     def _is_market_open(self) -> bool:
-        """检查当前是否为交易时段（周末closed）"""
+        """检查当前是否为交易时段（周末闭市，北京时间）
+
+        闭市窗口: 周六 05:00 (北京) -> 周一 06:00 (北京)
+        对应周五 21:00 UTC 收盘 / 周日 22:00 UTC 开盘（夏令时）
+        """
         from config.settings import LOCAL_TZ
         from datetime import datetime
         now = datetime.now(LOCAL_TZ)
-        # 周六整天 (weekday=5) closed
-        if now.weekday() == 5:
+        # 周六 05:00 后闭市（周五晚盘收盘）
+        if now.weekday() == 5 and now.hour >= 5:
             logger.info(f"[Session] Saturday closed, skip open (UTC+8: {now.strftime('%H:%M')})")
             return False
-        # 周日 07:00 前closed（黄金 23:00 UTC = 07:00 UTC+8 开盘）
-        if now.weekday() == 6 and now.hour < 7:
-            logger.info(f"[Session] Sunday not open, skip open (UTC+8: {now.strftime('%H:%M')})")
+        # 周日全天闭市（周日 22:00 UTC = 周一 06:00 北京开盘，非 07:00）
+        if now.weekday() == 6:
+            logger.info(f"[Session] Sunday closed, skip open (UTC+8: {now.strftime('%H:%M')})")
             return False
-        # 周六 05:00 后收盘（黄金周五 21:00 UTC = 周六 05:00 UTC+8 收盘）
-        if now.weekday() == 5 and now.hour < 5:
-            logger.info(f"[Session] Saturday early close, skip open (UTC+8: {now.strftime('%H:%M')})")
+        # 周一 06:00 前仍未开盘
+        if now.weekday() == 0 and now.hour < 6:
+            logger.info(f"[Session] Monday not open, skip open (UTC+8: {now.strftime('%H:%M')})")
             return False
         return True
 
@@ -1603,6 +1608,10 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 cool.pop(signal_dir, None)
 
         logger.info(f"[{strategy.name}] Signal received: {signal}")
+
+        # ---- 交易时段检查（周末闭市，休市期不发候选票/不开仓） ----
+        if not self._is_market_open():
+            return
 
         # ---- 全局方向过滤器（优先级最高） ----
         dir_filter = getattr(settings, 'GLOBAL_DIRECTION_FILTER', 'BOTH')

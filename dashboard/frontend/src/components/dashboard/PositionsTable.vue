@@ -112,6 +112,9 @@ const columns = [
                   } catch (e: any) {
                     if (e?.notFound) {
                       message.warning(t('positions.close_not_found', { ticket: row.ticket }))
+                    } else if (e?.timeoutButClosed) {
+                      // 请求超时但 MT4 已执行平仓（刷新后确认），按成功提示
+                      message.warning(t('positions.close_timeout_submitted', { ticket: row.ticket }))
                     } else {
                       message.error(e?.message || t('positions.close_failed'))
                     }

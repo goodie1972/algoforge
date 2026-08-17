@@ -42,6 +42,16 @@ export const usePositionStore = defineStore('positions', () => {
         items.value = items.value.filter(p => String(p.ticket) !== String(ticket))
         throw Object.assign(new Error('NOT_FOUND'), { notFound: true })
       }
+      // 网络超时：平仓命令可能已被 MT4 执行（后端仍在跑），刷新确认再下结论
+      const isTimeout = e?.code === 'ECONNABORTED' || /timeout|timed ?out/i.test(e?.message || '')
+      if (isTimeout) {
+        try { await fetch() } catch { /* 忽略刷新失败 */ }
+        const stillThere = items.value.some(p => String(p.ticket) === String(ticket))
+        if (!stillThere) {
+          items.value = items.value.filter(p => String(p.ticket) !== String(ticket))
+          throw Object.assign(new Error('TIMEOUT_BUT_CLOSED'), { timeoutButClosed: true, ticket })
+        }
+      }
       throw e
     }
   }

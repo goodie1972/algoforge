@@ -34,7 +34,8 @@ export async function getPositions(): Promise<Position[]> {
 }
 
 export async function closePosition(ticket: number, volume?: number): Promise<void> {
-  await http.post(`/positions/${ticket}/close`, { volume })
+  // 平仓走 MT4 桥接命令（可能触发 10s 超时 + 2 次重试 ~20s），单独放宽 timeout
+  await http.post(`/positions/${ticket}/close`, { volume }, { timeout: 30000 })
 }
 
 export async function modifyPosition(ticket: number, sl?: number, tp?: number): Promise<void> {

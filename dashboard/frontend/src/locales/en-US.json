@@ -760,7 +760,8 @@
     "empty": "No positions",
     "open_time": "Open Time",
     "direction": "Direction",
-    "close_not_found": "Position already closed or not found"
+    "close_not_found": "Position already closed or not found",
+    "close_timeout_submitted": "Request timed out, but the close was submitted successfully (positions refreshed)"
   },
   "backtest": {
     "archived": "Archived",

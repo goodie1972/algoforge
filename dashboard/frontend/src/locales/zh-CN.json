@@ -760,7 +760,8 @@
     "empty": "暂无持仓",
     "open_time": "开仓时间",
     "direction": "方向",
-    "close_not_found": "该单已平仓或不存在"
+    "close_not_found": "该单已平仓或不存在",
+    "close_timeout_submitted": "请求超时，但平仓已提交成功（持仓已刷新）"
   },
   "backtest": {
     "archived": "已归档",

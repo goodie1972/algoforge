@@ -127,7 +127,7 @@ def main():
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{BASE_DIR};{env.get('PYTHONPATH', '')}"
     _proc = subprocess.Popen(
-        [sys.executable, str(BACKEND_DIR / "main.py")],
+        [sys.executable, "-m", "dashboard.backend.main"],
         cwd=BASE_DIR,
         env=env,
         stdout=subprocess.PIPE,

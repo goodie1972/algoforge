@@ -698,6 +698,7 @@ function applyVolume() {
       paneSeries['volume'] = pc.addHistogramSeries({
         priceLineVisible: false, lastValueVisible: true,
       })
+      pc.priceScale('right').applyOptions({ scaleMargins: { top: 0.05, bottom: 0.05 } })
     }
 
     paneSeries['volume'].setData(castTime(vol))
@@ -707,7 +708,6 @@ function applyVolume() {
 }
 
 function applyADX() {
-  console.log('[ADX] v2.4.8 applyADX called, showADX:', showADX.value)
   if (!showADX.value) { destroyPane('adx'); return }
   const data = getCandleData()
   if (data.length === 0) return
@@ -751,7 +751,6 @@ function applyADX() {
 }
 
 function applyDI() {
-  console.log('[DI] v2.4.8 applyDI called, showDI:', showDI.value)
   if (!showDI.value) { destroyPane('di'); return }
   const data = getCandleData()
   if (data.length === 0) return
@@ -844,7 +843,6 @@ function applyMFI() {
 }
 
 function applyBBI() {
-  console.log('[BBI] v2.4.8 applyBBI called, showBBI:', showBBI.value)
   if (!showBBI.value) { destroyPane('bbi'); return }
   const data = getCandleData()
   if (data.length === 0) return
@@ -925,10 +923,16 @@ function scrollAllToRealTime() {
 
 function syncAllPriceScaleWidths() {
   if (!chart) return
-  const mainWidth = chart.priceScale('right').width()
-  if (mainWidth <= 0) return
-  for (const name of Object.keys(paneCharts)) {
-    paneCharts[name].priceScale('right').applyOptions({ minimumWidth: mainWidth })
+  // 取所有图（含主图）价格刻度的最大宽度，统一设为该值
+  const allCharts = [chart, ...Object.values(paneCharts)]
+  let maxWidth = 0
+  for (const c of allCharts) {
+    const w = c.priceScale('right').width()
+    if (w > maxWidth) maxWidth = w
+  }
+  if (maxWidth <= 0) return
+  for (const c of allCharts) {
+    c.priceScale('right').applyOptions({ minimumWidth: maxWidth })
   }
 }
 

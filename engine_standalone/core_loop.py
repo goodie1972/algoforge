@@ -111,13 +111,16 @@ class CoreLoopMixin:
         )
 
     def _is_market_open(self) -> bool:
-        """检查市场是否开放（周末休市）"""
+        """检查市场是否开放（周末休市，北京时间）"""
         now = datetime.now()
-        # 周六全天休市
-        if now.weekday() == 5:  # Saturday
+        # 周六 05:00 (北京) 后闭市（周五 21:00 UTC 收盘）
+        if now.weekday() == 5 and now.hour >= 5:  # Saturday after 5am
             return False
-        # 周日 07:00 UTC+8 前休市
-        if now.weekday() == 6 and now.hour < 7:  # Sunday before 7am
+        # 周日全天休市（周日 22:00 UTC = 周一 06:00 北京 开盘）
+        if now.weekday() == 6:  # Sunday
+            return False
+        # 周一 06:00 (北京) 前仍未开盘
+        if now.weekday() == 0 and now.hour < 6:  # Monday before 6am
             return False
         return True
 

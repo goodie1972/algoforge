@@ -9,7 +9,7 @@ from typing import TypedDict
 
 logger = logging.getLogger(__name__)
 
-DOCS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs", "strategies")
+DOCS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "strategies", "docs", "strategies")
 
 
 class EntryFactor(TypedDict, total=False):

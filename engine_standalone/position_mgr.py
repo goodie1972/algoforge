@@ -264,6 +264,11 @@ class PositionMgrMixin:
             except Exception:
                 pass
 
+    def _trim_closed_trades(self, max_size: int = 1000):
+        """限制内存中已平仓列表大小，避免无限增长"""
+        while len(self._closed_trades) > max_size:
+            self._closed_trades.pop(0)
+
     def _update_floating_pnl(self):
         """更新所有策略的浮动盈亏（含 legacy magic 持仓）"""
         all_positions = self.bridge.get_positions(settings.SYMBOL)

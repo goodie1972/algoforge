@@ -3,6 +3,51 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.3.6] - 2026-08-17 — 平仓记录写入修复 + 策略描述路径修复
+
+### 修复
+- **平仓记录不写入 trades 表**：`_run_exits` 中调用未定义的 `_trim_closed_trades` 方法导致 `AttributeError`，异常跳出循环后 `db.insert_trade` 被跳过。已在 `PositionMgrMixin` 中补上该方法定义，并加固异常捕获（`json.dumps` 异常类型从 `OSError` 扩展为 `(OSError, TypeError, ValueError, OverflowError)`，`db.insert_trade` 异常改为打 `error` 日志不再 `pass`）
+- **策略描述不显示**：`strategy_logics.py` 的 `DOCS_DIR` 指向已不存在的 `docs/strategies/`，实际文件在 `strategies/docs/strategies/`。已修正路径
+- 补录 003/004/005 平仓记录到 trades 表（分别盈利 +3.59 / +2.73 / +4.40）
+
+## [3.3.5] - 2026-08-16 — 平仓超时误报修复
+
+### 修复
+- **平仓"超时错误"误报**：平仓走 MT4 桥接命令（`_send_cmd` 默认 socket timeout 10s × 2 次重试，最坏 ~20s），而前端 axios 全局 timeout 仅 10s —— 平仓实际成功但前端先报"请求超时"，刷新后才消失。现已：
+  - 前端 `closePosition` 单独放宽 timeout 至 30s
+  - 持仓 store 超时兜底：请求超时后自动刷新持仓确认，若单子已平掉则按"已提交成功"提示（`TIMEOUT_BUT_CLOSED`），不再误报失败
+  - `PositionsTable` 区分提示：`请求超时，但平仓已提交成功（持仓已刷新）`
+  - 后端 `close_position` 路由改用 `run_bridge`（专用线程执行器），不再同步阻塞 uvicorn event loop（与 `modify_position` 一致）
+- 新增中英文案 `positions.close_timeout_submitted`
+
+## [3.3.4] - 2026-08-16 — 双实例引擎状态脱节修复
+
+### 修复
+- **引擎状态脱节（平仓失败根因）**：`python main.py` 以 `__main__` 加载时，运行中任何 `from dashboard.backend.main import XX` 会二次执行顶层代码，创建第二份 `EngineRunner` 并覆盖路由引用，导致 API/UI 显示 stopped、持仓为空、手动平仓失败。现已：
+  - `start.py` 改用 `python -m dashboard.backend.main` 模块方式启动（统一模块名）
+  - `main.py` 增加模块名守卫：脚本方式运行时提前注册 `sys.modules["dashboard.backend.main"]`，防止二次加载
+- **非交易时间误入场的根因**：`_is_market_open()` 错误地把「周日 07:00 北京时间」当开盘（正确应为周一 06:00 = 周日 22:00 UTC），且信号/Athlete 候选票阶段无市场开放过滤。现已：
+  - 修正 `engine_standalone/main.py` 与 `engine_standalone/core_loop.py` 的 `_is_market_open()`：闭市窗口为周六 05:00（北京）→ 周一 06:00（北京）
+  - 策略信号处理处（`Signal received` 后）增加市场开放检查，休市期间不再产生 Athlete 候选票/尝试开仓
+- **AI 聊天面板关闭按钮**：`AiChatPanel` 头部新增关闭按钮（上一版本 ChatLauncher 隐藏按钮的遗留问题），点击可收起面板
+
+## [3.3.3] - 2026-08-16 — AI 交易助理「金探」上线
+
+### 新增
+- **AI 交易助理「金探」** — 右下角浮动聊天面板，支持自然语言对话
+  - 人设：黄金量化交易分析师，熟悉系统三轨架构和 18 个策略
+  - 交易上下文自动注入：账户/持仓/价格/指标/新闻/策略状态/经济日历
+  - SSE 流式响应，逐字输出（打字机效果）
+  - 6 个快捷指令：行情研判/持仓诊断/新闻解读/策略表现/风险检查/今日总结
+  - 多会话管理：新建/切换/删除，会话持久化到 SQLite
+  - 空状态引导 + Markdown 渲染（加粗/列表/表格/代码块）
+  - 暗色主题，金色品牌色，响应式布局
+- 新增 `chat_sessions` + `chat_messages` 数据库表
+- 新增后端 `ai_service.py`（上下文收集 + System Prompt + 会话管理）
+- 新增后端 `routes/ai.py`（会话 CRUD + `/api/ai/chat` SSE 流式端点）
+- 新增前端 `stores/chat.ts`（Pinia 状态管理 + SSE 接收）
+- 新增前端组件：`ChatLauncher.vue` / `AiChatPanel.vue` / `ChatMessage.vue`
+
 ## [3.3.2] - 2026-08-16 — 删除策略 bug 修复 + 策略说明文档补全
 
 ### 修正

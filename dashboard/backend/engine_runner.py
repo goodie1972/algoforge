@@ -17,6 +17,16 @@ from core.bridge import MT4BridgeBase, OrderType
 
 class EngineRunner:
     """在后台线程中运行 TradingEngine，暴露状态供 API / WebSocket 查询"""
+    # 模块级单例，避免循环导入
+    _instance: Optional['EngineRunner'] = None
+
+    @classmethod
+    def get_instance(cls) -> Optional['EngineRunner']:
+        return cls._instance
+
+    @classmethod
+    def set_instance(cls, instance: 'EngineRunner') -> None:
+        cls._instance = instance
 
     def __init__(self, config_service=None):
         self.config_service = config_service

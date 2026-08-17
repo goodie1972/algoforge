@@ -79,7 +79,7 @@ async def close_position(ticket: int, req: CloseRequest = None):
         raise HTTPException(503, "桥接器未连接")
     try:
         volume = req.volume if req and req.volume else 0
-        ok = engine_runner.close_position(ticket, volume)
+        ok = await run_bridge(engine_runner.close_position, ticket, volume)
         if not ok:
             raise HTTPException(404, f"平仓失败，订单 {ticket} 可能已不存在")
         return {"message": f"订单 {ticket} 已平仓", "ticket": ticket}

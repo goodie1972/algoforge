@@ -23,6 +23,18 @@ async def run_bridge(func, *args):
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
+# 以脚本方式运行（python main.py）时，提前用规范模块名注册自身；
+# 否则运行中任何 `from dashboard.backend.main import XX` 都会二次执行本文件顶层代码，
+# 产生第二份 engine_runner/app 并覆盖路由引用，导致 API 与真实引擎状态脱节（平仓失败等问题）。
+if "__main__" in sys.modules:
+    try:
+        _main_mod = sys.modules["__main__"]
+        _main_file = getattr(_main_mod, "__file__", "") or ""
+        if _main_file.replace("\\", "/").endswith("/main.py") and "dashboard.backend.main" not in sys.modules:
+            sys.modules["dashboard.backend.main"] = _main_mod
+    except Exception:
+        pass
+
 # === 服务初始化 ===
 from dashboard.backend.config_service import RuntimeConfig
 from dashboard.backend.engine_runner import EngineRunner
@@ -54,6 +66,7 @@ if not logging.getLogger().handlers:
     logging.getLogger().addHandler(_console)
 
 engine_runner = EngineRunner(config_service=config_service)
+EngineRunner.set_instance(engine_runner)
 
 # === 注入依赖到路由模块 ===
 from dashboard.backend.routes import engine as route_engine
@@ -73,6 +86,7 @@ from dashboard.backend.routes import strategies as route_strategies
 from dashboard.backend.routes import supervisor as route_supervisor
 from dashboard.backend.routes import paper_trading as route_paper_trading
 from dashboard.backend.routes.llm_provider import router as llm_provider_router
+from dashboard.backend.routes.ai import router as ai_router
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -319,6 +333,7 @@ app.include_router(route_strategies.router)
 app.include_router(route_supervisor.router)
 app.include_router(route_paper_trading.router)
 app.include_router(llm_provider_router)
+app.include_router(ai_router)
 
 
 # === WebSocket 端点 ===
