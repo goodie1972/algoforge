@@ -9,6 +9,15 @@ from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side, numbers
 
+# ── 时区 ────────────────────────────────────────────────
+try:
+    from config.settings import LOCAL_TZ, dt_local
+except ImportError:
+    from datetime import timezone, timedelta
+    LOCAL_TZ = timezone(timedelta(hours=8))
+    def dt_local(ts):
+        return datetime.fromtimestamp(ts, tz=LOCAL_TZ)
+
 # ── 配置 ────────────────────────────────────────────────
 INITIAL_CAPITAL = 10000.0      # 模拟初始资金 USD
 FIXED_LOT = 0.1                # 固定每笔 0.1手
@@ -196,7 +205,7 @@ def compute_factors(m30, h1, curr_price):
     closes_h1 = [b['close'] for b in h1]
     bid = curr_price.get('bid', m30[-1]['close'])
     now_ts = m30[-1]['time']
-    now_str = datetime.fromtimestamp(now_ts).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = dt_local(now_ts).strftime("%Y-%m-%d %H:%M:%S")
     
     # ─── 公共指标 ───
     ema9_h1 = ema(closes_h1, 9)
@@ -243,7 +252,7 @@ def compute_factors(m30, h1, curr_price):
     breakout_dn = bid < recent_low
     
     # 日内时段 (UTC+8)
-    hour = datetime.now().hour
+    hour = datetime.now(tz=LOCAL_TZ).hour
     asia_session = 6 <= hour < 14
     london_session = 15 <= hour < 23
     ny_session = 21 <= hour or hour < 5
@@ -460,7 +469,8 @@ def load_state():
         "trades": [],
         "total_trades": 0,
         "wins": 0,
-        "losses": 0
+        "losses": 0,
+        "last_open_time": 0,  # 全局冷却期: 上次开仓时间戳
     }
 
 def save_state(state):
@@ -745,7 +755,7 @@ def generate_excel():
         ('胜率', f'{round(state["wins"]/state["total_trades"]*100, 1) if state["total_trades"] > 0 else 0}%'),
         ('当前持仓数', len(state['positions'])),
         ('每笔手数', f'{FIXED_LOT} 手'),
-        ('更新时间', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        ('更新时间', datetime.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")),
     ]
     
     for item, val in overview:
@@ -817,7 +827,7 @@ def main():
         return f"[ERROR] 数据不足: M30={len(m30)}, H1={len(h1)}"
     
     bid = current_price.get('bid', m30[-1]['close'])
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(tz=LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")
     
     # 2. Compute factor scores
     factor_data = compute_factors(m30, h1, current_price)
@@ -869,15 +879,27 @@ def main():
             pnl = close_position(state, pos, bid, f"信号出场: {f[strat_name]['说明']}", now_str)
             report += f"\n  📴 平仓 {strat_name} {pos['direction']} @ {bid:.2f} PnL=${pnl:.2f}"
     
-    # 6. Check new entry signals
+    # 6. Check new entry signals (含全局冷却期)
+    GLOBAL_COOLDOWN_SEC = 1800  # 30 分钟冷却期：开仓后 30 分钟内不开新仓
+    now_unix = time.time()
+    last_open = state.get('last_open_time', 0)
+    in_cooldown = (now_unix - last_open) < GLOBAL_COOLDOWN_SEC
+    cooldown_secs_left = max(0, GLOBAL_COOLDOWN_SEC - (now_unix - last_open)) if in_cooldown else 0
+    if in_cooldown:
+        report += f"\n  ⏳ 全局冷却中: 剩余 {cooldown_secs_left:.0f}s"
+
     for name, scores in f.items():
         if scores['信号'] in ('BUY', 'SELL') and name not in active_strats:
+            # 冷却期检查
+            if in_cooldown:
+                continue
             # Check no opposite position exists
             has_opposite = any(p['strategy'] == name for p in state['positions'])
             if not has_opposite:
                 open_position(state, name, scores['信号'], bid, now_str)
+                state['last_open_time'] = now_unix  # 更新冷却期计时
                 arrow = "▲" if scores['信号'] == "BUY" else "▼"
-                report += f"\n  🆕 {arrow} 开仓 {name} {scores['信号']} @ {bid:.2f}"
+                report += f"\n  🆕 {arrow} 开仓 {name} {scores['信号']} @ {bid:.2f} (冷却{GLOBAL_COOLDOWN_SEC//60}min)"
     
     # 7. Update equity
     floating = 0

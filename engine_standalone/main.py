@@ -42,6 +42,13 @@ from engine_standalone.events import format_status_report, format_trade_close_lo
 # 日志配置（仅在未配置时设置，避免被 Dashboard 引入重复 handler）
 if not logging.getLogger().handlers:
     from logging.handlers import RotatingFileHandler
+    from logging import Filter
+
+    class ErrorFilter(Filter):
+        """只允许 ERROR 及以上级别的日志通过"""
+        def filter(self, record):
+            return record.levelno >= logging.ERROR
+
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL),
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
@@ -57,11 +64,14 @@ if not logging.getLogger().handlers:
                 maxBytes=5_000_000,   # 5 MB 轮转
                 backupCount=3,
                 encoding="utf-8",
-                level="ERROR",        # 只记录 ERROR+
             ),
             logging.StreamHandler(sys.stdout),
         ],
     )
+    # 为 error.log 添加过滤，只记录 ERROR 及以上
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, RotatingFileHandler) and "error.log" in handler.baseFilename:
+            handler.addFilter(ErrorFilter())
 logger = logging.getLogger(__name__)
 
 SAFETY_LOCK_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "safety_lock.txt")
@@ -132,6 +142,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         self._last_data_sync = 0.0
         self._data_sync_interval = 300  # 每300秒（5分钟）同步一次数据
         self._last_recover_time = 0.0   # 上次成交恢复时间
+        self._last_config_check = 0.0   # 配置文件热重载检查时间守卫
+        self._config_check_interval = 5.0  # 配置文件检查间隔（秒）
         self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
         self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
         self._entry_times: dict[int | str, float] = {}     # ticket → 开仓时间戳
@@ -144,6 +156,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         self._MAX_CLOSED_TRADES = 200
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
+        self._last_account_info = None
+        self._last_account_info_time = 0.0
         # 监督者系统
         self.supervisor = TradeSupervisor()
         db.init_db()  # 确保所有表存在
@@ -884,6 +898,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             except Exception as e:
                 logger.exception(f"Main loop exception: {e}")
                 time.sleep(60)
+            # 主循环休眠 100ms，避免 CPU 满载（tick 频率约 1-10Hz，100ms 足够了）
+            time.sleep(0.1)
 
         self.bridge.disconnect()
         logger.info("Trading engine stopped")
@@ -898,34 +914,39 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             self._athlete.run()
             self._handle_athlete_opened()
 
-        # 配置热重载
-        try:
-            mtime = os.path.getmtime(settings.__file__)
-            if mtime > self._config_mtime:
-                self._config_mtime = mtime
-                importlib.reload(settings)
-                RuntimeConfig().reload()
-                logger.info("[HotReload] RuntimeConfig reloaded, active config updated")
-                from services.log_messages import clear_lang_cache
-                clear_lang_cache()
-                for s in snapshot:
-                    s.reload_config()
-                logger.info("[HotReload] Config updated")
-        except OSError:
-            pass
+        # 配置热重载（每 5 秒检查一次，避免每 tick 文件 I/O）
+        now = time.time()
+        if now - self._last_config_check < self._config_check_interval:
+            pass  # 跳过本轮检查
+        else:
+            self._last_config_check = now
+            try:
+                mtime = os.path.getmtime(settings.__file__)
+                if mtime > self._config_mtime:
+                    self._config_mtime = mtime
+                    importlib.reload(settings)
+                    RuntimeConfig().reload()
+                    logger.info("[HotReload] RuntimeConfig reloaded, active config updated")
+                    from services.log_messages import clear_lang_cache
+                    clear_lang_cache()
+                    for s in snapshot:
+                        s.reload_config()
+                    logger.info("[HotReload] Config updated")
+            except OSError:
+                pass
 
-        # runtime_config.json 热重载（仪表盘配置变更时）
-        try:
-            from core.runtime_config import CONFIG_FILE
-            rt_mtime = os.path.getmtime(CONFIG_FILE)
-            if rt_mtime > self._rtconfig_mtime:
-                self._rtconfig_mtime = rt_mtime
-                RuntimeConfig().reload()
-                for s in snapshot:
-                    s.reload_config()
-                logger.info("[RuntimeConfig] Hot reload complete")
-        except OSError:
-            pass
+            # runtime_config.json 热重载（仪表盘配置变更时）
+            try:
+                from core.runtime_config import CONFIG_FILE
+                rt_mtime = os.path.getmtime(CONFIG_FILE)
+                if rt_mtime > self._rtconfig_mtime:
+                    self._rtconfig_mtime = rt_mtime
+                    RuntimeConfig().reload()
+                    for s in snapshot:
+                        s.reload_config()
+                    logger.info("[RuntimeConfig] Hot reload complete")
+            except OSError:
+                pass
 
         # 策略池热同步：自动增删策略（无需重启引擎）
         self._sync_strategy_pool()
@@ -1213,20 +1234,22 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             ema_slope = ema_values[-1] - ema_values[-4]  # 最近 3 根
 
             # 斜率归一化：用 ATR 衡量斜率大小，避免微小波动触发平仓
+            # 直接使用 DataFactory 缓存的 ATR，避免重复计算
             sensitivity = coord.get('m15_reverse_tp_sensitivity', 0.5) if tf == 'M15' else coord.get('m5_reverse_tp_sensitivity', 0.5)
-            if sensitivity > 0:
-                tr_vals = []
-                for i in range(1, len(candles[1:])):
-                    c = candles[i]
-                    pc = candles[i-1].close
-                    tr_vals.append(max(c.high-c.low, abs(c.high-pc), abs(c.low-pc)))
-                atr14 = sum(tr_vals[:14])/14 if len(tr_vals) >= 14 else 0
-                if atr14 > 0:
-                    trend_up = ema_slope > atr14 * sensitivity
-                    trend_down = ema_slope < -atr14 * sensitivity
-                else:
-                    trend_up = ema_slope > 0
-                    trend_down = ema_slope < 0
+            cached_atr = None
+            if tf == 'M15':
+                from services.data_factory import get_cache
+                cache_m15 = get_cache("M15")
+                cached_atr = cache_m15.get("atr") or cache_m15.get("atr_20")
+            elif tf == 'M5':
+                from services.data_factory import get_cache
+                cache_m5 = get_cache("M5")
+                cached_atr = cache_m5.get("atr") or cache_m5.get("atr_20")
+
+            if sensitivity > 0 and cached_atr and cached_atr > 0:
+                atr14 = cached_atr
+                trend_up = ema_slope > atr14 * sensitivity
+                trend_down = ema_slope < -atr14 * sensitivity
             else:
                 trend_up = ema_slope > 0
                 trend_down = ema_slope < 0
@@ -1331,6 +1354,15 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             return
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
         now = time.time()
+
+        # 一次性获取历史成交记录，避免循环内重复查询
+        _broker_history = {}
+        try:
+            for o in self.bridge.get_order_history(settings.SYMBOL):
+                _broker_history[o["ticket"]] = o
+        except Exception:
+            pass
+
         for pos in my_positions:
             should_exit = strategy.check_ema20_exit(pos, bid, ask)
             if not should_exit:
@@ -1362,18 +1394,10 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             logger.info(f"[{strategy.name}] Strategy exit Ticket={pos.ticket}")
             self.bridge.close_order(pos.ticket)
 
-            # 从 MT4 历史成交获取开平仓时间（同源，计算持仓时间准确）
-            broker_open = 0
-            broker_close = 0
-            try:
-                history = self.bridge.get_order_history(settings.SYMBOL)
-                for o in history:
-                    if o["ticket"] == pos.ticket:
-                        broker_open = o["open_time"]
-                        broker_close = o["close_time"]
-                        break
-            except Exception:
-                pass
+            # 从缓存的历史中查找开平仓时间（同源，计算持仓时间准确）
+            _hist = _broker_history.get(pos.ticket, {})
+            broker_open = _hist.get("open_time", 0)
+            broker_close = _hist.get("close_time", 0)
 
             direction = "BUY" if pos.order_type in ("OP_BUY", "BUY") else "SELL"
             self._record_close(pos.ticket, pnl, strategy.magic, direction)
@@ -1691,7 +1715,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                         entry_info["sl"] = entry_price + sl_pips * 0.01 * 10
                         entry_info["tp"] = entry_price - tp_pips * 0.01 * 10
                 entry_info["entry_price"] = entry_price
-                self._athlete.submit(signal_id, direction, entry_info)
+                self._athlete.submit(signal_id, direction, entry_info, strategy_cls=type(strategy))
                 # ★ 提交后立即处理开仓成功回调 ★
                 self._handle_athlete_opened()
         else:
@@ -1714,74 +1738,33 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                     db.update_signal_status(signal_id, {"status": "voided", "void_reason": "订 orders发送失败"})
 
     def _execute_buy(self, strategy, signal_id=0):
-        bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
-        if hasattr(strategy, 'get_dynamic_sl_tp'):
-            sl, tp = strategy.get_dynamic_sl_tp(OrderType.BUY, ask)
-            if sl is None or tp is None:
-                sl = ask - self._rt('stop_loss_pips') * 0.01
-                tp = ask + self._rt('take_profit_pips') * 0.01
-        else:
-            sl = ask - self._rt('stop_loss_pips') * 0.01
-            tp = ask + self._rt('take_profit_pips') * 0.01
-
-        ticket = self.bridge.open_order(
-            symbol=settings.SYMBOL,
-            order_type=OrderType.BUY,
-            volume=self._rt('lot_size'),
-            price=ask,
-            sl=sl,
-            tp=tp,
-            comment=strategy.name,
-            magic=strategy.magic,
-        )
-        if ticket:
-            self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
-            logger.info(f"[{strategy.name}] Open long Magic={strategy.magic} "
-                        f"{self._rt('lot_size')}手 @ {ask:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
-            self._entry_times[ticket] = time.time()
-            last_sig = getattr(strategy, "_last_signal", None) or {}
-            self._entry_signal_data[ticket] = {
-                "entry_factors": {
-                    "long": last_sig.get("factors_long", []),
-                    "short": last_sig.get("factors_short", []),
-                },
-                "indicator_values": last_sig.get("indicator_values", {}),
-                "scores": {"long": last_sig.get("score_long", 0), "short": last_sig.get("score_short", 0)},
-            }
-            if hasattr(strategy, 'mark_extreme_entry'):
-                strategy.mark_extreme_entry(ticket)
-            # 通知监督者
-            if hasattr(self, 'supervisor'):
-                direction = "BUY"
-                ed = self._entry_signal_data.get(ticket, {})
-                self.supervisor.on_trade_open(
-                    ticket=ticket, strategy=strategy.name,
-                    direction=direction, price=ask,
-                    magic=strategy.magic,
-                    entry_data={
-                        "entry_factors": ed.get("entry_factors", {}),
-                        "indicator_values": ed.get("indicator_values", {}),
-                        "scores": ed.get("scores", {}),
-                    },
-                )
-        return ticket or 0
+        """旧接口兼容 — 调用合并后的 _execute_order"""
+        return self._execute_order(strategy, "BUY", signal_id)
 
     def _execute_sell(self, strategy, signal_id=0):
+        """旧接口兼容 — 调用合并后的 _execute_order"""
+        return self._execute_order(strategy, "SELL", signal_id)
+
+    def _execute_order(self, strategy, direction: str, signal_id=0) -> int:
+        """统一开仓逻辑 — BUY/SELL 共用"""
+        order_type = OrderType.BUY if direction == "BUY" else OrderType.SELL
         bid, ask = self.bridge.get_tick_price(settings.SYMBOL)
+        price = ask if direction == "BUY" else bid
+
         if hasattr(strategy, 'get_dynamic_sl_tp'):
-            sl, tp = strategy.get_dynamic_sl_tp(OrderType.SELL, bid)
+            sl, tp = strategy.get_dynamic_sl_tp(order_type, price)
             if sl is None or tp is None:
-                sl = bid + self._rt('stop_loss_pips') * 0.01
-                tp = bid - self._rt('take_profit_pips') * 0.01
+                sl = price - self._rt('stop_loss_pips') * 0.01 if direction == "BUY" else price + self._rt('stop_loss_pips') * 0.01
+                tp = price + self._rt('take_profit_pips') * 0.01 if direction == "BUY" else price - self._rt('take_profit_pips') * 0.01
         else:
-            sl = bid + self._rt('stop_loss_pips') * 0.01
-            tp = bid - self._rt('take_profit_pips') * 0.01
+            sl = price - self._rt('stop_loss_pips') * 0.01 if direction == "BUY" else price + self._rt('stop_loss_pips') * 0.01
+            tp = price + self._rt('take_profit_pips') * 0.01 if direction == "BUY" else price - self._rt('take_profit_pips') * 0.01
 
         ticket = self.bridge.open_order(
             symbol=settings.SYMBOL,
-            order_type=OrderType.SELL,
+            order_type=order_type,
             volume=self._rt('lot_size'),
-            price=bid,
+            price=price,
             sl=sl,
             tp=tp,
             comment=strategy.name,
@@ -1789,8 +1772,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         )
         if ticket:
             self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
-            logger.info(f"[{strategy.name}] Open short Magic={strategy.magic} "
-                        f"{self._rt('lot_size')}手 @ {bid:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
+            logger.info(f"[{strategy.name}] Open {direction} Magic={strategy.magic} "
+                        f"{self._rt('lot_size')}手 @ {price:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
             last_sig = getattr(strategy, "_last_signal", None) or {}
             self._entry_signal_data[ticket] = {
@@ -1805,11 +1788,10 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 strategy.mark_extreme_entry(ticket)
             # 通知监督者
             if hasattr(self, 'supervisor'):
-                direction = "SELL"
                 ed = self._entry_signal_data.get(ticket, {})
                 self.supervisor.on_trade_open(
                     ticket=ticket, strategy=strategy.name,
-                    direction=direction, price=bid,
+                    direction=direction, price=price,
                     magic=strategy.magic,
                     entry_data={
                         "entry_factors": ed.get("entry_factors", {}),
@@ -1820,12 +1802,21 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         return ticket or 0
 
     def _get_balance(self) -> float:
-        info = self.bridge.get_account_info()
-        return info.balance if info else 0.0
+        """获取账户余额（带缓存）"""
+        return self._get_account_info().balance if self._get_account_info() else 0.0
 
     def _get_equity(self) -> float:
-        info = self.bridge.get_account_info()
-        return info.equity if info else 0.0
+        """获取账户净值（带缓存）"""
+        return self._get_account_info().equity if self._get_account_info() else 0.0
+
+    def _get_account_info(self):
+        """获取账户信息（5秒内复用缓存，减少 MT4 桥接查询）"""
+        now = time.time()
+        if self._last_account_info and (now - self._last_account_info_time) < 5.0:
+            return self._last_account_info
+        self._last_account_info = self.bridge.get_account_info()
+        self._last_account_info_time = now
+        return self._last_account_info
 
     def _handle_news_risk(self, snapshot: list):
         """新闻事件风控：强平窗口平所有持仓"""
@@ -1928,9 +1919,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         blocked, reason = self.news_filter.is_in_blackout()
         if blocked:
             logger.info(f"[NewsFilter] blackout period: {reason}, skipopen")
-            for _ in range(3):
-                time.sleep(20)
-                self.bridge.send_heartbeat()
+            # 心跳保活已在主循环独立处理，此处不再阻塞 60s
             return True
         return False
 

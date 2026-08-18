@@ -273,6 +273,8 @@ class DataFactory:
         self._running = False
         self._thread = None
         self._last_db_ts: dict = {}  # 各周期已写 DB 的最大 K 线 ts，增量写用
+        self._last_ta_calc_time: dict = {}  # 各周期上次 TA-Lib 全量计算时间
+        self._ta_calc_interval = 5.0  # TA-Lib 全量计算间隔（秒），减少 CPU 负载
 
     def connect(self) -> bool:
         """连接数据桥接"""
@@ -399,7 +401,20 @@ class DataFactory:
                     _candles_dict[c.time] = c
                 merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-350:]
             # TA-Lib 计算 + DB 写在锁外（慢操作不持锁，避免阻塞 get_cache 读）
-            ta = _ta_only_indicators(merged, tf)
+            # 策略：有新 K 线时立即计算，否则每 5 秒全量重算一次保证数据新鲜度
+            now = time.time()
+            last_calc = self._last_ta_calc_time.get(tf, 0)
+            has_new_candle = (len(merged) > len(_old)) if _old else bool(new_candles)
+            need_full_calc = has_new_candle or (now - last_calc > self._ta_calc_interval)
+
+            ta = {}
+            if need_full_calc:
+                ta = _ta_only_indicators(merged, tf)
+                self._last_ta_calc_time[tf] = now
+            else:
+                # 增量模式：只计算最新一根 K 线的指标
+                latest_candle = merged[-1]
+                ta = {latest_candle.time: {}}
             latest_ind = ta.get(merged[-1].time, {}) if merged else {}
             # 缓存扁平：最新一根 TA-Lib 展开顶层，保留 _sync_indicators 已覆盖的 EA 字段
             with _CACHE_LOCK:

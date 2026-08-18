@@ -44,12 +44,14 @@ async def get_candles(
     try:
         from data.database import get_conn
         conn = get_conn()
-        rows = conn.execute(
-            "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
-            "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
-            (timeframe, count),
-        ).fetchall()
-        conn.close()
+        try:
+            rows = conn.execute(
+                "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+                "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
+                (timeframe, count),
+            ).fetchall()
+        finally:
+            conn.close()
         if rows:
             rows.reverse()
             return [

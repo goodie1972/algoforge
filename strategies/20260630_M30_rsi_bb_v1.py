@@ -89,26 +89,21 @@ class M30RSIStrategy(BaseStrategy):
         super().refresh_data(count)
 
     def _get_m30_rsi_direction(self) -> str:
-        """M30 RSI方向: 连续3 candlesRSIsame-dirconfirm
-        用 talib.RSI 在 self.candles 上计算，取最近 3 根判断方向。
+        """M30 RSI方向: 用 DataFactory 缓存的多w期 RSI(rsi_5/rsi_10/rsi) 比较方向
+        避免重算 talib.RSI——DataFactory 已提供 5/10/14 w期 RSI 缓存。
         """
-        closes = self.get_close_prices()
-        if closes is None or len(closes) < self.rsi_period + 3:
+        rsi_curr = self.get_indicator("rsi")
+        rsi_5 = self.get_indicator("rsi_5")
+        rsi_10 = self.get_indicator("rsi_10")
+        if rsi_curr is None or rsi_5 is None or rsi_10 is None:
             return 'flat'
-        try:
-            import numpy as np
-            import talib
-            rsi_arr = talib.RSI(np.array(closes, dtype=float), timeperiod=self.rsi_period)
-            if len(rsi_arr) < 3 or np.isnan(rsi_arr[-1]) or np.isnan(rsi_arr[-2]) or np.isnan(rsi_arr[-3]):
-                return 'flat'
-            rsi_3, rsi_2, rsi_1 = rsi_arr[-3], rsi_arr[-2], rsi_arr[-1]
-            if rsi_3 < rsi_2 < rsi_1:
-                return 'up'
-            if rsi_3 > rsi_2 > rsi_1:
-                return 'down'
-            return 'flat'
-        except Exception:
-            return 'flat'
+        # rsi_5 比 rsi_10 快，rsi_curr 比 rsi_5 快
+        # 方向反转: 短w期从低于长w期变为高于长w期（或反之）
+        if rsi_5 > rsi_10 and rsi_curr > rsi_5:
+            return 'up'
+        if rsi_5 < rsi_10 and rsi_curr < rsi_5:
+            return 'down'
+        return 'flat'
 
     # ─────────────── Signal generation ───────────────
 
@@ -221,9 +216,9 @@ class M30RSIStrategy(BaseStrategy):
         if adx_data:
             di_diff = adx_data["pdi"] - adx_data["ndi"]
             if di_diff > 10:
-                long_score += 1; long_detail.append(f"DI+{di_diff:.0f}")
+                long_score += 1; long_detail.append(f"DI-BULL+{di_diff:.0f}")
             elif di_diff < -10:
-                short_score += 1; short_detail.append(f"DI{di_diff:.0f}")
+                short_score += 1; short_detail.append(f"DI-BEAR{di_diff:.0f}")
 
         # ⑥ H1 趋-trendGate（只拦Signal不扣分）
         # 例外：价格在BBextreme + RSI极端同时满足时，confirm真均值回归，放过
@@ -510,7 +505,7 @@ class M30RSIStrategy(BaseStrategy):
                 return False
             if any(f.startswith("RSI-") for f in factors) and rsi > 45:
                 return False
-            if any(f.startswith("DI+") for f in factors) and pdi <= ndi:
+            if any(f.startswith("DI-BULL") for f in factors) and pdi <= ndi:
                 return False
             if any(f in ("M30-UP","MA20-UP") for f in factors) and trend != "UP":
                 return False
@@ -519,7 +514,7 @@ class M30RSIStrategy(BaseStrategy):
                 return False
             if any(f.startswith("RSI-") for f in factors) and rsi < 55:
                 return False
-            if any(f.startswith("DI-") or f.startswith("DI") for f in factors) and ndi <= pdi:
+            if any(f.startswith("DI-BEAR") for f in factors) and ndi <= pdi:
                 return False
             if any(f in ("M30-DN","MA20-DN") for f in factors) and trend != "DOWN":
                 return False

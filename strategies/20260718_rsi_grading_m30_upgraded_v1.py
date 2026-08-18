@@ -292,10 +292,10 @@ class RSIGradingM30Upgraded(BaseStrategy):
         dist = atr_val * hard
         if is_buy:
             sl = round(entry_price - dist, 2)
-            tp = round(entry_price + dist * 50, 2)
+            tp = 0  # 无固定止盈，交给 check_ema20_exit 自然出场
         else:
             sl = round(entry_price + dist, 2)
-            tp = max(round(entry_price - dist * 50, 2), 0)
+            tp = 0
         return sl, tp
 
     def _get_exit_multipliers(self, is_buy: bool) -> tuple[float, float]:
@@ -309,9 +309,10 @@ class RSIGradingM30Upgraded(BaseStrategy):
         return self.counter_trail, self.counter_hard
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """趋-trend感知出场（ and optimize版完全相同）"""
+        """趋-trend感知出场: 使用 BaseStrategy._run_exit_policy 统一执行出场策略"""
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
+        current_price = bid if is_buy else ask
 
         if ticket not in self._trail_data:
             self._trail_data[ticket] = {
@@ -333,75 +334,27 @@ class RSIGradingM30Upgraded(BaseStrategy):
         if _ax_adx and _ax_adx > 25:
             pdd = max(pdd, 0.5) if reg == "with" else min(pdd, 0.15)
 
-        if is_buy:
-            td["highest"] = max(td["highest"], bid)
-            current_profit = bid - td["entry"]
-            loss = td["entry"] - bid
-            td["peak_profit"] = max(td["peak_profit"], current_profit)
+        should_exit, exit_type, detail = self._run_exit_policy(
+            td, is_buy, current_price, atr_val, trail, hard,
+            pdd=pdd, update_peak_guard=False,
+        )
+        if not should_exit:
+            self._last_exit_detail = None
+            return False
 
-            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
-                logger.info(f"[{self.name}] BUY Breakeven ticket={ticket} profit=${current_profit:.2f}")
-                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
-                self._last_profit_exit_time["BUY"] = time.time()
-                del self._trail_data[ticket]
-                return True
+        direction = "BUY" if is_buy else "SELL"
+        detail["direction"] = direction
+        detail["reg"] = reg
+        # 带趋-trend感知前缀的 exit_type
+        prefixed_type = f"{reg}_{exit_type}" if exit_type in ("trail_stop", "hard_stop") else exit_type
+        self._last_exit_detail = {"exit_type": prefixed_type, **detail}
 
-            if current_profit > 0:
-                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
-                    profit_ratio = current_profit / td["peak_profit"]
-                    if profit_ratio < (1 - pdd):
-                        logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2), "reg": reg}
-                        del self._trail_data[ticket]
-                        return True
+        if exit_type == "breakeven":
+            self._last_profit_exit_time[direction] = time.time()
 
-            drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail:
-                logger.info(f"[{self.name}] BUY {reg}TrailStop ticket={ticket} peak={td['highest']:.2f} drawdown={drawdown:.2f}")
-                self._last_exit_detail = {"exit_type": f"{reg}_trail_stop", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2)}
-                del self._trail_data[ticket]
-                return True
-            if current_profit <= 0 and loss > atr_val * hard:
-                logger.info(f"[{self.name}] BUY {reg}HardStop ticket={ticket} loss={loss:.2f}")
-                self._last_exit_detail = {"exit_type": f"{reg}_hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
-                del self._trail_data[ticket]
-                return True
-        else:
-            td["lowest"] = min(td["lowest"], ask)
-            current_profit = td["entry"] - ask
-            loss = ask - td["entry"]
-            td["peak_profit"] = max(td["peak_profit"], current_profit)
-
-            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
-                logger.info(f"[{self.name}] SELL Breakeven ticket={ticket} profit=${current_profit:.2f}")
-                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
-                self._last_profit_exit_time["SELL"] = time.time()
-                del self._trail_data[ticket]
-                return True
-
-            if current_profit > 0:
-                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
-                    profit_ratio = current_profit / td["peak_profit"]
-                    if profit_ratio < (1 - pdd):
-                        logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2), "reg": reg}
-                        del self._trail_data[ticket]
-                        return True
-
-            rally = ask - td["lowest"]
-            if rally > atr_val * trail:
-                logger.info(f"[{self.name}] SELL {reg}TrailStop ticket={ticket} low={td['lowest']:.2f} rally={rally:.2f}")
-                self._last_exit_detail = {"exit_type": f"{reg}_trail_stop", "rally": round(rally, 2), "atr": round(atr_val, 2)}
-                del self._trail_data[ticket]
-                return True
-            if current_profit <= 0 and loss > atr_val * hard:
-                logger.info(f"[{self.name}] SELL {reg}HardStop ticket={ticket} loss={loss:.2f}")
-                self._last_exit_detail = {"exit_type": f"{reg}_hard_stop", "loss": round(loss, 2), "atr": round(atr_val, 2)}
-                del self._trail_data[ticket]
-                return True
-
-        self._last_exit_detail = None
-        return False
+        logger.info(f"[{self.name}] {direction} {reg} {exit_type} ticket={ticket} {detail}")
+        del self._trail_data[ticket]
+        return True
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:

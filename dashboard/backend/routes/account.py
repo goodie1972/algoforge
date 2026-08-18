@@ -2,35 +2,15 @@
 /api/account ��由 - ���户信息 + ��史快照
 """
 import logging
-from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
+from dashboard.backend.utils import _add_ts_fields
 
 router = APIRouter(prefix="/api/account", tags=["account"])
 logger = logging.getLogger(__name__)
 
 engine_runner = None
 run_bridge = None
-
-
-def _add_ts_fields(account: dict) -> dict:
-    result = dict(account)
-    for key in ("updated_at", "created_at", "timestamp"):
-        val = account.get(key)
-        if val:
-            try:
-                if isinstance(val, str):
-                    # Unix 时间戳字符串（纯数字）直接转 int
-                    if val.strip().isdigit():
-                        result[f"{key}_ts"] = int(val)
-                    else:
-                        dt = datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
-                        result[f"{key}_ts"] = int(dt.timestamp())
-                elif isinstance(val, (int, float)):
-                    result[f"{key}_ts"] = int(val)
-            except Exception:
-                pass
-    return result
 
 
 @router.get("")

@@ -11,7 +11,6 @@
 """
 import os
 import sys
-import math
 import sqlite3
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -21,6 +20,19 @@ from typing import Optional
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, PROJECT_ROOT)
+
+# 共享指标模块（与 DataFactory 口径一致：TA-Lib + numpy）
+from indicators.common import (
+    calc_ema, calc_ema_series,
+    calc_sma,
+    calc_rsi,
+    calc_stoch,
+    calc_macd,
+    calc_bb,
+    calc_atr as calc_atr_from_lists,
+    calc_keltner,
+    calc_adx,
+)
 
 # ============================================================
 # 数据加载
@@ -76,80 +88,44 @@ def load_ohlcv(timeframe):
 
 
 # ============================================================
-# 指标计算
+# 指标计算 — 委托至共享模块 indicators/common.py
 # ============================================================
-def calc_ema(closes, period):
-    if len(closes) < period: return None
-    k = 2.0 / (period + 1)
-    ema = closes[0]
-    for p in closes[1:]:
-        ema = (p - ema) * k + ema
-    return ema
-
-def calc_ema_series(closes, period):
-    if len(closes) < period: return None
-    k = 2.0 / (period + 1)
-    ema = [closes[0]]
-    for p in closes[1:]:
-        ema.append((p - ema[-1]) * k + ema[-1])
-    return ema
-
-def calc_sma(closes, period):
-    if len(closes) < period: return None
-    return sum(closes[-period:]) / period
-
-def calc_rsi(closes, period=14):
-    if len(closes) < period + 1: return None
-    gains, losses = [], []
-    for i in range(1, period + 1):
-        diff = closes[i] - closes[i - 1]
-        gains.append(max(diff, 0))
-        losses.append(max(-diff, 0))
-    avg_gain = sum(gains) / period
-    avg_loss = sum(losses) / period
-    for i in range(period + 1, len(closes)):
-        diff = closes[i] - closes[i - 1]
-        avg_gain = (avg_gain * (period - 1) + max(diff, 0)) / period
-        avg_loss = (avg_loss * (period - 1) + max(-diff, 0)) / period
-    if avg_loss == 0: return 100.0
-    return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+# calc_ema, calc_ema_series, calc_sma, calc_rsi, calc_bb,
+# calc_atr_from_lists(=calc_atr), calc_keltner, calc_adx
+# 已由 indicators.common 提供（TA-Lib + numpy，与 DataFactory 一致）
 
 def calc_stoch(closes_highs_lows, k_period=9, slowing=3, d_period=3):
-    """简化版 stoch（直接接收 closes/highs/lows 列表）"""
-    n = len(closes_highs_lows[0])
-    if n < k_period + slowing + d_period + 1: return None
+    """兼容旧签名：接收 [highs, lows, closes] 列表"""
     highs, lows, closes = closes_highs_lows
-    raw_k = []
-    for i in range(k_period - 1, n):
-        hi = max(highs[i - k_period + 1:i + 1])
-        lo = min(lows[i - k_period + 1:i + 1])
-        if hi == lo:
-            raw_k.append(50.0)
-        else:
-            raw_k.append((closes[i] - lo) / (hi - lo) * 100)
-    if len(raw_k) < slowing + d_period + 1: return None
-    smooth_k = [sum(raw_k[i - slowing + 1:i + 1]) / slowing for i in range(slowing - 1, len(raw_k))]
-    if len(smooth_k) < d_period + 1: return None
+    result = calc_stoch_internal(highs, lows, closes, k_period, slowing, d_period)
+    if result is None:
+        return None
     return {
-        "curr_k": smooth_k[-1], "prev_k": smooth_k[-2],
-        "curr_d": sum(smooth_k[-d_period:]) / d_period,
-        "prev_d": sum(smooth_k[-(d_period + 1):-1]) / d_period,
+        "curr_k": result["k"], "prev_k": result["prev_k"],
+        "curr_d": result["d"], "prev_d": result["prev_d"],
     }
 
+def calc_stoch_internal(highs, lows, closes, k_period=9, slowing=3, d_period=3):
+    """调用共享模块的 calc_stoch"""
+    return calc_stoch_shared(highs, lows, closes, k_period, slowing, d_period)
+
+# 导入共享模块的 calc_stoch
+from indicators.common import calc_stoch as calc_stoch_shared
+
+
 def calc_macd(closes):
-    if len(closes) < 35: return None
-    k12, k26, k9 = 2.0/13, 2.0/27, 2.0/10
-    e12 = closes[0]; e26 = closes[0]
-    macd_line = []
-    for p in closes:
-        e12 = (p - e12) * k12 + e12
-        e26 = (p - e26) * k26 + e26
-        macd_line.append(e12 - e26)
-    sig = [macd_line[0]]
-    for v in macd_line[1:]:
-        sig.append((v - sig[-1]) * k9 + sig[-1])
-    hist = [macd_line[i] - sig[i] for i in range(len(macd_line))]
-    return {"macd": macd_line[-1], "signal": sig[-1], "hist_values": hist}
+    """兼容旧签名：返回 {"macd", "signal", "hist_values"}"""
+    result = calc_macd_shared(closes, fast=12, slow=26, signal=9)
+    if result is None:
+        return None
+    return {
+        "macd": result["macd"],
+        "signal": result["signal"],
+        "hist_values": [result["hist"]],  # 旧版返回完整列表，简化为末值
+    }
+
+from indicators.common import calc_macd as calc_macd_shared
+
 
 def check_bottom_div(hist, lookback=10):
     n = len(hist); start = n - lookback * 2
@@ -171,30 +147,6 @@ def check_top_div(hist, lookback=10):
     if len(highs) < 2: return False
     return highs[-1][1] < highs[-2][1]
 
-def calc_bb(closes, period=20, std_mul=2.5):
-    if len(closes) < period: return None
-    recent = closes[-period:]
-    sma = sum(recent) / period
-    variance = sum((c - sma) ** 2 for c in recent) / period
-    std = math.sqrt(variance)
-    return {"sma": sma, "upper": sma + std_mul * std, "lower": sma - std_mul * std, "width": 2 * std_mul * std / sma}
-
-def calc_atr_from_lists(highs, lows, closes, period=20):
-    if len(closes) < period + 2: return None
-    tr = []
-    for i in range(1, len(closes)):
-        h, l, pc = highs[i], lows[i], closes[i - 1]
-        tr.append(max(h - l, abs(h - pc), abs(l - pc)))
-    if len(tr) < period: return None
-    atr = [sum(tr[:period]) / period]
-    for i in range(period, len(tr)):
-        atr.append((atr[-1] * (period - 1) + tr[i]) / period)
-    return atr[-1]
-
-def calc_keltner(closes, atr_val, period=20, mult=2.5):
-    ema20 = calc_ema(closes, period)
-    if ema20 is None or atr_val is None: return None
-    return {"ema": ema20, "upper": ema20 + atr_val * mult, "lower": ema20 - atr_val * mult}
 
 def calc_adx_proxy(highs, lows, period=14):
     """⚠️ DEPRECATED 2026-06-19: 这个不是真正的 ADX, 是效率比 (0-1 范围).
@@ -211,85 +163,14 @@ def calc_adx_proxy(highs, lows, period=14):
 
 
 def calc_adx_real(highs, lows, closes, period=14):
-    """真 ADX (Wilder via TA-Lib) — 0-100 范围, 标准趋势强度指标
-
-    Returns: dict {"adx": float, "pdi": float, "ndi": float} or None
-
-    标准用法:
-      ADX < 25  → 震荡 (counter-trend OK)
-      ADX >= 25 → 趋势 (需配合 +DI/-DI 判定方向)
-      +DI > -DI → 上升趋势
-      -DI > +DI → 下降趋势
-    """
-    if len(highs) < period + 2 or len(lows) < period + 2 or len(closes) < period + 2:
-        return None
-    try:
-        import numpy as np
-        import talib
-        h = np.array(highs, dtype=float)
-        l = np.array(lows, dtype=float)
-        c = np.array(closes, dtype=float)
-        adx_arr = talib.ADX(h, l, c, timeperiod=period)
-        pdi_arr = talib.PLUS_DI(h, l, c, timeperiod=period)
-        ndi_arr = talib.MINUS_DI(h, l, c, timeperiod=period)
-        adx_v = adx_arr[-1]
-        pdi_v = pdi_arr[-1]
-        ndi_v = ndi_arr[-1]
-        if np.isnan(adx_v) or np.isnan(pdi_v) or np.isnan(ndi_v):
-            return None
-        return {"adx": float(adx_v), "pdi": float(pdi_v), "ndi": float(ndi_v)}
-    except ImportError:
-        # TA-Lib 不可用, 回退到内置 Wilder 实现
-        return _calc_adx_wilder(highs, lows, closes, period)
-    except Exception:
-        return None
+    """真 ADX — 委托至共享模块 indicators.common.calc_adx"""
+    return calc_adx(highs, lows, closes, period)
 
 
 def _calc_adx_wilder(highs, lows, closes, period=14):
-    """Wilder ADX 纯 Python 实现 (TA-Lib 不可用时回退)"""
-    n = len(highs)
-    if n < period + 2:
-        return None
-    # 1. TR, +DM, -DM
-    tr_list, plus_dm, minus_dm = [], [], []
-    for i in range(1, n):
-        h, l, pc = highs[i], lows[i], closes[i-1]
-        ph, pl = highs[i-1], lows[i-1]
-        tr = max(h - l, abs(h - pc), abs(l - pc))
-        up = h - ph
-        down = pl - l
-        pdm = up if (up > down and up > 0) else 0
-        mdm = down if (down > up and down > 0) else 0
-        tr_list.append(tr)
-        plus_dm.append(pdm)
-        minus_dm.append(mdm)
-    # 2. Wilder 平滑
-    if len(tr_list) < period:
-        return None
-    atr_v = sum(tr_list[:period]) / period
-    pdi_v = sum(plus_dm[:period]) / period
-    ndi_v = sum(minus_dm[:period]) / period
-    if atr_v <= 0:
-        return None
-    pdi_v = pdi_v / atr_v * 100
-    ndi_v = ndi_v / atr_v * 100
-    atr_s = [atr_v]
-    pdi_s = [pdi_v]
-    ndi_s = [ndi_v]
-    for i in range(period, len(tr_list)):
-        atr_s.append((atr_s[-1] * (period - 1) + tr_list[i]) / period)
-        if atr_s[-1] > 0:
-            pdi_s.append((pdi_s[-1] * (period - 1) + plus_dm[i] / atr_s[-1] * 100) / period)
-            ndi_s.append((ndi_s[-1] * (period - 1) + minus_dm[i] / atr_s[-1] * 100) / period)
-        else:
-            pdi_s.append(pdi_s[-1])
-            ndi_s.append(ndi_s[-1])
-    # 3. DX + ADX
-    dx = [abs(pdi_s[i] - ndi_s[i]) / max(pdi_s[i] + ndi_s[i], 0.001) * 100 for i in range(len(atr_s))]
-    adx = [sum(dx[:period]) / period]
-    for i in range(period, len(dx)):
-        adx.append((adx[-1] * (period - 1) + dx[i]) / period)
-    return {"adx": adx[-1], "pdi": pdi_s[-1], "ndi": ndi_s[-1]}
+    """Wilder ADX 纯 numpy 实现 (TA-Lib 不可用时回退) — 委托至共享模块"""
+    from indicators.common import _calc_adx_wilder as _impl
+    return _impl(highs, lows, closes, period)
 
 # ============================================================
 # v6_hybrid 信号生成

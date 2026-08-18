@@ -511,7 +511,6 @@ async def generate_report(
     date: str = Query("", description="周报目标日期 YYYY-MM-DD"),
 ):
     """手动触发生成报告"""
-    open("D:/backup/baobao/pythonprogram/xauusd/report_started.txt", "a").close()
     if not engine_runner:
         raise HTTPException(400, "服务未初始化")
     try:
@@ -531,8 +530,4 @@ async def generate_report(
     except HTTPException:
         raise
     except Exception as e:
-        import traceback
-        _err = traceback.format_exc()
-        with open("D:\\backup\\baobao\\pythonprogram\\xauusd\\report_error.txt", "w") as _f:
-            _f.write(_err)
         raise HTTPException(500, f"生成报告失败: {e}")

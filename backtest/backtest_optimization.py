@@ -10,10 +10,18 @@ XAUUSD 多策略优化回测脚本 v2.0
 运行: python backtest/backtest_optimization.py
 """
 
-import os, sys
+import os, sys, json, csv, shutil
 from datetime import datetime
 import backtrader as bt
 import backtrader.feeds as btfeeds
+
+
+# XAUUSD 手续费模型
+# 每标准手(100oz)双边约$2-3, 取中值$2.50
+# backtrader 默认 size=1 (1oz), 双边 $0.025/oz
+# 费率 = 单边$0.0125 / $2300 ≈ 0.0000054 (0.00054%)
+# 对 size=100 (0.1手) 的交易, 双边约$2.50
+XAUUSD_COMMISSION_RATE = 0.0000054
 
 
 # ============================================================
@@ -590,9 +598,11 @@ def run_backtest(strategy_class, strategy_name, data_path, cash=10000.0,
     cerebro = bt.Cerebro(stdstats=False)
     cerebro.addstrategy(strategy_class)
     cerebro.broker.setcash(cash)
-    cerebro.broker.setcommission(commission=0.0)   # 点差在滑点中考虑
+    # XAUUSD 手续费模型: 每标准手(100oz)双边约$2-3, 取中值$2.50
+    # backtrader 默认 size=1(1oz), 费率 = $0.0125/$2300 ≈ 0.0000054
+    cerebro.broker.setcommission(commission=XAUUSD_COMMISSION_RATE)
 
-    # ⚠️ 滑点: 0.1% 单边 → 约$2.3/手（金价2300时），双边$4.6
+    # 滑点: 0.1% 单边 → 约$2.3/手（金价2300时），双边$4.6
     cerebro.broker.set_slippage_perc(0.001)
 
     data = btfeeds.GenericCSVData(
@@ -607,24 +617,33 @@ def run_backtest(strategy_class, strategy_name, data_path, cash=10000.0,
     cerebro.adddata(data)
 
     print(f'  资金: ${cash:.2f} | 数据: {os.path.basename(data_path)}')
-    print(f'  滑点: 0.1% 单边 | +1 K线入场')
+    print(f'  手续费: {XAUUSD_COMMISSION_RATE:.8f} (≈$2.50/0.1手双边) | 滑点: 0.1% 单边 | +1 K线入场')
     results = cerebro.run()
     strat = results[0]
     final_value = cerebro.broker.getvalue()
     total_return = (final_value - cash) / cash * 100
+    trade_count = strat.trade_count
+
+    # 估算手续费总额: 每笔双边约$2.50 (按 size=1 的 0.025/oz 比例)
+    est_commission_total = trade_count * 0.025  # size=1, 双边 $0.025/笔
+    gross_pnl = strat.total_pnl
+    net_pnl = final_value - cash
 
     print(f'\n  --- {strategy_name} ---')
     print(f'  初始: ${cash:,.2f} → 最终: ${final_value:,.2f}')
     print(f'  收益率: {total_return:+.2f}%')
-    print(f'  交易: {strat.trade_count} | 胜率: {strat.win_count/strat.trade_count*100:.1f}%' if strat.trade_count else '  N/A')
+    print(f'  交易: {trade_count} | 胜率: {strat.win_count/trade_count*100:.1f}%' if trade_count else '  N/A')
+    print(f'  ⚠️  手续费影响: ~${est_commission_total:.2f} (估算) | 毛PnL: ${gross_pnl:+.2f} | 净PnL: ${net_pnl:+.2f}')
 
     return {
         'strategy': strategy_name,
         'final_value': final_value,
         'total_return': total_return,
-        'trade_count': strat.trade_count,
+        'trade_count': trade_count,
         'win_count': strat.win_count,
         'total_pnl': strat.total_pnl,
+        'commission_rate': XAUUSD_COMMISSION_RATE,
+        'est_commission_total': est_commission_total,
     }
 
 
@@ -685,8 +704,50 @@ def main():
 
     print(f'  {"="*62}')
     print(f'  [!] 所有策略含 +1 K线入场延迟 + 0.1%单边滑点')
+    print(f'  [!] 手续费: {XAUUSD_COMMISSION_RATE:.8f} (≈$2.50/0.1手双边)')
     print(f'  [!] 评级: [***]>$50  [**]>$0  [*]>-$50')
     print()
+
+    # 落盘结果 — JSON + CSV
+    save_results(all_results, data_path, lines, XAUUSD_COMMISSION_RATE)
+
+
+def save_results(all_results, data_path, line_count, commission_rate):
+    """将回测结果落盘为 JSON 和 CSV，确保可复现"""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
+    os.makedirs(out_dir, exist_ok=True)
+
+    # JSON: 完整结果 + 元数据
+    json_path = os.path.join(out_dir, f"backtest_{ts}.json")
+    payload = {
+        "timestamp": datetime.now().isoformat(),
+        "data_file": data_path,
+        "candle_count": line_count,
+        "commission_rate": commission_rate,
+        "commission_note": "XAUUSD 每标准手(100oz)双边约$2.50",
+        "slippage_perc": 0.001,
+        "entry_delay": "+1K线",
+        "strategies": all_results,
+    }
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    print(f'  📄 JSON 结果已保存: {json_path}')
+
+    # CSV: 策略对比表
+    csv_path = os.path.join(out_dir, f"backtest_{ts}.csv")
+    with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow(['策略', '收益率%', '交易数', '胜场', '总盈亏', '手续费率', '估算手续费', '数据文件', 'K线数'])
+        for r in sorted(all_results, key=lambda x: -x['total_pnl']):
+            wr = r['win_count'] / r['trade_count'] * 100 if r['trade_count'] else 0
+            w.writerow([
+                r['strategy'], f"{r['total_return']:.2f}", r['trade_count'], r['win_count'],
+                f"{r['total_pnl']:.2f}", f"{r.get('commission_rate', 0):.8f}",
+                f"{r.get('est_commission_total', 0):.2f}",
+                os.path.basename(data_path), line_count,
+            ])
+    print(f'  📄 CSV 结果已保存: {csv_path}')
 
 
 if __name__ == "__main__":

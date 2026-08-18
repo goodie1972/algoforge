@@ -442,6 +442,97 @@ class BaseStrategy(abc.ABC):
         # 回到成本 ±0.05×ATR 以内（仅在盈利时触发，loss时让硬止损兜底）
         return 0 <= current_profit <= atr_val * 0.05
 
+    def _run_exit_policy(self, td: dict, is_buy: bool, current_price: float,
+                         atr_val: float, trail_mult: float, hard_mult: float,
+                         pdd: float = None, update_peak_guard: bool = False,
+                         **kwargs) -> tuple[bool, Optional[str], dict]:
+        """通用出场策略执行器——提取 12+ 策略中重复的 check_ema20_exit 核心逻辑。
+
+        执行顺序:
+          1. 更新 peak (highest/lowest)
+          2. 更新 peak_profit（可选 guard: abs(current_profit) < atr*10）
+          3. 保本出场 (_check_breakeven_exit)
+          4. profit_drawdown（盈利回撤保护）
+          5. trail_stop（ATR 追踪止损）
+          6. hard_stop（硬止损，仅 loss 阶段兜底）
+
+        参数:
+            td: 仓位跟踪数据 dict（子类维护，含 entry/highest/lowest/peak_profit）
+            is_buy: True=多头, False=空头
+            current_price: 当前价（bid for BUY, ask for SELL）
+            atr_val: ATR 值
+            trail_mult: ATR trailing 倍数
+            hard_mult: 硬止损 ATR 倍数
+            pdd: profit drawdown 百分比（None 用 self.profit_drawdown_pct 默认）
+            update_peak_guard: True 时仅 abs(current_profit) < atr*10 才更新 peak_profit
+            **kwargs: 额外数据（如 exit_type 前缀，供子类扩展日志用）
+
+        return:
+            (should_exit: bool, exit_type: Optional[str], exit_detail: dict)
+            should_exit=True 表示应平仓，exit_type 为类型名（供子类写日志和 _last_exit_detail）
+        """
+        if pdd is None:
+            pdd = self.profit_drawdown_pct
+
+        entry = td["entry"]
+
+        # ── 1. 更新 peak ──
+        if is_buy:
+            td["highest"] = max(td["highest"], current_price)
+            current_profit = current_price - entry
+            loss = entry - current_price
+        else:
+            td["lowest"] = min(td["lowest"], current_price)
+            current_profit = entry - current_price
+            loss = current_price - entry
+
+        # ── 2. 更新 peak_profit ──
+        if update_peak_guard:
+            if abs(current_profit) < atr_val * 10:
+                td["peak_profit"] = max(td["peak_profit"], current_profit)
+        else:
+            td["peak_profit"] = max(td["peak_profit"], current_profit)
+
+        # ── 3. 保本出场 ──
+        if self._check_breakeven_exit(td, current_profit, atr_val, entry, is_buy):
+            return (True, "breakeven", {"profit": round(current_profit, 2)})
+
+        # ── 4. profit_drawdown ──
+        if current_profit > 0 and self.profit_drawdown_enabled:
+            if td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
+                profit_ratio = current_profit / td["peak_profit"]
+                if profit_ratio < (1 - pdd):
+                    return (True, "profit_drawdown", {
+                        "peak_profit": round(td["peak_profit"], 2),
+                        "current_profit": round(current_profit, 2),
+                        "atr": round(atr_val, 2),
+                    })
+
+        # ── 5. trail_stop ──
+        if is_buy:
+            drawdown = td["highest"] - current_price
+            if drawdown > atr_val * trail_mult:
+                return (True, "trail_stop", {
+                    "drawdown": round(drawdown, 2), "atr": round(atr_val, 2),
+                    "trail_mult": trail_mult,
+                })
+        else:
+            rally = current_price - td["lowest"]
+            if rally > atr_val * trail_mult:
+                return (True, "trail_stop", {
+                    "rally": round(rally, 2), "atr": round(atr_val, 2),
+                    "trail_mult": trail_mult,
+                })
+
+        # ── 6. hard_stop ──
+        if current_profit <= 0 and loss > atr_val * hard_mult:
+            return (True, "hard_stop", {
+                "loss": round(loss, 2), "atr": round(atr_val, 2),
+                "hard_mult": hard_mult,
+            })
+
+        return (False, None, {})
+
     def filter_positions(self, positions: list[Position]) -> dict:
         """statscurrent品种 多空Positions"""
         longs = [p for p in positions if p.order_type in ("OP_BUY", "BUY")]

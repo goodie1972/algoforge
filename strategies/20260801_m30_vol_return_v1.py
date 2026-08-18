@@ -79,21 +79,12 @@ class M30VolReturnStrategy(BaseStrategy):
         short_factors = []
         iv = {}
 
-        # ATR 扩检测
+        # ATR 扩检测 — 使用 DataFactory 缓存的 atr_list，避免重算 talib.ATR
         atr_expanding = False
-        try:
-            import numpy as np
-            import talib
-            _h = np.array([c.high for c in candles], dtype=float)
-            _l = np.array([c.low for c in candles], dtype=float)
-            _c = np.array(closes, dtype=float)
-            _atr_arr = talib.ATR(_h, _l, _c, timeperiod=14)
-            _atr_valid = [x for x in _atr_arr[-5:] if not np.isnan(x)]
-            if len(_atr_valid) >= 5 and atr_val:
-                atr_ma = sum(_atr_valid) / 5
-                atr_expanding = atr_val > atr_ma * self.atr_expansion_threshold
-        except Exception:
-            pass
+        atr_list = self.get_indicator("atr_list")
+        if atr_list and len(atr_list) >= 5 and atr_val:
+            atr_ma = sum(atr_list[-5:]) / min(5, len(atr_list))
+            atr_expanding = atr_val > atr_ma * self.atr_expansion_threshold
 
         # BB 宽度扩 （volatility放大）
         bb_wide = False

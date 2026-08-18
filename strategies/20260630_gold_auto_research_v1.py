@@ -118,18 +118,11 @@ class GoldAutoResearchStrategy(BaseStrategy):
         ndi = self.get_indicator("ndi")
         atr_val = self.get_indicator("atr")
 
-        # ATR SMA(20) for comparison
-        try:
-            import numpy as np
-            import talib
-            _h = np.array(highs, dtype=float)
-            _l = np.array(lows, dtype=float)
-            _c = np.array(closes, dtype=float)
-            _atr_arr = talib.ATR(_h, _l, _c, timeperiod=14)
-            _atr_valid = [x for x in _atr_arr[-20:] if not np.isnan(x)]
-            atr_sma20 = sum(_atr_valid) / len(_atr_valid) if len(_atr_valid) >= 20 else None
-        except Exception:
-            atr_sma20 = None
+        # ATR SMA(20) for comparison — 使用 DataFactory 缓存的 atr_list
+        atr_list = self.get_indicator("atr_list")
+        atr_sma20 = None
+        if atr_list and len(atr_list) >= 10:
+            atr_sma20 = sum(atr_list) / len(atr_list)
 
         vol_active = False
         if adx_val is not None and adx_val > 20:
@@ -250,21 +243,17 @@ class GoldAutoResearchStrategy(BaseStrategy):
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
         _, hard_mult = self._get_exit_multipliers(direction == OrderType.BUY)
         dist = atr_val * hard_mult
+        # 无固定 TP，由 check_ema20_exit 运行时动态管理出场
         if direction == OrderType.BUY:
-            tp = round(entry_price + dist * 50, 2)
-            return round(entry_price - dist, 2), tp
+            return round(entry_price - dist, 2), 0
         else:
-            tp = round(entry_price - dist * 50, 2)
-            # TP 为负时设为 0（不给 TP，让移动take profit逻辑出场），
-            # 避免 MT4 OrderSend error 4107
-            if tp <= 0:
-                tp = 0
-            return round(entry_price + dist, 2), tp
+            return round(entry_price + dist, 2), 0
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
-        """双重take profit：profitdrawdowntake profit + ATR移动take profit + 硬止损"""
+        """出场: 使用 BaseStrategy._run_exit_policy 统一执行出场策略"""
         ticket = position.ticket
         is_buy = position.order_type in ("OP_BUY", "BUY")
+        current_price = bid if is_buy else ask
 
         if ticket not in self._trail_data:
             trail_mult, hard_mult = self._get_exit_multipliers(is_buy)
@@ -289,91 +278,27 @@ class GoldAutoResearchStrategy(BaseStrategy):
         _ax = self.get_adx_data()
         if _ax and _ax.get("adx", 0) > 25:
             pdd = max(pdd, 0.5)
-            # 盈利>10时收紧到35%（保护大盈利）
             if td.get("peak_profit", 0) > 10:
                 pdd = max(pdd, 0.35)
 
-        if is_buy:
-            td["highest"] = max(td["highest"], bid)
-            current_profit = bid - td["entry"]
-            loss = td["entry"] - bid
-            if abs(current_profit) < atr_val * 10:
-                td["peak_profit"] = max(td["peak_profit"], current_profit)
+        should_exit, exit_type, detail = self._run_exit_policy(
+            td, is_buy, current_price, atr_val,
+            trail_mult, hard_mult, pdd=pdd, update_peak_guard=True,
+        )
+        if not should_exit:
+            self._last_exit_detail = None
+            return False
 
-            # 保本出场：走过≥0.3ATR盈利后回到成本附近
-            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
-                logger.info(f"[{self.name}] BUY Breakeven ticket={ticket} profit=${current_profit:.2f}")
-                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
-                self._last_profit_exit_time["BUY"] = time.time()
-                del self._trail_data[ticket]
-                return True
+        direction = "BUY" if is_buy else "SELL"
+        detail["direction"] = direction
+        self._last_exit_detail = {"exit_type": exit_type, **detail}
 
-            if current_profit > 0:
-                # 盈利 → profitdrawdowntake profit
-                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
-                    profit_ratio = current_profit / td["peak_profit"]
-                    if profit_ratio < (1 - pdd):
-                        logger.info(f"[{self.name}] BUY ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
-                        del self._trail_data[ticket]
-                        return True
+        if exit_type == "breakeven":
+            self._last_profit_exit_time[direction] = time.time()
 
-            # 移动take profit：从最高 points回落
-            drawdown = td["highest"] - bid
-            if drawdown > atr_val * trail_mult:
-                logger.info(f"[{self.name}] BUY TrailStop ticket={ticket} drawdown={drawdown:.2f} trail={trail_mult}")
-                self._last_exit_detail = {"exit_type": "trail_stop", "direction": "BUY", "drawdown": round(drawdown, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
-                del self._trail_data[ticket]
-                return True
-
-            # 硬止损（仅loss时兜底）
-            if current_profit <= 0 and loss > atr_val * hard_mult:
-                logger.info(f"[{self.name}] BUY HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                self._last_exit_detail = {"exit_type": "hard_stop", "direction": "BUY", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
-                del self._trail_data[ticket]
-                return True
-        else:
-            td["lowest"] = min(td["lowest"], ask)
-            current_profit = td["entry"] - ask
-            loss = ask - td["entry"]
-            if abs(current_profit) < atr_val * 10:
-                td["peak_profit"] = max(td["peak_profit"], current_profit)
-
-            # 保本出场：走过≥0.3ATR盈利后回到成本附近
-            if self._check_breakeven_exit(td, current_profit, atr_val, td["entry"], is_buy):
-                logger.info(f"[{self.name}] SELL Breakeven ticket={ticket} profit=${current_profit:.2f}")
-                self._last_exit_detail = {"exit_type": "breakeven", "profit": round(current_profit, 2)}
-                self._last_profit_exit_time["SELL"] = time.time()
-                del self._trail_data[ticket]
-                return True
-
-            if current_profit > 0:
-                # 盈利 → profitdrawdowntake profit
-                if self.profit_drawdown_enabled and td["peak_profit"] > atr_val * self.profit_drawdown_min_peak_atr:
-                    profit_ratio = current_profit / td["peak_profit"]
-                    if profit_ratio < (1 - pdd):
-                        logger.info(f"[{self.name}] SELL ProfitStop ticket={ticket} profit=${current_profit:.2f} peak=${td['peak_profit']:.2f}")
-                        self._last_exit_detail = {"exit_type": "profit_drawdown", "peak_profit": round(td["peak_profit"], 2), "current_profit": round(current_profit, 2), "atr": round(atr_val, 2)}
-                        del self._trail_data[ticket]
-                        return True
-
-            # 移动take profit：从最低 pointsrebound
-            rally = ask - td["lowest"]
-            if rally > atr_val * trail_mult:
-                logger.info(f"[{self.name}] SELL TrailStop ticket={ticket} rally={rally:.2f} trail={trail_mult}")
-                self._last_exit_detail = {"exit_type": "trail_stop", "direction": "SELL", "rally": round(rally, 2), "atr": round(atr_val, 2), "trail_mult": trail_mult}
-                del self._trail_data[ticket]
-                return True
-
-            # 硬止损（仅loss时兜底）
-            if current_profit <= 0 and loss > atr_val * hard_mult:
-                logger.info(f"[{self.name}] SELL HardStop ticket={ticket} loss={loss:.2f} hard={hard_mult}")
-                self._last_exit_detail = {"exit_type": "hard_stop", "direction": "SELL", "loss": round(loss, 2), "atr": round(atr_val, 2), "hard_mult": hard_mult}
-                del self._trail_data[ticket]
-                return True
-
-        self._last_exit_detail = None
-        return False
+        logger.info(f"[{self.name}] {direction} {exit_type} ticket={ticket} {detail}")
+        del self._trail_data[ticket]
+        return True
 
     @staticmethod
     def _verify_entry(signal: dict, tick_price: float, latest: dict) -> bool:

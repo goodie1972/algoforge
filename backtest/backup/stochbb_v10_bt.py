@@ -14,12 +14,13 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+import numpy as np
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from backtest.mean_reversion_bt import (
+from backtest.backup.mean_reversion_bt import (
     load_ohlcv, calc_ema, calc_sma, calc_atr_from_lists,
     calc_stoch, calc_adx_proxy, calc_bb
 )
@@ -44,13 +45,24 @@ def run_backtest(candles, ma_type, ma_period, regime_method,
     daily_open_count = {}  # date_str -> count
     n = len(candles)
 
+    # ⚡ 预计算 numpy 数组，避免 O(n²) 切片
+    _closes = np.array([c['close'] for c in candles], dtype=np.float64)
+    _highs = np.array([c['high'] for c in candles], dtype=np.float64)
+    _lows = np.array([c['low'] for c in candles], dtype=np.float64)
+    # 预计算 20 周期 SMA（用于 bb_mid_slope）
+    _sma20 = np.full(n, np.nan)
+    if n >= 20:
+        _sma20[19:] = np.cumsum(_closes)[:n-19] - np.concatenate([[0], np.cumsum(_closes[:-20])])
+        _sma20[19:] /= 20
+    # 缓存 ts_str 列表（避免每次构建 dict 的重复访问）
+    _ts_strs = [c['ts_str'] for c in candles]
+
     for i in range(251, n):
         c = candles[i]
-        sub = candles[:i + 1]
-        closes = [x['close'] for x in sub]
-        highs = [x['high'] for x in sub]
-        lows = [x['low'] for x in sub]
-        close = closes[-1]
+        closes = _closes[:i + 1].tolist()
+        highs = _highs[:i + 1].tolist()
+        lows = _lows[:i + 1].tolist()
+        close = _closes[i]
 
         ma_val = calc_ma(closes, ma_period, ma_type)
         if ma_val is None:
@@ -65,10 +77,10 @@ def run_backtest(candles, ma_type, ma_period, regime_method,
         bb_width = bb["width"]
         bb_mid = bb["sma"]
 
-        if i >= 1:
-            closes_prev_bar = [x['close'] for x in candles[:i]]
-            if len(closes_prev_bar) >= 20:
-                sma20_prev = sum(closes_prev_bar[-20:]) / 20
+        # ⚡ O(1) 替代原 O(n) 切片：直接读预计算的 SMA20 数组
+        if i >= 20:
+            sma20_prev = _sma20[i - 1]
+            if not np.isnan(sma20_prev):
                 bb_mid_slope = bb_mid - sma20_prev
             else:
                 bb_mid_slope = 0

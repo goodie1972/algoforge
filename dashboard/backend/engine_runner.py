@@ -190,6 +190,8 @@ class EngineRunner:
         # 立即刷新缓存
         self._update_positions_cache()
         return True
+
+    def add_strategy(self, name: str, cfg: dict) -> bool:
         """动态添加策略"""
         if self._engine:
             return self._engine.add_strategy(name, cfg)

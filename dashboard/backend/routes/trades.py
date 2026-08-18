@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
 from data import database as db
+from dashboard.backend.utils import _add_ts_fields
 
 def _to_unix_ts(time_str: str) -> int | None:
     """将字符��时间转换为 Unix 时间��(秒)，失败返回 None"""
@@ -29,41 +30,58 @@ engine_runner = None
 run_bridge = None
 logger = logging.getLogger(__name__)
 
-MAGIC_TO_STRATEGY = {
-    # 新版 magic (PPNNVV)
-    660701: "M30_rsi_bb", 660702: "M30_rsi_bb", 660703: "M30_rsi_bb", 660704: "M30_rsi_bb", 660705: "M30_rsi_bb", 660706: "M30_rsi_bb",
-    660601: "H1_v6_hybrid", 660602: "H1_v6_hybrid", 660603: "H1_v6_hybrid", 660604: "H1_v6_hybrid",
-    660605: "H1_v6_hybrid", 660606: "H1_v6_hybrid", 660607: "H1_v6_hybrid",
-    880101: "sanqing_h1", 880102: "sanqing_h1", 880103: "sanqing_h1", 880104: "sanqing_h1",
-    880105: "sanqing_h1", 880106: "sanqing_h1", 880107: "sanqing_h1",
-    880301: "gold_auto_research", 880302: "gold_auto_research", 880303: "gold_auto_research",
-    880304: "gold_auto_research", 880305: "gold_auto_research", 880306: "gold_auto_research",
-    # 旧版 magic 兼容
-    777001: "M30_rsi_bb", 777002: "H1_v6_hybrid", 777003: "gold_auto_research",
-}
 
-# 4位 PPNN → 策略名（用于 by_strategy 分组）
-PPNN_TO_STRATEGY = {
-    "6607": "M30_rsi_bb",
-    "6606": "H1_v6_hybrid",
-    "8801": "sanqing_h1",
-    "8803": "gold_auto_research",
-}
+def _build_strategy_mappings() -> tuple[dict, dict]:
+    """从 config.settings.STRATEGY_POOL 动态生成 magic→策略 和 PPNN→策略 反向映射。
+
+    策略 magic 格式为 6 位数字 PPNNVV（产品-策略-版本），
+    对每个策略生成历史版本（VV=01~09）以及 PPNN 前缀分组。
+    返回 (magic_to_strategy, ppnn_to_strategy)。
+    """
+    magic_map: dict = {}
+    ppnn_map: dict = {}
+    try:
+        import sys
+        sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+        from config import settings
+        pool = getattr(settings, "STRATEGY_POOL", {})
+        for name, cfg in pool.items():
+            magic = int(cfg.get("magic", 0))
+            if magic < 100000:
+                continue
+            magic_str = str(magic)
+            if len(magic_str) == 6:
+                # 当前版本
+                magic_map[magic] = name
+                # 历史版本：同前 4 位（PPNN），后 2 位版本 01~09
+                prefix = magic_str[:4]
+                for v in range(1, 10):
+                    ver_magic = int(prefix + f"{v:02d}")
+                    magic_map[ver_magic] = name
+                # PPNN 分组（首次出现的策略优先进入分组）
+                if prefix not in ppnn_map:
+                    ppnn_map[prefix] = name
+    except Exception:
+        pass
+    return magic_map, ppnn_map
+
+
+MAGIC_TO_STRATEGY, PPNN_TO_STRATEGY = _build_strategy_mappings()
 
 
 def _resolve_strategy_name(magic: int, fallback: str = "") -> str:
-    """从 settings 策略池或静态映射表解析魔术号对应的策略名"""
+    """从 settings 策略池或动态映射表解析魔术号对应的策略名"""
     import sys
     sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
     try:
         from config import settings
-        pool = getattr(settings, 'STRATEGY_POOL', {})
+        pool = getattr(settings, "STRATEGY_POOL", {})
         for name, cfg in pool.items():
             if cfg.get("magic") == magic:
                 return name
     except Exception:
         pass
-    # 静态映射表兜底
+    # 动态映射表兜底（含历史版本）
     name = MAGIC_TO_STRATEGY.get(magic)
     if name:
         return name
@@ -193,26 +211,6 @@ def _calc_stats(trades: list[dict]) -> dict:
 
 
 # ── 历史成交 ──────────────────────────────────────────
-
-def _add_ts_fields(trade: dict) -> dict:
-    """为交易记录增加 _ts 后��的 Unix 时间��字段"""
-    result = dict(trade)
-    for key in ("open_time", "close_time", "created_at"):
-        val = trade.get(key)
-        if val:
-            try:
-                if isinstance(val, str):
-                    # Unix 时间戳字符串（纯数字）直接转 int
-                    if val.strip().isdigit():
-                        result[f"{key}_ts"] = int(val)
-                    else:
-                        dt = datetime.strptime(val, "%Y-%m-%d %H:%M:%S")
-                        result[f"{key}_ts"] = int(dt.timestamp())
-                elif isinstance(val, (int, float)):
-                    result[f"{key}_ts"] = int(val)
-            except Exception:
-                pass
-    return result
 
 @router.get("/history")
 async def get_trade_history(limit: int = 100):

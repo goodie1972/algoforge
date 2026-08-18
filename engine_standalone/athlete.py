@@ -20,7 +20,7 @@ class Athlete:
         self._pending: list[dict] = []
         self._recently_opened: list[tuple] = []  # (ticket, strategy_name)
 
-    def submit(self, signal_id: int, direction: str, signal: dict):
+    def submit(self, signal_id: int, direction: str, signal: dict, strategy_cls=None):
         """策略员提交候选门票 — 重复的策略+方向不再提交"""
         strategy_name = signal.get("strategy", "")
         for item in self._pending:
@@ -32,6 +32,7 @@ class Athlete:
             "direction": direction,
             "signal": signal,
             "ticks_left": _MAX_TICKS,  # 从 _MAX_TICKS 开始
+            "strategy_cls": strategy_cls,  # 缓存策略类引用，避免每 tick 重新扫描
         })
         logger.info(f"[Athlete] Received candidate ticket #{signal_id} {direction}, {_MAX_TICKS} ticks remaining")
         # 提交后立即验证一轮
@@ -74,18 +75,13 @@ class Athlete:
         if not latest:
             latest = signal.get("indicator_values", {})
 
-        strategy_name = signal.get("strategy", "")
-        try:
-            from strategies.scanner import scan_strategies, clear_cache
-            clear_cache()
-            cls = scan_strategies().get(strategy_name)
-            if cls and hasattr(cls, '_verify_entry'):
-                try:
-                    return cls._verify_entry(signal, tick_price, latest, item)
-                except TypeError:
-                    return cls._verify_entry(signal, tick_price, latest)
-        except Exception as e:
-            logger.warning(f"[Athlete] scanner exception ({strategy_name}): {e}")
+        # 使用缓存的策略类引用，避免每 tick 重新扫描所有策略文件
+        cls = item.get("strategy_cls")
+        if cls and hasattr(cls, '_verify_entry'):
+            try:
+                return cls._verify_entry(signal, tick_price, latest, item)
+            except TypeError:
+                return cls._verify_entry(signal, tick_price, latest)
 
         # 默认 fallback
         bb = latest.get("bb") or signal.get("indicator_values", {}).get("bb") or {}

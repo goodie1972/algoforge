@@ -123,7 +123,7 @@ class StochTrendH1Optimized(BaseStrategy):
         close = closes[-1]
 
         # ── all从 DataFactory read ──
-        stoch = self.get_indicator("stoch_14_3_3")
+        stoch = self.get_indicator("stoch_5_3_3")
         if stoch is None:
             return None
 
@@ -164,7 +164,7 @@ class StochTrendH1Optimized(BaseStrategy):
 
         # ── M15 Stoch 精确Entry时机（DataFactory 缓存） ──
         m15 = get_cache("M15")
-        m15_stoch = m15.get("stoch_14_3_3") if m15 else None
+        m15_stoch = m15.get("stoch_5_3_3") if m15 else None
         m15_k = m15_stoch["k"] if m15_stoch else None
 
         # ── Score系统（满分 8 分，threshold 4 分） ──
@@ -248,10 +248,11 @@ class StochTrendH1Optimized(BaseStrategy):
             return round(entry_price * 0.995, 2), round(entry_price * 100, 2)
 
         dist = atr_val * self.sl_atr
+        # 无固定 TP，由 check_ema20_exit 运行时动态管理出场
         if direction == OrderType.BUY:
-            return round(entry_price - dist, 2), round(entry_price + dist * 50, 2)
+            return round(entry_price - dist, 2), 0
         else:
-            return round(entry_price + dist, 2), max(round(entry_price - dist * 50, 2), 0)
+            return round(entry_price + dist, 2), 0
 
     def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
         ticket = position.ticket
@@ -353,7 +354,7 @@ class StochTrendH1Optimized(BaseStrategy):
         direction = signal.get("direction", "BUY")
         adx = latest.get("adx", 20)
         pdi, ndi = latest.get("pdi", 15), latest.get("ndi", 15)
-        stoch = latest.get("stoch_14_3_3") or {}
+        stoch = latest.get("stoch_5_3_3") or {}
         stoch_k = stoch.get("k", 50)
 
         if direction == "BUY":
