@@ -1,0 +1,216 @@
+<?xml version='1.0' encoding='utf8'?>
+<nuitka-compilation-report nuitka_version="4.1.3" nuitka_commercial_version="not installed" mode="onefile" completion="error exit message (1)" exit_message="pywebview: Conflict between user and plugin decision for module 'webview.platforms.cef'.">
+  <performance>
+    <memory_usage name="after_launch" value="46923776" />
+  </performance>
+  <data_file name="dashboard\frontend\dist\index.html" source="${cwd}\dashboard\frontend\dist\index.html" size="2271" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\ConfigView-B8JuYSEK.js" source="${cwd}\dashboard\frontend\dist\assets\ConfigView-B8JuYSEK.js" size="54411" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\ConfigView-DoMTfQxE.css" source="${cwd}\dashboard\frontend\dist\assets\ConfigView-DoMTfQxE.css" size="1127" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\DashboardView-BRo0Cg4J.css" source="${cwd}\dashboard\frontend\dist\assets\DashboardView-BRo0Cg4J.css" size="391" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\DashboardView-DWMWCJte.js" source="${cwd}\dashboard\frontend\dist\assets\DashboardView-DWMWCJte.js" size="56393" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\DataTable-uT68D7uy.js" source="${cwd}\dashboard\frontend\dist\assets\DataTable-uT68D7uy.js" size="138211" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\DatePicker-DqXkhpuv.js" source="${cwd}\dashboard\frontend\dist\assets\DatePicker-DqXkhpuv.js" size="119078" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\DescriptionsItem-DkfyC4mi.js" source="${cwd}\dashboard\frontend\dist\assets\DescriptionsItem-DkfyC4mi.js" size="8130" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Empty-Cs6Tm7wT.js" source="${cwd}\dashboard\frontend\dist\assets\Empty-Cs6Tm7wT.js" size="13774" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\FormItem-C9vNVGhZ.js" source="${cwd}\dashboard\frontend\dist\assets\FormItem-C9vNVGhZ.js" size="31510" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Grid-Cj4WdIbN.js" source="${cwd}\dashboard\frontend\dist\assets\Grid-Cj4WdIbN.js" size="99815" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\LogViewer-Cl9yI-5o.css" source="${cwd}\dashboard\frontend\dist\assets\LogViewer-Cl9yI-5o.css" size="699" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\LogViewer-DOfN4LcL.js" source="${cwd}\dashboard\frontend\dist\assets\LogViewer-DOfN4LcL.js" size="3505" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\NotFoundView-B3WFkmtd.css" source="${cwd}\dashboard\frontend\dist\assets\NotFoundView-B3WFkmtd.css" size="468" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\NotFoundView-WLbYl3nt.js" source="${cwd}\dashboard\frontend\dist\assets\NotFoundView-WLbYl3nt.js" size="667" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\PatrolView-6zHVoBNr.js" source="${cwd}\dashboard\frontend\dist\assets\PatrolView-6zHVoBNr.js" size="8184" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\PositionsTableBase.vue_vue_type_script_setup_true_lang-IOrx9XQG.js" source="${cwd}\dashboard\frontend\dist\assets\PositionsTableBase.vue_vue_type_script_setup_true_lang-IOrx9XQG.js" size="31107" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\PositionsView-CRZQaPVd.css" source="${cwd}\dashboard\frontend\dist\assets\PositionsView-CRZQaPVd.css" size="208" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\PositionsView-CrtMmTgo.js" source="${cwd}\dashboard\frontend\dist\assets\PositionsView-CrtMmTgo.js" size="9304" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\RadioGroup-BSkAwI62.js" source="${cwd}\dashboard\frontend\dist\assets\RadioGroup-BSkAwI62.js" size="17961" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\ReportView-C191NVa4.js" source="${cwd}\dashboard\frontend\dist\assets\ReportView-C191NVa4.js" size="27736" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Spin-BXIJ9WNy.js" source="${cwd}\dashboard\frontend\dist\assets\Spin-BXIJ9WNy.js" size="3400" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Statistic-Brs8lRYy.js" source="${cwd}\dashboard\frontend\dist\assets\Statistic-Brs8lRYy.js" size="2571" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\StrategyCenterView-CfUjah4l.js" source="${cwd}\dashboard\frontend\dist\assets\StrategyCenterView-CfUjah4l.js" size="55460" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Table-DnTi6tDO.js" source="${cwd}\dashboard\frontend\dist\assets\Table-DnTi6tDO.js" size="5047" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Tabs-D2HiLZcK.js" source="${cwd}\dashboard\frontend\dist\assets\Tabs-D2HiLZcK.js" size="29720" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\Thing-B0W6X1W2.js" source="${cwd}\dashboard\frontend\dist\assets\Thing-B0W6X1W2.js" size="7958" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\TradeHistoryView-C-gJwyDS.css" source="${cwd}\dashboard\frontend\dist\assets\TradeHistoryView-C-gJwyDS.css" size="427" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\TradeHistoryView-D5up97S5.js" source="${cwd}\dashboard\frontend\dist\assets\TradeHistoryView-D5up97S5.js" size="41394" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\config-CJwz9jw7.js" source="${cwd}\dashboard\frontend\dist\assets\config-CJwz9jw7.js" size="1412" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\index-DoKPb521.js" source="${cwd}\dashboard\frontend\dist\assets\index-DoKPb521.js" size="573764" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\index-kTByYMGt.css" source="${cwd}\dashboard\frontend\dist\assets\index-kTByYMGt.css" size="11637" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\strategyColors-CGpQSzIu.js" source="${cwd}\dashboard\frontend\dist\assets\strategyColors-CGpQSzIu.js" size="771" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\timeFormat-Ds7uPcHE.js" source="${cwd}\dashboard\frontend\dist\assets\timeFormat-Ds7uPcHE.js" size="1010" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\trades-txpbuqE6.js" source="${cwd}\dashboard\frontend\dist\assets\trades-txpbuqE6.js" size="2650" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\vendor-charts-C3BTrSSY.js" source="${cwd}\dashboard\frontend\dist\assets\vendor-charts-C3BTrSSY.js" size="162404" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\vendor-i18n-DMe8Nvod.js" source="${cwd}\dashboard\frontend\dist\assets\vendor-i18n-DMe8Nvod.js" size="63142" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="dashboard\frontend\dist\assets\vendor-vue-B5cDduhQ.js" source="${cwd}\dashboard\frontend\dist\assets\vendor-vue-B5cDduhQ.js" size="106709" reason="specified data dir 'dashboard\frontend\dist' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="config\safety_lock.txt" source="${cwd}\config\safety_lock.txt" size="116" reason="specified data dir 'config' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\.gitignore" source="${cwd}\strategies\.gitignore" size="19" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\STRATEGY_VERSIONING.md" source="${cwd}\strategies\STRATEGY_VERSIONING.md" size="4192" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\strategy_manual.html" source="${cwd}\strategies\strategy_manual.html" size="7760" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\strategy_manual.md" source="${cwd}\strategies\strategy_manual.md" size="5300" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\strategy_manual_20260630.html" source="${cwd}\strategies\strategy_manual_20260630.html" size="31691" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\_n30_strategy.txt" source="${cwd}\strategies\backup\_n30_strategy.txt" size="32996" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\github_strategies_results.json" source="${cwd}\strategies\backup\github_strategies_results.json" size="6741" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\index.html" source="${cwd}\strategies\backup\index.html" size="32345" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\zz_N30_Gold_Scalper.txt" source="${cwd}\strategies\backup\zz_N30_Gold_Scalper.txt" size="32996" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\bakome_backup.md" source="${cwd}\strategies\backup\docs\bakome_backup.md" size="1585" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\bakome_backup_optimized.md" source="${cwd}\strategies\backup\docs\bakome_backup_optimized.md" size="2141" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\m30_bb_deepreturn.md" source="${cwd}\strategies\backup\docs\m30_bb_deepreturn.md" size="1878" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\m30_bb_deepreturn_optimized.md" source="${cwd}\strategies\backup\docs\m30_bb_deepreturn_optimized.md" size="1813" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\mfi_bb_m30.md" source="${cwd}\strategies\backup\docs\mfi_bb_m30.md" size="1519" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\mfi_bb_m30_optimized.md" source="${cwd}\strategies\backup\docs\mfi_bb_m30_optimized.md" size="1612" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\mfi_bb_m30_upgraded.md" source="${cwd}\strategies\backup\docs\mfi_bb_m30_upgraded.md" size="3967" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\rsi_grading_m30.md" source="${cwd}\strategies\backup\docs\rsi_grading_m30.md" size="1817" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\rsi_grading_m30_optimized.md" source="${cwd}\strategies\backup\docs\rsi_grading_m30_optimized.md" size="2166" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\rsi_grading_m30_upgraded.md" source="${cwd}\strategies\backup\docs\rsi_grading_m30_upgraded.md" size="2345" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\sanqing_h1_original.md" source="${cwd}\strategies\backup\docs\sanqing_h1_original.md" size="1407" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\sanqing_original.md" source="${cwd}\strategies\backup\docs\sanqing_original.md" size="2367" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\stoch_trend_h1.md" source="${cwd}\strategies\backup\docs\stoch_trend_h1.md" size="2040" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\stoch_trend_h1_optimized.md" source="${cwd}\strategies\backup\docs\stoch_trend_h1_optimized.md" size="1935" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\backup\docs\stoch_trend_h1_upgraded.md" source="${cwd}\strategies\backup\docs\stoch_trend_h1_upgraded.md" size="2057" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\M30_rsi_bb.md" source="${cwd}\strategies\docs\strategies\M30_rsi_bb.md" size="2418" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\bakome_gold_scalper_original.md" source="${cwd}\strategies\docs\strategies\bakome_gold_scalper_original.md" size="2075" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\bakome_trinity_ea_original.md" source="${cwd}\strategies\docs\strategies\bakome_trinity_ea_original.md" size="1840" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\entry_score_pro.md" source="${cwd}\strategies\docs\strategies\entry_score_pro.md" size="1850" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\gold_auto_research.md" source="${cwd}\strategies\docs\strategies\gold_auto_research.md" size="1639" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\h1_breakout.md" source="${cwd}\strategies\docs\strategies\h1_breakout.md" size="2066" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\m30_vol_return.md" source="${cwd}\strategies\docs\strategies\m30_vol_return.md" size="1917" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\momentum_pulse_pro.md" source="${cwd}\strategies\docs\strategies\momentum_pulse_pro.md" size="2016" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\multi_confluence_quant.md" source="${cwd}\strategies\docs\strategies\multi_confluence_quant.md" size="2558" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\sanqing_h1.md" source="${cwd}\strategies\docs\strategies\sanqing_h1.md" size="1444" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\sanqing_h1_upgraded.md" source="${cwd}\strategies\docs\strategies\sanqing_h1_upgraded.md" size="2382" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\timeprofit_ea.md" source="${cwd}\strategies\docs\strategies\timeprofit_ea.md" size="2346" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\viprasol_sniper.md" source="${cwd}\strategies\docs\strategies\viprasol_sniper.md" size="1988" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="strategies\docs\strategies\xaubot_backup.md" source="${cwd}\strategies\docs\strategies\xaubot_backup.md" size="1459" reason="specified data dir 'strategies' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="engine_standalone\logs\trading_20260802_165200.log" source="${cwd}\engine_standalone\logs\trading_20260802_165200.log" size="107636" reason="specified data dir 'engine_standalone' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="engine_standalone\logs\trading_20260802_170627.log" source="${cwd}\engine_standalone\logs\trading_20260802_170627.log" size="50556" reason="specified data dir 'engine_standalone' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="engine_standalone\logs\trading_20260802_170758.log" source="${cwd}\engine_standalone\logs\trading_20260802_170758.log" size="116370" reason="specified data dir 'engine_standalone' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\.nojekyll" source="${cwd}\docs\.nojekyll" size="0" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\_config.yml" source="${cwd}\docs\_config.yml" size="132" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\ai_assistant_design_20260609.md" source="${cwd}\docs\ai_assistant_design_20260609.md" size="6882" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\changes_20260602.md" source="${cwd}\docs\changes_20260602.md" size="3177" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\data_factory.md" source="${cwd}\docs\data_factory.md" size="5392" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\evaluation_plan.md" source="${cwd}\docs\evaluation_plan.md" size="13915" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\index.html" source="${cwd}\docs\index.html" size="33603" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\mt4_guide.md" source="${cwd}\docs\mt4_guide.md" size="2216" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\optimization_plan_v3.md" source="${cwd}\docs\optimization_plan_v3.md" size="17283" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\packaging_plan_20260609.md" source="${cwd}\docs\packaging_plan_20260609.md" size="8841" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\product_manual.md" source="${cwd}\docs\product_manual.md" size="38384" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\对未来的构想.md" source="${cwd}\docs\对未来的构想.md" size="3566" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\开发计划_版本更新检查.md" source="${cwd}\docs\开发计划_版本更新检查.md" size="2858" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\开发计划_策略池热同步.md" source="${cwd}\docs\开发计划_策略池热同步.md" size="5044" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\新闻预判系统设计.md" source="${cwd}\docs\新闻预判系统设计.md" size="8977" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\logo.svg" source="${cwd}\docs\assets\logo.svg" size="476" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\screenshot_dashboard.png" source="${cwd}\docs\assets\screenshot_dashboard.png" size="1041841" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\screenshot_logs.png" source="${cwd}\docs\assets\screenshot_logs.png" size="1736599" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\screenshot_positions.png" source="${cwd}\docs\assets\screenshot_positions.png" size="777873" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\screenshot_report.png" source="${cwd}\docs\assets\screenshot_report.png" size="1133703" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\screenshot_strategy.png" source="${cwd}\docs\assets\screenshot_strategy.png" size="2906491" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="docs\assets\screenshot_trades.png" source="${cwd}\docs\assets\screenshot_trades.png" size="2187152" reason="specified data dir 'docs' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="tools\FreeMT4Bridge.mq4" source="${cwd}\tools\FreeMT4Bridge.mq4" size="18654" reason="specified data dir 'tools' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="tools\logs\signal_log.csv" source="${cwd}\tools\logs\signal_log.csv" size="3108" reason="specified data dir 'tools' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="tools\old engine\FreeMT4Bridge.ex4" source="${cwd}\tools\old engine\FreeMT4Bridge.ex4" size="38794" reason="specified data dir 'tools' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="tools\old engine\FreeMT4Bridge.mq4" source="${cwd}\tools\old engine\FreeMT4Bridge.mq4" size="15974" reason="specified data dir 'tools' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="tools\old engine\FreeMT4Bridge_V2.mq4" source="${cwd}\tools\old engine\FreeMT4Bridge_V2.mq4" size="13785" reason="specified data dir 'tools' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\20260606_7策略回测分析.html" source="${cwd}\backtest\backup\20260606_7策略回测分析.html" size="21429" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\_n30_strategy.txt" source="${cwd}\backtest\backup\_n30_strategy.txt" size="32996" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\cross_timeframe_results.json" source="${cwd}\backtest\backup\cross_timeframe_results.json" size="6518" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\factor_table.md" source="${cwd}\backtest\backup\factor_table.md" size="6477" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\factor_table.xlsx" source="${cwd}\backtest\backup\factor_table.xlsx" size="9629" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\factor_table_v8.xlsx" source="${cwd}\backtest\backup\factor_table_v8.xlsx" size="21839" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\factor_table_v8_final.xlsx" source="${cwd}\backtest\backup\factor_table_v8_final.xlsx" size="36619" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\factor_v8_full.xlsx" source="${cwd}\backtest\backup\factor_v8_full.xlsx" size="35796" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\github_all_strategies_results.json" source="${cwd}\backtest\backup\github_all_strategies_results.json" size="14234" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\github_strategies_results.json" source="${cwd}\backtest\backup\github_strategies_results.json" size="6741" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\h1_all_results.md" source="${cwd}\backtest\backup\h1_all_results.md" size="4710" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\m30_rsi_optimize_result.json" source="${cwd}\backtest\backup\m30_rsi_optimize_result.json" size="2747" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\mean_reversion_results.csv" source="${cwd}\backtest\backup\mean_reversion_results.csv" size="366" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\mfi_bb_m30_v12_bt.json" source="${cwd}\backtest\backup\mfi_bb_m30_v12_bt.json" size="504" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\mtf_all_strategies.json" source="${cwd}\backtest\backup\mtf_all_strategies.json" size="21883" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\research_results.md" source="${cwd}\backtest\backup\research_results.md" size="5156" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\results_summary.md" source="${cwd}\backtest\backup\results_summary.md" size="4505" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\three_strategy_compare.json" source="${cwd}\backtest\backup\three_strategy_compare.json" size="878213" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\timeframe_compare_results.md" source="${cwd}\backtest\backup\timeframe_compare_results.md" size="2541" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\v6_diagnose_trades.csv" source="${cwd}\backtest\backup\v6_diagnose_trades.csv" size="84708" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_file name="backtest\backup\v6_live_backtest_result.json" source="${cwd}\backtest\backup\v6_live_backtest_result.json" size="41818" reason="specified data dir 'backtest' on command line" tags="user,copy,data-dir-contents" />
+  <data_composer blob_size="None" />
+  <performance-totals>
+    <optimization-time pass="all" time="0.0000" module_count="0" />
+    <code-generation-time time="0.0000" module_count="0" />
+  </performance-totals>
+  <python_binary filename="window.dll" />
+  <onefile_binary filename="algoforge.exe" />
+  <command_line>
+    <option value="--standalone" />
+    <option value="--onefile" />
+    <option value="--windows-console-mode=disable" />
+    <option value="--nofollow-import-to=webview.platforms.android" />
+    <option value="--nofollow-import-to=webview.platforms.cocoa" />
+    <option value="--nofollow-import-to=webview.platforms.gtk" />
+    <option value="--nofollow-import-to=webview.platforms.qt" />
+    <option value="--nofollow-import-to=webview.platforms.mshtml" />
+    <option value="--nofollow-import-to=webview.platforms.cef" />
+    <option value="--include-package=uvicorn" />
+    <option value="--include-package=fastapi" />
+    <option value="--include-package=websockets" />
+    <option value="--include-package=pydantic" />
+    <option value="--include-package=pydantic_settings" />
+    <option value="--include-package=webview" />
+    <option value="--include-package=requests" />
+    <option value="--include-package=aiohttp" />
+    <option value="--include-package=httpx" />
+    <option value="--include-package=yfinance" />
+    <option value="--include-package=psutil" />
+    <option value="--include-package=tabulate" />
+    <option value="--include-package=metaapi_sdk" />
+    <option value="--include-package=metaapi_cloud_sdk" />
+    <option value="--include-package=metaapi_cloud_metastats_sdk" />
+    <option value="--include-package=metaapi_cloud_copyfactory_sdk" />
+    <option value="--include-package=scikit_learn" />
+    <option value="--include-package=xgboost" />
+    <option value="--include-data-dir=dashboard/frontend/dist=dashboard/frontend/dist" />
+    <option value="--include-data-dir=config=config" />
+    <option value="--include-data-dir=strategies=strategies" />
+    <option value="--include-data-dir=engine_standalone=engine_standalone" />
+    <option value="--include-data-dir=docs=docs" />
+    <option value="--include-data-dir=tools=tools" />
+    <option value="--include-data-dir=backtest=backtest" />
+    <option value="--output-dir=build" />
+    <option value="--output-filename=algoforge.exe" />
+    <option value="dashboard/backend/window.py" />
+  </command_line>
+  <plugins>
+    <plugin name="anti-bloat" user_enabled="no" />
+    <plugin name="data-files" user_enabled="no" />
+    <plugin name="delvewheel" user_enabled="no" />
+    <plugin name="dll-files" user_enabled="no" />
+    <plugin name="gevent" user_enabled="no" />
+    <plugin name="gi" user_enabled="no" />
+    <plugin name="glfw" user_enabled="no" />
+    <plugin name="implicit-imports" user_enabled="no" />
+    <plugin name="kivy" user_enabled="no" />
+    <plugin name="matplotlib" user_enabled="no" />
+    <plugin name="multiprocessing" user_enabled="no" />
+    <plugin name="options-nanny" user_enabled="no" />
+    <plugin name="pbr-compat" user_enabled="no" />
+    <plugin name="pkg-resources" user_enabled="no" />
+    <plugin name="playwright" user_enabled="no" />
+    <plugin name="pywebview" user_enabled="no" />
+    <plugin name="spacy" user_enabled="no" />
+    <plugin name="torch-jit" user_enabled="no" />
+    <plugin name="transformers" user_enabled="no" />
+  </plugins>
+  <onefile cache_mode="temporary" unpack_dir="{TEMP}\onefile_{PID}_{TIME_US}_{RANDOM}" />
+  <distributions />
+  <python python_exe="${sys.prefix}\python.exe" python_flavor="CPython Official" python_version="3.14.3" os_name="Windows" os_release="10" arch_name="x86_64" filesystem_encoding="utf-8" gil="yes">
+    <search_path>
+      <path value="${cwd}" />
+      <path value="${cwd}\dashboard\backend" />
+      <path value="${sys.prefix}\DLLs" />
+      <path value="${sys.prefix}\Lib" />
+      <path value="${sys.prefix}" />
+      <path value="~\AppData\Roaming\Python\Python314\site-packages" />
+      <path value="${sys.prefix}\Lib\site-packages" />
+      <path value="${sys.prefix}\Lib\site-packages\setuptools\_vendor" />
+    </search_path>
+  </python>
+  <output run_filename="${cwd}\build\algoforge.exe" />
+</nuitka-compilation-report>

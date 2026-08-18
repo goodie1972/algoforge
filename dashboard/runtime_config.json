@@ -32,32 +32,11 @@
   "block_short_when_bias_bullish": false,
   "max_positions": 7,
   "strategy_pool": {
-    "bakome_backup": {
-      "enabled": false,
-      "magic": 777004,
-      "timeframe": "H1",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "bakome_backup_optimized": {
-      "enabled": false,
-      "magic": 777006,
-      "timeframe": "H1",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "bakome_gold_scalper_original": {
-      "enabled": false,
-      "magic": 880303,
-      "timeframe": "M5",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "bakome_trinity_ea_original": {
-      "enabled": false,
-      "magic": 880304,
-      "timeframe": "M5",
-      "max_positions": 0,
+    "M30_rsi_bb": {
+      "enabled": true,
+      "magic": 660706,
+      "timeframe": "M30",
+      "max_positions": 1,
       "double_first": false
     },
     "entry_score_pro": {
@@ -74,58 +53,9 @@
       "max_positions": 1,
       "double_first": false
     },
-    "h1_breakout": {
-      "enabled": true,
-      "magic": 880301,
-      "timeframe": "H1",
-      "max_positions": 1,
-      "double_first": false
-    },
-    "m30_bb_deepreturn": {
-      "enabled": false,
-      "magic": 661101,
-      "timeframe": "M30",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "m30_bb_deepreturn_optimized": {
-      "enabled": true,
-      "magic": 661102,
-      "timeframe": "M30",
-      "max_positions": 5,
-      "double_first": false
-    },
     "mfi_bb_m30": {
       "enabled": false,
       "magic": 661001,
-      "timeframe": "M30",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "mfi_bb_m30_optimized": {
-      "enabled": false,
-      "magic": 661002,
-      "timeframe": "M30",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "mfi_bb_m30_upgraded": {
-      "enabled": true,
-      "magic": 661003,
-      "timeframe": "M30",
-      "max_positions": 1,
-      "double_first": false
-    },
-    "M30_rsi_bb": {
-      "enabled": true,
-      "magic": 660706,
-      "timeframe": "M30",
-      "max_positions": 1,
-      "double_first": false
-    },
-    "m30_vol_return": {
-      "enabled": false,
-      "magic": 880302,
       "timeframe": "M30",
       "max_positions": 0,
       "double_first": false
@@ -144,16 +74,44 @@
       "max_positions": 0,
       "double_first": false
     },
-    "rsi_grading_m30": {
+    "sanqing_h1": {
+      "enabled": true,
+      "magic": 880107,
+      "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "viprasol_sniper": {
       "enabled": false,
-      "magic": 660902,
+      "magic": 661401,
       "timeframe": "M30",
       "max_positions": 0,
       "double_first": false
     },
-    "rsi_grading_m30_optimized": {
+    "m30_bb_deepreturn_optimized": {
+      "enabled": true,
+      "magic": 661102,
+      "timeframe": "M30",
+      "max_positions": 5,
+      "double_first": false
+    },
+    "mfi_bb_m30_optimized": {
       "enabled": false,
-      "magic": 660903,
+      "magic": 661002,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "stoch_trend_h1_optimized": {
+      "enabled": true,
+      "magic": 661202,
+      "timeframe": "H1",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "mfi_bb_m30_upgraded": {
+      "enabled": true,
+      "magic": 661003,
       "timeframe": "M30",
       "max_positions": 1,
       "double_first": false
@@ -165,20 +123,6 @@
       "max_positions": 1,
       "double_first": false
     },
-    "sanqing_h1": {
-      "enabled": true,
-      "magic": 880107,
-      "timeframe": "H1",
-      "max_positions": 1,
-      "double_first": false
-    },
-    "sanqing_h1_original": {
-      "enabled": false,
-      "magic": 880101,
-      "timeframe": "H1",
-      "max_positions": 0,
-      "double_first": false
-    },
     "sanqing_h1_upgraded": {
       "enabled": true,
       "magic": 880108,
@@ -186,31 +130,31 @@
       "max_positions": 1,
       "double_first": false
     },
-    "sanqing_original": {
-      "enabled": false,
-      "magic": 880201,
-      "timeframe": "M5",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "stoch_trend_h1": {
-      "enabled": false,
-      "magic": 661201,
-      "timeframe": "H1",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "stoch_trend_h1_optimized": {
+    "h1_breakout": {
       "enabled": true,
-      "magic": 661202,
+      "magic": 880301,
       "timeframe": "H1",
       "max_positions": 1,
       "double_first": false
     },
-    "stoch_trend_h1_upgraded": {
+    "m30_vol_return": {
       "enabled": false,
-      "magic": 661204,
-      "timeframe": "H1",
+      "magic": 880302,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "bakome_gold_scalper_original": {
+      "enabled": false,
+      "magic": 880303,
+      "timeframe": "M5",
+      "max_positions": 0,
+      "double_first": false
+    },
+    "bakome_trinity_ea_original": {
+      "enabled": false,
+      "magic": 880304,
+      "timeframe": "M5",
       "max_positions": 0,
       "double_first": false
     },
@@ -218,20 +162,6 @@
       "enabled": false,
       "magic": 880202,
       "timeframe": "M5",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "viprasol_sniper": {
-      "enabled": false,
-      "magic": 661401,
-      "timeframe": "M30",
-      "max_positions": 0,
-      "double_first": false
-    },
-    "xaubot_backup": {
-      "enabled": false,
-      "magic": 777005,
-      "timeframe": "H1",
       "max_positions": 0,
       "double_first": false
     }

@@ -1,0 +1,80 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "autoglm-logo256.png",
+         "16": "autoglm-logo128.png",
+         "32": "autoglm-logo128.png",
+         "48": "autoglm-logo128.png"
+      },
+      "default_title": "__MSG_action_title__"
+   },
+   "background": {
+      "service_worker": "static/js/background.js"
+   },
+   "commands": {
+      "advanced_select": {
+         "description": "多链接总结",
+         "suggested_key": {
+            "default": "Alt+Q"
+         }
+      },
+      "commands_modal": {
+         "description": "快捷弹窗",
+         "suggested_key": {
+            "default": "Alt+K"
+         }
+      },
+      "summary_page": {
+         "description": "页面总结",
+         "suggested_key": {
+            "default": "Alt+S"
+         }
+      },
+      "web_translate": {
+         "description": "网页翻译",
+         "suggested_key": {
+            "default": "Alt+T"
+         }
+      }
+   },
+   "content_scripts": [ {
+      "js": [ "static/js/content.js" ],
+      "matches": [ "\u003Call_urls>" ]
+   } ],
+   "default_locale": "zh_CN",
+   "description": "__MSG_extension_description__",
+   "host_permissions": [ "\u003Call_urls>" ],
+   "icons": {
+      "128": "autoglm-logo256.png",
+      "16": "autoglm-logo128.png",
+      "32": "autoglm-logo128.png",
+      "48": "autoglm-logo128.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyvLs+1Lm30kzdSF6S+1wfd3P1olHX/mnRCgTVvu3O0cUbbRCE9UB7DZ3XqP/nP1Nn/WJEpnTtEzRBBc0iXhC/RqTNBxFIvJ7j3yvvqIQivVTuaslJT0CVNk7zfpNMOiZH/TfEua4erIt5AEPLYism0kZxU0m9qs9DR1W13G2TuIQSTnN2P1Zc1tLiOIqL2KhdtvbU7VoTYLM8RAtlJsO4Umq9LHe+ShiSEU1BiroH3bQPJSf5DemDLq7pHIIQ5txeUplYEAgW0PuwsM1EK3onp7/40MbSEIZm4W0mBtptTrkcm/PFLtdfeSI/dIohSQfSguCV6MoBP9lL15+NsPfmwIDAQAB",
+   "manifest_version": 3,
+   "name": "__MSG_extension_name__",
+   "options_page": "options.html",
+   "permissions": [ "storage", "activeTab", "sidePanel", "scripting", "tabs", "cookies", "tts", "alarms", "webNavigation", "downloads", "debugger", "webRequest", "windows", "tabGroups", "notifications" ],
+   "short_name": "__MSG_action_title__",
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "0.0.6",
+   "web_accessible_resources": [ {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "*.css" ]
+   }, {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "*.js" ]
+   }, {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "*.png" ]
+   }, {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "static/css/*" ]
+   }, {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "prompts.json" ]
+   }, {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "static/media/*" ]
+   } ]
+}

@@ -1,6 +1,34 @@
-# 核心依赖
+# ── Web 后端 ──
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=13.0
+pydantic>=2.10.0
+pydantic-settings>=2.14.0
+
+# ── 桌面窗口 ──
+pywebview>=5.0
+
+# ── 数据 / 指标 ──
+numpy>=2.0.0
+pandas>=2.0.0
+TA-Lib>=0.4.0
+
+# ── 机器学习 ──
+scikit-learn>=1.5.0
+xgboost>=2.0.0
+
+# ── MT4 桥接 ──
 metaapi-cloud-sdk>=9.0.0
 
-# 回测
-pandas>=2.0.0
-numpy>=1.24.0
+# ── HTTP / 爬虫 ──
+requests>=2.32.0
+aiohttp>=3.10.0
+httpx>=0.27.0
+yfinance>=0.2.0
+
+# ── 工具 ──
+psutil>=6.0.0
+tabulate>=0.9.0
+
+# ── 编译打包（开发用，分发时不需要）──
+# nuitka>=2.4.0

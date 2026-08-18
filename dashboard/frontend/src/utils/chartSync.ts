@@ -67,11 +67,21 @@ export function getPaneSeriesList(name: string, paneSeries: Record<string, any>)
   const ps = paneSeries[name]
   if (!ps) return []
   if (Array.isArray(ps)) return ps
+  // line + price (BB width ratio 等)
   if (ps.line && ps.price) return [ps.line, ps.price]
-  if (ps.k && ps.d) return [ps.k, ps.d]
-  if (ps.macd && ps.signal) return [ps.macd, ps.signal]
+  // stoch: k + d (+ ob + os)
+  if (ps.k && ps.d) return [ps.k, ps.d, ps.ob, ps.os].filter(Boolean)
+  // macd: macd + signal + histogram
+  if (ps.macd && ps.signal) return [ps.macd, ps.signal, ps.histogram].filter(Boolean)
+  // rsi: series + overbought + oversold
+  if (ps.series && ps.overbought) return [ps.series, ps.overbought, ps.oversold].filter(Boolean)
+  // mfi: series + ob/os/mid 参考线
+  if (ps.series && ps.ob) return [ps.series, ps.ob, ps.os, ps.mid].filter(Boolean)
+  // 单 series (atr 等)
   if (ps.line) return [ps.line]
   if (ps.k) return [ps.k]
+  // volume/adx 等直接是 series 对象
+  if (typeof ps === 'object' && typeof ps.setData === 'function') return [ps]
   return [ps]
 }
 

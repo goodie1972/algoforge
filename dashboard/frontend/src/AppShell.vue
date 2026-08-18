@@ -19,6 +19,7 @@ import { wsClient } from '@/api/websocket'
 import { getEngineStatus, startEngine, stopEngine, getVersionInfo, getChangelog, getRemoteChangelog, updateVersion, getUpdateConfig, setUpdateConfig, getUpdateState, rollbackVersion } from '@/api/client'
 import { useMessage, useDialog } from 'naive-ui'
 import PatrolIndicator from '@/components/PatrolIndicator.vue'
+import ChatLauncher from '@/components/chat/ChatLauncher.vue'
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 
@@ -515,6 +516,7 @@ onUnmounted(() => {
         </div>
       </template>
     </n-modal>
+    <ChatLauncher />
 </template>
 
 <style scoped>
