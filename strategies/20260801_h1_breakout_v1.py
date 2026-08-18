@@ -13,10 +13,12 @@ from strategies.base import BaseStrategy
 
 logger = logging.getLogger(__name__)
 
-STRATEGY_VERSION = "v1.0"
+STRATEGY_VERSION = "v1.1"
 STRATEGY_MAGIC = 880301
 STRATEGY_LEGACY_MAGICS: list[int] = []
 STRATEGY_CHANGELOG = [
+    {"version": "v1.1", "magic": 880301, "date": "2026-08-18",
+     "desc": "抗抖动: EMA20 trailing 出场加 _min_hold_seconds(600s) 最小持仓保护 + 改用 H1 收盘价确认穿越，避免 tick 级抖动导致高频反复开平"},
     {"version": "v1.0", "magic": 880301, "date": "2026-08-01",
      "desc": "H1range突破: 突破20w期range+ADX>25confirm; EMA20trailing+ATR止损"},
 ]
@@ -240,14 +242,21 @@ class H1BreakoutStrategy(BaseStrategy):
             del self._trail_data[ticket]
             return True
 
-        # (2) trailing止损（EMA20 trailing）
+        # (2) trailing止损（EMA20 trailing）— 抗抖动
+        # 方案A: 持仓须满 _min_hold_seconds 才允许 EMA21 穿越出场；
+        # 方案C: 用 H1 最新收盘价确认穿越（而非当前 tick 价格），避免 tick 级抖动来回平仓。
+        hold_sec = time.time() - td["entry_ts"]
         ema20 = self.get_indicator("ema_21")
-        if ema20 is not None:
-            if is_buy and bid < ema20:
+        if ema20 is not None and hold_sec >= self._min_hold_seconds:
+            try:
+                close_ref = self.candles[-1].close if (hasattr(self, 'candles') and self.candles) else (bid if is_buy else ask)
+            except Exception:
+                close_ref = bid if is_buy else ask
+            if is_buy and close_ref < ema20:
                 logger.info(f"[{self.name}] TrailStop EMA20 ticket={ticket}")
                 del self._trail_data[ticket]
                 return True
-            elif not is_buy and ask > ema20:
+            elif not is_buy and close_ref > ema20:
                 logger.info(f"[{self.name}] TrailStop EMA20 ticket={ticket}")
                 del self._trail_data[ticket]
                 return True
