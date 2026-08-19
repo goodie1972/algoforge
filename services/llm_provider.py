@@ -279,8 +279,25 @@ class LLMProviderManager:
             if provider["type"] == "ollama":
                 payload["stream"] = False
 
-            resp = httpx.post(api_url, json=payload, headers=headers,
-                              timeout=30)
+            # 代理配置：优先使用环境变量，其次检测 v2rayN 默认 SOCKS5 端口
+            proxy = os.environ.get("LLM_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+            if not proxy:
+                # 检测常见代理端口
+                for port in ["10808", "7890", "1080"]:
+                    try:
+                        import socket
+                        s = socket.create_connection(("127.0.0.1", int(port)), timeout=1)
+                        s.close()
+                        proxy = f"socks5://127.0.0.1:{port}"
+                        break
+                    except OSError:
+                        continue
+
+            client_kwargs = {"timeout": 30}
+            if proxy:
+                client_kwargs["proxy"] = proxy
+
+            resp = httpx.post(api_url, json=payload, headers=headers, **client_kwargs)
             resp.raise_for_status()
             data = resp.json()
 

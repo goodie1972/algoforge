@@ -143,6 +143,8 @@ def _stream_chat(messages: list[dict], temperature: float = 0.3):
     api_url = f"{base_url}/chat/completions"
 
     import httpx
+    import os
+
     headers = {"Content-Type": "application/json"}
     if provider.get("type") != "ollama":
         headers["Authorization"] = f"Bearer {provider['api_key']}"
@@ -154,7 +156,24 @@ def _stream_chat(messages: list[dict], temperature: float = 0.3):
         "stream": True,
     }
 
-    with httpx.stream("POST", api_url, json=payload, headers=headers, timeout=60) as resp:
+    # 代理配置：优先使用环境变量，其次检测 v2rayN 默认 SOCKS5 端口
+    proxy = os.environ.get("LLM_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    if not proxy:
+        for port in ["10808", "7890", "1080"]:
+            try:
+                import socket
+                s = socket.create_connection(("127.0.0.1", int(port)), timeout=1)
+                s.close()
+                proxy = f"socks5://127.0.0.1:{port}"
+                break
+            except OSError:
+                continue
+
+    client_kwargs = {"timeout": 60}
+    if proxy:
+        client_kwargs["proxy"] = proxy
+
+    with httpx.stream("POST", api_url, json=payload, headers=headers, **client_kwargs) as resp:
         resp.raise_for_status()
         for line in resp.iter_lines():
             if not line or not line.startswith("data: "):
