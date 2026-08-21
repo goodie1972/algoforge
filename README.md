@@ -3,239 +3,275 @@
 </p>
 
 <h1 align="center">AlgoForge</h1>
-<p align="center"><strong>XAUUSD 黄金量化交易系统</strong></p>
+
+<p align="center"><strong>Production-grade algorithmic trading system for XAUUSD (Gold) — multi-strategy, 3-layer risk, real-time monitoring.</strong></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js" alt="Vue 3">
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi" alt="FastAPI">
+  <img src="https://img.shields.io/badge/MT4-FreeMT4Bridge-orange" alt="MT4">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.7.4-gold" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.3.8-gold" alt="Version">
+</p>
+
+<p align="center">
+  🌐 <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 ---
 
-## 📋 项目简介
+## Why This Exists
 
-**AlgoForge**（Algorithmic + Forge = 算法锻造工坊）是一个面向 XAUUSD（黄金）的自动化量化交易系统。基于 Python + MetaTrader 4 构建，支持多策略并行、三层风控、实时 Web 监控、纸面测试及全链路信号追踪。
+Running a gold trading strategy shouldn't mean babysitting 10 separate scripts, manually tracking positions across sessions, or discovering at 3 AM that the bridge silently died.
 
-> 🎯 目标：通过算法组合管理，实现年化 50%+ 的稳定收益，最大回撤控制在 15% 以内。
+AlgoForge is a **self-contained, always-on trading workstation** for XAUUSD — it watches the market 24/7, runs 10+ strategies simultaneously, enforces hard risk limits, and surfaces everything through a live web dashboard. Built on Python + MetaTrader 4, it was designed to be **fire-and-forget**: it restarts itself, protects your capital, and tells you what happened.
 
----
+**What makes it different:**
 
-## 🏗️ 架构总览
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    MT4 + FreeMT4Bridge EA                │
-│                    (TCP Socket :23232)                   │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│                  core/bridge.py                          │
-│              桥接抽象层 (MT4 ⇄ Python)                   │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│              TradingEngine (三轨架构)                    │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ 轨1: DataFactory (独立线程)                      │   │
-│  │      → 增量拉取 K 线  →  TA-Lib 统一计算 26 指标   │   │
-│  ├──────────────────────────────────────────────────┤   │
-│  │ 轨2: 策略员 (主循环)                              │   │
-│  │      → get_indicator() 读缓存  →  评分出门票      │   │
-│  ├──────────────────────────────────────────────────┤   │
-│  │ 轨3: Athlete (tick 验证层)                       │   │
-│  │      → _verify_entry 实时重算  →  10秒过期       │   │
-│  └──────────────────────────────────────────────────┘   │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────▼────────────────────────────────┐
-│              Dashboard (Web 监控)                        │
-│  ┌──────────────┐  ┌────────────────────────────────┐   │
-│  │ FastAPI 后端  │  │  Vue 3 + Naive UI 前端         │   │
-│  │ :1783        │  │  lightweight-charts 图表       │   │
-│  └──────────────┘  └────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 三轨架构详解
-
-| 轨道 | 组件 | 职责 |
-|:----|:----|:------|
-| **轨1** | DataFactory | 独立线程，双桥接(exec+data)，增量拉取 K 线，TA-Lib 统一计算 26 个指标 |
-| **轨2** | 策略员 | 主引擎循环，`get_indicator(key)` 读缓存，评分达标出门票（候选信号） |
-| **轨3** | Athlete | tick 验证层，`_verify_entry` 实时重算入场条件，10 秒过期作废 |
+- ✅ **Multi-strategy parallel** — 25+ strategies, auto-discovered from the `strategies/` directory, zero-config registration
+- ✅ **3-layer risk system** — profit drawdown take-profit → ATR trailing stop → ATR hard stop, plus Gate/Risk/Trade managers
+- ✅ **Self-healing** — monitors engine health every 5 minutes, auto-restarts on crash or bridge disconnect
+- ✅ **Bilingual dashboard** — Chinese/English UI, LLM-driven news sentiment, live K-line charts
+- ✅ **Paper trading** — validate strategies with simulated fills before risking real capital
 
 ---
 
-## 🚀 核心特性
+## Quick Start — Running in 60 Seconds
 
-### 多策略并行
-- 25+ 个策略同时运行，独立 Magic Number 和风控状态
-- 自动扫描 `strategies/` 目录发现新策略，零配置注册
-- 策略分类：趋势跟踪 / 反转交易 / 突破交易 / 评分模型 / 组合策略
+### Prerequisites
 
-### 完整风控体系
-- **三层退出**：利润回撤止盈 → ATR 移动止盈 → ATR 硬止损
-- **GateManager**：时间门、波动门、趋势门、连续亏损门
-- **RiskManager**：单笔风险固定、总敞口限制、最大持仓数
-- **TradeManager**：订单管理、滑点处理、Magic Number 隔离
+| Dependency | Purpose |
+|:-----------|:--------|
+| Python 3.10+ | Engine & backend |
+| MetaTrader 4 | Logged into a XAUUSD account |
+| FreeMT4Bridge EA | Loaded on an XAUUSD chart (M5 timeframe) |
+| Node.js 18+ | Frontend build |
 
-### 多源新闻预判
-- 汇通网 7×24 黄金快讯 + 金十数据双源抓取
-- LLM 驱动方向判断（利多/利空/中性），自动翻译中英文
-- 经济日历跑马灯滚动展示，点击放大查看完整列表
-- 4 小时自动刷新，历史准确性复盘评估
-
-### 数据驱动
-- **DataFactory**：唯一指标来源，F043 MT4 值优先，TA-Lib 本地回退
-- 26 个通用指标跨策略共享（RSI, MFI, BB, ATR, ADX, MACD, Stoch 等）
-- M5/M15/M30/H1/H4 多周期覆盖
-
-### 纸面测试系统
-- 信号全量模拟入场 + 出场
-- 按策略规则模拟平仓
-- 真实成交价计算盈亏
-
-### 监控与自修复
-- 5 分钟自动检查引擎状态
-- 崩溃 / 桥接断连自动重启
-- 实时 Web 仪表盘 + 日志
-
----
-
-## 📊 当前策略组合
-
-| 策略 | 类型 | 周期 | Magic | 状态 |
-|:-----|:----|:----:|:-----:|:----:|
-| gold_auto_research | 评分 | H1 | 880306 | ✅ 运行中 |
-| h1_breakout | 突破 | H1 | 880301 | ✅ 运行中 |
-| M30_rsi_bb | 评分 | M30 | 660706 | ✅ 运行中 |
-| m30_bb_deepreturn_optimized | 反转 | M30 | 661102 | ✅ 运行中 |
-| mfi_bb_m30_upgraded | 反转 | M30 | 661003 | ✅ 运行中 |
-| rsi_grading_m30_upgraded | 评分 | M30 | 660904 | ✅ 运行中 |
-| sanqing_h1 | 趋势 | H1 | 880107 | ✅ 运行中 |
-| sanqing_h1_upgraded | 趋势 | H1 | 880108 | ✅ 运行中 |
-| stoch_trend_h1_optimized | 趋势 | H1 | 661202 | ✅ 运行中 |
-
-> 基于 3 个月回测，以上 9 个策略 PnL 为正。其余策略因回测亏损或表现不佳已禁用。
-
----
-
-## ⚡ 快速开始
-
-### 前置条件
-
-| 依赖 | 说明 |
-|:----|:------|
-| Python 3.10+ | 运行引擎和后端 |
-| MetaTrader 4 | 已安装并登录 XAUUSD 账户 |
-| FreeMT4Bridge EA | 加载到 XAUUSD 图表（M5 周期） |
-| Node.js 18+ | 前端构建 |
-
-### 一键启动
+### One-command start
 
 ```bash
-# 启动引擎 + 后端
 python start.py
-
-# 或分别启动
-python dashboard/backend/main.py   # 后端 + 引擎
 ```
 
-### 访问监控
+Or start the backend + engine directly:
+
+```bash
+python dashboard/backend/main.py
+```
+
+### Open the dashboard
 
 ```
 http://localhost:1783
 ```
 
----
-
-## 🔧 技术栈
-
-| 层级 | 技术 | 用途 |
-|:----|:-----|:-----|
-| 桥接 | FreeMT4Bridge EA (MQL4) | TCP Socket 通信 |
-| 引擎 | Python 3.10+ | 策略执行、风控、订单管理 |
-| 后端 | FastAPI + WebSocket | REST API、实时数据推送 |
-| 前端 | Vue 3 + TypeScript + Vite | 监控仪表盘 |
-| UI | Naive UI | 组件库 |
-| 图表 | lightweight-charts | K 线展示 |
-| 数据库 | SQLite | 行情、交易、信号存储 |
+That's it — the engine boots, connects to MT4, loads all active strategies, and the dashboard comes alive.
 
 ---
 
-## 📁 项目结构
+## Strategy Directory
+
+### Active Strategies
+
+| Strategy | Type | Timeframe | Magic | Note |
+|:---------|:-----|:---------:|:-----:|:-----|
+| `sanqing_h1_upgraded` | Trend | H1 | 880108 | ADX adaptive exits |
+| `gold_auto_research` | Scoring | H1 | 880306 | Stoch/RSI/EMA composite |
+| `stoch_trend_h1_optimized` | Trend | H1 | 661202 | Stoch + trend gate |
+| `goodma` | Trend | H1 | 880401 | 60MA direction + pullback |
+| `kiss` | Trend | H1 | 880501 | H4 MACD + H1 MA + pivot |
+| `rsi_grading_m30_upgraded` | Scoring | M30 | 660904 | RSI gradient scoring |
+| `m30_bb_deepreturn_optimized` | Reversal | M30 | 661102 | BB deep return |
+| `fish_eaten` | Reversal | M30 | 661301 | RSI+MFI+BB fish exit, backtest +3.46% |
+| `m30_followave` | Trend | M30 | 661402 | Stoch+BBI+BB + 2.0×ATR trailing, backtest +6.58% |
+| `m15_followave` | Trend | M15 | 661401 | Stoch+BBI+BB trend following, backtest +4.03% |
+| `timeprofit_ea` | Scalping | M5 | 880202 | Time-based profit EA |
+
+> Full strategy source & docs live in the separate **algoforge-strategies** repository.
+
+### Strategy Framework
+
+- **Three-rail architecture** — DataFactory (indicators) → Strategist (signals) → Athlete (tick verification)
+- **26 shared indicators** from one DataFactory cache (RSI, MFI, BB, ATR, ADX, MACD, Stoch…)
+- **Chaos-proof exits** — fish-exit logic waits for both indicators to reach extremes before reversing
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│               MT4 + FreeMT4Bridge EA (TCP :23232)       │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│                  core/bridge.py                         │
+│              abstraction layer (MT4 ⇄ Python)           │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│              TradingEngine (Three-Rail)                 │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │ Rail 1: DataFactory (thread)                     │   │
+│  │   → incremental K-line fetch → 26 TA-Lib        │   │
+│  │     indicators in one shared cache               │   │
+│  ├──────────────────────────────────────────────────┤   │
+│  │ Rail 2: Strategist (main loop)                   │   │
+│  │   → get_indicator() → score → candidate ticket  │   │
+│  ├──────────────────────────────────────────────────┤   │
+│  │ Rail 3: Athlete (tick verify)                    │   │
+│  │   → re-check entry → 10s expiry                  │   │
+│  └──────────────────────────────────────────────────┘   │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│              Dashboard (Web)                            │
+│  ┌──────────────┐  ┌────────────────────────────────┐   │
+│  │ FastAPI       │  │ Vue 3 + Naive UI              │   │
+│  │ :1783 + WS    │  │ lightweight-charts            │   │
+│  └──────────────┘  └────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Three-Rail Detail
+
+| Rail | Component | Responsibility |
+|:-----|:----------|:---------------|
+| **1** | DataFactory | Dedicated thread, dual bridge (exec+data), incremental K-line fetch, 26 TA-Lib indicators |
+| **2** | Strategist | Main engine loop, `get_indicator(key)` cache reads, scoring emits tickets |
+| **3** | Athlete | Tick verification, `_verify_entry` real-time recheck, 10-second expiry |
+
+---
+
+## Features
+
+### Multi-Strategy Parallel
+- 25+ strategies running simultaneously, independent magic numbers & risk states
+- Auto-scan `strategies/` directory — new strategies register with zero config
+- Categories: trend-following / mean-reversion / breakout / scoring / combo
+
+### Complete Risk System
+- **Three-layer exit**: profit drawdown take-profit → ATR trailing stop → ATR hard stop
+- **GateManager**: time gate, volatility gate, trend gate, losing-streak gate
+- **RiskManager**: per-trade risk, total exposure cap, max position count
+- **TradeManager**: order management, slippage handling, magic-number isolation
+
+### News-Driven Sentiment
+- HuiCheng (汇通网) 7×24 gold news + Jin10 dual-source fetching
+- LLM-powered direction judgment (bullish/bearish/neutral), zh/en auto-translate
+- Economic calendar marquee, click to expand
+- Auto-refresh every 4 hours, historical accuracy review
+
+### Data-First
+- **DataFactory**: single source of truth, F043 MT4 values preferred, TA-Lib local fallback
+- 26 shared indicators across strategies
+- M5/M15/M30/H1/H4 multi-timeframe coverage
+
+### Paper Trading
+- Full signal simulation with realistic fills
+- Strategy-rule-based position closing
+- Real-price PnL calculation
+
+### Monitoring & Self-Healing
+- Engine health check every 5 minutes
+- Auto-restart on crash / bridge disconnect
+- Real-time web dashboard + logs
+
+---
+
+## Backtest Highlights
+
+100% backtest on $10k, fixed 0.01 lot:
+
+| Strategy | Net PnL | Win Rate | Profit Factor |
+|:---------|:-------:|:--------:|:-------------:|
+| m30_followave | +$658 | 37% | 2.20 |
+| m15_followave | +$403 | 36% | 2.09 |
+| fish_eaten (M30) | +$346 | 62% | — |
+| rsi_grading_m30_upgraded | +$118 | 54.5% | 1.55 |
+
+---
+
+## Technology Stack
+
+| Layer | Tech | Purpose |
+|:------|:-----|:--------|
+| Bridge | FreeMT4Bridge EA (MQL4) | TCP socket comms |
+| Engine | Python 3.10+ | Strategy exec, risk, orders |
+| Backend | FastAPI + WebSocket | REST API, real-time push |
+| Frontend | Vue 3 + TypeScript + Vite | Monitoring dashboard |
+| UI | Naive UI | Component library |
+| Charts | lightweight-charts | K-line rendering |
+| Database | SQLite | Market, trades, signals |
+
+---
+
+## Repository Structure
 
 ```
 AlgoForge/
-├── config/                  # 配置
-│   └── settings.py          # 全局配置
-├── core/                    # 核心
-│   ├── bridge.py            # MT4 桥接
-│   ├── risk_manager.py      # 风险管理
-│   ├── trade_manager.py     # 订单管理
-│   └── gate_manager.py      # 时间/波动/趋势门
-├── engine_standalone/       # 引擎
-│   ├── main.py              # 主入口
-│   ├── run.py               # 启动脚本
-│   └── athlete.py           # tick 验证
-├── strategies/              # 策略库 (25+)
-│   ├── base.py              # 基类
-│   ├── scanner.py           # 自动扫描器
-│   └── *.py                 # 策略实现
-├── dashboard/               # Web 仪表盘
-│   ├── backend/             # FastAPI 后端
-│   └── frontend/            # Vue 3 前端
-├── services/                # 服务
-│   └── data_factory.py      # 数据工厂
-├── scripts/                 # 工具脚本
-│   ├── backtest_6months.py  # 回测引擎
-│   └── status_monitor.py    # 状态监控
-├── data/                    # 数据
-├── logs/                    # 日志
-└── docs/                    # 文档
+├── config/                  # Configuration
+├── core/                    # bridge / risk / trade / gate managers
+├── engine_standalone/       # TradingEngine (three-rail loop)
+├── strategies/              # → separate repo: algoforge-strategies
+├── dashboard/
+│   ├── backend/             # FastAPI + routes
+│   └── frontend/            # Vue 3 + Naive UI
+├── services/                # data_factory / news / llm / supervisor
+├── backtest/                # backtest scripts & results
+├── data/                    # SQLite database
+├── logs/                    # runtime logs
+└── docs/                    # documentation
 ```
 
----
-
-## 📈 回测表现
-
-3 个月回测（$10,000 本金，0.01 手固定）：
-
-| 策略 | 总盈亏 | 胜率 | 盈亏比 | 最大回撤 | 评分 |
-|:-----|:-----:|:----:|:------:|:-------:|:----:|
-| m30_bb_deepreturn | +$213.95 | 54.6% | 1.32 | 1.39% | 75 |
-| mfi_bb_m30 | +$198.33 | 54.2% | 1.30 | 1.39% | 70 |
-| rsi_grading_m30_upgraded | +$117.79 | 54.5% | 1.55 | 1.57% | 70 |
-| m30_bb_deepreturn_optimized | +$92.80 | 51.0% | 1.09 | 1.50% | 60 |
-| rsi_grading_m30 | +$72.37 | 46.4% | 1.46 | 0.82% | 60 |
-| mfi_bb_m30_optimized | +$66.60 | 57.6% | 1.38 | 0.51% | 70 |
-| momentum_pulse_pro | +$63.83 | 53.9% | 1.09 | 1.64% | 55 |
+> **Strategies live in [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies)** — strategy code, docs, and versioning are managed in that repository only.
 
 ---
 
-## 📚 文档
+## Documentation
 
-| 文档 | 说明 |
-|:----|:------|
-| [CLAUDE.md](CLAUDE.md) | AI 开发助手配置 |
-| [策略开发规范](docs/strategy_dev_guide.md) | 策略开发全流程 + BaseStrategy 参考 + MQL4 移植指南 |
-| [策略文档](/docs/strategies/) | 各策略详细逻辑 |
-| [回测分析](/docs/strategy_analysis.md) | 策略分类 + 回测分析 |
-| [评测方案](/docs/evaluation_plan.md) | 7 天纸面评测方案 |
-| [三级体系](/docs/tiered_strategy_plan.md) | 组合改造方案 |
-| [策略文档规范](/docs/strategy_doc_standard.md) | 文档编写标准 |
+| Doc | Purpose |
+|:----|:--------|
+| [CLAUDE.md](CLAUDE.md) | AI dev assistant config |
+| [strategy_dev_guide.md](docs/strategy_dev_guide.md) | Strategy development guide, BaseStrategy reference, MQL4 porting |
+| [product_manual.md](docs/product_manual.md) | Product manual |
+| [data_factory.md](docs/data_factory.md) | DataFactory metric reference (26 indicators) |
 
 ---
 
-## 📄 License
+## Contributing
+
+We welcome contributions!
+
+- **Add a strategy** — write it against `strategies/base.py`, drop it in `strategies/`, it's auto-discovered
+- **Fix a bug** — PRs welcome, please run `python -m pytest tests/` first
+- **Improve docs** — every strategy should ship with a doc in `docs/strategies/`
+
+### Strategy inclusion criteria
+
+A strategy belongs in the active pool if:
+1. It passes **backtest with positive PnL** over 3+ months of history
+2. It has a **complete doc** (entry/exit logic, risk, backtest results)
+3. It survives **paper trading** without violating risk limits
+
+---
+
+## Links
+
+- 📈 **Strategies repo**: [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies)
+- 🖥️ **Dashboard**: `http://localhost:1783`
+- 📊 **Backtest**: `python -m backtest.<script>`
+- 📋 **Status monitor**: `python tools/status_monitor.py`
+
+---
+
+## License
 
 MIT © goodie1972
 
 ---
 
 <p align="center">
-  <sub>Built with ❤️ for XAUUSD gold trading</sub>
+  <sub>Built with ❤️ for XAUUSD gold trading — version 3.3.8</sub>
 </p>
