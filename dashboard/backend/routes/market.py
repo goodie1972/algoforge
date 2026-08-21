@@ -32,24 +32,33 @@ async def get_price():
 async def get_candles(
     timeframe: str = Query(default=settings.TIMEFRAME),
     count: int = Query(default=100, le=1000, ge=3),
+    before: int = Query(default=0, ge=0),
 ):
     """获取 K 线数据（从引擎实时缓存读取，最后一根已用现价扩展）"""
     if not engine_runner:
         return []
     # 优先从缓存读取（更快，且包含实时价格扩展）
-    cached = engine_runner.get_cached_candles(timeframe, count)
-    if cached is not None:
-        return cached
-    # 缓存未就绪 → 优先回退到 SQLite（快，不受桥接超时影响）
+    if before == 0:
+        cached = engine_runner.get_cached_candles(timeframe, count)
+        if cached is not None:
+            return cached
+    # 缓存未就绪或指定了 before → 回退到 SQLite
     try:
         from data.database import get_conn
         conn = get_conn()
         try:
-            rows = conn.execute(
-                "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
-                "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
-                (timeframe, count),
-            ).fetchall()
+            if before > 0:
+                rows = conn.execute(
+                    "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+                    "WHERE timeframe=? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?",
+                    (timeframe, before, count),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
+                    "WHERE timeframe=? ORDER BY timestamp DESC LIMIT ?",
+                    (timeframe, count),
+                ).fetchall()
         finally:
             conn.close()
         if rows:

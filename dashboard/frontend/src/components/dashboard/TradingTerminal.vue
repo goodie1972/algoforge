@@ -2,9 +2,22 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 let autoScrollScheduled = false
+
+/** 检查用户是否在查看最新数据（近5根K线内） */
+function isViewingLatest() {
+  if (!chart) return true
+  try {
+    const range = chart.timeScale().getVisibleLogicalRange()
+    if (!range) return true
+    const lastIdx = store.candles.length - 1
+    return range.to >= lastIdx - 5
+  } catch { return true }
+}
+
 function scheduleAutoScroll() {
   if (autoScrollScheduled) return  // 防止 scrollAllToRealTime 触发的事件循环
   if (autoScrollTimer) clearTimeout(autoScrollTimer)
+  if (!isViewingLatest()) return  // 查看历史数据时不自动回滚
   autoScrollTimer = setTimeout(() => {
     autoScrollScheduled = true
     scrollAllToRealTime()
@@ -178,7 +191,7 @@ function startAutoRefresh() {
     catch (e) { console.warn('[K线] auto-refresh setData失败', e) }
     afterDataLoad()
     nextTick(() => {
-      scrollAllToRealTime()
+      if (isViewingLatest()) scrollAllToRealTime()
       requestAnimationFrame(() => syncAllPriceScaleWidths())
     })
   }, ms)
@@ -335,6 +348,16 @@ onMounted(() => {
   chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
     syncAllChartsFrom(chart!, _chartRef())
     scheduleAutoScroll()
+    // 检测用户滚动到左边缘时加载更多历史数据
+    try {
+      const range = chart!.timeScale().getVisibleLogicalRange()
+      if (range && range.from <= 3 && store.candles.length > 0) {
+        const firstCandle = store.candles[0]
+        if (typeof firstCandle.time === 'number') {
+          store.fetchMoreCandles(activeTf.value, firstCandle.time + 1, 500)
+        }
+      }
+    } catch {}
   })
   chart.subscribeCrosshairMove((param: any) => {
     syncAllChartsFrom(chart!, _chartRef())
@@ -757,7 +780,7 @@ function applyDI() {
   const { pdi, ndi } = calcADX(data, diPeriod.value)
   if (pdi.length === 0) return
   const pdiData = padLinePoints(data, pdi)
-  const ndiData = padLinePoints(data, ndi).map(p => ({ ...p, value: -p.value }))
+  const ndiData = padLinePoints(data, ndi)
 
   nextTick(() => {
     const container = getPaneEl('di')
@@ -772,21 +795,33 @@ function applyDI() {
       pc.timeScale().subscribeVisibleLogicalRangeChange(() => { syncAllChartsFrom(pc, _chartRef()) })
     }
 
-    if (!paneSeries['pdi']) {
-      paneSeries['pdi'] = pc.addHistogramSeries({
-        color: '#0ecb81', priceLineVisible: false, lastValueVisible: true,
-        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
-      })
-    }
-    if (!paneSeries['ndi']) {
-      paneSeries['ndi'] = pc.addHistogramSeries({
-        color: '#f6465d', priceLineVisible: false, lastValueVisible: true,
-        priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
-      })
+    if (!paneSeries['di']) {
+      paneSeries['di'] = {
+        pdi: pc.addLineSeries({
+          color: '#0ecb81', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
+          priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+        }),
+        ndi: pc.addLineSeries({
+          color: '#f6465d', lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true,
+          priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+        }),
+        di_ref20: pc.addLineSeries({
+          color: '#8b8f97', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+          priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+        }),
+        di_ref30: pc.addLineSeries({
+          color: '#8b8f97', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false,
+          priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+        }),
+      }
     }
 
-    paneSeries['pdi'].setData(castTime(pdiData))
-    paneSeries['ndi'].setData(castTime(ndiData))
+    paneSeries['di'].pdi.setData(castTime(pdiData))
+    paneSeries['di'].ndi.setData(castTime(ndiData))
+    const ref20Data = data.map(d => ({ time: d.time, value: 20 }))
+    const ref30Data = data.map(d => ({ time: d.time, value: 30 }))
+    paneSeries['di'].di_ref20.setData(castTime(ref20Data))
+    paneSeries['di'].di_ref30.setData(castTime(ref30Data))
     syncPaneRange('di')
     requestAnimationFrame(() => syncAllPriceScaleWidths())
   })

@@ -77,6 +77,8 @@ export function getPaneSeriesList(name: string, paneSeries: Record<string, any>)
   if (ps.series && ps.overbought) return [ps.series, ps.overbought, ps.oversold].filter(Boolean)
   // mfi: series + ob/os/mid 参考线
   if (ps.series && ps.ob) return [ps.series, ps.ob, ps.os, ps.mid].filter(Boolean)
+  // di: pdi + ndi + 参考线
+  if (ps.pdi && ps.ndi) return [ps.pdi, ps.ndi, ps.di_ref20, ps.di_ref30].filter(Boolean)
   // 单 series (atr 等)
   if (ps.line) return [ps.line]
   if (ps.k) return [ps.k]

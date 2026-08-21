@@ -268,30 +268,33 @@ export function calcADX(candles: CandleData[], period: number = 14): { adx: Line
 
 // ---- MFI ----
 export function calcMFI(candles: CandleData[], period: number = 14): LinePoint[] {
-  const n = candles.length
-  if (n < period + 1) return []
+  const result: LinePoint[] = []
+  if (candles.length < period + 1) return result
 
   const typicalPrices = candles.map(c => (c.high + c.low + c.close) / 3)
   const rawMoney = candles.map(c => c.volume || 0)
   const moneyFlow = typicalPrices.map((tp, i) => tp * rawMoney[i])
 
-  const result: number[] = []
-  for (let i = period; i < n; i++) {
-    let positive = 0, negative = 0
-    for (let j = i - period + 1; j <= i; j++) {
-      if (typicalPrices[j] >= typicalPrices[j - 1]) {
-        positive += moneyFlow[j]
-      } else {
-        negative += moneyFlow[j]
-      }
-    }
-    const mfr = negative > 0 ? positive / negative : 100
-    result.push(100 - 100 / (1 + mfr))
+  // 第一个值：统计 1..period 的 money flow（与 RSI 结构一致，直接取 candles[period].time）
+  let positive = 0, negative = 0
+  for (let j = 1; j <= period; j++) {
+    if (typicalPrices[j] > typicalPrices[j - 1]) positive += moneyFlow[j]
+    else if (typicalPrices[j] < typicalPrices[j - 1]) negative += moneyFlow[j]
   }
+  const mfr0 = negative > 0 ? positive / negative : 100
+  result.push({ time: candles[period].time, value: 100 - 100 / (1 + mfr0) })
 
-  const offset = candles.length - result.length
-  return result.map((v, i) => ({
-    time: candles[offset + i].time,
-    value: Math.round(v * 100) / 100,
-  }))
+  // 后续值：滑动窗口，逐根推进（时间轴直接用 candles[i].time）
+  for (let i = period + 1; i < candles.length; i++) {
+    // 移除窗口最旧一根的贡献（i-period 相对 i-period-1）
+    if (typicalPrices[i - period] > typicalPrices[i - period - 1]) positive -= moneyFlow[i - period]
+    else if (typicalPrices[i - period] < typicalPrices[i - period - 1]) negative -= moneyFlow[i - period]
+    // 加入最新一根的贡献（i 相对 i-1）
+    if (typicalPrices[i] > typicalPrices[i - 1]) positive += moneyFlow[i]
+    else if (typicalPrices[i] < typicalPrices[i - 1]) negative += moneyFlow[i]
+
+    const mfr = negative > 0 ? positive / negative : 100
+    result.push({ time: candles[i].time, value: 100 - 100 / (1 + mfr) })
+  }
+  return result
 }

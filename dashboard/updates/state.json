@@ -7,6 +7,6 @@
   "last_check_at": null,
   "pending_path": null,
   "message": "已是最新版本",
-  "error": "git fetch failed: fatal: unable to access 'https://github.com/goodie1972/algoforge.git/': Recv failure: Connection was reset",
-  "updated_at": "2026-08-18T04:44:02.274522+00:00"
+  "error": null,
+  "updated_at": "2026-08-21T10:54:08.664155+00:00"
 }

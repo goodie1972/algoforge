@@ -134,7 +134,7 @@ def _stream_chat(messages: list[dict], temperature: float = 0.3):
         yield {"content": "⚠️ 尚未配置 LLM Provider，请在「设置 → AI Agent」页面配置。"}
         return
 
-    model = provider.get("selected_model") or (provider.get("models", [""])[0] if provider.get("models") else "")
+    model = provider.get("selected_model") or (provider.get("models")[0] if provider.get("models") and len(provider.get("models", [])) > 0 else "")
     if not model:
         yield {"content": "⚠️ 未选择模型。"}
         return

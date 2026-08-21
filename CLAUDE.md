@@ -8,7 +8,7 @@ XAUUSD 黄金自动化交易系统，基于 Python + MetaTrader 4。
 - **技术栈:** Python 3.10+ / FastAPI / Vue 3 + TypeScript + Vite + Naive UI / SQLite / lightweight-charts
 - **桥接:** FreeMT4Bridge EA (MQL4, TCP Socket :23232) 或 MetaApi 云端
 - **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals 表)
-- **版本:** 3.3.6 (VERSION)
+- **版本:** 3.3.8 (VERSION)
 - **策略仓库:** [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies.git)
 
 ## 仓库结构
@@ -55,7 +55,7 @@ DataFactory 是**所有策略指标的唯一数据来源**。两层数据源：
 1. **F043 命令**：从 MT4 EA 直接获取指标值（优先，与 MT4 图表一致）
 2. **TA-Lib 本地计算**：`_talib_indicators()` 回退计算（首次加载 / F043 失败时）
 
-### 完整指标表（26 个）
+### 完整指标表（27 个）
 
 | key | 类型 | 参数 | 说明 |
 |:----|:----|:----|:----|
@@ -83,6 +83,7 @@ DataFactory 是**所有策略指标的唯一数据来源**。两层数据源：
 | `ndi` | float | 14 | −DI 空头方向 |
 | `macd` | dict | 12,26,9 | `{"macd": f, "signal": f}` |
 | `stoch_5_3_3` | dict | 5,3,3 | `{"k": f, "d": f}` |
+| `stoch_14_3_3` | dict | 14,3,3 | `{"k": f, "d": f}` |
 | `volume_sma_20` | float | 20 | 成交量 SMA |
 | `price_position` | float | 20 周期 | 价格在 20 周期高低区间的位置 0~1 |
 

@@ -3,6 +3,33 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.3.8] - 2026-08-21 — K线图修复 + 三新策略上线
+
+### 新增
+- **fish_eaten v2**（magic 661301）：M30 价格回归策略，修改为 M30 + TS=48 吃鱼出场 + 时间止损
+- **m15_followave v1**（magic 661401）：M15 Stoch+BBI+BB 趋势跟踪，±DI 门禁，回测 +$403
+- **m30_followave v1**（magic 661402）：M30 Stoch+BBI+BB 趋势跟踪，2.0×ATR trailing stop，回测 +$658
+- **K线图历史数据滚动加载**：后端 `before` 参数 + 前端滚动左边缘自动加载更多历史，不设上限
+
+### 修复
+- **K线图漂移**：`isViewingLatest()` 判断用户是否查看最新，查看历史时不再自动回滚（阈值 5 根）
+- **K线图历史被裁**：`fetchLatestCandles` 不再 `splice` 裁头部（原会把已加载历史删掉）
+- **AI Agent 调用失败**：修复 `list index out of range`（models 空列表访问）
+
+## [3.3.7] - 2026-08-19 — 四仓库研究吸收 + 策略升级
+
+### 新增
+- **timeprofit_ea v2**：入场增强（M5 EMA10 回踩确认 + 真突破前一根关内判断），替换 v1 在线基础版
+- **gold_auto_research v8**：Stoch 5,3,3→14,3,3、RSI 超买 70→79、超卖 35→29（BeanBagData 最新版移植）
+- **GoodMA v1**：新策略 60MA 方向 + 回踩入场（Yumerain/EA-MQL4 移植）
+- **KISS v1**：新策略 H4 MACD + H1 均线组 + 枢轴支阻（Yumerain/EA-MQL4 移植）
+- **LLM 参数搜索工具** `tools/llm_param_search.py`：遗传式搜索 + Ollama 引导（BeanBagData 未吸收部分）
+- **DataFactory**：新增 `stoch_14_3_3` 指标缓存
+
+### 修复
+- 策略描述路径修复（上一个版本遗留的路径修正）
+- 平仓记录写入异常捕获加固
+
 ## [3.3.6] - 2026-08-17 — 平仓记录写入修复 + 策略描述路径修复
 
 ### 修复

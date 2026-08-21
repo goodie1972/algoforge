@@ -10,6 +10,8 @@ export const usePriceStore = defineStore('prices', () => {
   const candles = ref<Candle[]>([])
   const loading = ref(false)
 
+  let lastMoreBefore = 0  // 历史滚动加载防抖：同一 before 不重复请求
+
   const midPrice = computed(() => (bid.value + ask.value) / 2)
 
   function updateTick(b: number, a: number) {
@@ -27,6 +29,7 @@ export const usePriceStore = defineStore('prices', () => {
 
   async function fetchCandles(timeframe = 'H1', count = 500) {
     loading.value = true
+    lastMoreBefore = 0  // 切换周期后重置历史加载防抖
     try {
       const resp = await fetch(`/api/market/candles?timeframe=${timeframe}&count=${count}`)
       const data: Candle[] = await resp.json()
@@ -49,9 +52,8 @@ export const usePriceStore = defineStore('prices', () => {
       const resp = await fetch(`/api/market/candles?timeframe=${timeframe}&count=${count}`)
       const data: Candle[] = await resp.json()
       if (data.length === 0) return data
-      // 按时间戳匹配更新，新蜡烛追加到尾部
+      // 按时间戳匹配更新，新蜡烛追加到尾部（不裁头部，避免删掉已加载的历史）
       const timeMap = new Map(candles.value.map(c => [c.time, true]))
-      let added = 0
       for (const c of data) {
         if (timeMap.has(c.time)) {
           // 更新已有蜡烛
@@ -61,16 +63,29 @@ export const usePriceStore = defineStore('prices', () => {
           // 新蜡烛，追加
           candles.value.push(c)
           timeMap.set(c.time, true)
-          added++
         }
-      }
-      // 如果追加了新蜡烛，裁剪旧数据防止无限膨胀
-      if (added > 0 && candles.value.length > 1000) {
-        candles.value.splice(0, added)
       }
       return data
     } catch { return [] }
   }
 
-  return { bid, ask, spread, candles, midPrice, loading, updateTick, fetchPrice, fetchCandles, fetchLatestCandles }
+  /** 加载更多历史数据（before 时间戳之前），滚动到左边缘时调用 */
+  async function fetchMoreCandles(timeframe: string, before: number, count = 500) {
+    if (before <= 0 || before === lastMoreBefore) return []
+    lastMoreBefore = before
+    try {
+      const resp = await fetch(`/api/market/candles?timeframe=${timeframe}&count=${count}&before=${before}`)
+      const data: Candle[] = await resp.json()
+      if (data && data.length > 0) {
+        const existTimes = new Set(candles.value.map(c => c.time))
+        const newCandles = data.filter(c => !existTimes.has(c.time))
+        candles.value = [...newCandles, ...candles.value]
+        // 不设上限：保留全部已加载历史，滚动回看不用重新加载。
+        // 当前单周期最多几万根（M5 约1.6万），内存完全可承受
+      }
+      return data
+    } catch { return [] }
+  }
+
+  return { bid, ask, spread, candles, midPrice, loading, updateTick, fetchPrice, fetchCandles, fetchLatestCandles, fetchMoreCandles }
 })

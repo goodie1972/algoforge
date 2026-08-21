@@ -137,6 +137,36 @@ STRATEGY_POOL = {
         "double_first": False,
         "max_positions": 1,
     },
+    "goodma": {
+        "magic": 880401,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "kiss": {
+        "magic": 880501,
+        "timeframe": "H1",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "fish_eaten": {
+        "magic": 661301,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "m15_followave": {
+        "magic": 661401,
+        "timeframe": "M15",
+        "double_first": False,
+        "max_positions": 1,
+    },
+    "m30_followave": {
+        "magic": 661402,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+    },
     # === 备选/历史策略 (disabled by default) ===
     # "stoch_trend_h1": {  # 旧版本，已被 stoch_trend_h1_optimized 替代
     #     "magic": 661201,
@@ -169,7 +199,7 @@ STRATEGY_POOL = {
     #     "max_positions": 5,
     # },
     "timeprofit_ea": {
-        "magic": 880202,
+        "magic": 880203,
         "timeframe": "M5",
         "double_first": False,
         "max_positions": 5,

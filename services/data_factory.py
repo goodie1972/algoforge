@@ -150,9 +150,23 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
             if i > 0 and widths[i-1] == widths[i-1]:
                 cur, prv = widths[i], widths[i-1]
                 result[c.time]["bb_width_direction"] = "up" if cur > prv else ("down" if cur < prv else "flat")
+            # BB 中轨方向（更快、比 bbi_direction 反应早）
+            if i > 0 and mid[i] == mid[i] and mid[i-1] == mid[i-1]:
+                cur_m, prv_m = float(mid[i]), float(mid[i-1])
+                result[c.time]["bb_mid_direction"] = "up" if cur_m > prv_m else ("down" if cur_m < prv_m else "flat")
             if i >= 3:
                 _avg3 = float(talib.SMA(widths, timeperiod=3)[i])
                 result[c.time]["bb_width_ratio"] = round(widths[i] / _avg3, 3) if _avg3 > 0 else 1.0
+    except Exception:
+        pass
+
+    # BBI = (SMA3 + SMA6 + SMA12 + SMA24) / 4
+    try:
+        bbi_periods = [3, 6, 12, 24]
+        _bbi_smas = {p: talib.SMA(closes, timeperiod=p) for p in bbi_periods}
+        for i, c in enumerate(candles):
+            if i >= bbi_periods[-1] - 1 and all(_bbi_smas[p][i] == _bbi_smas[p][i] for p in bbi_periods):
+                result[c.time]["bbi"] = float(sum(_bbi_smas[p][i] for p in bbi_periods) / len(bbi_periods))
     except Exception:
         pass
 
@@ -220,6 +234,15 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
         for i, c in enumerate(candles):
             if sk[i] == sk[i]:
                 result[c.time]["stoch_5_3_3"] = {"k": float(sk[i]), "d": float(sd[i])}
+    except Exception:
+        pass
+
+    # Stoch(14,3,3) — 黄金自动研究 v8 使用
+    try:
+        sk14, sd14 = talib.STOCH(highs, lows, closes, fastk_period=14, slowk_period=3, slowd_period=3)
+        for i, c in enumerate(candles):
+            if sk14[i] == sk14[i]:
+                result[c.time]["stoch_14_3_3"] = {"k": float(sk14[i]), "d": float(sd14[i])}
     except Exception:
         pass
 
@@ -543,8 +566,8 @@ class DataFactory:
 
         原则：EA 提供的字段用 EA 值（与图表完全一致），覆盖内存缓存顶层 + 持久化到 DB。
         兜底：EA 拿不到（None 或空 dict），字段由 _ta_only_indicators（_sync_tf 调）算。
-        EA 没提供的字段（bb_width_direction / bb_width_ratio / mfi_direction /
-        mfi_dir_50 / trend / price_position）一律由 _ta_only_indicators 算。
+        EA 没提供的字段（bb_width_direction / bb_width_ratio / bb_mid_direction /
+        bbi / mfi_direction / mfi_dir_50 / trend / price_position）一律由 _ta_only_indicators 算。
         """
         from data.database import upsert_indicators
         ea_keys = ("rsi", "rsi_5", "rsi_10", "mfi", "bb",
