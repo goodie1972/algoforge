@@ -47,11 +47,13 @@ strategies/test_*.txt
 *.bak
 .backup/
 
-# 策略：框架 + 策略快照保留在主应用（clone 后开箱即用），后续策略更新在独立 algoforge-strategies 仓库
+# 策略：仅框架保留在主应用，具体策略实现在独立 algoforge-strategies 仓库
 strategies/__pycache__/
 strategies/backup/
 strategies/docs/
 strategies/*.html
+# 策略实现文件（由 algoforge-strategies 仓库维护，主应用不含）
+strategies/2026*.py
 
 # Playwright / UI 测试脚本与截图（不入库）
 test_*.cjs
