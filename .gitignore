@@ -46,5 +46,16 @@ strategies/test_*.txt
 # 备份
 *.bak
 .backup/
-strategies/
-~$
+
+# 策略：框架 + 策略快照保留在主应用（clone 后开箱即用），后续策略更新在独立 algoforge-strategies 仓库
+strategies/__pycache__/
+strategies/backup/
+strategies/docs/
+strategies/*.html
+
+# Playwright / UI 测试脚本与截图（不入库）
+test_*.cjs
+test_*.mjs
+test_*.png
+screenshot_*.png
+backtest/~$*.xlsx
