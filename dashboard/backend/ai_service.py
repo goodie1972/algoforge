@@ -46,13 +46,18 @@ def build_system_prompt() -> str:
     from services.agent.persona_manager import get_persona_manager
     from services.agent.skill_loader import get_loader
 
+    # 确保技能已扫描（首次调用时加载）
+    loader = get_loader()
+    if not loader.list_skills():
+        loader.scan()
+
     # 上下文（含 K线/信号/成交/策略等增强）
     builder = get_builder()
     context = builder.build(["engine", "positions", "price", "indicators", "kline",
                              "signals", "trades", "strategies", "news", "calendar"])
 
     # 技能上下文
-    skills_text = get_loader().get_all_context()
+    skills_text = loader.get_all_context()
     if skills_text:
         context += "\n\n【可用技能】\n" + skills_text
 

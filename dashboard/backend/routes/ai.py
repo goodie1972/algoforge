@@ -105,6 +105,9 @@ async def set_persona(req: dict):
 async def list_skills():
     """列出已加载的技能"""
     from services.agent.skill_loader import get_loader
+    loader = get_loader()
+    if not loader.list_skills():
+        loader.scan()
     return {"skills": get_loader().list_skills()}
 
 
