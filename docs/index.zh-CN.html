@@ -624,7 +624,7 @@
   </script>
 
 <script>
-function toggleLang() {
+function toggleLang() { var p = window.location.pathname; if (p.indexOf(".zh-CN") >= 0) { window.location.href = "index.html"; } else { window.location.href = "index.zh-CN.html"; } }
   var current = window.location.pathname;
   if (current.endsWith('.zh-CN.html')) {
     window.location.href = current.replace('.zh-CN.html', '.html');

@@ -627,10 +627,8 @@
 <script>
 function toggleLang() {
   var current = window.location.pathname;
-  if (current.endsWith('.zh-CN.html')) {
-    window.location.href = current.replace('.zh-CN.html', '.html');
-  } else if (current.endsWith('.html') || current.endsWith('/')) {
-    window.location.href = current.replace(/\/?$/, '') + '.zh-CN.html';
+  if (current.indexOf('.zh-CN') >= 0) {
+    window.location.href = 'index.html';
   } else {
     window.location.href = 'index.zh-CN.html';
   }
