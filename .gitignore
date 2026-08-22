@@ -50,7 +50,6 @@ strategies/test_*.txt
 # 策略：仅框架保留在主应用，具体策略实现在独立 algoforge-strategies 仓库
 strategies/__pycache__/
 strategies/backup/
-strategies/docs/
 strategies/*.html
 # 策略实现文件（由 algoforge-strategies 仓库维护，主应用不含）
 strategies/2026*.py

@@ -327,14 +327,14 @@ class DataFactory:
         logger.info("[DataFactory] started")
 
     def _init_indicators_from_db(self):
-        """从 DB 读最近 350 根 K 线的指标填充内存缓存（启动恢复）。
+        """从 DB 读最近 500 根 K 线的指标填充内存缓存（启动恢复）。
         取最新一根的指标展开到缓存顶层（扁平结构，策略 get_indicator 直接读）。
         """
         from data.database import get_recent_indicators
         with _CACHE_LOCK:
             for tf in ["M15", "M30", "H1", "H4"]:
                 _DATA_CACHE.setdefault(tf, {"candles": []})
-                rows = get_recent_indicators(tf, limit=350)
+                rows = get_recent_indicators(tf, limit=500)
                 if not rows:
                     continue
                 # rows 已按时间戳升序，取最新一根的指标展开顶层

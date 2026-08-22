@@ -88,15 +88,18 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 // ---- localStorage 持久化（保存周期和指标配置） ----
 const STORAGE_KEY = 'algoforge_terminal_config'
 
-/** 按周期保存/加载配置，格式: { tf: { showEMA, ema1, ... } } */
+/** 按周期保存/加载配置，格式: { lastTf: 'H1', H1: { showEMA, ... }, M30: {...} } */
 function loadTerminalConfig() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return
     const all = JSON.parse(raw)
+    // 恢复上次使用的周期
+    if (all.lastTf && all.lastTf !== activeTf.value) {
+      activeTf.value = all.lastTf
+    }
     const cfg = all[activeTf.value]
     if (!cfg) return
-    activeTf.value = cfg.tf || 'H1'
     showEMA.value = cfg.showEMA ?? false
     showSMA.value = cfg.showSMA ?? false
     showBB.value = cfg.showBB ?? false
@@ -135,6 +138,7 @@ function saveTerminalConfig() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const all = raw ? JSON.parse(raw) : {}
+    all.lastTf = activeTf.value  // 保存最后使用的周期
     all[activeTf.value] = {
       tf: activeTf.value,
       showEMA: showEMA.value, showSMA: showSMA.value, showBB: showBB.value,
