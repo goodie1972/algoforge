@@ -389,7 +389,7 @@ class DataFactory:
             with _CACHE_LOCK:
                 has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles") and "rsi" in _DATA_CACHE[tf]
             needs_full = full or not has_data
-            count = 350 if needs_full else 2
+            count = 2000 if needs_full else 2
             raw = bridge.get_candles("XAUUSD", tf, count)
             new_candles = list(reversed(raw)) if raw else []
 
@@ -400,7 +400,7 @@ class DataFactory:
                     conn = get_conn()
                     rows = conn.execute(
                         "SELECT timestamp, open, high, low, close, volume FROM ohlcv "
-                        "WHERE timeframe=? ORDER BY timestamp DESC LIMIT 350",
+                        "WHERE timeframe=? ORDER BY timestamp DESC LIMIT 2000",
                         (tf,),
                     ).fetchall()
                     conn.close()
@@ -422,7 +422,7 @@ class DataFactory:
                 _candles_dict = {c.time: c for c in _old}
                 for c in new_candles:
                     _candles_dict[c.time] = c
-                merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-350:]
+                merged = sorted(_candles_dict.values(), key=lambda x: x.time)[-2000:]
             # TA-Lib 计算 + DB 写在锁外（慢操作不持锁，避免阻塞 get_cache 读）
             # 策略：有新 K 线时立即计算，否则每 5 秒全量重算一次保证数据新鲜度
             now = time.time()
