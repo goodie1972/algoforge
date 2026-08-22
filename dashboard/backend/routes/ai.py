@@ -192,38 +192,32 @@ def _stream_chat(messages: list[dict], temperature: float = 0.3):
         "stream": True,
     }
 
-    # 代理配置：优先使用环境变量，其次检测 v2rayN 默认 SOCKS5 端口
-    proxy = os.environ.get("LLM_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
-    if not proxy:
-        for port in ["10808", "7890", "1080"]:
-            try:
-                import socket
-                s = socket.create_connection(("127.0.0.1", int(port)), timeout=1)
-                s.close()
-                proxy = f"socks5://127.0.0.1:{port}"
-                break
-            except OSError:
-                continue
+    # 代理配置：仅使用环境变量，不自动检测
+    proxy = os.environ.get("LLM_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or ""
 
-    client_kwargs = {"timeout": 60}
+    client_kwargs = {"timeout": 60, "http2": False}
     if proxy:
         client_kwargs["proxy"] = proxy
 
-    with httpx.stream("POST", api_url, json=payload, headers=headers, **client_kwargs) as resp:
-        resp.raise_for_status()
-        for line in resp.iter_lines():
-            if not line or not line.startswith("data: "):
-                continue
-            data_str = line[6:]
-            if data_str.strip() == "[DONE]":
-                break
-            try:
-                data = json.loads(data_str)
-                delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                if delta:
-                    yield {"content": delta}
-            except json.JSONDecodeError:
-                continue
+    try:
+        with httpx.Client(**client_kwargs) as client:
+            with client.stream("POST", api_url, json=payload, headers=headers) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                        delta = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if delta:
+                            yield {"content": delta}
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as e:
+        yield {"content": f"⚠️ 调用失败: {e}"}
 
 
 def _session_exists(session_id: str) -> bool:
