@@ -977,7 +977,7 @@ function syncAllPriceScaleWidths() {
 
 // ---- 数据加载 ----
 async function loadCandles() {
-  await store.fetchCandles(activeTf.value, 500)
+  await store.fetchCandles(activeTf.value, 2000)
   if (candleSeries && store.candles.length > 0) {
     try { candleSeries.setData(sanitizeCandleData(store.candles)) }
   catch (e) { console.warn('[K线] setData失败', e) }

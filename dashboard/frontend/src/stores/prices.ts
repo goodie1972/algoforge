@@ -27,7 +27,7 @@ export const usePriceStore = defineStore('prices', () => {
     } catch { /* ignore polling errors */ }
   }
 
-  async function fetchCandles(timeframe = 'H1', count = 500) {
+  async function fetchCandles(timeframe = 'H1', count = 2000) {
     loading.value = true
     lastMoreBefore = 0  // 切换周期后重置历史加载防抖
     try {

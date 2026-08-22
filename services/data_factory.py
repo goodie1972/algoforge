@@ -334,7 +334,7 @@ class DataFactory:
         with _CACHE_LOCK:
             for tf in ["M15", "M30", "H1", "H4"]:
                 _DATA_CACHE.setdefault(tf, {"candles": []})
-                rows = get_recent_indicators(tf, limit=500)
+                rows = get_recent_indicators(tf, limit=2000)
                 if not rows:
                     continue
                 # rows 已按时间戳升序，取最新一根的指标展开顶层
