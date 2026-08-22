@@ -31,7 +31,7 @@ async def get_price():
 @router.get("/candles")
 async def get_candles(
     timeframe: str = Query(default=settings.TIMEFRAME),
-    count: int = Query(default=100, le=1000, ge=3),
+    count: int = Query(default=100, le=2000, ge=3),
     before: int = Query(default=0, ge=0),
 ):
     """获取 K 线数据（从引擎实时缓存读取，最后一根已用现价扩展）"""

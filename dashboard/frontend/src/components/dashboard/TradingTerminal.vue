@@ -88,14 +88,17 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 // ---- localStorage 持久化（保存周期和指标配置） ----
 const STORAGE_KEY = 'algoforge_terminal_config'
 
-/** 按周期保存/加载配置，格式: { lastTf: 'H1', H1: { showEMA, ... }, M30: {...} } */
-function loadTerminalConfig() {
+/**
+ * 按周期加载配置
+ * @param restoreLastTf 是否恢复上次使用的周期（仅组件挂载时 true，切换周期时 false）
+ */
+function loadTerminalConfig(restoreLastTf = false) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return
     const all = JSON.parse(raw)
-    // 恢复上次使用的周期
-    if (all.lastTf && all.lastTf !== activeTf.value) {
+    // 只在组件挂载时恢复上次使用的周期
+    if (restoreLastTf && all.lastTf && all.lastTf !== activeTf.value) {
       activeTf.value = all.lastTf
     }
     const cfg = all[activeTf.value]
@@ -335,7 +338,7 @@ onMounted(() => {
 
   // 先应用周期预设，再加载保存的配置覆盖（让保存的配置优先）
   applyTfPreset()
-  loadTerminalConfig()
+  loadTerminalConfig(true)  // 组件挂载时恢复上次使用的周期
   loadCandles()
 
   const observer = new ResizeObserver(() => {
