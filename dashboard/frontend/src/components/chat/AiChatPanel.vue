@@ -324,7 +324,7 @@ async function handleDeleteSession(id: string, e: Event) {
 .chat-empty-subtitle { font-size: 13px; color: #7d8590; margin-bottom: 16px; }
 .chat-empty-desc { font-size: 12px; color: #7d8590; margin-bottom: 20px; line-height: 1.6; }
 .chat-empty-hint { font-size: 12px; color: #7d8590; margin-bottom: 8px; }
-.chat-empty-commands { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.chat-empty-commands { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-height: 120px; overflow-y: auto; }
 .chat-empty-cmd {
   background: rgba(240,185,11,0.08); border: 1px solid rgba(240,185,11,0.2);
   color: #f0b90b; font-size: 11px; padding: 4px 10px;

@@ -136,6 +136,45 @@ async function testConnection() {
 }
 
 onMounted(loadProviders)
+
+// ── 人设 ──
+const personaName = ref('')
+const personaRole = ref('')
+const personaStyle = ref('')
+const personaLimits = ref('')
+
+async function loadPersona() {
+  try {
+    const r = await fetch('/api/ai/persona')
+    const d = await r.json()
+    if (d.current) {
+      personaName.value = d.current.name || ''
+      personaRole.value = d.current.role || ''
+      personaStyle.value = d.current.style || ''
+      personaLimits.value = d.current.limits || ''
+    }
+  } catch (e) { /* ignore */ }
+}
+async function savePersona() {
+  await fetch('/api/ai/persona', {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name: personaName.value, role: personaRole.value, style: personaStyle.value, limits: personaLimits.value, language: 'zh-CN', save: true }),
+  })
+  message.success('人设已保存')
+}
+
+// ── 技能 ──
+const skills = ref<any[]>([])
+async function loadSkills() {
+  try {
+    const r = await fetch('/api/ai/skills')
+    const d = await r.json()
+    skills.value = d.skills || []
+  } catch (e) { /* ignore */ }
+}
+
+onMounted(() => { loadPersona(); loadSkills() })
 </script>
 
 <template>
@@ -231,5 +270,44 @@ onMounted(loadProviders)
         </div>
       </template>
     </n-modal>
+
+    <!-- ── 人设配置 ── -->
+    <n-divider />
+    <n-h3>AI 人设</n-h3>
+    <n-space vertical>
+      <n-input-group>
+        <n-input-group-label>人设名</n-input-group-label>
+        <n-input v-model:value="personaName" placeholder="金探" style="flex:1" />
+      </n-input-group>
+      <n-input
+        v-model:value="personaRole"
+        type="textarea"
+        placeholder="角色描述（如：专业的 XAUUSD 黄金量化交易分析师）"
+        :rows="2"
+      />
+      <n-input
+        v-model:value="personaStyle"
+        type="textarea"
+        placeholder="回答风格"
+        :rows="2"
+      />
+      <n-input
+        v-model:value="personaLimits"
+        type="textarea"
+        placeholder="限制（如：不直接执行交易）"
+        :rows="2"
+      />
+      <n-button size="small" @click="savePersona">保存人设</n-button>
+    </n-space>
+
+    <!-- ── 已加载技能列表 ── -->
+    <n-divider />
+    <n-h3>已加载技能 ({{ skills.length }})</n-h3>
+    <n-space vertical v-if="skills.length > 0">
+      <n-card v-for="s in skills" :key="s.name" size="small" :title="s.name">
+        {{ s.description }}
+      </n-card>
+    </n-space>
+    <n-empty v-else description="暂无技能" />
   </div>
 </template>
