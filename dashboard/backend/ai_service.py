@@ -41,118 +41,31 @@ SYSTEM_PROMPT = """你是「金探」，一位专业的 XAUUSD 黄金量化交�
 
 
 def build_system_prompt() -> str:
-    """构建 system prompt，包含人设 + 实时交易上下文"""
-    context = _gather_trading_context()
-    if context:
-        return SYSTEM_PROMPT + "\n\n" + context
-    return SYSTEM_PROMPT
+    """构建 system prompt，包含人设 + 实时交易上下文 + 技能"""
+    from services.agent.context_builder import get_builder
+    from services.agent.persona_manager import get_persona_manager
+    from services.agent.skill_loader import get_loader
+
+    # 上下文（含 K线/信号/成交/策略等增强）
+    builder = get_builder()
+    context = builder.build(["engine", "positions", "price", "indicators", "kline",
+                             "signals", "trades", "strategies", "news", "calendar"])
+
+    # 技能上下文
+    skills_text = get_loader().get_all_context()
+    if skills_text:
+        context += "\n\n【可用技能】\n" + skills_text
+
+    # 人设组装
+    prompt = get_persona_manager().build_system_prompt(context)
+    return prompt
 
 
 def _gather_trading_context() -> str:
-    """收集当前交易上下文，注入 system prompt"""
-    from dashboard.backend.engine_runner import EngineRunner
-    engine_runner = EngineRunner.get_instance()
-
-    lines = ["\n【当前交易上下文】"]
-    now = datetime.now(LOCAL_TZ)
-    lines.append(f"时间: {now.strftime('%Y-%m-%d %H:%M:%S')} UTC+8")
-
-    # 引擎状态
-    if engine_runner:
-        try:
-            status = engine_runner.get_status()
-            lines.append(f"引擎: {status.get('status', '?')} (uptime {status.get('uptime_seconds', 0):.0f}s), 桥接: {'已连接' if status.get('bridge_connected') else '未连接'}")
-        except Exception:
-            pass
-
-        # 账户快照
-        try:
-            acct = engine_runner._cached_account
-            if acct:
-                lines.append(f"账户: 余额 ${acct.get('balance', 0):.2f} | 净值 ${acct.get('equity', 0):.2f} | 浮盈 ${acct.get('floating_pnl', 0):+.2f} | 可用 ${acct.get('free_margin', 0):.2f}")
-        except Exception:
-            pass
-
-        # 持仓
-        try:
-            positions = engine_runner._fresh_positions()
-            if positions:
-                lines.append("持仓:")
-                for p in positions[:5]:
-                    direction = p.get('type', p.get('order_type', '?'))
-                    vol = p.get('volume', 0)
-                    entry = p.get('open_price', p.get('entry_price', 0))
-                    profit = p.get('profit', p.get('floating_pnl', 0))
-                    sl = p.get('stop_loss', 0)
-                    tp = p.get('take_profit', 0)
-                    ticket = p.get('ticket', '?')
-                    lines.append(f"  - #{ticket} {direction} {vol} XAUUSD @{entry} 浮盈${profit:+.2f} 止损{sl} 止盈{tp}")
-            else:
-                lines.append("持仓: 无")
-        except Exception:
-            pass
-
-        # 当前价格
-        try:
-            price = engine_runner._cached_price
-            if price:
-                bid = price.get('bid', 0)
-                ask = price.get('ask', 0)
-                spread = round(ask - bid, 2)
-                lines.append(f"价格: bid {bid} ask {ask} spread {spread}")
-        except Exception:
-            pass
-
-        # 指标快照
-        try:
-            indicators = engine_runner._cached_indicators
-            if indicators:
-                lines.append("指标:")
-                for tf in ('M30', 'H1', 'H4'):
-                    tf_data = indicators.get(tf, {})
-                    if tf_data:
-                        rsi = tf_data.get('rsi', '?')
-                        macd = tf_data.get('macd', {})
-                        bb = tf_data.get('bb', {})
-                        atr = tf_data.get('atr', '?')
-                        adx = tf_data.get('adx', '?')
-                        trend = tf_data.get('trend', '?')
-                        ema9 = tf_data.get('ema_9', '?')
-                        ema21 = tf_data.get('ema_21', '?')
-                        macd_str = f"MACD={macd.get('macd','?')}/{macd.get('signal','?')}" if isinstance(macd, dict) else ""
-                        bb_str = f"BB({bb.get('upper','?')}/{bb.get('mid','?')}/{bb.get('lower','?')})" if isinstance(bb, dict) else ""
-                        lines.append(f"  {tf}: RSI={rsi} {macd_str} {bb_str} ATR={atr} ADX={adx} EMA9={ema9} EMA21={ema21} 趋势={trend}")
-        except Exception:
-            pass
-
-        # 策略列表
-        try:
-            strats = engine_runner.get_active_strategies()
-            if strats:
-                names = [s.get('name', s) if isinstance(s, dict) else str(s) for s in strats]
-                lines.append(f"策略: {len(names)}个活跃 - {', '.join(names[:8])}")
-        except Exception:
-            pass
-
-    # 新闻方向
-    try:
-        news_lines = _get_latest_news(3)
-        if news_lines:
-            lines.append("新闻:")
-            for n in news_lines:
-                lines.append(f"  - [{n['direction']}] {n['content'][:60]}")
-    except Exception:
-        pass
-
-    # 经济日历
-    try:
-        events = _get_today_calendar()
-        if events:
-            lines.append(f"经济日历: {events}")
-    except Exception:
-        pass
-
-    return "\n".join(lines)
+    """保留兼容性，新代码请直接使用 build_system_prompt"""
+    from services.agent.context_builder import get_builder
+    return get_builder().build(["engine", "positions", "price", "indicators",
+                                "signals", "trades", "strategies", "news", "calendar"])
 
 
 def _get_latest_news(limit=3):

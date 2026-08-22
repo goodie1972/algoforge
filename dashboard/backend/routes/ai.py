@@ -75,6 +75,39 @@ async def update_title_api(session_id: str, req: UpdateTitleRequest):
     return {"message": "已更新"}
 
 
+@router.get("/persona")
+async def get_persona():
+    """获取当前人设和所有可用人设"""
+    from services.agent.persona_manager import get_persona_manager
+    mgr = get_persona_manager()
+    return {
+        "current": mgr.get_current(),
+        "list": mgr.get_list(),
+    }
+
+
+@router.put("/persona")
+async def set_persona(req: dict):
+    """保存/切换人设"""
+    from services.agent.persona_manager import get_persona_manager
+    mgr = get_persona_manager()
+    name = req.get("name", "")
+    if req.get("save", False):
+        mgr.save_persona(req)
+        return {"success": True, "name": name}
+    if name:
+        ok = mgr.set_current(name)
+        return {"success": ok}
+    return {"success": False}
+
+
+@router.get("/skills")
+async def list_skills():
+    """列出已加载的技能"""
+    from services.agent.skill_loader import get_loader
+    return {"skills": get_loader().list_skills()}
+
+
 @router.post("/chat")
 async def chat_api(req: ChatRequest):
     """SSE 流式对话 — 逐字返回 AI 回复"""
