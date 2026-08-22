@@ -403,7 +403,7 @@ class EngineRunner:
         """从数据工厂缓存刷新 K 线缓存（每 tick 最多刷一个周期，避免堵塞快速采样）"""
         now = time.time()
         # 按优先级依次刷新：H1 > M30 > M15 > M5 > H4 > D1 > W1 > M1
-        priority = ["H1", "M30", "M15", "M5", "H4", "D1", "W1", "M1"]
+        priority = ["H1", "M30", "M15", "H4", "M5", "D1", "W1", "M1"]
         for tf in priority:
             last_ts = self._cached_candles_ts.get(tf, 0)
             if now - last_ts >= 120 or tf not in self._cached_candles:
