@@ -83,14 +83,7 @@ class Athlete:
             except TypeError:
                 return cls._verify_entry(signal, tick_price, latest)
 
-        # 默认 fallback
-        bb = latest.get("bb") or signal.get("indicator_values", {}).get("bb") or {}
-        if direction == "BUY":
-            if bb.get("lower") and tick_price > bb["lower"] * 1.005:
-                return False
-        else:
-            if bb.get("upper") and tick_price < bb["upper"] * 0.995:
-                return False
+        # 默认：新策略无需验票，直接通过（有 _verify_entry 的走自定义验证）
         return True
 
     # ═══════════════ 执行 ═══════════════

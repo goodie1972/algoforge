@@ -4,7 +4,7 @@
 
 <h1 align="center">AlgoForge</h1>
 
-<p align="center"><strong>XAUUSD 黄金自动化交易系统 · Algorithmic + Forge = 算法锻造工坊</strong> — 多策略并行、全面风控、实时 Web 监控的专业黄金自动化交易平台。</p>
+<p align="center"><strong>XAUUSD Algorithmic Trading System · Algorithmic + Forge</strong> — Multi-strategy parallel, comprehensive risk control, real-time Web monitoring — professional gold trading platform.</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python" alt="Python">
@@ -23,33 +23,33 @@
 
 ## Features
 
-> 从数据采集到交易执行，从信号回放到复盘，**全链路追踪**。
+> Full-chain traceability: from data collection to trade execution, from signal replay to review.
 
-### 🎯 多策略并行
-- **25+ 策略同时运行**，独立 Magic Number 和风控状态
-- 自动扫描 `strategies/` 目录发现新策略，**零配置注册**
-- 分类覆盖：趋势跟踪 / 反转交易 / 突破交易 / 评分模型 / 组合策略
+### 🎯 Multi-Strategy Parallel
+- **25+ strategies run simultaneously** with independent Magic Numbers and risk states
+- Auto-scans the `strategies/` directory for new strategies — **zero-config registration**
+- Categories: trend following / reversal / breakout / scoring / combo
 
-### 🏗️ 三轨架构
-- **DataFactory**（数据采集 + 指标计算）→ **策略员**（信号评分）→ **Athlete**（tick 验证入场）
-- 分工明确、职责单一，实时重算入场条件，10 秒过期作废
+### 🏗️ Three-Rail Architecture
+- **DataFactory** (data + indicators) → **Strategist** (signal scoring) → **Athlete** (tick verification)
+- Clear separation of duties, real-time entry re-computation, 10s expiry
 
-### 🛡️ 完整风控
-- **三层止盈出场** + **ATR 移动止盈** + **ATR 硬止损**
-- **GateManager**（时间/波动/趋势/亏损门）· **RiskManager**（单笔/敞口/持仓上限）· **TradeManager**（订单/滑点/Magic 隔离）三层管理体系
+### 🛡️ Complete Risk Control
+- **Three-layer take-profit** + **ATR trailing stop** + **ATR hard stop**
+- **GateManager** (time/volatility/trend/loss gates) · **RiskManager** (per-trade/exposure/position caps) · **TradeManager** (orders/slippage/Magic isolation) — three-layer management
 
-### 📊 数据驱动
-- DataFactory 统一计算 **26 个 TA-Lib 指标**，F043 MT4 值优先
-- 指标在策略间**共享**，绝不重复计算
-- M5 / M15 / M30 / H1 / H4 多周期覆盖
+### 📊 Data-Driven
+- DataFactory computes **26 TA-Lib indicators**, F043 MT4 values preferred
+- **Shared** across strategies, zero redundant computation
+- M5 / M15 / M30 / H1 / H4 multi-timeframe coverage
 
-### 🧪 纸面测试
-- 信号全量模拟入场 + 出场，按策略规则模拟平仓
-- 真实成交价计算盈亏，**上线前充分验证**
+### 🧪 Paper Trading
+- Full simulation of entries/exits, strategy-rule-based closes
+- Real-price PnL calculation — **fully validated before going live**
 
-### 💪 自修复监控
-- 5 分钟自动检查引擎状态，崩溃 / 桥接断线**自动重启**
-- 实时 WebSocket 推送，日志全链路追踪
+### 💪 Self-Healing Monitor
+- Auto health check every 5 minutes, **auto-restart** on crash / bridge disconnect
+- Real-time WebSocket push, full log tracking
 
 ---
 
@@ -87,7 +87,7 @@ http://localhost:1783
 ## Architecture
 
 ```
-Data Flow:  MT4 → FreeMT4Bridge EA → core/bridge.py → DataFactory → 策略员 → Athlete → 下单
+Data Flow:  MT4 → FreeMT4Bridge EA → core/bridge.py → DataFactory → Strategist → Athlete → Order
 ```
 
 ```
@@ -97,25 +97,25 @@ Data Flow:  MT4 → FreeMT4Bridge EA → core/bridge.py → DataFactory → 策�
                          │
 ┌────────────────────────▼────────────────────────────────┐
 │                  core/bridge.py                         │
-│              桥接抽象层 (MT4 ⇄ Python)                    │
+│              bridge abstraction (MT4 ⇄ Python)                     │
 └────────────────────────┬────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────┐
-│              TradingEngine（三轨架构）                    │
+│              TradingEngine (Three-Rail)                    │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │ 轨1: DataFactory（独立线程）                      │   │
-│  │   → 增量拉取 K 线 → TA-Lib 统一计算 26 指标        │   │
+│  │ Rail 1: DataFactory (dedicated thread)                      │   │
+│  │   → Incremental K-line fetch → 26 TA-Lib indicators computed   │   │
 │  ├──────────────────────────────────────────────────┤   │
-│  │ 轨2: 策略员（主循环）                             │   │
-│  │   → get_indicator() 读缓存 → 评分出门票           │   │
+│  │ Rail 2: Strategist (main loop)                             │   │
+│  │   → get_indicator() cache read → scoring emits tickets           │   │
 │  ├──────────────────────────────────────────────────┤   │
-│  │ 轨3: Athlete（tick 验证层）                      │   │
-│  │   → _verify_entry 实时重算 → 10 秒过期           │   │
+│  │ Rail 3: Athlete (tick verification)                      │   │
+│  │   → _verify_entry real-time recheck → 10s expiry           │   │
 │  └──────────────────────────────────────────────────┘   │
 └────────────────────────┬────────────────────────────────┘
                          │
 ┌────────────────────────▼────────────────────────────────┐
-│              Dashboard（Web 监控）                       │
+│              Dashboard (Web)                              │
 │  ┌──────────────┐  ┌────────────────────────────────┐   │
 │  │ FastAPI :1783│  │ Vue 3 + Naive UI              │   │
 │  │ + WebSocket  │  │ lightweight-charts            │   │
@@ -147,7 +147,7 @@ Data Flow:  MT4 → FreeMT4Bridge EA → core/bridge.py → DataFactory → 策�
 
 ## Strategy Directory
 
-> 基于回测筛选，以下策略当前在线运行（分类：趋势 / 反转 / 评分 / 突破 / 剥头皮）。
+> Backtest-validated strategies currently running (categories: trend / reversal / scoring / breakout / scalping).
 
 | Strategy | Type | Timeframe | Magic | Note |
 |:---------|:-----|:---------:|:-----:|:-----|
