@@ -114,6 +114,16 @@ function onPointerCancel(e: PointerEvent) {
   dragging.value = false
 }
 
+// 面板关闭：接收面板最终几何，按钮同步到面板右下角外 12px（钳制后持久化）
+// 与打开锚点公式对称：再打开时面板将回到关闭前的位置附近，形成协同闭环；几何缺失则跳过（兜底）
+function onPanelClose(panelGeo?: { x: number; y: number; w: number; h: number }) {
+  open.value = false
+  if (panelGeo && ['x', 'y', 'w', 'h'].every(k => typeof (panelGeo as any)[k] === 'number')) {
+    pos.value = clampPos({ x: panelGeo.x + panelGeo.w + 12, y: panelGeo.y + panelGeo.h + 12 })
+    savePos()
+  }
+}
+
 // 键盘可访问性：Enter/Space 直接打开（无需双击）；鼠标产生的 click 事件去重跳过
 function onClick() {
   if (Date.now() - lastPointerUpAt < 500) return
@@ -146,7 +156,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', onWindowResize))
   <!-- 聊天面板 -->
   <Transition name="panel">
     <div v-if="open" class="chat-panel-wrapper">
-      <AiChatPanel @close="toggle" />
+      <AiChatPanel :anchor="{ x: pos.x, y: pos.y }" @close="onPanelClose" />
     </div>
   </Transition>
 </template>

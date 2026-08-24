@@ -5,7 +5,9 @@ import { useChatStore } from '@/stores/chat'
 import ChatMessage from './ChatMessage.vue'
 
 const { t } = useI18n()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [PanelGeo] }>()
+// 与启动按钮位置协同：打开时 launcher 传入按钮当前位置作为锚点
+const props = defineProps<{ anchor?: { x: number; y: number } | null }>()
 const chat = useChatStore()
 const inputText = ref('')
 const showSessions = ref(false)
@@ -49,7 +51,20 @@ function loadGeo(): PanelGeo {
   return defaultGeo()
 }
 
-const geo = ref<PanelGeo>(loadGeo())
+// 初始几何：尺寸沿用自身记忆；位置优先按锚点（按钮位置）计算，缺失/损坏回退记忆位置
+function initGeo(): PanelGeo {
+  const saved = loadGeo()
+  const a = props.anchor
+  if (!a || typeof a.x !== 'number' || typeof a.y !== 'number') return saved
+  // 面板右下角对齐按钮左上角外 12px（面板弹在按钮左上方）
+  let x = a.x - 12 - saved.w
+  let y = a.y - 12 - saved.h
+  if (x < 0) x = a.x + 72    // 左侧放不下 → 翻转到按钮右侧
+  if (y < 0) y = a.y + 72    // 上方放不下 → 翻转到按钮下方
+  return clampGeo({ x, y, w: saved.w, h: saved.h })
+}
+
+const geo = ref<PanelGeo>(initGeo())
 const dragging = ref(false)
 const resizing = ref<'' | 'corner' | 'right' | 'bottom'>('')
 const panelRef = ref<HTMLElement | null>(null)
@@ -186,6 +201,11 @@ async function handleDeleteSession(id: string, e: Event) {
   e.stopPropagation()
   await chat.deleteSession(id)
 }
+
+// 关闭：把最终几何上报给 launcher，供其锚定按钮位置（协同联动）
+function handleClose() {
+  emit('close', { x: geo.value.x, y: geo.value.y, w: geo.value.w, h: geo.value.h })
+}
 </script>
 
 <template>
@@ -202,7 +222,7 @@ async function handleDeleteSession(id: string, e: Event) {
         </div>
       </div>
       <div class="chat-header-right">
-        <button class="chat-icon-btn" @click="emit('close')" title="关闭">
+        <button class="chat-icon-btn" @click="handleClose" title="关闭">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
