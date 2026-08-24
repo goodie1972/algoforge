@@ -65,8 +65,8 @@ def _parse_entry_table(body: str, section_title: str) -> list[dict]:
         return _parse_table_rows(m2.group(1))
 
     # 尝试匹配英文标题 "BUY (Long)" / "SELL (Short)" / "Long Entry" / "Short Entry"
-    en_search = "BUY \\(Long\\)|Long Entry" if "做多" in section_title else "SELL \\(Short\\)|Short Entry"
-    pattern_en = rf"### ({en_search}).*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+    en_search = "BUY \\(Long\\)|Long Entry|Three-Layer Filter \\(Long" if "做多" in section_title else "SELL \\(Short\\)|Short Entry|Three-Layer Filter \\(Short"
+    pattern_en = rf"### ({en_search}).*?\n\s*\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
     m_en = re.search(pattern_en, body, re.DOTALL)
     if m_en:
         return _parse_table_rows(m_en.group(2))
@@ -154,8 +154,10 @@ def load_strategy_logic(name: str, lang: str = "zh") -> StratLogic | None:
         if prefix:
             fpath = os.path.join(doc_dir, prefix[0])
         else:
-            # 3. frontmatter name 精确匹配
+            # 3. frontmatter name 精确匹配（只匹配对应语言的 _cn/_en 文件）
             for fname in files:
+                if not fname.endswith(f'{suffix}.md'):
+                    continue
                 try:
                     with open(os.path.join(doc_dir, fname), 'r', encoding='utf-8') as f:
                         fc = f.read()
