@@ -81,30 +81,50 @@ def _parse_entry_table(body: str, section_title: str) -> list[dict]:
 
 
 def _parse_table_rows(table_text: str) -> list[dict]:
-    """解析 markdown 表格行（通用）"""
+    """解析 markdown 表格行（通用，自动识别 3 列/4 列布局）"""
+    import re as _re
     rows = []
     for line in table_text.strip().split('\n'):
         line = line.strip()
         if not line.startswith('|') or '---' in line:
             continue
         cols = [c.strip() for c in line.split('|')]
-        if len(cols) >= 4:
-            rows.append({"name": cols[2], "score": cols[3] if len(cols) > 3 else '',
-                         "detail": cols[4] if len(cols) > 4 else ''})
-        elif len(cols) >= 3:
-            rows.append({"name": cols[2] if len(cols) > 2 else '',
-                         "score": '', "detail": cols[3] if len(cols) > 3 else ''})
+        if len(cols) < 3:
+            continue
+        # cols[0]='' cols[1]=序号 cols[2]=条件/因子
+        name = cols[2] if len(cols) > 2 else ''
+        score = ''
+        detail = ''
+        if len(cols) >= 5:
+            # 4 列布局: # | 因子 | 得分 | 说明
+            score_cand = cols[3]
+            detail_cand = cols[4]
+            # 第3列是纯数字/分数形式（+1/+2/1.5/10分）才当作 score
+            if _re.match(r'^[+-]?\d+(\.\d+)?([分点]|[×x]\d)?$', score_cand) or \
+               _re.match(r'^[+-]?\d+$', score_cand):
+                score = score_cand
+                detail = detail_cand
+            else:
+                detail = score_cand
+                if detail_cand:
+                    detail += ('' if not detail_cand.startswith(('，', '、', '；')) else detail_cand)
+        elif len(cols) == 4:
+            # 3 列布局: # | 条件 | 说明
+            detail = cols[3]
+        rows.append({"name": name, "score": score, "detail": detail})
     return rows
 
 
 def _parse_exit_table(body: str) -> list[dict]:
-    """从 markdown 解析出场逻辑表格 — 灵活匹配"""
+    """从 markdown 解析出场逻辑表格 — 返回 {method, normal} 结构"""
     # 先找"出场逻辑"或"出场"标题
     for header in [r"## 出场逻辑", r"### 出场"]:
         pattern = rf"{header}.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
         m = re.search(pattern, body, re.DOTALL)
         if m:
-            return _parse_table_rows(m.group(1))
+            rows = _parse_table_rows(m.group(1))
+            # 转换为前端期望的 {method, normal} 结构
+            return [{"method": r.get("name", ""), "normal": r.get("detail", "") or r.get("score", "")} for r in rows]
     return []
 
 

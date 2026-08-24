@@ -688,7 +688,7 @@
     "smithery_key_configured": "Configured",
     "smithery_key_not_configured": "Not configured",
     "chat_panel_resize_hint": "Drag to resize the panel",
-    "launcher_open_hint": "Hold to drag, double-click to open the AI assistant"
+    "launcher_open_hint": "Fortune JinTan: hold to drag, double-click to open the AI assistant"
   },
   "coordinator": {
     "trigger_rate_disabled": "Disabled",

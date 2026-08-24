@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import FortuneCat from './FortuneCat.vue'
 
 const props = defineProps<{
   role: 'user' | 'assistant' | 'system'
@@ -51,7 +52,7 @@ function _escapeHtml(text: string): string {
 <template>
   <div class="chat-message" :class="{ 'chat-message--user': isUser, 'chat-message--ai': isAI }">
     <div v-if="isAI" class="chat-avatar">
-      <span class="chat-avatar-icon">🟡</span>
+      <FortuneCat :size="26" />
     </div>
     <div class="chat-bubble" :class="{ 'chat-bubble--user': isUser, 'chat-bubble--ai': isAI }">
       <div v-if="isAI && toolStatus" class="chat-tool-status">🔧 {{ toolStatus }}</div>

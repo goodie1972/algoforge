@@ -3,6 +3,7 @@ import { ref, nextTick, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
 import ChatMessage from './ChatMessage.vue'
+import FortuneCat from './FortuneCat.vue'
 
 const { t } = useI18n()
 const emit = defineEmits<{ close: [PanelGeo] }>()
@@ -215,7 +216,7 @@ function handleClose() {
     <div class="chat-header"
       @pointerdown="onHeaderPointerDown" @pointermove="onHeaderPointerMove" @pointerup="onHeaderPointerUp">
       <div class="chat-header-left">
-        <div class="chat-header-avatar">🟡</div>
+        <div class="chat-header-avatar"><FortuneCat :size="26" /></div>
         <div class="chat-header-info">
           <div class="chat-header-name">金探</div>
           <div class="chat-header-role">黄金交易分析师 · 在线</div>
@@ -262,7 +263,7 @@ function handleClose() {
     <div ref="messagesContainer" class="chat-messages">
       <!-- 空状态 -->
       <div v-if="chat.messages.length === 0" class="chat-empty">
-        <div class="chat-empty-avatar">🟡</div>
+        <div class="chat-empty-avatar"><FortuneCat :size="32" /></div>
         <div class="chat-empty-title">你好，我是金探</div>
         <div class="chat-empty-subtitle">你的黄金交易分析师</div>
         <div class="chat-empty-desc">我可以实时查看你的持仓、账户、指标和新闻，随时问我。</div>

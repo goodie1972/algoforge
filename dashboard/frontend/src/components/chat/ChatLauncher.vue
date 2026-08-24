@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useChatStore } from '@/stores/chat'
 import AiChatPanel from './AiChatPanel.vue'
+import FortuneCat from './FortuneCat.vue'
 
 const { t } = useI18n()
+const chat = useChatStore()
 const open = ref(false)
 
 function toggle() {
@@ -98,7 +101,9 @@ function onPointerUp(e: PointerEvent) {
     lastClickAt = 0  // 拖动结束的这次按下不计入双击
     return
   }
-  // 点击：两次间隔 < 500ms 才打开（双击），避免拖动/误击误开
+  // 点击（位移<5px）：播放一次眨眼微表情（不打开面板）
+  blinkOnce()
+  // 双击：两次间隔 < 500ms 才打开，避免拖动/误击误开
   const now = Date.now()
   if (now - lastClickAt < 500) {
     lastClickAt = 0
@@ -114,6 +119,43 @@ function onPointerCancel(e: PointerEvent) {
   dragging.value = false
 }
 
+// 键盘可访问性：Enter/Space 直接打开（无需双击）；鼠标产生的 click 事件去重跳过
+function onClick() {
+  if (Date.now() - lastPointerUpAt < 500) return
+  blinkOnce()
+  open.value = true
+}
+
+// ── 桌宠状态机：待机 → 思考（流式期间）→ 完成（回复结束 0.8s）→ 待机 ──
+// 动画只作用于内层 .pet（transform/opacity），外层按钮 left/top 定位契约不受影响
+const celebrating = ref(false)   // 完成庆祝
+const blinking = ref(false)      // 单击眨眼微表情
+let completeTimer: ReturnType<typeof setTimeout> | null = null
+let blinkTimer: ReturnType<typeof setTimeout> | null = null
+
+const petState = computed(() =>
+  chat.streaming ? 'thinking' : (celebrating.value ? 'complete' : 'idle')
+)
+
+// 订阅流式状态：true→思考态；false（回复/失败结束）→播放一次完成庆祝后回待机
+watch(() => chat.streaming, (v, old) => {
+  if (v) {
+    celebrating.value = false
+    if (completeTimer) { clearTimeout(completeTimer); completeTimer = null }
+  } else if (old) {
+    celebrating.value = true
+    if (completeTimer) clearTimeout(completeTimer)
+    completeTimer = setTimeout(() => { celebrating.value = false; completeTimer = null }, 800)
+  }
+})
+
+// 单击微表情：眨眼一次（约 0.5s），与双击打开兼容
+function blinkOnce() {
+  blinking.value = true
+  if (blinkTimer) clearTimeout(blinkTimer)
+  blinkTimer = setTimeout(() => { blinking.value = false; blinkTimer = null }, 500)
+}
+
 // 面板关闭：接收面板最终几何，按钮同步到面板右下角外 12px（钳制后持久化）
 // 与打开锚点公式对称：再打开时面板将回到关闭前的位置附近，形成协同闭环；几何缺失则跳过（兜底）
 function onPanelClose(panelGeo?: { x: number; y: number; w: number; h: number }) {
@@ -124,32 +166,30 @@ function onPanelClose(panelGeo?: { x: number; y: number; w: number; h: number })
   }
 }
 
-// 键盘可访问性：Enter/Space 直接打开（无需双击）；鼠标产生的 click 事件去重跳过
-function onClick() {
-  if (Date.now() - lastPointerUpAt < 500) return
-  open.value = true
-}
-
 // 窗口尺寸变化时修正越界位置
 function onWindowResize() {
   pos.value = clampPos(pos.value)
 }
 
 onMounted(() => window.addEventListener('resize', onWindowResize))
-onBeforeUnmount(() => window.removeEventListener('resize', onWindowResize))
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onWindowResize)
+  // 清理计时器，避免卸载后回调泄漏
+  if (completeTimer) clearTimeout(completeTimer)
+  if (blinkTimer) clearTimeout(blinkTimer)
+})
 </script>
 
 <template>
-  <!-- 浮动按钮（按住左键拖动，双击打开，位置记忆） -->
+  <!-- 浮动桌宠按钮（按住左键拖动，双击打开，位置记忆） -->
   <Transition name="launcher">
     <button v-if="!open" class="chat-launcher" :class="{ dragging }"
       :style="{ left: pos.x + 'px', top: pos.y + 'px', cursor: dragging ? 'grabbing' : 'pointer' }"
       @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp"
       @pointercancel="onPointerCancel" @click="onClick" @dragstart.prevent
-      draggable="false" :title="t('ai.launcher_open_hint')">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-      </svg>
+      draggable="false" :title="t('ai.launcher_open_hint')" :aria-label="t('ai.launcher_open_hint')">
+      <!-- 桌宠：内层承载全部动画（transform/opacity），外层按钮只负责定位，二者互不冲突 -->
+      <FortuneCat class="pet" :size="48" animated :state="petState" :blink="blinking" />
     </button>
   </Transition>
 
@@ -175,6 +215,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', onWindowResize))
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   box-shadow: 0 4px 20px rgba(240, 185, 11, 0.4);
   z-index: 9999;
   /* 只过渡阴影；绝不过渡 left/top/transform，避免拖动滞后与抖动 */
@@ -194,6 +235,14 @@ onBeforeUnmount(() => window.removeEventListener('resize', onWindowResize))
   transform: scale(1.08);
   transform-origin: 0 0;
   box-shadow: 0 8px 32px rgba(240, 185, 11, 0.7);
+}
+
+/* 桌宠形象由 FortuneCat 组件承载（动画在组件内）；此容器仅保证居中且不抢命中 */
+.pet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .chat-panel-wrapper {
