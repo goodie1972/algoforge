@@ -64,6 +64,13 @@ def _parse_entry_table(body: str, section_title: str) -> list[dict]:
     if m2:
         return _parse_table_rows(m2.group(1))
 
+    # 尝试匹配英文标题 "BUY (Long)" / "SELL (Short)" / "Long Entry" / "Short Entry"
+    en_search = "BUY \\(Long\\)|Long Entry" if "做多" in section_title else "SELL \\(Short\\)|Short Entry"
+    pattern_en = rf"### ({en_search}).*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+    m_en = re.search(pattern_en, body, re.DOTALL)
+    if m_en:
+        return _parse_table_rows(m_en.group(2))
+
     # 最后尝试"入场条件"下的通用表格（bakome 等格式）
     pattern3 = r"### 入场条件.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
     m3 = re.search(pattern3, body, re.DOTALL)
@@ -128,21 +135,22 @@ def _parse_exit_table(body: str) -> list[dict]:
     return []
 
 
-def load_strategy_logic(name: str) -> StratLogic | None:
-    """加载单个策略的进出场逻辑"""
+def load_strategy_logic(name: str, lang: str = "zh") -> StratLogic | None:
+    """加载单个策略的进出场逻辑（lang=zh 读 _cn.md，lang=en 读 _en.md）"""
     doc_dir = DOCS_DIR
     if not os.path.isdir(doc_dir):
         return None
 
+    suffix = "_cn" if lang == "zh" else "_en"
     files = sorted(f for f in os.listdir(doc_dir) if f.endswith('.md'))
     fpath = None
-    # 1. 精确文件名匹配 {name}.md
-    exact = [f for f in files if f.lower() == f'{name}.md'.lower()]
+    # 1. 精确文件名匹配 {name}_cn.md 或 {name}_en.md
+    exact = [f for f in files if f.lower() == f'{name}{suffix}.md'.lower()]
     if exact:
         fpath = os.path.join(doc_dir, exact[0])
     else:
-        # 2. 前缀+下划线匹配 {name}_.md (取最短)
-        prefix = sorted([f for f in files if f.lower().startswith(f'{name}_'.lower())], key=len)
+        # 2. 前缀+下划线匹配 {name}_cn_.md / {name}_en_.md
+        prefix = sorted([f for f in files if f.lower().startswith(f'{name}{suffix}_'.lower())], key=len)
         if prefix:
             fpath = os.path.join(doc_dir, prefix[0])
         else:
@@ -196,32 +204,33 @@ def load_strategy_logic(name: str) -> StratLogic | None:
     return result
 
 
-def load_all_logics() -> dict[str, StratLogic]:
-    """加载所有策略的进出场逻辑"""
+def load_all_logics(lang: str = "zh") -> dict[str, StratLogic]:
+    """加载所有策略的进出场逻辑（lang=zh 读 _cn.md，lang=en 读 _en.md）"""
     logics = {}
     doc_dir = DOCS_DIR
     if not os.path.isdir(doc_dir):
         logger.warning(f"strategydocdirectorynot found: {doc_dir}")
         return logics
 
+    suffix = "_cn" if lang == "zh" else "_en"
     for fname in sorted(os.listdir(doc_dir)):
-        if not fname.endswith('.md'):
+        if not fname.endswith('.md') or not fname.endswith(f'{suffix}.md'):
             continue
         try:
             with open(os.path.join(doc_dir, fname), 'r', encoding='utf-8') as f:
                 content = f.read()
             meta, _ = _parse_frontmatter(content)
-            name = meta.get('name', fname.replace('.md', ''))
-            logics[name] = load_strategy_logic(name)
+            name = meta.get('name', fname.replace(f'{suffix}.md', ''))
+            logics[name] = load_strategy_logic(name, lang=lang)
         except Exception as e:
             logger.warning(f"parse {fname} failed: {e}")
 
     return {k: v for k, v in logics.items() if v is not None}
 
 
-def get_strategy_logics() -> dict[str, StratLogic]:
+def get_strategy_logics(lang: str = "zh") -> dict[str, StratLogic]:
     """返回所有策略逻辑定义（供前端API查询），每次实时解析"""
-    return load_all_logics()
+    return load_all_logics(lang=lang)
 
 
 def get_strategy_logic(name: str) -> StratLogic | None:

@@ -23,9 +23,9 @@ async def list_available():
 
 
 @router.get("/logics")
-async def list_logics():
+async def list_logics(lang: str = "zh"):
     """返回所有策略的进出场逻辑描述（供前端交易终端/策略中心展示）"""
-    return {"logics": get_strategy_logics()}
+    return {"logics": get_strategy_logics(lang=lang)}
 
 
 @router.post("/upload")

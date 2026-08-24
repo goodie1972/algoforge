@@ -71,16 +71,22 @@ withDefaults(defineProps<{
         <!-- 颈铃 -->
         <circle class="fc-bell" cx="22" cy="31.8" r="2.1" stroke-width="1"/>
         <path class="fc-mouth" d="M22 32.6 L22 33.8" stroke-width="0.9" stroke-linecap="round"/>
-        <!-- 招财爪：几何近竖直，姿态由 CSS 以肩(12.4,26)为轴旋转（静态后举 -24°） -->
+        <!-- 招财爪：手臂组/爪子组拆分（透视前后摆动独立驱动）；整体外移，摆动不扫脸 -->
         <g class="fc-paw">
-          <path class="fc-paw-arm" d="M12.4 26 L11.8 16.2" stroke-width="4.8" stroke-linecap="round"/>
-          <circle class="fc-paw-pad" cx="11.7" cy="14.2" r="3.2" stroke-width="1.3"/>
-          <!-- 掌垫+趾垫：掌心朝向观者，「前落=招手」一眼可辨 -->
-          <g class="fc-paw-pads">
-            <ellipse cx="11.7" cy="14.8" rx="1.6" ry="1.2"/>
-            <circle cx="10" cy="12.7" r="0.6"/>
-            <circle cx="11.7" cy="12.2" r="0.6"/>
-            <circle cx="13.4" cy="12.7" r="0.6"/>
+          <!-- 手臂组：以肩(10.6,26.4)为轴 scaleY 压缩 = 「向观众方向折下」 -->
+          <g class="fc-arm">
+            <path class="fc-paw-arm" d="M9.8 27 L6.8 17.4" stroke-width="4.8" stroke-linecap="round"/>
+          </g>
+          <!-- 爪子组：前落相位放大 + 前移下移（离观众近所以大），只见掌心 -->
+          <g class="fc-paw-head">
+            <circle class="fc-paw-pad" cx="5.8" cy="15" r="3.3" stroke-width="1.3"/>
+            <!-- 掌垫+趾垫：掌心朝向观者，「前落=招手」一眼可辨 -->
+            <g class="fc-paw-pads">
+              <ellipse cx="5.8" cy="15.6" rx="1.6" ry="1.2"/>
+              <circle cx="4.1" cy="13.5" r="0.6"/>
+              <circle cx="5.8" cy="13" r="0.6"/>
+              <circle cx="7.5" cy="13.5" r="0.6"/>
+            </g>
           </g>
         </g>
         <!-- 怀中铜钱 -->
@@ -136,26 +142,33 @@ withDefaults(defineProps<{
   transform-origin: 22px 24px;
   animation: fc-bob 2.8s ease-in-out infinite;
 }
-/* 招财爪基准姿态：斜置「后举」（朝耳侧后上方 -24°，掌心朝前/朝外）；
-   小尺寸静态形象（标题栏/头像）即保持该姿态 */
-.fortune-cat .fc-paw {
+/* 招财爪透视摆动：手臂组以肩为轴压缩、爪子组放大前移——不用整体 rotate，无钟摆感。
+   静态（小尺寸标题栏/头像）= 后举位：无变换，整条手臂完整可见 */
+.fc-arm {
   transform-box: view-box;
-  transform-origin: 12.4px 26px;
-  transform: rotate(-24deg);
+  transform-origin: 9.8px 27px;  /* 肩为轴 */
 }
-.fc--anim .fc-paw {
-  animation: fc-beckon 2.4s ease-in-out infinite;
+.fc-paw-head {
+  transform-box: view-box;
+  transform-origin: 5.8px 15px;     /* 爪心为轴 */
 }
+.fc--anim .fc-arm { animation: fc-arm-beckon 2.4s ease-in-out infinite; }
+.fc--anim .fc-paw-head { animation: fc-pawhead-beckon 2.4s ease-in-out infinite; }
 @keyframes fc-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-1.6px); }
 }
-/* 招手（beckoning）：以肩为轴在「后举 -24°」与「前落 +38°」间往复——
-   前落占 40%（稍快，把财招进来）、举回占 60%（缓），首尾同值循环无缝 */
-@keyframes fc-beckon {
-  0%, 100% { transform: rotate(-24deg); }
-  40% { transform: rotate(38deg); }
-  52% { transform: rotate(32deg); }
+/* 透视招手：后举（全臂可见）→ 前落（手臂压扁缩短 + 爪放大下移只见掌心）→ 缓举回；
+   前落占 40%（稍快）、举回占 60%（缓），首尾同值循环无缝 */
+@keyframes fc-arm-beckon {
+  0%, 100% { transform: scaleY(1); opacity: 1; }
+  40% { transform: scaleY(0.28); opacity: 0.85; }
+  52% { transform: scaleY(0.34); opacity: 0.87; }
+}
+@keyframes fc-pawhead-beckon {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(1.6px, 7.4px) scale(1.32); }
+  52% { transform: translate(1.3px, 6.6px) scale(1.28); }
 }
 
 /* 思考/工作态：微微前倾 + 爪子摆动加快 + 头顶省略号浮动 */
@@ -164,9 +177,8 @@ withDefaults(defineProps<{
   transform-origin: 22px 24px;
   animation: fc-tilt 1.4s ease-in-out infinite;
 }
-.fc--thinking .fc-paw {
-  animation: fc-beckon 0.9s ease-in-out infinite;  /* 同一招手轨迹，思考态只是更快 */
-}
+.fc--thinking .fc-arm { animation: fc-arm-beckon 0.9s ease-in-out infinite; }      /* 同一轨迹，更快 */
+.fc--thinking .fc-paw-head { animation: fc-pawhead-beckon 0.9s ease-in-out infinite; }
 .fc--thinking .fc-dots { display: block; }
 .fc--thinking .fc-dots circle { animation: fc-dot 1.1s ease-in-out infinite; }
 .fc--thinking .fc-dots circle:nth-child(2) { animation-delay: 0.18s; }
@@ -209,8 +221,8 @@ withDefaults(defineProps<{
 
 /* 尊重系统「减弱动画」：只保留静态形象 */
 @media (prefers-reduced-motion: reduce) {
-  .fc--anim .fc-bob, .fc--anim .fc-paw,
-  .fc--thinking .fc-bob, .fc--thinking .fc-paw,
+  .fc--anim .fc-bob, .fc--anim .fc-arm, .fc--anim .fc-paw-head,
+  .fc--thinking .fc-bob, .fc--thinking .fc-arm, .fc--thinking .fc-paw-head,
   .fc--thinking .fc-dots circle,
   .fc--complete .fc-bob, .fc--complete .fc-ingot,
   .fc--blink .fc-eyes {

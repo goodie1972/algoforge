@@ -74,7 +74,8 @@ function getLogic(name: string): StratLogic | null {
 
 async function fetchLogics() {
   try {
-    const res = await fetch('/api/strategies/logics')
+    const lang = locale.value === 'en-US' ? 'en' : 'zh'
+    const res = await fetch(`/api/strategies/logics?lang=${lang}`)
     const data = await res.json()
     strategyLogics.value = data.logics || {}
   } catch (e) {
