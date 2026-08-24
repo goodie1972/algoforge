@@ -52,6 +52,14 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 
 ## 出场逻辑
 
+## Exit Logic
+
+| # | 条件 | 说明 |  |
+|:-:|:----|:----|
+| ① | Fixed Stop | 3.0×ATR (minimum $5) |  |
+| ② | Round-Number TP | Take profit $3 before price reaches nearest round number level |  |
+| ③ | Min TP Distance | Skip signal when take-profit distance < $10 |  |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | ① | 固定止损 | 3.0×ATR（最小 $5） |

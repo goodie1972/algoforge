@@ -33,6 +33,14 @@ desc_en: H1 5-factor weighted scoring system, scoring 0-100, threshold ≥75 tri
 
 ## 出场逻辑
 
+## Exit Logic
+
+| # | 条件 | 说明 |  |
+|:-:|:----|:----|
+| ① | Initial SL | ±0.55 ATR |  |
+| ② | ATR Moving Trailing | Triggered when peak retracement exceeds 1.5 ATR |  |
+| ③ | Initial TP | 3x SL (R:R = 3:1) |  |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | ① | 初始 SL | ±0.55 ATR |

@@ -25,6 +25,13 @@ desc_en: H1 XGBoost binary ML model, 80+ technical features, confidence threshol
 
 ## 出场逻辑
 
+## Exit Logic
+
+| # | 条件 | 说明 |  |
+|:-:|:----|:----|
+| ① | ATR Moving Trailing | Peak drawdown exceeds 3.0 ATR |  |
+| ② | Hard Stop | Loss exceeds 2.0 ATR |  |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | ① | ATR 移动追踪 | 峰值回撤超过 3.0 ATR |

@@ -31,6 +31,15 @@ desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only wh
 
 ## 出场逻辑
 
+## Exit Logic
+
+| # | 条件 | 说明 |  |
+|:-:|:----|:----|
+| ① | Breakeven Exit | After reaching ≥0.3ATR profit, returns near breakeven |  |
+| ② | Profit Pullback TP | Peak profit retraces 25% (relaxed to 50% when ADX>25) |  |
+| ③ | ATR Moving TP | Retraces more than trail_mult × ATR from peak |  |
+| ④ | Hard Stop | Loss exceeds hard_mult × ATR (with-trend 3.0×ATR, against-trend 2.0×ATR) |  |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | ① | 保本出场 | 走过 ≥0.3ATR 盈利后回到成本附近 |

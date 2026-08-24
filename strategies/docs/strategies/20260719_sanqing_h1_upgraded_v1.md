@@ -48,6 +48,16 @@ desc_en: EMA9/21 Trend Score + Athlete Pullback to EMA9 Entry + ADX Adaptive Exi
 | ④ | 利润回撤+DI保护 | 峰值回撤25%，DI对齐(趋势完好)时跳过回撤止盈 |
 | ⑤ | DI反转出场 | 开仓5分钟后: BUY持仓NDI>PDI / SELL持仓PDI>NDI |
 
+## Exit Logic (ADX Adaptive)
+
+| # | Condition | Range (ADX≤25) | Medium Trend (25~35) | Strong Trend (ADX>35) |
+|:-:|:---------|:----:|:----:|:----:|
+| ① | ADX adaptive trailing stop | 1.5 ATR drawdown | 2.5 ATR drawdown | 3.5 ATR drawdown |
+| ② | ADX adaptive take profit | 2.5 ATR | 4.0 ATR | 6.0 ATR |
+| ③ | Hard stop (fixed) | 1.5 ATR | 1.5 ATR | 1.5 ATR |
+| ④ | Profit drawdown + DI protection | Peak drawdown 25%, skip if DI aligned (trend intact) |
+| ⑤ | DI reversal exit | 5 min after open: BUY pos NDI>PDI / SELL pos PDI>NDI |
+
 ## 特别规则
 
 - 阈值: **固定 5 分**（评分 3→5，提高入场门槛，减少低质量信号约60%）

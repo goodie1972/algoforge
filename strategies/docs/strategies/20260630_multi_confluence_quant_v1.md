@@ -51,6 +51,14 @@ desc_en: H1: 14 technical indicator factor scores, signal triggered when ≥10/1
 
 ## 出场逻辑
 
+## Exit Logic
+
+| # | 条件 | 说明 |  |
+|:-:|:----|:----|
+| ① | Profit Pullback TP | Peak profit drawdown 25% (peak > 0.5 ATR) |  |
+| ② | ATR Moving Trailing | Peak drawdown exceeds 1.5 ATR |  |
+| ③ | Hard Stop | Loss exceeds 2.0 ATR |  |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | ① | 利润回撤止盈 | 峰值利润回撤 25%（峰值 > 0.5ATR） |
