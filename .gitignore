@@ -14,7 +14,7 @@ dist/
 runtime_config.json
 data/llm_providers.json
 
-# 临时工具/扫描脚本
+# 临时工具/扄1�7��脚本
 add_i18n_keys.py
 scan_i18n.py
 scan_signals.py
@@ -22,18 +22,18 @@ scan_signals.py
 *.db-shm
 *.db-wal
 
-# 截图
+# 戄1�7��
 *.png
 *.jpg
 *.jpeg
 
-# 但保留 docs/assets/ 下的截图资源
+# 但保畄1�7 docs/assets/ 下的戄1�7��资源
 !docs/assets/screenshot_*.png
 
-# 可执行文件
+# 叄1�7��行文仄1�7
 *.exe
 
-# 运行时状态
+# 运�1�7时状怄1�7
 monitor/.patrol.*
 
 # 测试输出
@@ -47,11 +47,11 @@ strategies/test_*.txt
 *.bak
 .backup/
 
-# 策略：仅框架保留在主应用，具体策略实现在独立 algoforge-strategies 仓库
+# 策略：仅框架保留在主应用，具体策略实现在狄1�7�� algoforge-strategies 仓库
 strategies/__pycache__/
 strategies/backup/
 strategies/*.html
-# 策略实现文件（由 algoforge-strategies 仓库维护，主应用不含）
+# 策略实现文件（由 algoforge-strategies 仓库维护，主应用不含＄1�7
 strategies/2026*.py
 
 # Playwright / UI 测试脚本与截图（不入库）
@@ -60,6 +60,8 @@ test_*.mjs
 test_*.png
 screenshot_*.png
 backtest/~$*.xlsx
+# ����Ŀ¼�����ϴ���Ӧ�ã����ԲֿⱣ����
+tests/
 
 # ����ʱ���������ݣ��� Key/����������⣩
 data/agent_settings.json
