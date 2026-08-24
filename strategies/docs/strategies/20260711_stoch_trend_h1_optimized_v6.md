@@ -61,3 +61,7 @@ n## Exit Logic
 ## 数据源
 
 - 依赖指标：`close`, `stoch_5_3_3`, `trend`, `ema_9`, `ema_21`
+
+## Data Source
+
+- Dependencies：`close`, `stoch_5_3_3`, `trend`, `ema_9`, `ema_21`

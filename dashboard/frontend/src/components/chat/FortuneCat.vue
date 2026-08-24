@@ -71,10 +71,17 @@ withDefaults(defineProps<{
         <!-- 颈铃 -->
         <circle class="fc-bell" cx="22" cy="31.8" r="2.1" stroke-width="1"/>
         <path class="fc-mouth" d="M22 32.6 L22 33.8" stroke-width="0.9" stroke-linecap="round"/>
-        <!-- 举起的招财爪（左臂+掌，肩部为摆动轴） -->
+        <!-- 招财爪：几何近竖直，姿态由 CSS 以肩(12.4,26)为轴旋转（静态后举 -24°） -->
         <g class="fc-paw">
-          <path class="fc-paw-arm" d="M12.4 26 L6.6 17.2" stroke-width="4.8" stroke-linecap="round"/>
-          <circle class="fc-paw-pad" cx="6.2" cy="15.2" r="3" stroke-width="1.3"/>
+          <path class="fc-paw-arm" d="M12.4 26 L11.8 16.2" stroke-width="4.8" stroke-linecap="round"/>
+          <circle class="fc-paw-pad" cx="11.7" cy="14.2" r="3.2" stroke-width="1.3"/>
+          <!-- 掌垫+趾垫：掌心朝向观者，「前落=招手」一眼可辨 -->
+          <g class="fc-paw-pads">
+            <ellipse cx="11.7" cy="14.8" rx="1.6" ry="1.2"/>
+            <circle cx="10" cy="12.7" r="0.6"/>
+            <circle cx="11.7" cy="12.2" r="0.6"/>
+            <circle cx="13.4" cy="12.7" r="0.6"/>
+          </g>
         </g>
         <!-- 怀中铜钱 -->
         <g>
@@ -97,6 +104,7 @@ withDefaults(defineProps<{
   --fc-dark: #3d2a08;      /* 眼睛/眯眼笑 */
   --fc-nose: #b3722a;
   --fc-whisker: #a5822f;
+  --fc-pad: #eda94f;      /* 掌垫/趾垫（掌心可读性） */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -115,6 +123,7 @@ withDefaults(defineProps<{
 .fortune-cat .fc-mouth { stroke: var(--fc-outline); }
 .fortune-cat .fc-eyes-happy path { stroke: var(--fc-dark); }
 .fortune-cat .fc-whiskers { stroke: var(--fc-whisker); }
+.fortune-cat .fc-paw-pads { fill: var(--fc-pad); }
 
 .fc-eyes, .fc-eyes-happy, .fc-dots, .fc-ingot { transform-box: fill-box; }
 .fc-eyes { transform-origin: 50% 50%; }
@@ -127,18 +136,26 @@ withDefaults(defineProps<{
   transform-origin: 22px 24px;
   animation: fc-bob 2.8s ease-in-out infinite;
 }
-.fc--anim .fc-paw {
+/* 招财爪基准姿态：斜置「后举」（朝耳侧后上方 -24°，掌心朝前/朝外）；
+   小尺寸静态形象（标题栏/头像）即保持该姿态 */
+.fortune-cat .fc-paw {
   transform-box: view-box;
   transform-origin: 12.4px 26px;
-  animation: fc-wave-slow 2.4s ease-in-out infinite;
+  transform: rotate(-24deg);
+}
+.fc--anim .fc-paw {
+  animation: fc-beckon 2.4s ease-in-out infinite;
 }
 @keyframes fc-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-1.6px); }
 }
-@keyframes fc-wave-slow {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(-14deg); }
+/* 招手（beckoning）：以肩为轴在「后举 -24°」与「前落 +38°」间往复——
+   前落占 40%（稍快，把财招进来）、举回占 60%（缓），首尾同值循环无缝 */
+@keyframes fc-beckon {
+  0%, 100% { transform: rotate(-24deg); }
+  40% { transform: rotate(38deg); }
+  52% { transform: rotate(32deg); }
 }
 
 /* 思考/工作态：微微前倾 + 爪子摆动加快 + 头顶省略号浮动 */
@@ -148,9 +165,7 @@ withDefaults(defineProps<{
   animation: fc-tilt 1.4s ease-in-out infinite;
 }
 .fc--thinking .fc-paw {
-  transform-box: view-box;
-  transform-origin: 12.4px 26px;
-  animation: fc-wave-fast 0.9s ease-in-out infinite;
+  animation: fc-beckon 0.9s ease-in-out infinite;  /* 同一招手轨迹，思考态只是更快 */
 }
 .fc--thinking .fc-dots { display: block; }
 .fc--thinking .fc-dots circle { animation: fc-dot 1.1s ease-in-out infinite; }
@@ -159,10 +174,6 @@ withDefaults(defineProps<{
 @keyframes fc-tilt {
   0%, 100% { transform: translateY(0) rotate(2.5deg); }
   50% { transform: translateY(-1px) rotate(-1.5deg); }
-}
-@keyframes fc-wave-fast {
-  0%, 100% { transform: rotate(4deg); }
-  50% { transform: rotate(-22deg); }
 }
 @keyframes fc-dot {
   0%, 100% { opacity: 0; transform: translateY(0.5px); }

@@ -64,3 +64,7 @@ n## Exit Logic
 ## 数据源
 
 - 依赖指标：`close`, `rsi`, `rsi_5`, `rsi_10`, `bb`
+
+## Data Source
+
+- Dependencies：`close`, `rsi`, `rsi_5`, `rsi_10`, `bb`

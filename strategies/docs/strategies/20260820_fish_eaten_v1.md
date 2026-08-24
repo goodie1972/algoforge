@@ -112,13 +112,90 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 - **BB**: 8/10 优于 5
 - **TS**: 48 为最佳平衡点（TS=12 全部被砍，无 TS 有死单）
 
+### Performance
+
+| Metric | Value |
+|:----|:---|
+| Net PnL | +$346 (+3.46%) |
+| Trades | 26 |
+| Win Rate | 62% |
+| Max Hold | 48 bars（24 hours） |
+
+### 参数敏感性
+
+- **ADX**: 20/22 效果接近，25 略差
+- **DI**: 5 和 10 无差异
+- **BB**: 8/10 优于 5
+- **TS**: 48 为最佳平衡点（TS=12 全部被砍，无 TS 有死单）
+
+### Parameter Sensitivity
+
+- **ADX**: 20/22 similar performance，25 slightly worse
+- **DI**: 5 和 10 无差异
+- **BB**: 8/10 better than 5
+- **TS**: 48 为optimal balance（TS=12 all cut off，无 TS have dead trades）
+
+### Performance
+
+| Metric | Value |
+|:----|:---|
+| Net PnL | +$346 (+3.46%) |
+| Trades | 26 |
+| Win Rate | 62% |
+| Max Hold | 48 bars（24 hours） |
+
+### 参数敏感性
+
+- **ADX**: 20/22 similar performance，25 slightly worse
+- **DI**: 5 和 10 无差异
+- **BB**: 8/10 better than 5
+- **TS**: 48 为optimal balance（TS=12 all cut off，无 TS have dead trades）
+
+## Backtest Results
+
+### Best Parameters（M30, 2024-01 ~ 2026-08, 4889 根 bars）
+
+| 参数 | 值 | 说明 |
+|:----|:---|:----|
+| ADX_GATE | 20 | 门禁阈值 |
+| DI_DIFF_GATE | 5 | DI 差值门禁 |
+| BB_EXIT_OFFSET | 8 | 吃鱼出场偏移 |
+| TIME_STOP_BARS | 48 | 时间止损 bars数 |
+
+### 性能
+
+| Metric | Value |
+|:----|:---|
+| Net PnL | +$346 (+3.46%) |
+| Trades | 26 |
+| Win Rate | 62% |
+| Max Hold | 48 bars（24 hours） |
+
+### 参数敏感性
+
+- **ADX**: 20/22 效果接近，25 略差
+- **DI**: 5 和 10 无差异
+- **BB**: 8/10 优于 5
+- **TS**: 48 为最佳平衡点（TS=12 全部被砍，无 TS 有死单）
+
 ## 数据源
 
 - 全部指标从 DataFactory TA-Lib 读取
 - 依赖指标：`close`, `rsi`, `mfi`, `adx`, `pdi`, `ndi`, `bb`, `bb_mid_direction`
+
+## Data Source
+
+- All indicators from DataFactory TA-Lib
+- Dependencies：`close`, `rsi`, `mfi`, `adx`, `pdi`, `ndi`, `bb`, `bb_mid_direction`
 
 ## 风控
 
 - 固定 0.01 手
 - 1.5×ATR 宽止损兜底（正常情况不会触发）
 - 吃鱼出场管理利润，无止盈锁
+
+## Risk Control
+
+- Fixed 0.01 lots
+- 1.5×ATR wide stop-loss backstop（正常情况不会触发）
+- Fish exit manages profit，no take profit锁

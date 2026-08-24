@@ -16,7 +16,32 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 - **作者:** caoruihua
 - **说明:** 一个 H2 趋势 + M5 入场的整数关口箱体交易策略，核心文件为 `TimeProfitEA.mq5`，回测 188 笔交易，Profit Factor 2.03，胜率 38.3%。
 
+## Original Source
+
+- **GitHub:** [caoruihua/sanqing-ea-mt5](https://github.com/caoruihua/sanqing-ea-mt5)
+- **语言:** MQL5 (MT5) → Python 移植
+- **作者:** caoruihua
+- **说明:** 一个 H2 趋势 + M5 入场的整数关口箱体交易策略，核心文件为 `TimeProfitEA.mq5`，回测 188 笔交易，Profit Factor 2.03，胜率 38.3%。
+
 ## 评分因子
+
+### BUY（做多）
+### BUY (Long)
+| # | 因子 | 得分 | 说明 |
+|:-:|:----|:----:|:----|
+| 1 | H2 趋势向上 | +1 | EMA10 > EMA30 且间距≥$1.0 |
+| 2 | 回弹入场 | +1 | 价格从上方关口回弹到下方关口附近 |
+| 3 | 突破入场 | +1 | 价格强势突破上方关口 |
+
+### SELL（做空）
+### SELL (Short)
+| # | 因子 | 得分 | 说明 |
+|:-:|:----|:----:|:----|
+| 1 | H2 趋势向下 | +1 | EMA10 < EMA30 且间距≥$1.0 |
+| 2 | 回弹入场 | +1 | 价格从下方关口反弹到上方关口附近 |
+| 3 | 突破入场 | +1 | 价格跌破下方关口 |
+
+## Scoring Factors
 
 ### BUY（做多）
 ### BUY (Long)

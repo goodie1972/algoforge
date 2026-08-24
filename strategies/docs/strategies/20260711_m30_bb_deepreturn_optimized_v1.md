@@ -62,3 +62,7 @@ desc_en: M30 BB deep reversion with RSI+MFI oversold/overbought entry, triple ex
 ## 数据源
 
 - 依赖指标：`close`, `rsi`, `mfi`, `bb`, `atr`
+
+## Data Source
+
+- Dependencies：`close`, `rsi`, `mfi`, `bb`, `atr`

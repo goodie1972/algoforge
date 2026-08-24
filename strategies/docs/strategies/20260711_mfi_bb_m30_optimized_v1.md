@@ -56,3 +56,7 @@ n## Exit Logic
 ## 数据源
 
 - 依赖指标：`close`, `mfi`, `mfi_direction`, `bb`, `bb_width`
+
+## Data Source
+
+- Dependencies：`close`, `mfi`, `mfi_direction`, `bb`, `bb_width`
