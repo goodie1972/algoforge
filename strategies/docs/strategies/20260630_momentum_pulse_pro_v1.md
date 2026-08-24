@@ -66,12 +66,6 @@ desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profi
 
 ## Special Rules
 
-- - AMC = (RSI_norm + MACD_norm + ROC_norm) / 3，三项归一化后取均值
-- - 来源：TradingView Momentum Pulse PRO (自适应动量复合 + 多维度共识)
-- - 时间止损：最多持仓 40 根 K 线
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - AMC = (RSI_norm + MACD_norm + ROC_norm) / 3，三项归一化后取均值
 - 来源：TradingView Momentum Pulse PRO (自适应动量复合 + 多维度共识)
 - 时间止损：最多持仓 40 根 K 线

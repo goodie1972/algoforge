@@ -88,12 +88,6 @@ H4 EMA200 定趋势 Bias → Silver Bullet 时段 → M5 三重 ICT 确认 → A
 
 ## Special Rules
 
-- Max simultaneous positions: 2
-- Max daily trades: 10
-- ATR < 1.0: Trading prohibited (low volatility filter)
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - 最大同时持仓 2 张
 - 每日最大交易 10 笔
 - ATR < 1.0 时禁止交易（低波动过滤）

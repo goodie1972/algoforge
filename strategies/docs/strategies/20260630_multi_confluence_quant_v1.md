@@ -75,11 +75,6 @@ desc_en: H1: 14 technical indicator factor scores, signal triggered when ≥10/1
 
 ## Special Rules
 
-- - 覆盖趋势/动量/波动/成交量/结构 5 大类别
-- - 来源：TradingView Multi-Confluence Quant Crypto Engine [QuantSovereign]
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - 覆盖趋势/动量/波动/成交量/结构 5 大类别
 - 来源：TradingView Multi-Confluence Quant Crypto Engine [QuantSovereign]
 - 数据源：全部指标从 DataFactory TA-Lib 读取

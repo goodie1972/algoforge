@@ -71,11 +71,6 @@ desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 
 ## Special Rules
 
-- - 来源：TradingView Viprasol Sniper Confluence Entry/Exit
-- - K 线收盘确认入场
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - 来源：TradingView Viprasol Sniper Confluence Entry/Exit
 - K 线收盘确认入场
 - 数据源：全部指标从 DataFactory TA-Lib 读取

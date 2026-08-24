@@ -58,9 +58,5 @@ desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only wh
 
 ## Special Rules
 
-- - H4 SMA50 趋势门禁：H4 下行禁 BUY，H4 上行禁 SELL
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - H4 SMA50 趋势门禁：H4 下行禁 BUY，H4 上行禁 SELL
 - 数据源：全部指标从 DataFactory TA-Lib 读取

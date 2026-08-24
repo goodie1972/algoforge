@@ -76,11 +76,6 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 
 ## Special Rules
 
-- - 冷却期: 任何平仓后 10 分钟内不交易
-- - 盈利平仓冷却: 同方向 5 分钟内不重复开仓
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - 冷却期: 任何平仓后 10 分钟内不交易
 - 盈利平仓冷却: 同方向 5 分钟内不重复开仓
 - 数据源: 全部指标从 DataFactory TA-Lib 读取

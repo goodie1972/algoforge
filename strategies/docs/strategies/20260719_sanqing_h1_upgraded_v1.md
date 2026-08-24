@@ -71,14 +71,6 @@ desc_en: EMA9/21 Trend Score + Athlete Pullback to EMA9 Entry + ADX Adaptive Exi
 
 ## Special Rules
 
-- Score threshold: Fixed 5 points
-- ADX Gate: Only enter when ADX>25
-- Position Gate: Price in top 10% blocks long, bottom 10% blocks short
-- - **硬止损**: 1.2 ATR（1.5→1.2，每笔约36点，防大亏）
-- Score threshold: Fixed 5 points
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - 阈值: **固定 5 分**（评分 3→5，提高入场门槛，减少低质量信号约60%）
 - **ADX 门禁**: ADX>25 时才允许入场（20→25，加强趋势过滤）
 - **位置门禁**: 价格在60根K线顶部10%禁多，底部10%禁空

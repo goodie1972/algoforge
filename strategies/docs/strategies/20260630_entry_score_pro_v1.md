@@ -57,11 +57,6 @@ desc_en: H1 5-factor weighted scoring system, scoring 0-100, threshold ≥75 tri
 
 ## Special Rules
 
-- - 来源：TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
-- - SL=入场区 ±0.55ATR，TP=下一摆动点
-- Data source: All indicators from DataFactory TA-Lib
-## Special Rules
-
 - 来源：TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
 - SL=入场区 ±0.55ATR，TP=下一摆动点
 - 数据源：全部指标从 DataFactory TA-Lib 读取
