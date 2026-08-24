@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSignalStore } from '@/stores/signals'
 import { usePriceStore } from '@/stores/prices'
@@ -35,6 +35,7 @@ const loadingNews = ref(false)
 const newsExpanded = ref(false)
 let refreshTimer: number | null = null
 let refreshTimer2: number | null = null
+let langWatch: (() => void) | null = null
 
 async function fetchCalendar() {
   loadingNews.value = true
@@ -125,7 +126,8 @@ const loadingGold = ref(false)
 async function fetchGoldNews() {
   loadingGold.value = true
   try {
-    const res = await fetch('/api/news/gold')
+    const lang = locale.value === 'en-US' ? 'en' : 'zh'
+    const res = await fetch(`/api/news/gold?lang=${lang}`)
     if (res.ok) goldNews.value = await res.json()
   } catch { /* ignore */ }
   finally { loadingGold.value = false }
@@ -133,6 +135,17 @@ async function fetchGoldNews() {
 
 function goldDirColor(dir: string): string {
   return dir === 'bullish' ? '#0ecb81' : dir === 'bearish' ? '#f6465d' : '#8b8f97'
+}
+
+/** 按 source 返回来源标签（huicong/jin10/fxstreet/kitco） */
+function sourceLabel(source: string | undefined | null): string {
+  const map: Record<string, string> = {
+    huicong: t('signals.source_huicong'),
+    jin10: t('signals.source_jinshi'),
+    fxstreet: t('signals.source_fxstreet'),
+    kitco: t('signals.source_kitco'),
+  }
+  return map[source || ''] || source || t('signals.source_huicong')
 }
 
 function goldDirLabel(dir: string): string {
@@ -150,11 +163,15 @@ onMounted(() => {
   fetchLogics()
   refreshTimer = window.setInterval(fetchCalendar, 300000)
   refreshTimer2 = window.setInterval(fetchGoldNews, 300000)
+
+  // 监听语言切换，重新按语言拉取新闻
+  langWatch = watch(locale, () => { fetchGoldNews() })
 })
 
 onUnmounted(() => {
   if (refreshTimer !== null) clearInterval(refreshTimer)
   if (refreshTimer2 !== null) clearInterval(refreshTimer2)
+  if (langWatch) langWatch()
 })
 </script>
 
@@ -234,8 +251,13 @@ onUnmounted(() => {
             <n-text style="font-size:12px;line-height:1.4">{{ locale === 'en-US' && item.content_en ? item.content_en.slice(0, 60) : item.content.slice(0, 60) }}{{ (locale === 'en-US' && item.content_en ? item.content_en : item.content).length > 60 ? '...' : '' }}</n-text>
           </div>
           <div style="display:flex;justify-content:space-between;margin-top:2px">
-            <n-text depth="3" style="font-size:11px">{{ $t('signals.source_huicong') }}</n-text>
+            <n-text depth="3" style="font-size:11px">{{ sourceLabel(item.source) }}</n-text>
             <n-text depth="3" style="font-size:11px">{{ item.news_time }}</n-text>
+          </div>
+          <div v-if="item.url" style="margin-top:2px;text-align:right">
+            <a :href="item.url" target="_blank" rel="noopener" style="font-size:11px;color:#1890ff;text-decoration:none">
+              {{ $t('signals.view_original') }} ↗
+            </a>
           </div>
         </div>
         <div v-if="loadingGold" style="text-align:center;padding:8px">
@@ -275,8 +297,13 @@ onUnmounted(() => {
               <n-text style="font-size:18px;line-height:1.6">{{ locale === 'en-US' && item.content_en ? item.content_en : item.content }}</n-text>
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
-              <n-text depth="3" style="font-size:16px">{{ $t('signals.source_huicong') }}</n-text>
+              <n-text depth="3" style="font-size:16px">{{ sourceLabel(item.source) }}</n-text>
               <n-text depth="3" style="font-size:16px">{{ item.news_time || '' }}</n-text>
+            </div>
+            <div v-if="item.url" style="margin-top:2px">
+              <a :href="item.url" target="_blank" rel="noopener" style="font-size:14px;color:#1890ff;text-decoration:none">
+                {{ $t('signals.view_original') }} ↗
+              </a>
             </div>
           </div>
           <div v-if="!goldNews?.news?.length" style="text-align:center;padding:30px 0;color:#8b8f97">{{ $t('signals.gold_no_news') }}</div>

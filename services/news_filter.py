@@ -329,7 +329,7 @@ class NewsFilter:
 
     # ── News-Bias 实时方向阻塞 ──────────────────────────────
 
-    def get_current_bias(self) -> Optional[dict]:
+    def get_current_bias(self, lang: str = "zh") -> Optional[dict]:
         """
         获取当前黄金快讯方向偏向（用于阻塞控制）。
         从 gold_news 表读取最近 N 条快讯的 LLM 判断方向。
@@ -344,7 +344,7 @@ class NewsFilter:
             # 从 gold_news 表读取最近快讯的方向
             from data import database as db
             db.init_db()
-            gold_news = db.get_gold_news(limit=20, direction="")
+            gold_news = db.get_gold_news(limit=20, direction="", lang=lang)
             
             if not gold_news:
                 return None

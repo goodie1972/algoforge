@@ -4,6 +4,7 @@ magic: 661301
 
 type: 反转
 display: Momentum Pulse PRO — 7维度多因子评分 + 三层TP出场
+display_en: Momentum Pulse PRO — 7-Dimension Momentum Score + 3-Layer TP Exit
 desc: H1 7维度多因子评分系统，三层TP分步出场
 desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profit phased exit
 ---

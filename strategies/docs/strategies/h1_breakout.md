@@ -4,6 +4,7 @@ magic: 880301
 
 type: 突破
 display: H1 突破趋势策略
+display_en: H1 Breakout Trend Strategy
 desc: H1 区间突破+ADX确认，EMA20追踪止损，6分制评分系统
 desc_en: H1 Range Breakout + ADX Confirmation, EMA20 Trailing Stop, 6-Point Scoring System
 ---

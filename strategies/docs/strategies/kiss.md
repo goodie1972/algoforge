@@ -4,6 +4,7 @@ magic: 880501
 
 type: 趋势
 display: KISS — 极简均线回归策略
+display_en: KISS — Minimalist MA Reversion Strategy
 desc: Keep It Simple，SMA60 均线回归 + H4 MACD 趋势过滤 + 5×ATR 范围限制
 desc_en: KISS — Keep It Simple SMA60 mean reversion with H4 MACD trend filter
 ---

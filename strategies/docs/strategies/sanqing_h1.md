@@ -4,6 +4,7 @@ magic: 880107
 
 type: 趋势
 display: H1 SanQing 原版
+display_en: H1 SanQing Original
 desc: EMA9/21趋势 + ATR14评分 + 双重止盈
 desc_en: EMA9/21 Trend + ATR14 Score + Dual Take-Profit
 ---

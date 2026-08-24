@@ -4,6 +4,7 @@ magic: 777005
 
 type: 其他
 display: xaubot-ai — XGBoost ML 后备策略
+display_en: xaubot-ai — XGBoost ML Backup Strategy
 desc: H1 XGBoost 二分类 ML 模型，80+ 技术特征，置信度阈值 0.52
 desc_en: H1 XGBoost binary ML model, 80+ technical features, confidence threshold 0.52
 ---

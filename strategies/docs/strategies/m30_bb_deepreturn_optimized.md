@@ -4,6 +4,7 @@ magic: 661102
 
 type: 反转
 display: M30 BB Deep Return — 布林带深回归
+display_en: M30 BB Deep Return — Oversold Deep Reversion
 desc: M30 布林带深度回归，RSI+MFI 超卖超买入场，三重分支出场
 desc_en: M30 BB deep reversion with RSI+MFI oversold/overbought entry, triple exit
 ---

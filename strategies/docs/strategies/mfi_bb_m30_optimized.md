@@ -4,6 +4,7 @@ magic: 661002
 
 type: 反转
 display: M30 MFI+BB Optimized — 资金流布林带优化版
+display_en: M30 MFI+BB Optimized — Money Flow BB Optimized
 desc: MFI+BB 优化版，MFI 双条件门禁 + BB Band 回归 + 4 件套风控
 desc_en: M30 MFI+BB optimized with MFI dual gate + BB band return + 4-set risk control
 ---

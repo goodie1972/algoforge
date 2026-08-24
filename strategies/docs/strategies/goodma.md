@@ -4,6 +4,7 @@ magic: 880401
 
 type: 趋势
 display: GoodMA — 均线回归趋势策略
+display_en: GoodMA — MA Reversion Trend Strategy
 desc: SMA60 均线回归，价格回踩/反弹 SMA60 入场，EMA20 方向出场
 desc_en: GoodMA — SMA60 mean reversion, price pullback to SMA60 entry, EMA20 direction exit
 ---

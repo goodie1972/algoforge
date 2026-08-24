@@ -3,6 +3,7 @@ name: bakome_trinity_ea_original
 magic: 880304
 version: v1_original
 display: BAKOME Trinity EA Original
+display_en: BAKOME Trinity EA Original
 desc: 多资产趋势追踪（H1 EMA34 + H4 EMA200）
 desc_en: Multi-Asset Trend Following (H1 EMA34 + H4 EMA200) Type: Trend
 type: 趋势

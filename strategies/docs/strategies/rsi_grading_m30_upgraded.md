@@ -4,6 +4,7 @@ magic: 660904
 
 type: 评分
 display: M30 RSI Grading — RSI 评分分级策略
+display_en: M30 RSI Grading — RSI Scoring Strategy
 desc: M30 RSI 评分系统，多周期 RSI 综合评分，分档入场
 desc_en: M30 RSI Grading system with multi-timeframe RSI scoring
 ---

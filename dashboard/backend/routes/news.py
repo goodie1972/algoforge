@@ -33,14 +33,14 @@ async def get_calendar():
 
 
 @router.get("/gold")
-async def get_gold_news(limit: int = 20):
-    """获取黄金新闻快讯（汇通+金十）的 LLM 方向判断结果"""
+async def get_gold_news(limit: int = 20, lang: str = "zh"):
+    """获取黄金新闻快讯（按语言过滤：zh=汇通+金十，en=FXStreet+Kitco）"""
     try:
         from data import database as db
         db.init_db()
-        summary = db.get_gold_news_summary()
-        news = db.get_gold_news(limit=limit)
-        bias = NewsFilter().get_current_bias()
+        summary = db.get_gold_news_summary(lang=lang)
+        news = db.get_gold_news(limit=limit, lang=lang)
+        bias = NewsFilter().get_current_bias(lang=lang)
         eval_stats = db.get_gold_news_evaluation_stats()
         return {
             "summary": summary,

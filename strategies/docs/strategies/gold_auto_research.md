@@ -4,6 +4,7 @@ magic: 880306
 
 type: ML
 display: Gold-AutoResearch — H1 实盘策略
+display_en: Gold-AutoResearch — H1 Live Trading Strategy
 desc: H1 4因子共识投票策略 + 高位拦截(price_position>0.88且偏离EMA21>4×ATR禁BUY)
 desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only when all conditions are consistent.
 ---

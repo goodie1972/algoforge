@@ -3,6 +3,7 @@ name: bakome_gold_scalper_original
 magic: 880303
 version: v1_original
 display: BAKOME Gold Scalper Original
+display_en: BAKOME Gold Scalper Original
 desc: 完整 ICT 策略（FVG + OB + Liquidity Sweep + Silver Bullet）
 desc_en: Complete ICT Strategy (FVG + OB + Liquidity Sweep + Silver Bullet) type: Reversal
 type: 反转

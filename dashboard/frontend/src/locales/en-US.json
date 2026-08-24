@@ -1003,7 +1003,10 @@
     "fcast_prefix": "Fcast ",
     "signal_title": "Live Signals",
     "strategy_title": "Strategies",
-    "accuracy": "Accuracy"
+    "accuracy": "Accuracy",
+    "source_fxstreet": "FXStreet",
+    "source_kitco": "Kitco",
+    "view_original": "View Original"
   },
   "config.section.risk_control": "Per-Strategy Risk",
   "config.account_sltp": "Account SL/TP",

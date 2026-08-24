@@ -1003,7 +1003,10 @@
     "fcast_prefix": "预",
     "signal_title": "实盘信号",
     "strategy_title": "实盘策略",
-    "accuracy": "准确率"
+    "accuracy": "准确率",
+    "source_fxstreet": "FXStreet",
+    "source_kitco": "Kitco",
+    "view_original": "查看原文"
   },
   "config.section.risk_control": "单策略风控",
   "config.account_sltp": "账户级止盈止损",

@@ -4,6 +4,7 @@ magic: 661003
 
 type: 反转
 display: M30 MFI+BB Upgraded — 资金流布林带升级版
+display_en: M30 MFI+BB Upgraded — Money Flow BB Upgraded
 desc: MFI+BB v16 升级版，BB expand 4 件套 + MFI 方向 + 时间/价格止损
 desc_en: M30 MFI+BB v16 upgraded with BB expand 4-set + MFI direction + time/price stop
 ---

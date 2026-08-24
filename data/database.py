@@ -186,7 +186,9 @@ CREATE TABLE IF NOT EXISTS gold_news (
     actual_move_15m REAL DEFAULT 0,
     actual_move_1h REAL DEFAULT 0,
     direction_match INTEGER DEFAULT NULL,
-    evaluated_at REAL DEFAULT NULL
+    evaluated_at REAL DEFAULT NULL,
+    url TEXT DEFAULT '',
+    lang TEXT DEFAULT 'zh'
 );
 CREATE INDEX IF NOT EXISTS idx_gold_news_time ON gold_news(fetched_at);
 CREATE INDEX IF NOT EXISTS idx_gold_news_direction ON gold_news(direction);
@@ -1040,8 +1042,8 @@ def insert_gold_news(items: list[dict]) -> int:
             conn.execute(
                 """INSERT INTO gold_news
                    (source, content, direction, direction_reason,
-                    direction_confidence, news_time, content_en, fetched_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    direction_confidence, news_time, content_en, fetched_at, url, lang)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     item.get("source", "huicong"),
                     item.get("content", ""),
@@ -1051,6 +1053,8 @@ def insert_gold_news(items: list[dict]) -> int:
                     item.get("time", ""),
                     item.get("content_en", ""),
                     item.get("fetched_at", time.time()),
+                    item.get("url", ""),
+                    item.get("lang", "zh"),
                 ),
             )
             count += 1
@@ -1063,7 +1067,7 @@ def insert_gold_news(items: list[dict]) -> int:
         conn.close()
 
 
-def get_gold_news(limit: int = 50, source: str = "", direction: str = "") -> list[dict]:
+def get_gold_news(limit: int = 50, source: str = "", direction: str = "", lang: str = "") -> list[dict]:
     """获取黄金新闻快讯"""
     conn = get_conn()
     try:
@@ -1075,6 +1079,9 @@ def get_gold_news(limit: int = 50, source: str = "", direction: str = "") -> lis
         if direction:
             where.append("direction = ?")
             params.append(direction)
+        if lang:
+            where.append("lang = ?")
+            params.append(lang)
         sql = "SELECT * FROM gold_news"
         if where:
             sql += " WHERE " + " AND ".join(where)
@@ -1086,14 +1093,20 @@ def get_gold_news(limit: int = 50, source: str = "", direction: str = "") -> lis
         conn.close()
 
 
-def get_gold_news_summary() -> dict:
+def get_gold_news_summary(lang: str = "") -> dict:
     """获取黄金新闻方向统计摘要"""
     conn = get_conn()
     try:
-        total = conn.execute("SELECT COUNT(*) FROM gold_news").fetchone()[0]
-        bullish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bullish'").fetchone()[0]
-        bearish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bearish'").fetchone()[0]
-        latest = conn.execute("SELECT fetched_at FROM gold_news ORDER BY fetched_at DESC LIMIT 1").fetchone()
+        if lang:
+            total = conn.execute("SELECT COUNT(*) FROM gold_news WHERE lang=?", (lang,)).fetchone()[0]
+            bullish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bullish' AND lang=?", (lang,)).fetchone()[0]
+            bearish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bearish' AND lang=?", (lang,)).fetchone()[0]
+            latest = conn.execute("SELECT fetched_at FROM gold_news WHERE lang=? ORDER BY fetched_at DESC LIMIT 1", (lang,)).fetchone()
+        else:
+            total = conn.execute("SELECT COUNT(*) FROM gold_news").fetchone()[0]
+            bullish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bullish'").fetchone()[0]
+            bearish = conn.execute("SELECT COUNT(*) FROM gold_news WHERE direction='bearish'").fetchone()[0]
+            latest = conn.execute("SELECT fetched_at FROM gold_news ORDER BY fetched_at DESC LIMIT 1").fetchone()
         last_fetch = latest[0] if latest else 0
         return {
             "total": total,

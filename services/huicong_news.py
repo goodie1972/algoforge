@@ -30,7 +30,16 @@ GOLD_KEYWORDS = [
     "地缘", "避险", "战争", "制裁",
     "失业", "初请", "零售", "制造业PMI",
     "ISM", "消费者信心", "耐用品",
+    # 英文关键词（英文源）
+    "gold", "XAU", "precious metal", "bullion", "silver",
+    "Fed", "FOMC", "inflation", "CPI", "PPI", "GDP",
+    "dollar index", "Treasury", "yield", "rate cut", "rate hike",
+    "sanctions", "safe haven", "geopolitical", "nonfarm",
 ]
+
+# 英文源 URL
+FXSTREET_URL = "https://www.fxstreet.com/news"
+KITCO_URL = "https://www.kitco.com/news"
 
 
 def fetch_huicong_news() -> list[dict]:
@@ -54,18 +63,23 @@ def fetch_huicong_news() -> list[dict]:
     # 从 topaid ID 中提取时间: topaid202608081053512063
     # 格式: topaid{YYYY}{MM}{DD}{HH}{MM}{SS}{随机}
     for m in re.finditer(
-        r'id=\"topaid(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\d*\"[^>]*>([^<]+)</a>',
+        r'id="topaid(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\d*"[^>]*href="([^"]*)"[^>]*>([^<]+)</a>',
         html,
     ):
         y, mo, d, h, mi, s = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), m.group(6)
-        content = m.group(7).strip()
+        url = m.group(7).strip()
+        content = m.group(8).strip()
         if not content or len(content) < 5:
             continue
+        if url and not url.startswith("http"):
+            url = "https://flash.fx678.com" + url
         dt = f"{y}-{mo}-{d} {h}:{mi}:{s}"
         items.append({
             "time": dt,
             "content": content,
             "source": "huicong",
+            "url": url,
+            "lang": "zh",
             "fetched_at": time.time(),
         })
 
@@ -92,6 +106,94 @@ def _extract_nearby_time(html: str, content: str) -> str:
     before = html[max(0, idx - 500):idx]
     times = re.findall(r"(\d{2}:\d{2}:\d{2})", before)
     return times[-1] if times else ""
+
+
+def fetch_fxstreet_news() -> list[dict]:
+    """抓取 FXStreet 新闻列表（英文源），返回 {time, content, url, source='fxstreet', lang='en'}"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    try:
+        resp = requests.get(FXSTREET_URL, headers=headers, timeout=15)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        logger.warning(f"[FXStreet] fetch failed: {e}")
+        return []
+
+    items = []
+    # FXStreet 文章链接: https://www.fxstreet.com/news/xxx-202608240842
+    for m in re.finditer(r'<a[^>]*href="(https://www\.fxstreet\.com/news/[^"]+)"[^>]*>(.*?)</a>', html, re.DOTALL):
+        url = m.group(1)
+        content = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        if not content or len(content) < 15:
+            continue
+        items.append({
+            "time": "",
+            "content": content,
+            "source": "fxstreet",
+            "url": url,
+            "lang": "en",
+            "fetched_at": time.time(),
+        })
+
+    # 去重（按内容前 50 字）
+    seen = set()
+    unique = []
+    for item in items:
+        key = item["content"][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    logger.info(f"[FXStreet] Fetched {len(unique)} (raw {len(items)})")
+    return unique
+
+
+def fetch_kitco_news() -> list[dict]:
+    """抓取 Kitco 新闻列表（英文源），返回 {time, content, url, source='kitco', lang='en'}"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    try:
+        resp = requests.get(KITCO_URL, headers=headers, timeout=15)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        logger.warning(f"[Kitco] fetch failed: {e}")
+        return []
+
+    items = []
+    # Kitco 文章: <a href="/news/article/2026-08-21/xxx"><img alt="标题 teaser image"...>
+    for m in re.finditer(r'<a[^>]*href="(/news/article/[^"]+)"[^>]*>(?:(?!</a>).)*?alt="([^"]+)"', html, re.DOTALL):
+        url = "https://www.kitco.com" + m.group(1)
+        content = m.group(2).strip()
+        # 去掉尾部 "<source> teaser image" 等后缀
+        content = re.sub(r'\s*[-–]\s*Kitco.*$', '', content)
+        content = re.sub(r'\s+teaser image.*$', '', content)
+        content = content.replace("&amp;", "&").replace("&#39;", "'").strip()
+        if not content or len(content) < 10:
+            continue
+        items.append({
+            "time": "",
+            "content": content,
+            "source": "kitco",
+            "url": url,
+            "lang": "en",
+            "fetched_at": time.time(),
+        })
+
+    # 去重
+    seen = set()
+    unique = []
+    for item in items:
+        key = item["content"][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    logger.info(f"[Kitco] Fetched {len(unique)} (raw {len(items)})")
+    return unique
 
 
 def filter_gold_related(news: list[dict]) -> list[dict]:
@@ -218,12 +320,44 @@ def _rule_based_judge(content: str) -> str:
         "美联储放鹰", "美元上涨",
         "避险消退", "停火", "风险偏好",
     ]
+    # 英文利多模式
+    bullish_en = [
+        "surge", "rally", "soar", "jump", "higher", "gain", "climb",
+        "rate cut", "dovish", "safe haven", "risk-off",
+        "weak dollar", "dollar weak", "inflation cools", "yields fall",
+        "sanctions", "geopolitical tension", "war", "strike",
+        "philly fed", "below expectations", "unemployment up",
+    ]
+    # 英文利空模式
+    bearish_en = [
+        "slump", "plunge", "drop", "fall", "lower", "decline", "slide",
+        "rate hike", "hawkish", "risk-on", "strong dollar", "dollar firm",
+        "inflation hot", "yields rise", "ceasefire", "risk appetite",
+        "unemployment down", "above expectations", "bounce",
+    ]
 
     for kw in bullish:
         if kw in content:
             return "bullish"
     for kw in bearish:
         if kw in content:
+            return "bearish"
+    # 英文：黄金自身涨跌优先（gold/xau + 涨跌词）
+    gold_mentions_gold = "gold" in content_lower or "xau" in content_lower
+    if gold_mentions_gold:
+        for kw in ["rally", "surge", "soar", "jump", "gain", "climb", "higher", "highs",
+                   "breaks above", "up", "rebound", "firm", "steady gains"]:
+            if kw in content_lower:
+                return "bullish"
+        for kw in ["slump", "plunge", "drop", "fall", "lower", "decline", "slide",
+                   "weak", "loss", "below", "retreat", "pullback", "down"]:
+            if kw in content_lower:
+                return "bearish"
+    for kw in bullish_en:
+        if kw in content_lower:
+            return "bullish"
+    for kw in bearish_en:
+        if kw in content_lower:
             return "bearish"
     return "neutral"
 
@@ -257,17 +391,29 @@ def fetch_jin10_news() -> list[dict]:
     # 金十快讯结构: <div class="flash-item"> 内含 flash-text
     items = []
     for m in re.finditer(
-        r'<div[^>]*class="[^"]*flash-item[^"]*"[^>]*>.*?'
-        r'<div[^>]*class="[^"]*flash-text[^"]*"[^>]*>(.*?)</div>',
+        r'<div[^>]*class="[^"]*flash-item[^"]*"[^>]*>(.*?)</div>',
         html, re.DOTALL,
     ):
-        content = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+        block = m.group(1)
+        content_match = re.search(r'class="[^"]*flash-text[^"]*"[^>]*>(.*?)</div>', block, re.DOTALL)
+        if not content_match:
+            continue
+        content = re.sub(r"<[^>]+>", "", content_match.group(1)).strip()
         if not content or len(content) < 5:
             continue
+        # 提取链接（flash-item 内的 <a href>）
+        url = ""
+        href = re.search(r'href="([^"]+)"', block)
+        if href:
+            url = href.group(1)
+            if url and not url.startswith("http"):
+                url = "https://www.jin10.com" + url
         items.append({
             "time": "",
             "content": content,
             "source": "jin10",
+            "url": url,
+            "lang": "zh",
             "fetched_at": time.time(),
         })
 
@@ -290,7 +436,7 @@ def fetch_and_judge(llm_manager=None) -> list[dict]:
     """
     logger.info("[GoldNews] Starting fetch + judge...")
 
-    # 抓取多源
+    # 抓取多源（中文：汇通+金十；英文：FXStreet+Kitco）
     all_news = []
     try:
         all_news.extend(fetch_huicong_news())
@@ -300,6 +446,14 @@ def fetch_and_judge(llm_manager=None) -> list[dict]:
         all_news.extend(fetch_jin10_news())
     except Exception as e:
         logger.warning(f"[Jin10Data] fetch failed: {e}")
+    try:
+        all_news.extend(fetch_fxstreet_news())
+    except Exception as e:
+        logger.warning(f"[FXStreet] fetch failed: {e}")
+    try:
+        all_news.extend(fetch_kitco_news())
+    except Exception as e:
+        logger.warning(f"[Kitco] fetch failed: {e}")
 
     if not all_news:
         logger.warning("[GoldNews] No news fetched")

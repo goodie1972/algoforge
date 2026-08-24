@@ -4,6 +4,7 @@ magic: 880302
 
 type: 反转
 display: M30 波动率均值回归
+display_en: M30 Volatility Mean Reversion
 desc: M30 BB触及+ATR扩张+RSI背离，回归中轨止盈，有限 recovery
 desc_en: M30 BB touch + ATR expansion + RSI divergence, take profit on return to middle band, limited recovery.
 ---

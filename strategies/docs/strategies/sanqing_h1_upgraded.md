@@ -4,6 +4,7 @@ magic: 880108
 
 type: 趋势
 display: H1 SanQing 升级版
+display_en: H1 SanQing Upgraded
 desc: EMA9/21趋势评分 + 高位拦截 + 动态利润回撤止盈
 desc_en: EMA9/21 Trend Score + Athlete Pullback to EMA9 Entry + ADX Adaptive Exit
 ---

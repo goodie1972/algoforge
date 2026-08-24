@@ -4,6 +4,7 @@ magic: 661401
 
 type: 趋势跟踪
 display: M15 FollowAve — Stoch+BBI+BB 趋势跟踪
+display_en: M15 FollowAve — Stoch+BBI+BB Trend Following
 desc: M15 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI 方向 + BB 中轨确认，无 trailing stop
 desc_en: M15 trend-following strategy with ±DI gate, Stoch cross, BBI direction, and BB mid confirmation
 ---

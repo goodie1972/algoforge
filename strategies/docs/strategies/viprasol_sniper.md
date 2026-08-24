@@ -4,6 +4,7 @@ magic: 661401
 
 type: 其他
 display: Viprasol Sniper — 7因子共识 + 多级RR出场
+display_en: Viprasol Sniper — 7-Factor Consensus + Multi-Level RR Exit
 desc: H1 7因子评分系统，多级RR出场（1R/2R/3R/4R/5R）
 desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 ---

@@ -4,6 +4,7 @@ magic: 661202
 
 type: 趋势
 display: H1 Stoch Trend — 随机指标趋势策略
+display_en: H1 Stoch Trend — Stochastic Trend Strategy
 desc: H1 Stoch 趋势跟踪，三周期趋势确认 + Stoch 金叉/死叉入场
 desc_en: H1 Stoch trend-following with 3-TF trend confirmation + Stoch cross
 ---

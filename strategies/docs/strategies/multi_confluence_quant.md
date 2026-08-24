@@ -4,6 +4,7 @@ magic: 661601
 
 type: 评分
 display: Multi-Confluence Quant — 14因子综合评分
+display_en: Multi-Confluence Quant — 14-Factor Composite Score
 desc: H1 14个技术指标因子评分，≥10/14触发信号
 desc_en: H1: 14 technical indicator factor scores, signal triggered when ≥10/14.
 ---

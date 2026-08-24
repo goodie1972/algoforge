@@ -4,6 +4,7 @@ magic: 661501
 
 type: 评分
 display: Entry Score PRO — 5因子加权评分
+display_en: Entry Score PRO — 5-Factor Weighted Score System
 desc: H1 5因子加权评分系统，评分0-100，阈值≥75触发
 desc_en: H1 5-factor weighted scoring system, scoring 0-100, threshold ≥75 triggers
 ---

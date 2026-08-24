@@ -4,6 +4,7 @@ magic: 661001
 
 type: 反转
 display: M30 MFI+BB — 资金流布林带策略
+display_en: M30 MFI+BB — Money Flow Bollinger Bands Strategy
 desc: M30 MFI+BB 超卖超买反转，2 种入场模式 + 1 种出场方式
 desc_en: M30 MFI+BB oversold/overbought reversion with 2 entry modes
 exitNote: 多空双开锁仓

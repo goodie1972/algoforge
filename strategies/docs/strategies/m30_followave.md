@@ -4,6 +4,7 @@ magic: 661402
 
 type: 趋势跟踪
 display: M30 FollowAve — Stoch+BBI+BB 趋势跟踪（带 Trailing Stop）
+display_en: M30 FollowAve — Stoch+BBI+BB Trend Following (w/ Trailing Stop)
 desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2.0×ATR trailing stop
 desc_en: M30 trend-following with ±DI gate, Stoch cross, BBI, BB mid, and 2.0×ATR trailing stop
 ---

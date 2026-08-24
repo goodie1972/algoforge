@@ -4,6 +4,7 @@ magic: 880202
 
 type: 趋势
 display: TimeProfit EA — H2趋势 + M5入场 + 整数关口箱体
+display_en: TimeProfit EA — H2 Trend + M5 Entry + Round Number Box
 desc: 原始 TimeProfitEA 移植，H2趋势判断，100美金整数关口箱体交易，ATR风控
 desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 ---

@@ -4,6 +4,7 @@ magic: 661301
 
 type: 价格回归（Counter-Trend）
 display: RSI-BB Trend — M30 价格回归策略
+display_en: fish_eaten v2 — M30 Price Reversion Strategy
 desc: 门禁+3层筛子入场，RSI/MFI双极限吃鱼出场，M30周期
 desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer filter entry + fish exit
 ---

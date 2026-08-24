@@ -4,6 +4,7 @@ magic: 660707
 
 type: 反转
 display: M30 RSI + 布林带均值回归 — 7因子评分系统
+display_en: M30 RSI + Bollinger Bands Mean Reversion — 7-Factor Score System
 desc: M30 RSI+布林带均值回归，7因子评分系统，双重止盈出场 + 动态利润回撤止盈
 desc_en: M30 RSI + Bollinger Bands Mean Reversion, 7-Factor Scoring System, Dual Take-Profit Exit
 ---
