@@ -26,6 +26,8 @@ class ExitRow(TypedDict, total=False):
 
 class StratLogic(TypedDict, total=False):
     desc: str
+    desc_en: str
+    display_en: str
     exitWiden: bool
     exitNote: str
     long: dict
@@ -158,6 +160,7 @@ def load_strategy_logic(name: str) -> StratLogic | None:
     result: StratLogic = {
         "desc": meta.get('desc', ''),
         "desc_en": meta.get('desc_en') or meta.get('desc', ''),
+        "display_en": meta.get('display_en', ''),
         "exitWiden": has_exit_widen,
         "exitNote": exit_note,
     }

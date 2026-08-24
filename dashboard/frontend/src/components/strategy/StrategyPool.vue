@@ -59,6 +59,7 @@ interface ExitRow {
 interface StratLogic {
   desc: string
   desc_en?: string
+  display_en?: string
   exitWiden?: boolean
   exitNote?: string
   long: { entry: EntryFactor[]; exit: ExitRow[] }
@@ -321,7 +322,7 @@ async function confirmDeleteClick() {
               @update:checked="() => toggleSelect(meta.name)" @click.stop />
             <n-switch :value="pool[meta.id]?.enabled"
               @update:value="toggleStrategy(meta.id)" size="small" />
-            <n-text strong style="font-size: 14px;">{{ locale === 'en-US' ? translateDisplay(meta.display) : meta.display }}</n-text>
+            <n-text strong style="font-size: 14px;">{{ locale === 'en-US' ? (getLogic(meta.name)?.display_en || translateDisplay(meta.display)) : meta.display }}</n-text>
             <n-tag :color="{ color: getColor(meta.name), textColor: getStrategyTextColor(meta.name) }" size="tiny" style="font-weight: 600; font-size: 14px; padding: 2px 7px;">
               {{ meta.name }}
             </n-tag>
