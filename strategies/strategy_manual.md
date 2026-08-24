@@ -45,6 +45,8 @@ strategies/docs/{YYYYMMDD}_{策略名}_v{版本号}.md
 
 **双语要求（强制）：** 每个策略文档的 frontmatter 必须同时填写 `desc`（中文简介）和 `desc_en`（英文简介）。表格中的中文文本需同步更新 `dashboard/frontend/src/utils/strategyTranslations.ts` 的翻译映射，确保英文界面正常显示。
 
+**新闻翻译要求：** 新闻快讯内容需支持中英文双语显示。`gold_news` 表的 `content_en` 字段由 `huicong_news.py` 的 LLM 判断函数自动填充，前端 `StrategySignals.vue` 根据 locale 自动切换显示。新增新闻来源时需确保 LLM 翻译逻辑覆盖到。
+
 ---
 
 ---
