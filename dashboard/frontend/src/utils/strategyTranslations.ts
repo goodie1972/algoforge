@@ -513,6 +513,18 @@ const displayTranslations: Record<string, string> = {
   "TimeProfit EA — H2趋-trend + M5Entry + 整数关口箱体（原始版移植）": "TimeProfit EA — H2 Trend + M5 Entry + Round Number Box (Original Port)",
   "Viprasol Sniper — 7因子共识 + 多级RR出场": "Viprasol Sniper — 7-Factor Consensus + Multi-Level RR Exit",
   "xaubot-ai — XGBoost ML 后备strategy": "xaubot-ai — XGBoost ML Backup Strategy",
+  "fish_eaten v2 — M30 价格回归策略": "fish_eaten v2 — M30 Price Reversion Strategy",
+  "m15_followave v1 — M15 Stoch+BBI+BB 趋势跟踪策略": "m15_followave v1 — M15 Stoch+BBI+BB Trend Following",
+  "m30_followave v1 — M30 Stoch+BBI+BB 趋势跟踪策略（带 Trailing Stop）": "m30_followave v1 — M30 Stoch+BBI+BB Trend Following (w/ Trailing Stop)",
+  "GoodMA v1 — 60MA 方向 + 回踩入场": "GoodMA v1 — 60MA Direction + Pullback Entry",
+  "KISS v1 — H4 MACD 定向 + H1 均线组 + 枢轴支阻": "KISS v1 — H4 MACD Trend + H1 MA + Pivot S/R",
+  "M30 BB DeepReturn Optimized — 超跌reboundstrategyoptimize版": "M30 BB DeepReturn Optimized — Oversold Rebound Optimized",
+  "M30 MFI + 布林带均值回归 — 均值回归strategy": "M30 MFI + BB Mean Reversion",
+  "M30 MFI + 布林带均值回归 (optimize版) — 均值回归strategy": "M30 MFI + BB Mean Reversion (Optimized)",
+  "M30 MFI + BB Upgraded v8 — 超跌rebound升级版": "M30 MFI + BB Upgraded v8 — Oversold Rebound Upgraded",
+  "M30 RSI分级Score升级版 v5_upgraded — RSI+MA14+BB升级": "M30 RSI Grading Upgraded v5 — RSI+MA14+BB",
+  "Stoch 回调with-trendstrategy (v7_optimized)": "Stoch Pullback Trend-Following (v7_optimized)",
+  "TimeProfit EA v2 — H2 趋势 + M5 入场 + 整数关口箱体（入场确认增强版）": "TimeProfit EA v2 — H2 Trend + M5 Entry + Round Number Box (Enhanced)",
 }
 
 export function translateDisplay(cn: string): string {

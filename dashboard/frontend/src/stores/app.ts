@@ -26,6 +26,10 @@ export const useAppStore = defineStore('app', () => {
 
   function setLocale(lang: string) {
     locale.value = lang
+    // 同步更新 i18n 实例的 locale
+    import('@/locales/i18n').then(mod => {
+      mod.default.global.locale.value = lang
+    })
     localStorage.setItem('algoforge-lang', lang)
     // 通知后端切换日志语言（静默失败即可）
     import('@/api/client').then(({ updateConfig }) => {

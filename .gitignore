@@ -60,6 +60,8 @@ test_*.mjs
 test_*.png
 screenshot_*.png
 backtest/~$*.xlsx
+# 更新状态文件（自动生成，不提交）
+dashboard/updates/state.json
 # 测试目录（不上传主应用，策略仓库保留）
 tests/
 
