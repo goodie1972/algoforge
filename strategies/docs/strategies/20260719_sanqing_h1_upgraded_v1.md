@@ -33,29 +33,6 @@ desc_en: EMA9/21 Trend Score + Athlete Pullback to EMA9 Entry + ADX Adaptive Exi
 | 5 | 放量 | +1 | 成交量 > 均量×1.3 |
 | 6 | 吞没形态 | +2 | 实体中位数≥1.5且实体/前高≥1.5且实体占K线≥50% |
 
-## Scoring Factors
-
-### BUY（做多）
-### BUY (Long)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| 1 | 上涨趋势 | +2 | EMA9 > EMA21 |
-| 2 | EMA金叉 | +1 | EMA9上穿EMA21 |
-| 3 | 回抽EMA9 | +2 | low ≤ EMA9×1.002 且 close > EMA9 |
-| 4 | 实体>1ATR | +1 | 实体长度超过1倍ATR |
-| 5 | 放量 | +1 | 成交量 > 均量×1.3 |
-| 6 | 吞没形态 | +2 | 实体中位数≥1.5且实体/前高≥1.5且实体占K线≥50% |
-
-### SELL（做空）
-### SELL (Short)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| 1 | 下跌趋势 | +2 | EMA9 < EMA21 |
-| 2 | EMA死叉 | +1 | EMA9下穿EMA21 |
-| 3 | 回抽EMA9 | +2 | high ≥ EMA9×0.998 且 close < EMA9 |
-| 4 | 实体>1ATR | +1 | 实体长度超过1倍ATR |
-| 5 | 放量 | +1 | 成交量 > 均量×1.3 |
-| 6 | 吞没形态 | +2 | 实体中位数≥1.5且实体/前高≥1.5且实体占K线≥50% |
 
 ## 运动员验票
 
@@ -102,9 +79,9 @@ desc_en: EMA9/21 Trend Score + Athlete Pullback to EMA9 Entry + ADX Adaptive Exi
 
 ## Special Rules
 
-- 阈值: **固定 5 分**（评分 3→5，提高入场门槛，减少低质量信号约60%）
-- **ADX 门禁**: ADX>25 时才允许入场（20→25，加强趋势过滤）
-- **位置门禁**: 价格在60根K线顶部10%禁多，底部10%禁空
+- 阈值: **Fixed 5 points**（评分 3→5，提高入场门槛，减少低质量信号约60%）
+- **ADX Gate**: ADX>25 时才允许入场（20→25，加强趋势过滤）
+- **Position Gate**: Price in top 10% of 60-bar range blocks long，bottom 10% blocks short
 - **硬止损**: 1.2 ATR（1.5→1.2，每笔约36点，防大亏）
-- **v10_optimized (2026-08-08)**: 提高评分阈值至5、ADX阈值至25、硬止损收紧至1.2ATR，减少交易量、提升信号质量
-- 数据源: 全部指标从 DataFactory TA-Lib 读取
+- **v10_optimized (2026-08-08)**: 提高Score threshold至5、ADX阈值至25、硬止损收紧至1.2ATR，减少交易量、提升信号质量
+- Data source: All indicators from DataFactory TA-Lib

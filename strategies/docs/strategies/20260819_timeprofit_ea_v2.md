@@ -19,9 +19,9 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 ## Original Source
 
 - **GitHub:** [caoruihua/sanqing-ea-mt5](https://github.com/caoruihua/sanqing-ea-mt5)
-- **语言:** MQL5 (MT5) → Python 移植
-- **作者:** caoruihua
-- **说明:** 一个 H2 趋势 + M5 入场的整数关口箱体交易策略，核心文件为 `TimeProfitEA.mq5`，回测 188 笔交易，Profit Factor 2.03，胜率 38.3%。
+- **Language:** MQL5 (MT5) → Python Port
+- **Author:** caoruihua
+- **Description:** An H2 trend + M5 entry round-number box trading strategy. Core file: TimeProfitEA.mq5. Backtest: 188 trades, Profit Factor 2.03, Win Rate 38.3%.
 
 ## 评分因子
 
@@ -41,27 +41,16 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 | 2 | 回弹入场 | +1 | 价格从下方关口反弹到上方关口附近 |
 | 3 | 突破入场 | +1 | 价格跌破下方关口 |
 
-## Scoring Factors
-
-### BUY（做多）
-### BUY (Long)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| 1 | H2 趋势向上 | +1 | EMA10 > EMA30 且间距≥$1.0 |
-| 2 | 回弹入场 | +1 | 价格从上方关口回弹到下方关口附近 |
-| 3 | 突破入场 | +1 | 价格强势突破上方关口 |
-
-### SELL（做空）
-### SELL (Short)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| 1 | H2 趋势向下 | +1 | EMA10 < EMA30 且间距≥$1.0 |
-| 2 | 回弹入场 | +1 | 价格从下方关口反弹到上方关口附近 |
-| 3 | 突破入场 | +1 | 价格跌破下方关口 |
 
 ## 入场逻辑
 
 ### 趋势判断（H2）
+- 快 EMA: 10 (H2) / M5 替代: 120
+- 慢 EMA: 30 (H2) / M5 替代: 300
+- 最小趋势间距: $1.0 (避免盘整期)
+- 趋势中性时不交易
+
+### Trend Judgment (H2)
 - 快 EMA: 10 (H2) / M5 替代: 120
 - 慢 EMA: 30 (H2) / M5 替代: 300
 - 最小趋势间距: $1.0 (避免盘整期)
@@ -73,10 +62,22 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 - 回弹区域：距关口 $70 以内（趋势中的回弹）
 - 突破入场：价格突破关口 $4 以上
 
+### Round Number Box (100 Interval)
+- XAUUSD 在 100 美金整数关口（如 2300, 2400, 2500...）存在明显的支撑/阻力
+- 关口附近 ±$4 为禁入区（避免假突破）
+- 回弹区域：距关口 $70 以内（趋势中的回弹）
+- 突破入场：价格突破关口 $4 以上
+
 ### M5 入场确认
 - K 线方向需与趋势一致（可配置 `REQUIRE_CANDLE_DIRECTION`）
 - 回弹方向和突破方向均需与 H2 趋势一致
 
+### M5 Entry Confirmation
+- K 线方向需与趋势一致（可配置 `REQUIRE_CANDLE_DIRECTION`）
+- 回弹方向和突破方向均需与 H2 趋势一致
+
+
+## Entry Logic
 ## 出场逻辑
 
 ## Exit Logic
@@ -101,6 +102,6 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 
 ## Special Rules
 
-- 冷却期: 任何平仓后 10 分钟内不交易
-- 盈利平仓冷却: 同方向 5 分钟内不重复开仓
-- 数据源: 全部指标从 DataFactory TA-Lib 读取
+- Cooldown: No trading within 10 minutes after any close
+- Profit close cooldown: No repeat position in same direction within 5 minutes
+- Data source: All indicators from DataFactory TA-Lib

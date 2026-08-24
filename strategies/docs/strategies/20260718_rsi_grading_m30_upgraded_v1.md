@@ -53,8 +53,10 @@ desc_en: M30 RSI Grading system with multi-timeframe RSI scoring
 | 4 | 价格 ≥ BB 上轨 | +2 | 布林带确认 |
 | 5 | 总分 ≥ 4 | — | 空单入场 |
 
+
+## Entry Logic
 ## 出场逻辑
-n## Exit Logic
+## Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

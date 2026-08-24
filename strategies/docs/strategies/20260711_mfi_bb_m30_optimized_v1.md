@@ -45,8 +45,10 @@ desc_en: M30 MFI+BB optimized with MFI dual gate + BB band return + 4-set risk c
 | 2 | close ≥ BB 上轨 | 价格在上轨附近 |
 | 3 | BB 带宽扩张 | 波动率放大 |
 
+
+## Entry Logic
 ## 出场逻辑
-n## Exit Logic
+## Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

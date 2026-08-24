@@ -43,6 +43,8 @@ desc_en: M30 BB deep reversion with RSI+MFI oversold/overbought entry, triple ex
 | 2 | MFI > 80 | Money flow extremely strong |
 | 3 | close ≥ BB upper band | Price breaks above upper band |
 
+
+## Entry Logic
 ## 出场逻辑
 
 | # | 条件 | 说明 |

@@ -33,29 +33,6 @@ desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only wh
 
 **Judgment Rule:** ** 4 个因子全部一致才触发信号（AND 逻辑），缺少任一因子不交易。
 
-## Scoring Factors
-
-### BUY（做多）
-### BUY (Long)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| ① | 趋势 | +1 | H1 EMA10 > EMA20 |
-| ② | 动量 | +1 | MACD(12,26,9) + Stoch(14,3,3) 同时看多 |
-| ③ | 波动活性 | +1 | ADX>20 或 ATR 高于 SMA20 |
-| ④ | 安全 | +1 | RSI(10) 未超买 + 价格未在 BB 上轨外 |
-
-### SELL（做空）
-### SELL (Short)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| ① | 趋势 | +1 | H1 EMA10 < EMA20 |
-| ② | 动量 | +1 | MACD(12,26,9) + Stoch(14,3,3) 同时看空 |
-| ③ | 波动活性 | +1 | ADX>20 或 ATR 高于 SMA20 |
-| ④ | 安全 | +1 | RSI≤35 时独立封空，防止接近超卖区开空 |
-
-**判决规则：**** 4 个因子全部一致才触发信号（AND 逻辑），缺少任一因子不交易。
-
-**Judgment Rule:** ** 4 个因子全部一致才触发信号（AND 逻辑），缺少任一因子不交易。
 
 ## 出场逻辑
 
@@ -83,4 +60,4 @@ desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only wh
 ## Special Rules
 
 - H4 SMA50 趋势门禁：H4 下行禁 BUY，H4 上行禁 SELL
-- 数据源：全部指标从 DataFactory TA-Lib 读取
+- Data source: All indicators from DataFactory TA-Lib

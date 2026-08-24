@@ -37,33 +37,6 @@ desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profi
 
 **阈值：** ≥6/7 分触发信号，且优势方向得分必须大于另一方。
 
-## Scoring Factors
-
-### BUY（做多）
-### BUY (Long)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| ① | AMC 强度 | +1 | 自适应动量复合 (RSI+MACD+ROC Z-score) > 0.3 |
-| ② | 信号对齐 | +1 | MACD(12,26,9) 为正 |
-| ③ | RSI 区域 | +1 | RSI(14) > 50 |
-| ④ | 多周期对齐 | +1 | H1 close > H1 MA20 |
-| ⑤ | 成交量确认 | +1 | 当前成交量 > 前20根均值 × 1.2 |
-| ⑥ | 市场状态 | +1 | ADX>22 且 +DI > -DI |
-| ⑦ | 无衰竭 | +1 | BB 位置在 20%~80% 之间（非极端） |
-
-### SELL（做空）
-### SELL (Short)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| ① | AMC 强度 | +1 | 自适应动量复合 < -0.3 |
-| ② | 信号对齐 | +1 | MACD(12,26,9) 为负 |
-| ③ | RSI 区域 | +1 | RSI(14) < 50 |
-| ④ | 多周期对齐 | +1 | H1 close < H1 MA20 |
-| ⑤ | 成交量确认 | +1 | 当前成交量 > 前20根均值 × 1.2 |
-| ⑥ | 市场状态 | +1 | ADX>22 且 -DI > +DI |
-| ⑦ | 无衰竭 | +1 | BB 位置在 20%~80% 之间（非极端） |
-
-**阈值：** ≥6/7 分触发信号，且优势方向得分必须大于另一方。
 
 ## 出场逻辑
 
@@ -97,4 +70,4 @@ desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profi
 - AMC = (RSI_norm + MACD_norm + ROC_norm) / 3，三项归一化后取均值
 - 来源：TradingView Momentum Pulse PRO (自适应动量复合 + 多维度共识)
 - 时间止损：最多持仓 40 根 K 线
-- 数据源：全部指标从 DataFactory TA-Lib 读取
+- Data source: All indicators from DataFactory TA-Lib

@@ -57,6 +57,8 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 | 2 | close ≥ BB upper band − 5 | Price near BB upper band |
 | 3 | BB mid-band direction up | MA trend up, waiting for reversion |
 
+
+## Entry Logic
 ## 出场逻辑
 
 ## Exit Logic
@@ -87,7 +89,7 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 
 ## 回测结果
 
-### 最佳参数（M30, 2024-01 ~ 2026-08, 4889 根 K 线）
+### Best Parameters (M30, 2024-01 ~ 2026-08, 4889 bars)
 
 | 参数 | 值 | 说明 |
 |:----|:---|:----|

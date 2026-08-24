@@ -37,33 +37,6 @@ desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 
 **阈值：** ≥4/7 因子触发，且优势方向得分必须大于另一方。
 
-## Scoring Factors
-
-### BUY（做多）
-### BUY (Long)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| ① | 价格 vs EMA | +1 | close > EMA21（VWAP 替代） |
-| ② | RSI 方向 | +1 | RSI(14) > 50 |
-| ③ | MACD 方向 | +1 | MACD(12,26,9) > 0 |
-| ④ | EMA 排列 | +1 | EMA9 > EMA21 |
-| ⑤ | ADX+DI | +1 | ADX>25 且 +DI > -DI |
-| ⑥ | 成交量确认 | +1 | 成交量 > 前 20 根均值 × 1.2，且为阳线 |
-| ⑦ | 次级 RSI | +1 | M15 RSI(14) > 50 |
-
-### SELL（做空）
-### SELL (Short)
-| # | 因子 | 得分 | 说明 |
-|:-:|:----|:----:|:----|
-| ① | 价格 vs EMA | +1 | close < EMA21 |
-| ② | RSI 方向 | +1 | RSI(14) < 50 |
-| ③ | MACD 方向 | +1 | MACD(12,26,9) < 0 |
-| ④ | EMA 排列 | +1 | EMA9 < EMA21 |
-| ⑤ | ADX+DI | +1 | ADX>25 且 -DI > +DI |
-| ⑥ | 成交量确认 | +1 | 成交量 > 前 20 根均值 × 1.2，且为阴线 |
-| ⑦ | 次级 RSI | +1 | M15 RSI(14) < 50 |
-
-**阈值：** ≥4/7 因子触发，且优势方向得分必须大于另一方。
 
 ## 出场逻辑
 
@@ -101,4 +74,4 @@ desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 
 - 来源：TradingView Viprasol Sniper Confluence Entry/Exit
 - K 线收盘确认入场
-- 数据源：全部指标从 DataFactory TA-Lib 读取
+- Data source: All indicators from DataFactory TA-Lib

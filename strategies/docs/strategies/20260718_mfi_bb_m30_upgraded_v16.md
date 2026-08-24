@@ -45,8 +45,10 @@ desc_en: M30 MFI+BB v16 upgraded with BB expand 4-set + MFI direction + time/pri
 | 2 | close ≥ BB 上轨 | 价格突破上轨 |
 | 3 | BB expand 4 件套 | 带宽扩张、方向、比率、趋势齐备 |
 
+
+## Entry Logic
 ## 出场逻辑
-n## Exit Logic
+## Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

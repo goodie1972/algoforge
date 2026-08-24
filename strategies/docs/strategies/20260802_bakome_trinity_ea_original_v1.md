@@ -22,6 +22,10 @@ type: 趋势
 
 > Bakome Trinity EA - Multi-Asset Trading System supporting XAUUSD, GBPUSD, BTCUSD with Economic News Filter, No Grid/Martingale, Adaptive Risk.
 
+### Original Repo Description
+
+> Bakome Trinity EA - Multi-Asset Trading System supporting XAUUSD, GBPUSD, BTCUSD with Economic News Filter, No Grid/Martingale, Adaptive Risk.
+
 ## Original Source
 
 | 项目 | 内容 |
@@ -35,9 +39,17 @@ type: 趋势
 
 > Bakome Trinity EA - Multi-Asset Trading System supporting XAUUSD, GBPUSD, BTCUSD with Economic News Filter, No Grid/Martingale, Adaptive Risk.
 
+### Original Repo Description
+
+> Bakome Trinity EA - Multi-Asset Trading System supporting XAUUSD, GBPUSD, BTCUSD with Economic News Filter, No Grid/Martingale, Adaptive Risk.
+
 ## 策略逻辑
 
 ### 核心架构
+
+H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
+
+### Core Architecture
 
 H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 
@@ -97,6 +109,10 @@ H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 ## Strategy Logic
 
 ### 核心架构
+
+H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
+
+### Core Architecture
 
 H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 
@@ -162,7 +178,7 @@ H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 
 ## Special Rules
 
-- 最大同时持仓 1 张
-- 每日最大交易 10 笔
-- 经济新闻过滤（NFP/FOMC/CPI 前后禁入）
-- 数据源: 全部指标从 DataFactory TA-Lib 读取
+- Max simultaneous positions 1 张
+- Max daily trades 10 笔
+- Economic news filter（NFP/FOMC/CPI 前后禁入）
+- Data source: All indicators from DataFactory TA-Lib
