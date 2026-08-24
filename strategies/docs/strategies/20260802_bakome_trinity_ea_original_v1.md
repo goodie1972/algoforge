@@ -46,6 +46,24 @@ H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 - 亚洲时段静默
 - 经济新闻前后 30/20 分钟禁止交易
 
+### Entry Conditions
+
+**Trend Judgment (H1 + H4 Dual Timeframe):**
+| # | Condition | Direction |
+|:-:|:---------|:--------:|
+| 1 | H1 EMA34 > H4 EMA200 | Long (BUY) |
+| 2 | H1 EMA34 < H4 EMA200 | Short (SELL) |
+
+**M5 Entry Confirmation:**
+- M5 close on the trend side (0.5% tolerance allowed)
+- In bullish trend, M5 should not be significantly below H1 EMA34
+- In bearish trend, M5 should not be significantly above H1 EMA34
+
+**Session Filter:**
+- London (7-11, UTC+3) and New York (13-17, UTC+3) sessions
+- Asian session quiet
+- No trading 30/20 min before/after economic news
+
 ### 出场逻辑
 
 | # | 条件 | 说明 |
@@ -53,6 +71,14 @@ H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 | ① | ATR 硬止损 | 亏损达到 2.0×ATR 时平仓 |
 | ② | 盈亏平衡 | 盈利达到 1.0×ATR 时移止损至入场价 |
 | ③ | 追踪止损 | 盈利达到 1.5×ATR 时激活，步长 0.5×ATR |
+
+### Exit Logic
+
+| # | Condition | Description |
+|:-:|:---------|:------------|
+| ① | ATR Hard Stop | Close at 2.0×ATR loss |
+| ② | Breakeven | Move SL to entry after 1.0×ATR profit |
+| ③ | Trailing Stop | Activate at 1.5×ATR profit, step 0.5×ATR |
 
 ## 特别规则
 

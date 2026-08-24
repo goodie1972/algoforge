@@ -13,6 +13,16 @@ desc_en: H1 Stoch trend-following with 3-TF trend confirmation + Stoch cross
 
 ### 做多
 
+### Long Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 条件 | 说明 |
+| 1 | H1 trend up | Main timeframe trend |
+| 2 | H4 trend up | Higher timeframe confirmation |
+| 3 | Stoch K > D (golden cross) | Golden cross |
+| 4 | Stoch K < 80 | Not overbought |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | 1 | H1 趋势向上 | 主周期趋势 |
@@ -21,6 +31,16 @@ desc_en: H1 Stoch trend-following with 3-TF trend confirmation + Stoch cross
 | 4 | Stoch K < 80 | 未超买 |
 
 ### 做空
+
+### Short Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 条件 | 说明 |
+| 1 | H1 trend down | Main timeframe trend |
+| 2 | H4 trend down | Higher timeframe confirmation |
+| 3 | Stoch K < D (death cross) | Death cross |
+| 4 | Stoch K > 20 | Not oversold |
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

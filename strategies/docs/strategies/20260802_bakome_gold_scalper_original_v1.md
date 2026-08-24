@@ -45,6 +45,23 @@ H4 EMA200 定趋势 Bias → Silver Bullet 时段 → M5 三重 ICT 确认 → A
 - 仅 Silver Bullet 时段交易：伦敦 8-9 点、纽约 15-16 点（MT4 时区 UTC+3）
 - 仅伦敦/纽约时段交易，亚洲时段静默
 
+### Entry Conditions
+
+**Bias Direction (H4 EMA200):**
+- Price > EMA200 → Bullish bias (BUY direction)
+- Price < EMA200 → Bearish bias (SELL direction)
+
+**Triple ICT Confirmation (at least 2 must hold):**
+| # | Condition | Description |
+|:-:|:---------|:------------|
+| 1 | Liquidity Sweep | Price breaks recent swing high/low then reverses |
+| 2 | Fair Value Gap | 3-candle gap pattern detection |
+| 3 | Order Block | Reversal candle before strong breakout as S/R zone |
+
+**Session Filter:**
+- Silver Bullet sessions only: London 8-9, New York 15-16 (MT4 UTC+3)
+- London/New York sessions only, Asian session quiet
+
 ### 出场逻辑
 
 | # | 条件 | 说明 |
@@ -52,6 +69,14 @@ H4 EMA200 定趋势 Bias → Silver Bullet 时段 → M5 三重 ICT 确认 → A
 | ① | ATR 硬止损 | 亏损达到 2.0×ATR 时平仓 |
 | ② | 盈亏平衡 | 盈利达到 1.0×ATR 时移止损至入场价 |
 | ③ | 追踪止损 | 盈利达到 1.5×ATR 时激活，步长 0.5×ATR |
+
+### Exit Logic
+
+| # | Condition | Description |
+|:-:|:---------|:------------|
+| ① | ATR Hard Stop | Close at 2.0×ATR loss |
+| ② | Breakeven | Move SL to entry after 1.0×ATR profit |
+| ③ | Trailing Stop | Activate at 1.5×ATR profit, step 0.5×ATR |
 
 ## 特别规则
 

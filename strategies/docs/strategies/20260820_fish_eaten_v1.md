@@ -18,6 +18,13 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 | ① | ADX > 20 | 存在趋势，非震荡 |
 | ② | \|+DI − -DI\| > 5 | 趋势方向明确 |
 
+### Gate (Pre-conditions)
+
+| # | Condition | Description |
+|:-:|:---------|:------------|
+| ① | ADX > 20 | Trending market, not ranging |
+| ② | \|+DI − -DI\| > 5 | Clear trend direction |
+
 ### 三层筛子（做多：−DI > +DI）
 
 | 层 | 条件 | 说明 |
@@ -26,6 +33,14 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 | 第2层 | close ≤ BB 下轨 + 5 | 价格在 BB 下轨附近 |
 | 第3层 | BB 中轨方向向下 | 均线趋势向下，等待回归 |
 
+### Three-Layer Filter (Long: −DI > +DI)
+
+| Layer | Condition | Description |
+|:----:|:---------|:------------|
+| 1 | RSI < 30 **and** MFI < 25 | Oversold confirmation |
+| 2 | close ≤ BB lower band + 5 | Price near BB lower band |
+| 3 | BB mid-band direction down | MA trend down, waiting for reversion |
+
 ### 三层筛子（做空：+DI > −DI）
 
 | 层 | 条件 | 说明 |
@@ -33,6 +48,14 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 | 第1层 | RSI > 70 **且** MFI > 75 | 超买确认 |
 | 第2层 | close ≥ BB 上轨 − 5 | 价格在 BB 上轨附近 |
 | 第3层 | BB 中轨方向向上 | 均线趋势向上，等待回归 |
+
+### Three-Layer Filter (Short: +DI > −DI)
+
+| Layer | Condition | Description |
+|:----:|:---------|:------------|
+| 1 | RSI > 70 **and** MFI > 75 | Overbought confirmation |
+| 2 | close ≥ BB upper band − 5 | Price near BB upper band |
+| 3 | BB mid-band direction up | MA trend up, waiting for reversion |
 
 ## 出场逻辑
 
@@ -43,10 +66,22 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 | **做多** | RSI≥70 **且** MFI≥75 **都到过** → 任一离开(RSI<70 或 MFI<75) → 且 close < BB上轨−offset | 完整吃完一波上涨 |
 | **做空** | RSI≤30 **且** MFI≤25 **都到过** → 任一离开(RSI>30 或 MFI>25) → 且 close > BB下轨+offset | 完整吃完一波下跌 |
 
+### Fish Exit (Primary)
+
+| Direction | Trigger | Description |
+|:--------:|:--------|:------------|
+| **Long** | RSI≥70 **and** MFI≥75 **both reached** → either leaves (RSI<70 or MFI<75) → and close < BB upper band − offset | Capture the full upside move |
+| **Short** | RSI≤30 **and** MFI≤25 **both reached** → either leaves (RSI>30 or MFI>25) → and close > BB lower band + offset | Capture the full downside move |
+
 ### 时间止损（兜底）
 
 - 一个指标到达极限后，另一个在 **48 根 K 线（M30 = 24 小时）** 内未到达 → 强制平仓
 - 防止部分交易永远等不到两个指标同时到极限
+
+### Time Stop (Backstop)
+
+- One indicator reaches extreme, the other does not within **48 bars (M30 = 24 hours)** → force close
+- Prevents trades from waiting indefinitely for both indicators to reach extremes
 
 ## 回测结果
 

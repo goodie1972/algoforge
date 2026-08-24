@@ -13,6 +13,15 @@ desc_en: M30 MFI+BB optimized with MFI dual gate + BB band return + 4-set risk c
 
 ### 做多
 
+### Long Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 条件 | 说明 |
+| 1 | MFI < 20 or MFI up and < 50 | Dual condition gate |
+| 2 | close ≤ BB lower band | Price near lower band |
+| 3 | BB Bandwidth Expansion | Volatility expansion |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | 1 | MFI < 20 或 MFI 方向向上且 < 50 | 双条件门禁 |
@@ -20,6 +29,15 @@ desc_en: M30 MFI+BB optimized with MFI dual gate + BB band return + 4-set risk c
 | 3 | BB 带宽扩张 | 波动率放大 |
 
 ### 做空
+
+### Short Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 条件 | 说明 |
+| 1 | MFI > 80 or MFI down and > 50 | Dual condition gate |
+| 2 | close ≥ BB upper band | Price near upper band |
+| 3 | BB Bandwidth Expansion | Volatility expansion |
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

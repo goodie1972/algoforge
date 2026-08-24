@@ -13,6 +13,17 @@ desc_en: M30 RSI Grading system with multi-timeframe RSI scoring
 
 ### 做多
 
+### Long Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 因子 | 得分 |
+| 1 | RSI14 < 30 | +2 |
+| 2 | RSI5 < 25 | +1 |
+| 3 | RSI10 < 28 | +1 |
+| 4 | Price ≤ BB lower band | +2 |
+| 5 | Total score ≥ 4 | — |
+
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | RSI14 < 30 | +2 | 超卖 |
@@ -22,6 +33,17 @@ desc_en: M30 RSI Grading system with multi-timeframe RSI scoring
 | 5 | 总分 ≥ 4 | — | 多单入场 |
 
 ### 做空
+
+### Short Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 因子 | 得分 |
+| 1 | RSI14 > 70 | +2 |
+| 2 | RSI5 > 75 | +1 |
+| 3 | RSI10 > 72 | +1 |
+| 4 | Price ≥ BB upper band | +2 |
+| 5 | Total score ≥ 4 | — |
 
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|

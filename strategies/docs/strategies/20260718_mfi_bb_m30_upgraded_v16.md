@@ -13,6 +13,15 @@ desc_en: M30 MFI+BB v16 upgraded with BB expand 4-set + MFI direction + time/pri
 
 ### 做多
 
+### Long Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 条件 | 说明 |
+| 1 | MFI < 20 | Oversold |
+| 2 | close ≤ BB lower band | Price breaks below lower band |
+| 3 | BB expand 4-set | Bandwidth expansion, direction, ratio, trend all set |
+
 | # | 条件 | 说明 |
 |:-:|:----|:----|
 | 1 | MFI < 20 | 超卖 |
@@ -20,6 +29,15 @@ desc_en: M30 MFI+BB v16 upgraded with BB expand 4-set + MFI direction + time/pri
 | 3 | BB expand 4 件套 | 带宽扩张、方向、比率、趋势齐备 |
 
 ### 做空
+
+### Short Entry
+
+| # | Condition | Description |
+|:------:|:------------------:|:----------------------:|
+| # | 条件 | 说明 |
+| 1 | MFI > 80 | Overbought |
+| 2 | close ≥ BB upper band | Price breaks above upper band |
+| 3 | BB expand 4-set | Bandwidth expansion, direction, ratio, trend all set |
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|
