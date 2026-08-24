@@ -35,13 +35,17 @@ strategies/{YYYYMMDD}_{策略名}_v{版本号}.py
 
 修改策略 → 原文件移入 `strategies/backup/`，生成新版本号文件。
 
-### 1.5 策略说明文档
+### 1.5 策略说明文档（双语强制）
 
 ```
 strategies/docs/{YYYYMMDD}_{策略名}_v{版本号}.md
 ```
 
 和策略 `.py` 同目录，backup 在 `strategies/docs/backup/`。
+
+**双语要求（强制）：** 每个策略文档的 frontmatter 必须同时填写 `desc`（中文简介）和 `desc_en`（英文简介）。表格中的中文文本需同步更新 `dashboard/frontend/src/utils/strategyTranslations.ts` 的翻译映射，确保英文界面正常显示。
+
+---
 
 ---
 

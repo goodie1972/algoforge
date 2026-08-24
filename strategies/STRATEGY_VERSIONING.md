@@ -68,6 +68,15 @@ desc_en: Strategy brief (English)
 ---
 ```
 
+### 双语要求（强制）
+
+所有策略说明文档必须同时提供中英文版本，具体如下：
+
+1. **frontmatter 字段**：`desc`（中文简介）+ `desc_en`（英文简介）必须同时填写
+2. **表格内容**：入场条件、出场逻辑等表格中的中文文本，必须同步在 `dashboard/frontend/src/utils/strategyTranslations.ts` 的 `detailTranslations` 映射表中添加对应英文翻译
+3. **新增或修改策略文档时**，必须同步更新 `strategyTranslations.ts`，否则英文界面下表格会显示中文原文
+4. 翻译映射 key 为精确中文字符串，value 为英文翻译，建议使用 `"中文字段": "English translation"` 格式
+
 ## 策略删除规则
 
 删除策略不是永久删除，而是移至 backup 目录，可随时恢复：
