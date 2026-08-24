@@ -1,0 +1,38 @@
+---
+name: kiss
+magic: 880501
+
+type: 趋势
+display: KISS — 极简均线回归策略
+desc: Keep It Simple，SMA60 均线回归 + H4 MACD 趋势过滤 + 5×ATR 范围限制
+desc_en: KISS — Keep It Simple SMA60 mean reversion with H4 MACD trend filter
+---
+
+## 入场逻辑
+
+### 做多
+
+| # | 条件 | 说明 |
+|:-:|:----|:----|
+| 1 | 价格回踩 ≤ 60SMA | 价格从上方回踩 SMA60 |
+| 2 | H4 MACD > 0 | 大周期趋势向上 |
+| 3 | 价格在 5×ATR 范围内 | 避免极端偏离 |
+
+### 做空
+
+| # | 条件 | 说明 |
+|:-:|:----|:----|
+| 1 | 价格反弹 ≥ 60SMA | 价格从下方反弹 SMA60 |
+| 2 | H4 MACD < 0 | 大周期趋势向下 |
+| 3 | 价格在 5×ATR 范围内 | 避免极端偏离 |
+
+## 出场逻辑
+
+| # | 条件 | 说明 |
+|:-:|:----|:----|
+| ① | EMA20 方向反转 | 多单：EMA20 向下；空单：EMA20 向上 |
+| ② | ATR 硬止损 | 2.0×ATR 亏损止损 |
+
+## 数据源
+
+- 依赖指标：`close`, `sma_60`, `ema_20`, `atr`, `macd`

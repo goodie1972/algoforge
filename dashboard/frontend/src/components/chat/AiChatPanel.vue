@@ -1,47 +1,133 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
 import ChatMessage from './ChatMessage.vue'
 
+const { t } = useI18n()
 const emit = defineEmits<{ close: [] }>()
 const chat = useChatStore()
 const inputText = ref('')
 const showSessions = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 
-// 拖拽
-const posX = ref(window.innerWidth - 460)
-const posY = ref(window.innerHeight - 660)
-const dragging = ref(false)
-const dragOffset = ref({ x: 0, y: 0 })
-const panelRef = ref<HTMLElement | null>(null)
+// ── 浮动面板几何：拖动 / 调节大小 / localStorage 持久化 ──
+const GEO_KEY = 'ai_panel_geometry'
+const MIN_W = 320
+const MIN_H = 400
 
-function onHeaderMouseDown(e: MouseEvent) {
+interface PanelGeo { x: number; y: number; w: number; h: number }
+
+function defaultGeo(): PanelGeo {
+  const w = Math.min(420, window.innerWidth - 16)
+  const h = Math.min(600, window.innerHeight - 16)
+  return {
+    x: Math.max(8, window.innerWidth - w - 24),
+    y: Math.max(8, window.innerHeight - h - 24),
+    w, h,
+  }
+}
+
+// 尺寸限制在最小值与视口之间；位置至少保留 40px 可见区域
+function clampGeo(g: PanelGeo): PanelGeo {
+  const vw = window.innerWidth, vh = window.innerHeight
+  const w = Math.max(MIN_W, Math.min(g.w || MIN_W, vw))
+  const h = Math.max(MIN_H, Math.min(g.h || MIN_H, vh))
+  const x = Math.max(-(w - 40), Math.min(g.x ?? 0, vw - 40))
+  const y = Math.max(-(h - 40), Math.min(g.y ?? 0, vh - 40))
+  return { x, y, w, h }
+}
+
+function loadGeo(): PanelGeo {
+  try {
+    const raw = localStorage.getItem(GEO_KEY)
+    if (raw) {
+      const g = JSON.parse(raw)
+      if (['x', 'y', 'w', 'h'].every(k => typeof g[k] === 'number')) return clampGeo(g)
+    }
+  } catch { /* 数据损坏回退默认 */ }
+  return defaultGeo()
+}
+
+const geo = ref<PanelGeo>(loadGeo())
+const dragging = ref(false)
+const resizing = ref<'' | 'corner' | 'right' | 'bottom'>('')
+const panelRef = ref<HTMLElement | null>(null)
+let dragStart = { px: 0, py: 0, x: 0, y: 0 }
+let resizeStart = { px: 0, py: 0, w: 0, h: 0 }
+
+function saveGeo() {
+  try { localStorage.setItem(GEO_KEY, JSON.stringify(geo.value)) } catch { /* ignore */ }
+}
+
+// ── 拖动（标题栏为手柄，Pointer Events + setPointerCapture）──
+function onHeaderPointerDown(e: PointerEvent) {
+  // 标题栏上的按钮（关闭/会话列表）按下时不触发拖动
+  if ((e.target as HTMLElement).closest('button')) return
   dragging.value = true
-  dragOffset.value = { x: e.clientX - posX.value, y: e.clientY - posY.value }
+  dragStart = { px: e.clientX, py: e.clientY, x: geo.value.x, y: geo.value.y }
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
 
-function onMouseMove(e: MouseEvent) {
+function onHeaderPointerMove(e: PointerEvent) {
   if (!dragging.value) return
-  posX.value = Math.max(0, Math.min(window.innerWidth - 420, e.clientX - dragOffset.value.x))
-  posY.value = Math.max(0, Math.min(window.innerHeight - 200, e.clientY - dragOffset.value.y))
+  const vw = window.innerWidth, vh = window.innerHeight
+  const nx = dragStart.x + (e.clientX - dragStart.px)
+  const ny = dragStart.y + (e.clientY - dragStart.py)
+  geo.value.x = Math.max(-(geo.value.w - 40), Math.min(nx, vw - 40))
+  geo.value.y = Math.max(-(geo.value.h - 40), Math.min(ny, vh - 40))
 }
 
-function onMouseUp() {
+function onHeaderPointerUp(e: PointerEvent) {
+  if (!dragging.value) return
   dragging.value = false
+  saveGeo()
+  try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ }
 }
 
-onMounted(() => {
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
-  chat.fetchSessions()
+// ── 调节大小（右下角 / 右侧边 / 底边手柄）──
+function onResizePointerDown(mode: 'corner' | 'right' | 'bottom', e: PointerEvent) {
+  resizing.value = mode
+  resizeStart = { px: e.clientX, py: e.clientY, w: geo.value.w, h: geo.value.h }
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+function onResizePointerMove(e: PointerEvent) {
+  if (!resizing.value) return
+  const vw = window.innerWidth, vh = window.innerHeight
+  if (resizing.value !== 'bottom') {
+    const maxW = Math.max(MIN_W, vw - geo.value.x)  // 右缘不超视口
+    geo.value.w = Math.max(MIN_W, Math.min(resizeStart.w + (e.clientX - resizeStart.px), maxW))
+  }
+  if (resizing.value !== 'right') {
+    const maxH = Math.max(MIN_H, vh - geo.value.y)  // 底缘不超视口
+    geo.value.h = Math.max(MIN_H, Math.min(resizeStart.h + (e.clientY - resizeStart.py), maxH))
+  }
+}
+
+function onResizePointerUp(e: PointerEvent) {
+  if (!resizing.value) return
+  resizing.value = ''
+  saveGeo()
+  try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId) } catch { /* ignore */ }
+}
+
+// 窗口尺寸变化时修正越界位置与尺寸
+function onWindowResize() {
+  geo.value = clampGeo(geo.value)
+}
+
+onMounted(async () => {
+  window.addEventListener('resize', onWindowResize)
+  await chat.fetchSessions()
   scrollToBottom()
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('mouseup', onMouseUp)
+  window.removeEventListener('resize', onWindowResize)
 })
 
 const quickCommands = [
@@ -52,11 +138,6 @@ const quickCommands = [
   { icon: '⚠️', label: '风险检查', text: '当前有什么风险需要注意的？' },
   { icon: '📅', label: '今日总结', text: '帮我总结今天的交易情况' },
 ]
-
-onMounted(async () => {
-  await chat.fetchSessions()
-  scrollToBottom()
-})
 
 watch(() => chat.messages.length, () => {
   nextTick(scrollToBottom)
@@ -108,9 +189,11 @@ async function handleDeleteSession(id: string, e: Event) {
 </script>
 
 <template>
-  <div ref="panelRef" class="ai-chat-panel" :style="{ left: posX + 'px', top: posY + 'px', cursor: dragging ? 'grabbing' : undefined }">
+  <div ref="panelRef" class="ai-chat-panel" :class="{ 'is-active': dragging || resizing }"
+    :style="{ left: geo.x + 'px', top: geo.y + 'px', width: geo.w + 'px', height: geo.h + 'px' }">
     <!-- 头部（拖拽手柄） -->
-    <div class="chat-header" @mousedown="onHeaderMouseDown" style="cursor: grab; user-select: none;">
+    <div class="chat-header"
+      @pointerdown="onHeaderPointerDown" @pointermove="onHeaderPointerMove" @pointerup="onHeaderPointerUp">
       <div class="chat-header-left">
         <div class="chat-header-avatar">🟡</div>
         <div class="chat-header-info">
@@ -177,6 +260,7 @@ async function handleDeleteSession(id: string, e: Event) {
           :role="msg.role"
           :content="msg.content"
           :streaming="chat.streaming && idx === chat.messages.length - 1 && msg.role === 'assistant'"
+          :tool-status="msg.toolStatus"
         />
       </template>
 
@@ -217,16 +301,23 @@ async function handleDeleteSession(id: string, e: Event) {
         </svg>
       </button>
     </div>
+
+    <!-- 调节大小手柄：右侧边 / 底边 / 右下角 -->
+    <div class="resize-handle resize-handle--right"
+      @pointerdown="onResizePointerDown('right', $event)" @pointermove="onResizePointerMove" @pointerup="onResizePointerUp"></div>
+    <div class="resize-handle resize-handle--bottom"
+      @pointerdown="onResizePointerDown('bottom', $event)" @pointermove="onResizePointerMove" @pointerup="onResizePointerUp"></div>
+    <div class="resize-handle resize-handle--corner" :title="t('ai.chat_panel_resize_hint')"
+      @pointerdown="onResizePointerDown('corner', $event)" @pointermove="onResizePointerMove" @pointerup="onResizePointerUp"></div>
   </div>
 </template>
 
 <style scoped>
 .ai-chat-panel {
   position: fixed;
-  width: 420px;
-  max-width: 90vw;
-  height: 600px;
-  max-height: 80vh;
+  z-index: 9999;
+  min-width: 320px;
+  min-height: 400px;
   background: #0d1117;
   border: 1px solid #21262d;
   border-radius: 16px;
@@ -234,6 +325,11 @@ async function handleDeleteSession(id: string, e: Event) {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.15s ease;
+}
+/* 拖动/缩放中的加强反馈 */
+.ai-chat-panel.is-active {
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(240, 185, 11, 0.3);
 }
 
 /* 头部 */
@@ -244,6 +340,9 @@ async function handleDeleteSession(id: string, e: Event) {
   padding: 12px 16px;
   border-bottom: 1px solid #21262d;
   background: #161b22;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
 }
 .chat-header-left { display: flex; align-items: center; gap: 10px; }
 .chat-header-avatar {
@@ -392,5 +491,37 @@ async function handleDeleteSession(id: string, e: Event) {
 }
 .slide-enter-from, .slide-leave-to {
   transform: translateX(-100%);
+}
+
+/* 调节大小手柄 */
+.resize-handle {
+  position: absolute;
+  z-index: 20;
+  touch-action: none;
+}
+.resize-handle--right {
+  top: 70px; right: 0; bottom: 16px; width: 5px;
+  cursor: ew-resize;
+}
+.resize-handle--bottom {
+  left: 12px; right: 16px; bottom: 0; height: 5px;
+  cursor: ns-resize;
+}
+.resize-handle--corner {
+  right: 0; bottom: 0; width: 18px; height: 18px;
+  cursor: nwse-resize;
+}
+.resize-handle--corner::after {
+  content: '';
+  position: absolute; right: 5px; bottom: 5px;
+  width: 8px; height: 8px;
+  border-right: 2px solid #484f58;
+  border-bottom: 2px solid #484f58;
+  border-bottom-right-radius: 2px;
+  transition: border-color 0.15s ease;
+}
+.resize-handle--corner:hover::after,
+.ai-chat-panel.is-active .resize-handle--corner::after {
+  border-color: #f0b90b;
 }
 </style>

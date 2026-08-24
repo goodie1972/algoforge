@@ -8,7 +8,7 @@ XAUUSD 黄金自动化交易系统，基于 Python + MetaTrader 4。
 - **技术栈:** Python 3.10+ / FastAPI / Vue 3 + TypeScript + Vite + Naive UI / SQLite / lightweight-charts
 - **桥接:** FreeMT4Bridge EA (MQL4, TCP Socket :23232) 或 MetaApi 云端
 - **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals 表)
-- **版本:** 3.3.8 (VERSION)
+- **版本:** 3.3.9 (VERSION)
 - **策略仓库:** [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies.git)
 
 ## 仓库结构

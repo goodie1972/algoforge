@@ -3,6 +3,17 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.3.9] - 2026-08-24 — 策略说明文档全面修复 + Git 版本号升级
+
+### 修复
+- **策略说明文档不完整**：25 个策略的说明文档全部修复，解析器支持中文标题（`### 做多/做空`）+ exitNote 从 frontmatter 读取
+- **get_dynamic_sl_tp 签名不兼容**：followave/fish_eaten 的 4 参签名加 `atr_val=None` 默认值，兼容引擎 2 参调用，止损恢复正常
+- **AI 代理自动检测代理端口**：去掉端口 10808 自动检测，改用纯环境变量配置，修复 SSL 连接错误
+- **K线图漂移**：`isViewingLatest()` 防止查看历史时自动回滚
+
+### 新增
+- AI Agent 人设系统 + ToolRegistry + SkillLoader（3 内置技能）
+
 ## [3.3.8] - 2026-08-21 — K线图修复 + 三新策略上线
 
 ### 新增

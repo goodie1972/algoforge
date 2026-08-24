@@ -307,7 +307,42 @@ class LLMProviderManager:
                 return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
         except Exception as e:
-            logger.error(f"[LLMProvider] call failed: {e}")
+            logger.warning(f"[LLMProvider] primary provider failed: {e}")
+            # 故障转移：尝试其他有 API Key 的 provider
+            if not provider_id:
+                for fallback in self._providers:
+                    if fallback["id"] == provider["id"] or not fallback.get("api_key"):
+                        continue
+                    fb_model = fallback.get("selected_model") or (fallback.get("models") or [""])[0]
+                    if not fb_model:
+                        continue
+                    fb_url = fallback.get("base_url", "https://api.openai.com/v1").rstrip("/")
+                    fb_api = f"{fb_url}/chat/completions"
+                    try:
+                        fb_headers = {"Content-Type": "application/json"}
+                        if fallback.get("type") != "ollama":
+                            fb_headers["Authorization"] = f"Bearer {fallback['api_key']}"
+                        fb_payload = {"model": fb_model, "messages": messages, "temperature": temperature}
+                        if fallback.get("type") == "ollama":
+                            fb_payload["stream"] = False
+                            fb_api = f"{fb_url}/api/chat"
+                        fb_proxy = os.environ.get("LLM_PROXY") or os.environ.get("HTTPS_PROXY") or ""
+                        fb_kwargs = {"timeout": 30}
+                        if fb_proxy:
+                            fb_kwargs["proxy"] = fb_proxy
+                        resp = httpx.post(fb_api, json=fb_payload, headers=fb_headers, **fb_kwargs)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        if fallback.get("type") == "ollama":
+                            result = data.get("message", {}).get("content", "")
+                        else:
+                            result = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        logger.info(f"[LLMProvider] fallback to {fallback.get('name', '?')} succeeded")
+                        return result
+                    except Exception as fe:
+                        logger.warning(f"[LLMProvider] fallback {fallback.get('name', '?')} also failed: {fe}")
+                        continue
+            logger.error("[LLMProvider] all providers failed")
             return None
 
     def test_connection(self, provider_id: str) -> dict:

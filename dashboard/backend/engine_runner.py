@@ -290,6 +290,39 @@ class EngineRunner:
         except Exception as e:
             self.logger.warning(f"[DataSync] Skipped (module not ready: {e})")
 
+    # ======================== 公开接口（供 context_builder 等外部模块使用） ========================
+
+    def get_account_info(self) -> Optional[dict]:
+        """获取缓存的账户信息（余额/净值/浮盈/可用保证金）"""
+        return self._cached_account
+
+    def get_fresh_positions(self) -> list:
+        """获取用最新价格刷新后的持仓列表（含实时浮盈）"""
+        return self._fresh_positions()
+
+    def get_price(self) -> Optional[dict]:
+        """获取缓存的最新价格 {bid, ask}"""
+        return self._cached_price
+
+    def get_indicators_by_tf(self) -> dict:
+        """从各活跃策略收集指标数据，按时间周期返回 {M30: {...}, H1: {...}, H4: {...}}"""
+        result = {}
+        if not self._engine:
+            return result
+        for strategy in getattr(self._engine, 'strategies', []):
+            tf = getattr(strategy, 'timeframe', None)
+            if tf and hasattr(strategy, '_cached_indicators') and strategy._cached_indicators:
+                result[tf] = strategy._cached_indicators
+        return result
+
+    def get_active_strategies(self) -> list:
+        """返回当前活跃策略列表（含名称和周期）"""
+        if not self._engine:
+            return []
+        strats = getattr(self._engine, 'strategies', [])
+        return [{"name": getattr(s, 'name', str(s)),
+                 "timeframe": getattr(s, 'timeframe', '?')} for s in strats]
+
     # ======================== 缓存更新（仅从价格轮询线程调用，消除主线程 bridge 竞争） ========================
 
     def _fresh_positions(self):

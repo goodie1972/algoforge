@@ -68,6 +68,25 @@ if not logging.getLogger().handlers:
 engine_runner = EngineRunner(config_service=config_service)
 EngineRunner.set_instance(engine_runner)
 
+# 注册 AI 内置工具（工具 handler 通过 _get_engine() 延迟获取引擎，
+# 引擎尚未启动时调用工具会返回友好错误，因此此处注册是安全的）
+from services.agent.tool_registry import register_builtin_tools
+try:
+    register_builtin_tools()
+except Exception as e:
+    logger.warning(f"[ToolRegistry] 内置工具注册失败: {e}")
+
+# 启动时把 agent_settings 持久化的 smithery_api_key 载入环境变量（环境变量已有则不覆盖），
+# 使 MCP 市场无需重启即可使用 API 级能力；失败仅记日志，不影响启动。
+try:
+    from services.agent.agent_settings import get_setting as _get_agent_setting
+    _smithery_key = str(_get_agent_setting("smithery_api_key") or "").strip()
+    if _smithery_key and not os.environ.get("SMITHERY_API_KEY"):
+        os.environ["SMITHERY_API_KEY"] = _smithery_key
+        logger.info("[AgentSettings] smithery_api_key 已从持久化配置载入环境变量")
+except Exception as e:
+    logger.warning(f"[AgentSettings] smithery_api_key 载入失败: {e}")
+
 # === 注入依赖到路由模块 ===
 from dashboard.backend.routes import engine as route_engine
 from dashboard.backend.routes import account as route_account
@@ -87,6 +106,9 @@ from dashboard.backend.routes import supervisor as route_supervisor
 from dashboard.backend.routes import paper_trading as route_paper_trading
 from dashboard.backend.routes.llm_provider import router as llm_provider_router
 from dashboard.backend.routes.ai import router as ai_router
+from dashboard.backend.routes.mcp import router as mcp_router
+from dashboard.backend.routes.skill_store import router as skill_store_router
+from dashboard.backend.routes.mcp_store import router as mcp_store_router
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -193,6 +215,10 @@ async def report_weekly_loop():
 
 
 # === FastAPI 生命周期 ===
+# 启动期预热的后台任务引用（模块级集合防 GC）
+_lifespan_bg_tasks: set = set()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """启动/关闭事件 — 自动启动引擎线程 + 后台预热策略缓存
@@ -209,6 +235,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"策略缓存预热失败: {e}")
     asyncio.create_task(_warm_cache())
+    # 预热 MCP 工具目录（避免首条聊天 +8s 发现延迟）；
+    # get_openai_tools 内部对失败连接器已有容错，预热异常只记日志不影响启动。
+    try:
+        from services.agent.mcp_runtime import get_mcp_runtime
+
+        async def _warm_mcp_tools():
+            try:
+                await get_mcp_runtime().get_openai_tools()
+                logger.info("[Startup] MCP 工具目录预热完成")
+            except Exception as e:
+                logger.warning(f"[Startup] MCP 工具目录预热失败: {e}")
+
+        _mcp_warm_task = asyncio.create_task(_warm_mcp_tools())
+        _lifespan_bg_tasks.add(_mcp_warm_task)
+        _mcp_warm_task.add_done_callback(_lifespan_bg_tasks.discard)
+    except Exception as e:
+        logger.warning(f"[Startup] MCP 预热调度失败: {e}")
     # 在后台线程启动引擎（不阻塞 asyncio 事件循环，也不阻塞 lifespan 完成）
     asyncio.create_task(asyncio.to_thread(engine_runner.start))
     # 后台延迟检查远程更新（默认 15s 后，避免启动同步 fetch 网络）
@@ -264,6 +307,13 @@ async def lifespan(app: FastAPI):
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     logger.info("[Shutdown] 后台任务已取消")
+    # 1.5 关闭 MCP 运行时（stdio 子进程 / SSE 连接）
+    try:
+        from services.agent.mcp_runtime import get_mcp_runtime
+        await get_mcp_runtime().close_all()
+        logger.info("[Shutdown] MCP runtime closed")
+    except Exception as e:
+        logger.warning(f"[Shutdown] MCP runtime close failed: {e}")
     # 2. 停止引擎（含策略线程、桥接心跳）
     try:
         engine_runner.stop()
@@ -334,6 +384,9 @@ app.include_router(route_supervisor.router)
 app.include_router(route_paper_trading.router)
 app.include_router(llm_provider_router)
 app.include_router(ai_router)
+app.include_router(mcp_router)
+app.include_router(skill_store_router)
+app.include_router(mcp_store_router)
 
 
 # === WebSocket 端点 ===

@@ -37,12 +37,13 @@ class ContextBuilder:
         if not engine:
             return lines
         try:
-            status = self._engine.get_status()
+            status = engine.get_status()
             lines.append(f"引擎: {status.get('status', '?')} (已运行 {status.get('uptime_seconds', 0):.0f}s), 桥接: {'已连接' if status.get('bridge_connected') else '未连接'}")
         except Exception:
             pass
         try:
-            acct = self._engine._cached_account
+            # 使用公开接口获取账户信息
+            acct = engine.get_account_info()
             if acct:
                 lines.append(f"账户: 余额 ${acct.get('balance', 0):.2f} | 净值 ${acct.get('equity', 0):.2f} | 浮盈 ${acct.get('floating_pnl', 0):+.2f} | 可用 ${acct.get('free_margin', 0):.2f}")
         except Exception:
@@ -52,10 +53,11 @@ class ContextBuilder:
     def _section_positions(self) -> list[str]:
         engine = self._get_engine()
         lines = []
-        if not self._engine:
+        if not engine:
             return lines
         try:
-            positions = self._engine._fresh_positions()
+            # 使用公开接口获取刷新后的持仓
+            positions = engine.get_fresh_positions()
             if positions:
                 lines.append("持仓:")
                 for p in positions[:5]:
@@ -76,10 +78,11 @@ class ContextBuilder:
     def _section_price(self) -> list[str]:
         engine = self._get_engine()
         lines = []
-        if not self._engine:
+        if not engine:
             return lines
         try:
-            price = self._engine._cached_price
+            # 使用公开接口获取价格
+            price = engine.get_price()
             if price:
                 bid = price.get('bid', 0)
                 ask = price.get('ask', 0)
@@ -93,10 +96,11 @@ class ContextBuilder:
         engine = self._get_engine()
         """增强版：注入 M30/H1/H4 指标 + K 线摘要"""
         lines = []
-        if not self._engine:
+        if not engine:
             return lines
         try:
-            indicators = self._engine._cached_indicators
+            # 使用公开接口从各策略收集指标
+            indicators = engine.get_indicators_by_tf()
             if indicators:
                 lines.append("指标:")
                 for tf in ('M30', 'H1', 'H4'):
@@ -121,10 +125,11 @@ class ContextBuilder:
         engine = self._get_engine()
         """K 线形态摘要（阶段1新增）"""
         lines = []
-        if not self._engine:
+        if not engine:
             return lines
         try:
-            indicators = self._engine._cached_indicators
+            # 使用公开接口从各策略收集指标
+            indicators = engine.get_indicators_by_tf()
             if indicators:
                 lines.append("K线形态:")
                 for tf in ('M30', 'H1'):
@@ -193,10 +198,11 @@ class ContextBuilder:
         engine = self._get_engine()
         """策略列表 + 各策略进出场逻辑（阶段1增强）"""
         lines = []
-        if not self._engine:
+        if not engine:
             return lines
         try:
-            strats = self._engine.get_active_strategies()
+            # 使用公开接口获取活跃策略
+            strats = engine.get_active_strategies()
             if strats:
                 names = [s.get('name', s) if isinstance(s, dict) else str(s) for s in strats]
                 lines.append(f"策略: {len(names)}个活跃 - {', '.join(names[:10])}")
@@ -216,27 +222,48 @@ class ContextBuilder:
         return lines
 
     def _section_news(self) -> list[str]:
+        """最新新闻（直接查询数据库，无循环依赖）"""
         lines = []
         try:
-            from dashboard.backend.ai_service import _get_latest_news
-            news = _get_latest_news(3)
-            if news:
-                lines.append("新闻:")
-                for n in news:
-                    direction = n.get('direction', '?')
-                    content = n.get('content', '')[:60]
-                    lines.append(f"  - [{direction}] {content}")
+            from data.database import get_conn
+            conn = get_conn()
+            try:
+                rows = conn.execute(
+                    "SELECT content, direction, direction_confidence, news_time "
+                    "FROM gold_news ORDER BY fetched_at DESC LIMIT 3"
+                ).fetchall()
+                if rows:
+                    lines.append("新闻:")
+                    for r in rows:
+                        direction = r[1] or '?'
+                        text = (r[0] or '')[:60]
+                        lines.append(f"  - [{direction}] {text}")
+            finally:
+                conn.close()
         except Exception:
             pass
         return lines
 
     def _section_calendar(self) -> list[str]:
+        """今日经济日历（直接查询数据库，无循环依赖）"""
         lines = []
         try:
-            from dashboard.backend.ai_service import _get_today_calendar
-            events = _get_today_calendar()
-            if events:
-                lines.append(f"经济日历: {events}")
+            from data.database import get_conn
+            today = datetime.now(LOCAL_TZ).strftime("%Y-%m-%d")
+            conn = get_conn()
+            try:
+                rows = conn.execute(
+                    "SELECT time, title, impact, forecast, previous "
+                    "FROM news_calendar WHERE date=? ORDER BY time",
+                    (today,)
+                ).fetchall()
+                if rows:
+                    summary = "; ".join(
+                        f"{r[0] or ''} {r[1]}({r[2] or ''})" for r in rows[:5]
+                    )
+                    lines.append(f"经济日历: {summary}")
+            finally:
+                conn.close()
         except Exception:
             pass
         return lines

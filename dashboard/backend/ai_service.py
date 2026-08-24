@@ -16,30 +16,6 @@ from data.database import get_conn
 
 logger = logging.getLogger("dashboard.backend.ai_service")
 
-# ── System Prompt ───────────────────────────────────────
-
-SYSTEM_PROMPT = """你是「金探」，一位专业的 XAUUSD 黄金量化交易分析师，内置于 AlgoForge 交易系统中。
-
-你的能力：
-- 精通黄金微结构、流动性猎取、ICT 价格行为
-- 熟悉本系统的三轨架构（DataFactory → 策略员 → 运动员）
-- 能读取实时持仓、账户、信号、指标缓存、新闻方向
-- 熟悉系统 18 个活跃策略的进出场逻辑
-
-你的回答风格：
-- 用中文回答，简洁专业，不废话
-- 给观点时附带理由和依据（引用具体指标数值/持仓数据）
-- 涉及风险时主动提示
-- 不确定时说"不确定"，不编造数据
-- 如果用户问的数据你没有，说明需要什么条件才能获取
-
-你的限制：
-- 不直接执行交易（平仓/开仓），只给建议
-- 不预测精确价格点位，给的是区间和概率
-- 严格遵守交易纪律提示
-"""
-
-
 def build_system_prompt() -> str:
     """构建 system prompt，包含人设 + 实时交易上下文 + 技能"""
     from services.agent.context_builder import get_builder
@@ -48,8 +24,8 @@ def build_system_prompt() -> str:
 
     # 确保技能已扫描（首次调用时加载）
     loader = get_loader()
-    if not loader.list_skills():
-        loader.scan()
+    if not loader.all_skills():
+        loader.rescan()
 
     # 上下文（含 K线/信号/成交/策略等增强）
     builder = get_builder()
@@ -57,7 +33,7 @@ def build_system_prompt() -> str:
                              "signals", "trades", "strategies", "news", "calendar"])
 
     # 技能上下文
-    skills_text = loader.get_all_context()
+    skills_text = loader.get_summary_context()
     if skills_text:
         context += "\n\n【可用技能】\n" + skills_text
 
@@ -71,35 +47,6 @@ def _gather_trading_context() -> str:
     from services.agent.context_builder import get_builder
     return get_builder().build(["engine", "positions", "price", "indicators",
                                 "signals", "trades", "strategies", "news", "calendar"])
-
-
-def _get_latest_news(limit=3):
-    """获取最近 N 条黄金新闻方向"""
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT content, direction, direction_confidence, news_time FROM gold_news ORDER BY fetched_at DESC LIMIT ?",
-            (limit,)
-        ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
-
-
-def _get_today_calendar():
-    """获取今日经济日历"""
-    today = datetime.now(LOCAL_TZ).strftime("%Y-%m-%d")
-    conn = get_conn()
-    try:
-        rows = conn.execute(
-            "SELECT time, title, impact, forecast, previous FROM news_calendar WHERE date=? ORDER BY time",
-            (today,)
-        ).fetchall()
-        if not rows:
-            return ""
-        return "; ".join(f"{r['time'] or ''} {r['title']}({r['impact'] or ''})" for r in rows[:5])
-    finally:
-        conn.close()
 
 
 # ── 会话管理 ────────────────────────────────────────────

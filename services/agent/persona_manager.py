@@ -1,10 +1,18 @@
 """
-人设管理器 — 存储/读取/切换 AI 人设
-人设数据存 DB（settings 表）
+人设管理器 — Hermes Agent 模式：SOUL.md + MEMORY.md 双文件人设模型
+
+- SOUL（基础设定）：身份/能力/风格/限制，占 system prompt 第 1 槽位
+- MEMORY（日常记忆）：使用过程中的记忆沉淀，会话时冻结注入
+
+存储：纯文件，位于 data/persona/ 目录：
+- soul.md      基础设定（≤2000 字硬校验）
+- memory.md    日常记忆（≤2000 字硬校验）
+- legacy_persona.json  旧 DB 人设的一次性迁移备份（自动生成）
 """
 import json
 import logging
-from typing import Optional
+import os
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -19,97 +27,151 @@ DEFAULT_PERSONA = {
 }
 
 PERSONA_DB_KEY = "ai_persona"
+MAX_PERSONA_CHARS = 2000
+
+# data/ 目录与本模块同处项目根目录下（services/agent/persona_manager.py → ../../data）
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")
+_DATA_DIR = os.path.abspath(_DATA_DIR)
+PERSONA_DIR = os.path.join(_DATA_DIR, "persona")
+SOUL_PATH = os.path.join(PERSONA_DIR, "soul.md")
+MEMORY_PATH = os.path.join(PERSONA_DIR, "memory.md")
+LEGACY_BACKUP_PATH = os.path.join(PERSONA_DIR, "legacy_persona.json")
+
+
+def _render_persona_template(p: dict) -> str:
+    """把 name/role/expertise/style/limits 字段渲染为自然语言 soul 文本"""
+    return (
+        f"你是「{p.get('name', 'AI助手')}」，{p.get('role', '专业的交易分析师')}。\n"
+        f"\n"
+        f"你的能力：\n{p.get('expertise', '')}\n"
+        f"\n"
+        f"你的回答风格：\n{p.get('style', '')}\n"
+        f"\n"
+        f"你的限制：\n{p.get('limits', '')}"
+    )
+
+
+def _validate_limit(text: str, label: str) -> None:
+    """字符数硬校验，超限抛 ValueError 并附当前字数"""
+    n = len(text)
+    if n > MAX_PERSONA_CHARS:
+        raise ValueError(f"{label}超过 {MAX_PERSONA_CHARS} 字限制（当前 {n} 字）")
 
 
 class PersonaManager:
+    """soul.md + memory.md 双文件人设管理器（Hermes Agent 模式）"""
+
     def __init__(self):
-        self._current = dict(DEFAULT_PERSONA)
-        self._all_personas: dict[str, dict] = {}
-        self._load_from_db()
+        self._lock = threading.Lock()
+        self._migrated = False
 
-    def _load_from_db(self):
-        """从 DB 加载保存的人设"""
+    # ── 存储路径 ────────────────────────────────────────
+
+    def _ensure_dir(self):
+        os.makedirs(PERSONA_DIR, exist_ok=True)
+
+    # ── Soul（基础设定）────────────────────────────────
+
+    def load_soul(self) -> str:
+        """读取 soul.md；文件不存在时执行懒迁移/默认初始化"""
+        self._ensure_migration()
+        with self._lock:
+            with open(SOUL_PATH, "r", encoding="utf-8") as f:
+                return f.read()
+
+    def save_soul(self, text: str) -> None:
+        """保存 soul.md（≤2000 字硬校验，超限抛 ValueError）"""
+        _validate_limit(text, "人设")
+        self._ensure_dir()
+        with self._lock:
+            with open(SOUL_PATH, "w", encoding="utf-8") as f:
+                f.write(text)
+            self._migrated = True
+        logger.info(f"[PersonaManager] soul.md saved ({len(text)} chars)")
+
+    # ── Memory（日常记忆）──────────────────────────────
+
+    def load_memory(self) -> str:
+        """读取 memory.md；文件不存在返回空串"""
         try:
-            from data.database import get_conn
-            conn = get_conn()
-            try:
-                rows = conn.execute(
-                    "SELECT value FROM settings WHERE key=?",
-                    (PERSONA_DB_KEY,)
-                ).fetchall()
-                if rows:
-                    data = json.loads(rows[0][0])
-                    self._all_personas = data.get("personas", {})
-                    current = data.get("current", "金探")
-                    if current in self._all_personas:
-                        self._current = self._all_personas[current]
-                    else:
-                        self._all_personas["金探"] = dict(DEFAULT_PERSONA)
-                        self._current = dict(DEFAULT_PERSONA)
-            finally:
-                conn.close()
+            with open(MEMORY_PATH, "r", encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
         except Exception as e:
-            logger.warning(f"[PersonaManager] load failed: {e}")
-            self._all_personas = {"金探": dict(DEFAULT_PERSONA)}
-            self._current = dict(DEFAULT_PERSONA)
+            logger.warning(f"[PersonaManager] load memory failed: {e}")
+            return ""
 
-    def _save_to_db(self):
-        """持久化人设到 DB"""
-        try:
-            from data.database import get_conn
-            conn = get_conn()
+    def save_memory(self, text: str) -> None:
+        """保存 memory.md（≤2000 字硬校验，超限抛 ValueError）"""
+        _validate_limit(text, "日常记忆")
+        self._ensure_dir()
+        with self._lock:
+            with open(MEMORY_PATH, "w", encoding="utf-8") as f:
+                f.write(text)
+        logger.info(f"[PersonaManager] memory.md saved ({len(text)} chars)")
+
+    # ── 一次性懒迁移（幂等）─────────────────────────────
+
+    def _ensure_migration(self):
+        """首次加载时：若 soul.md 不存在，从 DB 旧人设迁移（或直接初始化默认值）"""
+        if self._migrated or os.path.exists(SOUL_PATH):
+            self._migrated = True
+            return
+        with self._lock:
+            if os.path.exists(SOUL_PATH):
+                self._migrated = True
+                return
+            self._ensure_dir()
+            soul_text = None
             try:
-                current_name = self._current.get("name", "金探")
-                data = json.dumps({"personas": self._all_personas, "current": current_name}, ensure_ascii=False)
-                conn.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                    (PERSONA_DB_KEY, data)
-                )
-                conn.commit()
-            finally:
-                conn.close()
-        except Exception as e:
-            logger.warning(f"[PersonaManager] save failed: {e}")
+                from data.database import get_metadata
+                raw = get_metadata(PERSONA_DB_KEY)
+                if raw:
+                    data = json.loads(raw)
+                    current_name = data.get("current", "")
+                    persona = (data.get("personas") or {}).get(current_name) or {}
+                    if persona:
+                        # 备份原始 JSON
+                        with open(LEGACY_BACKUP_PATH, "w", encoding="utf-8") as f:
+                            f.write(raw)
+                        soul_text = _render_persona_template(persona)
+                        logger.info(f"[PersonaManager] migrated legacy persona '{current_name}' → soul.md")
+            except Exception as e:
+                logger.warning(f"[PersonaManager] legacy migration failed: {e}")
+            if soul_text is None:
+                soul_text = _render_persona_template(DEFAULT_PERSONA)
+                logger.info("[PersonaManager] initialized soul.md with DEFAULT_PERSONA")
+            with open(SOUL_PATH, "w", encoding="utf-8") as f:
+                f.write(soul_text)
+            self._migrated = True
 
-    def get_current(self) -> dict:
-        return dict(self._current)
-
-    def get_list(self) -> list[dict]:
-        return [{"name": p["name"], "role": p.get("role", "")[:50]} for p in self._all_personas.values()]
-
-    def set_current(self, name: str) -> bool:
-        if name in self._all_personas:
-            self._current = dict(self._all_personas[name])
-            self._save_to_db()
-            return True
-        return False
-
-    def save_persona(self, persona: dict) -> None:
-        name = persona.get("name", "自定义")
-        self._all_personas[name] = persona
-        self._current = persona
-        self._save_to_db()
-        logger.info(f"[PersonaManager] saved persona: {name}")
-
-    def delete_persona(self, name: str) -> bool:
-        if name == "金探":
-            return False
-        if name in self._all_personas:
-            del self._all_personas[name]
-            if self._current.get("name") == name:
-                self._current = dict(DEFAULT_PERSONA)
-                self._all_personas["金探"] = dict(DEFAULT_PERSONA)
-            self._save_to_db()
-            return True
-        return False
+    # ── System Prompt 组装（Hermes 式）──────────────────
 
     def build_system_prompt(self, context: str = "") -> str:
-        """根据当前人设构建 system prompt"""
-        p = self._current
-        prompt = f"你是「{p.get('name', 'AI助手')}」，{p.get('role', '专业的交易分析师')}。\n\n"
-        prompt += f"你的能力：\n{p.get('expertise', '')}\n\n"
-        prompt += f"你的回答风格：\n{p.get('style', '')}\n\n"
-        prompt += f"你的限制：\n{p.get('limits', '')}\n\n"
+        """Hermes 式组装：[1] soul 全文 → [2] 长期记忆 → [3] 实时上下文（含技能摘要）
+
+        双轨兼容：soul.md 读取失败/为空时回退 DEFAULT_PERSONA 字段模板，保证聊天不中断。
+        技能摘要由 ai_service.build_system_prompt 层拼接进 context，此处保持兼容。
+        """
+        try:
+            soul = self.load_soul().strip()
+        except Exception as e:
+            logger.warning(f"[PersonaManager] load soul failed, fallback to default template: {e}")
+            soul = ""
+        if not soul:
+            soul = _render_persona_template(DEFAULT_PERSONA)
+
+        prompt = soul
+
+        memory = ""
+        try:
+            memory = self.load_memory().strip()
+        except Exception:
+            memory = ""
+        if memory:
+            prompt += f"\n\n【长期记忆】\n{memory}"
+
         if context:
             prompt += f"\n\n{context}"
         return prompt

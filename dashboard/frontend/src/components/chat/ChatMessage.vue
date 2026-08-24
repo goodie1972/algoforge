@@ -5,6 +5,8 @@ const props = defineProps<{
   role: 'user' | 'assistant' | 'system'
   content: string
   streaming?: boolean
+  /** 工具调用状态（流式期间由后端 tool 事件驱动） */
+  toolStatus?: string
 }>()
 
 const isUser = computed(() => props.role === 'user')
@@ -52,6 +54,7 @@ function _escapeHtml(text: string): string {
       <span class="chat-avatar-icon">🟡</span>
     </div>
     <div class="chat-bubble" :class="{ 'chat-bubble--user': isUser, 'chat-bubble--ai': isAI }">
+      <div v-if="isAI && toolStatus" class="chat-tool-status">🔧 {{ toolStatus }}</div>
       <div
         v-if="isAI"
         class="chat-content"
@@ -108,6 +111,12 @@ function _escapeHtml(text: string): string {
 }
 .chat-content {
   text-align: left;
+}
+.chat-tool-status {
+  font-size: 11px;
+  color: #7d8590;
+  margin-bottom: 4px;
+  opacity: 0.85;
 }
 .chat-cursor {
   display: inline-block;

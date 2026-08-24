@@ -102,13 +102,13 @@ def test_is_market_open_sunday_before_7():
 
 
 def test_is_market_open_sunday_after_7():
-    """周日7点后开市"""
+    """周日全天休市（周一 06:00 北京时间才开盘，与 core_loop._is_market_open 一致）"""
     from datetime import datetime
     engine = FakeEngine()
     with patch('engine_standalone.core_loop.datetime') as mock_dt:
         mock_dt.now.return_value = datetime(2026, 8, 16, 8, 0)  # Sunday 8am
         mock_dt.side_effect = lambda *a, **k: datetime(*a, **k)
-        assert engine._is_market_open() is True
+        assert engine._is_market_open() is False
 
 
 def test_is_safety_locked_not_locked():

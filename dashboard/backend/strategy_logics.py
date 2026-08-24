@@ -48,42 +48,62 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:
 
 
 def _parse_entry_table(body: str, section_title: str) -> list[dict]:
-    """从 markdown 解析入场因子表格"""
-    pattern = rf"### {section_title}.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+    """从 markdown 解析入场因子表格 — 支持灵活标题匹配"""
+    # 先精确匹配 section_title（如 "BUY（做多）"）
+    pattern = rf"### {re.escape(section_title)}\s*\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
     m = re.search(pattern, body, re.DOTALL)
-    if not m:
-        return []
+    if m:
+        return _parse_table_rows(m.group(1))
+
+    # 再尝试匹配"三层筛子（做多"或"三层筛子（做空"（新策略格式）
+    search = "三层筛子（做多" if "做多" in section_title else "三层筛子（做空"
+    pattern2 = rf"### {re.escape(search)}.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+    m2 = re.search(pattern2, body, re.DOTALL)
+    if m2:
+        return _parse_table_rows(m2.group(1))
+
+    # 最后尝试"入场条件"下的通用表格（bakome 等格式）
+    pattern3 = r"### 入场条件.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+    m3 = re.search(pattern3, body, re.DOTALL)
+    if m3:
+        return _parse_table_rows(m3.group(1))
+
+    # 终极 fallback：尝试纯中文标题 "### 做多" / "### 做空"（含括号后缀如"做多（超卖）"）
+    search_zh = "做多" if "做多" in section_title else "做空"
+    pattern4 = rf"### {re.escape(search_zh)}[（(]?.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+    m4 = re.search(pattern4, body, re.DOTALL)
+    if m4:
+        return _parse_table_rows(m4.group(1))
+
+    return []
+
+
+def _parse_table_rows(table_text: str) -> list[dict]:
+    """解析 markdown 表格行（通用）"""
     rows = []
-    for line in m.group(1).strip().split('\n'):
+    for line in table_text.strip().split('\n'):
         line = line.strip()
         if not line.startswith('|') or '---' in line:
             continue
         cols = [c.strip() for c in line.split('|')]
-        # cols[0]='', cols[1]=序号, cols[2]=因子名, cols[3]=得分, cols[4]=说明(可选)
-        name = cols[2] if len(cols) > 2 else ''
-        score = cols[3] if len(cols) > 3 else ''
-        detail = cols[4] if len(cols) > 4 else ''
-        rows.append({"name": name, "score": score, "detail": detail})
+        if len(cols) >= 4:
+            rows.append({"name": cols[2], "score": cols[3] if len(cols) > 3 else '',
+                         "detail": cols[4] if len(cols) > 4 else ''})
+        elif len(cols) >= 3:
+            rows.append({"name": cols[2] if len(cols) > 2 else '',
+                         "score": '', "detail": cols[3] if len(cols) > 3 else ''})
     return rows
 
 
 def _parse_exit_table(body: str) -> list[dict]:
-    """从 markdown 解析出场逻辑表格"""
-    pattern = r"## 出场逻辑.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
-    m = re.search(pattern, body, re.DOTALL)
-    if not m:
-        return []
-    rows = []
-    for line in m.group(1).strip().split('\n'):
-        line = line.strip()
-        if not line.startswith('|') or '---' in line:
-            continue
-        cols = [c.strip() for c in line.split('|')]
-        # cols[0]='', cols[1]=序号, cols[2]=条件, cols[3]=说明(可选)
-        method = cols[2] if len(cols) > 2 else ''
-        normal = cols[3] if len(cols) > 3 else ''
-        rows.append({"method": method, "normal": normal})
-    return rows
+    """从 markdown 解析出场逻辑表格 — 灵活匹配"""
+    # 先找"出场逻辑"或"出场"标题
+    for header in [r"## 出场逻辑", r"### 出场"]:
+        pattern = rf"{header}.*?\n\|.*?\n\|.*?\n((?:\|.*?\n)*)"
+        m = re.search(pattern, body, re.DOTALL)
+        if m:
+            return _parse_table_rows(m.group(1))
+    return []
 
 
 def load_strategy_logic(name: str) -> StratLogic | None:
@@ -128,10 +148,12 @@ def load_strategy_logic(name: str) -> StratLogic | None:
     has_exit_widen = '加宽' in body
     exit_note = ''
 
-    # 解析特别规则中的 exitNote
-    sn_match = re.search(r'趋势感知[：:](.*?)(?=\n##|\Z)', body, re.DOTALL)
-    if sn_match:
-        exit_note = sn_match.group(1).strip()[:200]
+    # 解析特别规则中的 exitNote（优先从 frontmatter 读，降级到 body 趋势感知）
+    exit_note = meta.get('exitNote', '') or ''
+    if not exit_note:
+        sn_match = re.search(r'趋势感知[：:](.*?)(?=\n##|\Z)', body, re.DOTALL)
+        if sn_match:
+            exit_note = sn_match.group(1).strip()[:200]
 
     result: StratLogic = {
         "desc": meta.get('desc', ''),

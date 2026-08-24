@@ -60,3 +60,9 @@ test_*.mjs
 test_*.png
 screenshot_*.png
 backtest/~$*.xlsx
+
+# 运行时配置与数据（防 Key/人设数据入库）
+data/agent_settings.json
+data/mcp_connectors.json
+data/skill_config.json
+data/persona/

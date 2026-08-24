@@ -20,6 +20,8 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   created_at?: string
+  /** 工具调用状态（SSE tool 事件，仅流式期间展示） */
+  toolStatus?: string
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -140,6 +142,10 @@ export const useChatStore = defineStore('chat', () => {
           if (!line.startsWith('data: ')) continue
           try {
             const data = JSON.parse(line.slice(6))
+            if (data.tool) {
+              // 工具调用状态：后到的覆盖先到的，不影响 content 累积
+              messages.value[aiMsgIndex].toolStatus = data.tool
+            }
             if (data.content) {
               messages.value[aiMsgIndex].content += data.content
             }
@@ -147,6 +153,7 @@ export const useChatStore = defineStore('chat', () => {
               if (data.message_id) {
                 messages.value[aiMsgIndex].id = data.message_id
               }
+              messages.value[aiMsgIndex].toolStatus = ''  // 流结束，清空工具状态
               if (data.error) {
                 error.value = data.content
               }
@@ -161,6 +168,7 @@ export const useChatStore = defineStore('chat', () => {
     } catch (e: any) {
       console.error('[Chat] sendMessage error:', e)
       error.value = e.message
+      messages.value[aiMsgIndex].toolStatus = ''
       messages.value[aiMsgIndex].content =
         `⚠️ 调用失败: ${e.message || '未知错误'}`
     } finally {

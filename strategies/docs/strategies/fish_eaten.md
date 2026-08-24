@@ -1,5 +1,5 @@
 ---
-name: rsi_bb_trend
+name: fish_eaten
 magic: 661301
 
 type: 价格回归（Counter-Trend）

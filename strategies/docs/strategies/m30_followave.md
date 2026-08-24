@@ -17,9 +17,21 @@ desc_en: M30 trend-following with ±DI gate, Stoch cross, BBI, BB mid, and 2.0×
 | ① | \|+DI − -DI\| > 5 | 趋势方向明确 |
 | ② | +DI > −DI = 多头，−DI > +DI = 空头 | 趋势方向 |
 
-### 三层筛子
+### 三层筛子（做多：+DI > −DI）
 
-与 m15_followave 相同，详见 [m15_followave.md](m15_followave.md)。
+| 层 | 条件 | 说明 |
+|:--:|:----|:----|
+| 第1层 | close > BBI | 价格在均线簇上方 |
+| 第2层 | Stoch K > D（金叉）且 K < 80 | 动量向上，但未超买 |
+| 第3层 | close ≥ BB 中轨 | 价格在布林带中轨之上 |
+
+### 三层筛子（做空：−DI > +DI）
+
+| 层 | 条件 | 说明 |
+|:--:|:----|:----|
+| 第1层 | close < BBI | 价格在均线簇下方 |
+| 第2层 | Stoch K < D（死叉）且 K > 20 | 动量向下，但未超卖 |
+| 第3层 | close ≤ BB 中轨 | 价格在布林带中轨之下 |
 
 ## 出场逻辑
 
