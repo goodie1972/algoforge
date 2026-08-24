@@ -12,7 +12,7 @@ desc_en: H1 5-factor weighted scoring system, scoring 0-100, threshold ≥75 tri
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 权重 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 结构 | 30% | HTF EMA 排列 + K 线方向，close>EMA50 加 25 分，ADX>25 且 +DI>-DI 再加 25 分 |
@@ -22,7 +22,7 @@ n### BUY (Long)
 | ⑤ | 趋势 | 20% | close>MA14 加 30 分，RSI>50 加 20 分 |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 权重 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 结构 | 30% | close<EMA50 加 25 分，ADX>25 且 -DI>+DI 再加 25 分 |
@@ -50,6 +50,17 @@ n### SELL (Short)
 | ③ | 初始 TP | 3×SL（R:R=3:1） |
 
 ## 特别规则
+
+- 来源：TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
+- SL=入场区 ±0.55ATR，TP=下一摆动点
+- 数据源：全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- - 来源：TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
+- - SL=入场区 ±0.55ATR，TP=下一摆动点
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - 来源：TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
 - SL=入场区 ±0.55ATR，TP=下一摆动点

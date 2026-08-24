@@ -12,7 +12,7 @@ desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 价格 vs EMA | +1 | close > EMA21（VWAP 替代） |
@@ -24,7 +24,7 @@ n### BUY (Long)
 | ⑦ | 次级 RSI | +1 | M15 RSI(14) > 50 |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 价格 vs EMA | +1 | close < EMA21 |
@@ -64,6 +64,17 @@ n### SELL (Short)
 **RR 出场：** 入场时锁定 1R = SL_ATR × ATR，各级 TP 价位基于锁定的 1R（不随后续 ATR 漂移）。
 
 ## 特别规则
+
+- 来源：TradingView Viprasol Sniper Confluence Entry/Exit
+- K 线收盘确认入场
+- 数据源：全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- - 来源：TradingView Viprasol Sniper Confluence Entry/Exit
+- - K 线收盘确认入场
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - 来源：TradingView Viprasol Sniper Confluence Entry/Exit
 - K 线收盘确认入场

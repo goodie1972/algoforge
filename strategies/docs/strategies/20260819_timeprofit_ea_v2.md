@@ -19,7 +19,7 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | H2 趋势向上 | +1 | EMA10 > EMA30 且间距≥$1.0 |
@@ -27,7 +27,7 @@ n### BUY (Long)
 | 3 | 突破入场 | +1 | 价格强势突破上方关口 |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | H2 趋势向下 | +1 | EMA10 < EMA30 且间距≥$1.0 |
@@ -69,6 +69,17 @@ n### SELL (Short)
 | ③ | 最小止盈距离 | 止盈距离 < $10 时跳过该信号 |
 
 ## 特别规则
+
+- 冷却期: 任何平仓后 10 分钟内不交易
+- 盈利平仓冷却: 同方向 5 分钟内不重复开仓
+- 数据源: 全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- - 冷却期: 任何平仓后 10 分钟内不交易
+- - 盈利平仓冷却: 同方向 5 分钟内不重复开仓
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - 冷却期: 任何平仓后 10 分钟内不交易
 - 盈利平仓冷却: 同方向 5 分钟内不重复开仓

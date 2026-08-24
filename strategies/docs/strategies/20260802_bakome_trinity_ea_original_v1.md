@@ -65,7 +65,7 @@ H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 - No trading 30/20 min before/after economic news
 
 ### 出场逻辑
-n### Exit Logic
+### Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|
@@ -82,6 +82,19 @@ n### Exit Logic
 | ③ | Trailing Stop | Activate at 1.5×ATR profit, step 0.5×ATR |
 
 ## 特别规则
+
+- 最大同时持仓 1 张
+- 每日最大交易 10 笔
+- 经济新闻过滤（NFP/FOMC/CPI 前后禁入）
+- 数据源: 全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- Max simultaneous positions: 2
+- Max daily trades: 10
+- Economic news filter (NFP/FOMC/CPI blackout)
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - 最大同时持仓 1 张
 - 每日最大交易 10 笔

@@ -12,7 +12,7 @@ desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profi
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | AMC 强度 | +1 | 自适应动量复合 (RSI+MACD+ROC Z-score) > 0.3 |
@@ -24,7 +24,7 @@ n### BUY (Long)
 | ⑦ | 无衰竭 | +1 | BB 位置在 20%~80% 之间（非极端） |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | AMC 强度 | +1 | 自适应动量复合 < -0.3 |
@@ -58,6 +58,19 @@ n### SELL (Short)
 | ⑤ | 硬止损 | 亏损超过 1.5 ATR |
 
 ## 特别规则
+
+- AMC = (RSI_norm + MACD_norm + ROC_norm) / 3，三项归一化后取均值
+- 来源：TradingView Momentum Pulse PRO (自适应动量复合 + 多维度共识)
+- 时间止损：最多持仓 40 根 K 线
+- 数据源：全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- - AMC = (RSI_norm + MACD_norm + ROC_norm) / 3，三项归一化后取均值
+- - 来源：TradingView Momentum Pulse PRO (自适应动量复合 + 多维度共识)
+- - 时间止损：最多持仓 40 根 K 线
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - AMC = (RSI_norm + MACD_norm + ROC_norm) / 3，三项归一化后取均值
 - 来源：TradingView Momentum Pulse PRO (自适应动量复合 + 多维度共识)

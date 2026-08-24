@@ -12,13 +12,13 @@ desc_en: H1 XGBoost binary ML model, 80+ technical features, confidence threshol
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | XGBoost 预测 | 概率 | 模型输出上涨概率 > 置信度阈值 0.52 |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | XGBoost 预测 | 概率 | 模型输出下跌概率 > 置信度阈值 0.52（1 - 上涨概率） |
@@ -40,6 +40,23 @@ n### SELL (Short)
 | ② | 硬止损 | 亏损超过 2.0 ATR |
 
 ## 特别规则
+
+- Walk-forward XGBoost 二分类模型，预测下一根 K 线方向
+- Polars 特征工程，需 xgboost + polars 依赖
+- 优先加载 `models/xaubot_model.ubj` 预训练模型
+- 无预训练模型时首次加载自动从 SQLite 训练
+- 训练参数：max_depth=3, learning_rate=0.024, min_child_weight=10, subsample=0.7
+- 数据源：全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- - Walk-forward XGBoost 二分类模型，预测下一根 K 线方向
+- - Polars 特征工程，需 xgboost + polars 依赖
+- - 优先加载 `models/xaubot_model.ubj` 预训练模型
+- - 无预训练模型时首次加载自动从 SQLite 训练
+- - 训练参数：max_depth=3, learning_rate=0.024, min_child_weight=10, subsample=0.7
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - Walk-forward XGBoost 二分类模型，预测下一根 K 线方向
 - Polars 特征工程，需 xgboost + polars 依赖

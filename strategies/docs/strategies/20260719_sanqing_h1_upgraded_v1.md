@@ -12,7 +12,7 @@ desc_en: EMA9/21 Trend Score + Athlete Pullback to EMA9 Entry + ADX Adaptive Exi
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | 上涨趋势 | +2 | EMA9 > EMA21 |
@@ -23,7 +23,7 @@ n### BUY (Long)
 | 6 | 吞没形态 | +2 | 实体中位数≥1.5且实体/前高≥1.5且实体占K线≥50% |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | 下跌趋势 | +2 | EMA9 < EMA21 |
@@ -61,6 +61,23 @@ n### SELL (Short)
 | ⑤ | DI reversal exit | 5 min after open: BUY pos NDI>PDI / SELL pos PDI>NDI |
 
 ## 特别规则
+
+- 阈值: **固定 5 分**（评分 3→5，提高入场门槛，减少低质量信号约60%）
+- **ADX 门禁**: ADX>25 时才允许入场（20→25，加强趋势过滤）
+- **位置门禁**: 价格在60根K线顶部10%禁多，底部10%禁空
+- **硬止损**: 1.2 ATR（1.5→1.2，每笔约36点，防大亏）
+- **v10_optimized (2026-08-08)**: 提高评分阈值至5、ADX阈值至25、硬止损收紧至1.2ATR，减少交易量、提升信号质量
+- 数据源: 全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- Score threshold: Fixed 5 points
+- ADX Gate: Only enter when ADX>25
+- Position Gate: Price in top 10% blocks long, bottom 10% blocks short
+- - **硬止损**: 1.2 ATR（1.5→1.2，每笔约36点，防大亏）
+- Score threshold: Fixed 5 points
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - 阈值: **固定 5 分**（评分 3→5，提高入场门槛，减少低质量信号约60%）
 - **ADX 门禁**: ADX>25 时才允许入场（20→25，加强趋势过滤）

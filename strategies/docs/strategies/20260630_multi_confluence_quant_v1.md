@@ -12,7 +12,7 @@ desc_en: H1: 14 technical indicator factor scores, signal triggered when ≥10/1
 ## 评分因子
 
 ### BUY（做多）
-n### BUY (Long)
+### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | EMA Ribbon | +1 | EMA20 > EMA50 |
@@ -31,7 +31,7 @@ n### BUY (Long)
 | ⑭ | RSI 过度延伸 | -1 | RSI > 70 时扣分（超买不追多） |
 
 ### SELL（做空）
-n### SELL (Short)
+### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | EMA Ribbon | +1 | EMA20 < EMA50 |
@@ -68,6 +68,17 @@ n### SELL (Short)
 | ③ | 硬止损 | 亏损超过 2.0 ATR |
 
 ## 特别规则
+
+- 覆盖趋势/动量/波动/成交量/结构 5 大类别
+- 来源：TradingView Multi-Confluence Quant Crypto Engine [QuantSovereign]
+- 数据源：全部指标从 DataFactory TA-Lib 读取
+
+## Special Rules
+
+- - 覆盖趋势/动量/波动/成交量/结构 5 大类别
+- - 来源：TradingView Multi-Confluence Quant Crypto Engine [QuantSovereign]
+- Data source: All indicators from DataFactory TA-Lib
+## Special Rules
 
 - 覆盖趋势/动量/波动/成交量/结构 5 大类别
 - 来源：TradingView Multi-Confluence Quant Crypto Engine [QuantSovereign]
