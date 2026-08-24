@@ -63,6 +63,7 @@ H4 EMA200 定趋势 Bias → Silver Bullet 时段 → M5 三重 ICT 确认 → A
 - London/New York sessions only, Asian session quiet
 
 ### 出场逻辑
+n### Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

@@ -188,8 +188,11 @@ onBeforeUnmount(() => {
       @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp"
       @pointercancel="onPointerCancel" @click="onClick" @dragstart.prevent
       draggable="false" :title="t('ai.launcher_open_hint')" :aria-label="t('ai.launcher_open_hint')">
-      <!-- 桌宠：内层承载全部动画（transform/opacity），外层按钮只负责定位，二者互不冲突 -->
-      <FortuneCat class="pet" :size="48" animated :state="petState" :blink="blinking" />
+      <!-- 桌宠：外层按钮只负责 60px 定位/命中；内层圆座 + 放大猫（探出顶部）+ 动画互不冲突 -->
+      <span class="pet-scene" aria-hidden="true">
+        <span class="pet-base"></span>
+        <FortuneCat class="pet-cat" :size="60" animated :state="petState" :blink="blinking" />
+      </span>
     </button>
   </Transition>
 
@@ -208,7 +211,7 @@ onBeforeUnmount(() => {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f0b90b, #d4a309);
+  background: transparent;  /* 视觉收敛到内层深底圆座；按钮仅保留 60px 命中区 */
   border: none;
   color: #0d1117;
   cursor: pointer;  /* 默认/悬停一律 pointer；仅按住拖动中（内联 + .dragging）为 grabbing */
@@ -216,17 +219,18 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 0;
-  box-shadow: 0 4px 20px rgba(240, 185, 11, 0.4);
+  overflow: visible;  /* 猫耳/头顶探出 60px 容器（视觉溢出，命中区不变） */
   z-index: 9999;
   /* 只过渡阴影；绝不过渡 left/top/transform，避免拖动滞后与抖动 */
   transition: box-shadow 0.2s ease;
   touch-action: none;
   user-select: none;
 }
-/* hover 仅加深阴影：不改尺寸、不改光标、不产生任何位置变化 */
-.chat-launcher:hover {
-  box-shadow: 0 6px 28px rgba(240, 185, 11, 0.6);
-  cursor: pointer;
+/* hover 仅加深圆座光晕：不改尺寸、不改光标、不产生任何位置变化 */
+.chat-launcher:hover .pet-base {
+  box-shadow: 0 0 0 1.5px rgba(247, 201, 72, 0.7),
+    0 0 18px rgba(247, 201, 72, 0.42),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.4);
 }
 /* 按住拖动中：轻微放大 + 加强阴影 + grabbing 光标。
    transform-origin 锁定左上角：放大只向右下扩展，定位锚点纹丝不动、零抖动 */
@@ -234,15 +238,41 @@ onBeforeUnmount(() => {
   cursor: grabbing;
   transform: scale(1.08);
   transform-origin: 0 0;
-  box-shadow: 0 8px 32px rgba(240, 185, 11, 0.7);
+}
+.chat-launcher.dragging .pet-base {
+  box-shadow: 0 0 0 1.5px rgba(247, 201, 72, 0.75),
+    0 6px 24px rgba(0, 0, 0, 0.45),
+    0 0 20px rgba(247, 201, 72, 0.5);
 }
 
-/* 桌宠形象由 FortuneCat 组件承载（动画在组件内）；此容器仅保证居中且不抢命中 */
-.pet {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* 桌宠场景：60×60 与按钮等大；所有子层不抢命中（命中区以 60px 按钮为准） */
+.pet-scene {
+  position: relative;
+  width: 60px;
+  height: 60px;
   pointer-events: none;
+}
+/* 深暖棕圆座（缩小到 46px、略偏下）：漆器质感 + 细金描边 + 金色光晕，亮金猫立刻跳出 */
+/* 备选底色一键切换：藏蓝 radial-gradient(circle at 32% 28%, #27365a 0%, #1e2a44 62%, #151f33 100%) */
+/*                    深红棕 radial-gradient(circle at 32% 28%, #5a2c26 0%, #4a2420 62%, #361a16 100%) */
+.pet-base {
+  position: absolute;
+  left: 7px;
+  bottom: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #4a3420 0%, #3a2a18 62%, #2c1f10 100%);
+  box-shadow: 0 0 0 1.5px rgba(247, 201, 72, 0.45),
+    0 0 12px rgba(247, 201, 72, 0.28),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 0.2s ease;  /* 与按钮 hover 阴影过渡节奏一致 */
+}
+/* 放大到 60px 的猫叠在圆座上：上移 4px 让耳朵探出容器顶部，下半身/元宝压住圆座边缘 */
+.pet-cat {
+  position: absolute;
+  left: 0;
+  top: -4px;
 }
 
 .chat-panel-wrapper {

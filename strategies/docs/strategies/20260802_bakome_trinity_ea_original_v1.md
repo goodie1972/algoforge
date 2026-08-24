@@ -65,6 +65,7 @@ H1 EMA34 + H4 EMA200 双时间框架趋势 → M5 入场确认 → ATR 风控
 - No trading 30/20 min before/after economic news
 
 ### 出场逻辑
+n### Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

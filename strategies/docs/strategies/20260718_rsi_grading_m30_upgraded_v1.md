@@ -54,6 +54,7 @@ desc_en: M30 RSI Grading system with multi-timeframe RSI scoring
 | 5 | 总分 ≥ 4 | — | 空单入场 |
 
 ## 出场逻辑
+n## Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

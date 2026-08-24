@@ -12,11 +12,13 @@ desc_en: H1 XGBoost binary ML model, 80+ technical features, confidence threshol
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | XGBoost 预测 | 概率 | 模型输出上涨概率 > 置信度阈值 0.52 |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | XGBoost 预测 | 概率 | 模型输出下跌概率 > 置信度阈值 0.52（1 - 上涨概率） |

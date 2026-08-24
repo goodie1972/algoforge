@@ -59,6 +59,8 @@ desc_en: RSI-BB Trend — M30 price reversion strategy with ADX gate + 3-layer f
 
 ## 出场逻辑
 
+## Exit Logic
+
 ### 吃鱼出场（主出场）
 
 | 方向 | 触发条件 | 说明 |

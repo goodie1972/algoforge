@@ -4,6 +4,8 @@
 // - animated：是否启用待机动画（桌宠为 true；头像/标题栏图标保持静态）
 // - state：idle / thinking（流式工作态）/ complete（完成庆祝，播一次）
 // - blink：一次性眨眼微表情
+// 配色：全部收敛为 --fc-* CSS 变量（深底亮猫方案，亮金 + 暖白 + 深棕描边），
+// 需要整体换色时只改这组变量即可。
 withDefaults(defineProps<{
   size?: number
   animated?: boolean
@@ -38,46 +40,46 @@ withDefaults(defineProps<{
         </g>
         <!-- 金元宝（完成态闪光） -->
         <g class="fc-ingot">
-          <path d="M5.6 40.8 Q11.5 33.4 17.4 40.8 L15.6 42.4 L7.4 42.4 Z" fill="#f6c445" stroke="#6b4a12" stroke-width="1.2" stroke-linejoin="round"/>
-          <ellipse cx="11.5" cy="38.6" rx="2.8" ry="1.9" fill="#ffe08a" stroke="#6b4a12" stroke-width="0.9"/>
+          <path class="fc-ingot-body" d="M5.6 40.8 Q11.5 33.4 17.4 40.8 L15.6 42.4 L7.4 42.4 Z" stroke-width="1.2" stroke-linejoin="round"/>
+          <ellipse class="fc-ingot-top" cx="11.5" cy="38.6" rx="2.8" ry="1.9" stroke-width="0.9"/>
         </g>
         <!-- 左耳 / 右耳 -->
-        <path class="fc-ear" d="M11 14 L9.4 4.6 L18 9.6 Z" fill="#f0b90b" stroke="#6b4a12" stroke-width="1.5" stroke-linejoin="round"/>
-        <path class="fc-ear" d="M33 14 L34.6 4.6 L26 9.6 Z" fill="#f0b90b" stroke="#6b4a12" stroke-width="1.5" stroke-linejoin="round"/>
+        <path class="fc-ear" d="M11 14 L9.4 4.6 L18 9.6 Z" stroke-width="1.5" stroke-linejoin="round"/>
+        <path class="fc-ear" d="M33 14 L34.6 4.6 L26 9.6 Z" stroke-width="1.5" stroke-linejoin="round"/>
         <!-- 圆脸 -->
-        <circle cx="22" cy="19" r="12.2" fill="#f0b90b" stroke="#6b4a12" stroke-width="1.5"/>
+        <circle class="fc-face" cx="22" cy="19" r="12.2" stroke-width="1.5"/>
         <!-- 暖白口鼻区 -->
-        <ellipse cx="22" cy="23.8" rx="6.8" ry="4.8" fill="#fff6dd"/>
+        <ellipse class="fc-muzzle" cx="22" cy="23.8" rx="6.8" ry="4.8"/>
         <!-- 眼睛：常态（眨眼用） -->
         <g class="fc-eyes">
-          <circle cx="17.2" cy="17.6" r="1.6" fill="#4a3208"/>
-          <circle cx="26.8" cy="17.6" r="1.6" fill="#4a3208"/>
+          <circle class="fc-eye" cx="17.2" cy="17.6" r="1.6"/>
+          <circle class="fc-eye" cx="26.8" cy="17.6" r="1.6"/>
         </g>
         <!-- 眯眼笑（完成态显示） -->
         <g class="fc-eyes-happy">
-          <path d="M15 18.2 Q17.2 15.8 19.4 18.2" stroke="#4a3208" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-          <path d="M24.6 18.2 Q26.8 15.8 29 18.2" stroke="#4a3208" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M15 18.2 Q17.2 15.8 19.4 18.2" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M24.6 18.2 Q26.8 15.8 29 18.2" stroke-width="1.5" fill="none" stroke-linecap="round"/>
         </g>
         <!-- 鼻 + 嘴 -->
-        <circle cx="22" cy="21.6" r="1" fill="#b3722a"/>
-        <path d="M19.8 24.2 Q22 26.4 24.2 24.2" stroke="#6b4a12" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+        <circle class="fc-nose" cx="22" cy="21.6" r="1"/>
+        <path class="fc-mouth" d="M19.8 24.2 Q22 26.4 24.2 24.2" stroke-width="1.3" fill="none" stroke-linecap="round"/>
         <!-- 胡须 -->
-        <g stroke="#8a6a2f" stroke-width="0.9" stroke-linecap="round">
+        <g class="fc-whiskers" stroke-width="0.9" stroke-linecap="round">
           <path d="M7.2 18.4 L11.4 19.2"/><path d="M7.4 21.8 L11.5 21.5"/>
           <path d="M32.6 19.2 L36.8 18.4"/><path d="M32.5 21.5 L36.6 21.8"/>
         </g>
         <!-- 颈铃 -->
-        <circle cx="22" cy="31.8" r="2.1" fill="#f6c445" stroke="#6b4a12" stroke-width="1"/>
-        <path d="M22 32.6 L22 33.8" stroke="#6b4a12" stroke-width="0.9" stroke-linecap="round"/>
+        <circle class="fc-bell" cx="22" cy="31.8" r="2.1" stroke-width="1"/>
+        <path class="fc-mouth" d="M22 32.6 L22 33.8" stroke-width="0.9" stroke-linecap="round"/>
         <!-- 举起的招财爪（左臂+掌，肩部为摆动轴） -->
         <g class="fc-paw">
-          <path d="M12.4 26 L6.6 17.2" stroke="#f0b90b" stroke-width="4.8" stroke-linecap="round"/>
-          <circle cx="6.2" cy="15.2" r="3" fill="#fff6dd" stroke="#6b4a12" stroke-width="1.3"/>
+          <path class="fc-paw-arm" d="M12.4 26 L6.6 17.2" stroke-width="4.8" stroke-linecap="round"/>
+          <circle class="fc-paw-pad" cx="6.2" cy="15.2" r="3" stroke-width="1.3"/>
         </g>
         <!-- 怀中铜钱 -->
         <g>
-          <circle cx="30.5" cy="33.6" r="4.2" fill="#f6c445" stroke="#6b4a12" stroke-width="1.2"/>
-          <rect x="29" y="32.1" width="3" height="3" fill="#fff6dd" stroke="#6b4a12" stroke-width="0.8"/>
+          <circle class="fc-coin" cx="30.5" cy="33.6" r="4.2" stroke-width="1.2"/>
+          <rect class="fc-coin-hole" x="29" y="32.1" width="3" height="3" stroke-width="0.8"/>
         </g>
       </g>
     </svg>
@@ -85,16 +87,39 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped>
+/* ── 配色单一来源：--fc-* 变量（亮金系，在深底圆座上对比强烈）── */
 .fortune-cat {
+  --fc-gold: #f7c948;      /* 主体鎏金（比旧 #f0b90b 更亮更饱和） */
+  --fc-gold-hi: #ffe9a8;   /* 高光金（元宝顶/反光） */
+  --fc-gold-deep: #e0a20c; /* 深金（铃铛/铜钱，拉开层次） */
+  --fc-cream: #fff8e1;     /* 暖白（口鼻/掌垫/钱孔） */
+  --fc-outline: #5c3d10;   /* 深棕描边（深底上依然清晰） */
+  --fc-dark: #3d2a08;      /* 眼睛/眯眼笑 */
+  --fc-nose: #b3722a;
+  --fc-whisker: #a5822f;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;  /* 纯视觉形象，不抢交互命中 */
 }
+/* ── 各部件着色（CSS 覆盖优先于表现属性，便于一键换肤）── */
+.fortune-cat .fc-face, .fortune-cat .fc-ear { fill: var(--fc-gold); stroke: var(--fc-outline); }
+.fortune-cat .fc-paw-arm { stroke: var(--fc-gold); }
+.fortune-cat .fc-muzzle, .fortune-cat .fc-paw-pad, .fortune-cat .fc-coin-hole { fill: var(--fc-cream); }
+.fortune-cat .fc-paw-pad, .fortune-cat .fc-coin-hole { stroke: var(--fc-outline); }
+.fortune-cat .fc-ingot-body { fill: var(--fc-gold-deep); stroke: var(--fc-outline); }
+.fortune-cat .fc-ingot-top { fill: var(--fc-gold-hi); stroke: var(--fc-outline); }
+.fortune-cat .fc-bell, .fortune-cat .fc-coin { fill: var(--fc-gold-deep); stroke: var(--fc-outline); }
+.fortune-cat .fc-eye { fill: var(--fc-dark); }
+.fortune-cat .fc-nose { fill: var(--fc-nose); }
+.fortune-cat .fc-mouth { stroke: var(--fc-outline); }
+.fortune-cat .fc-eyes-happy path { stroke: var(--fc-dark); }
+.fortune-cat .fc-whiskers { stroke: var(--fc-whisker); }
+
 .fc-eyes, .fc-eyes-happy, .fc-dots, .fc-ingot { transform-box: fill-box; }
 .fc-eyes { transform-origin: 50% 50%; }
 .fc-eyes-happy, .fc-dots { display: none; }
-.fc-dots circle { fill: #fff6dd; opacity: 0; }
+.fc-dots circle { fill: var(--fc-cream); opacity: 0; }
 
 /* 动画只动 transform/opacity（GPU 友好）；仅桌宠启用（.fc--anim / 思考 / 完成） */
 .fc--anim .fc-bob {

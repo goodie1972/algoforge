@@ -12,6 +12,7 @@ desc_en: H1 5-factor weighted scoring system, scoring 0-100, threshold ≥75 tri
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 权重 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 结构 | 30% | HTF EMA 排列 + K 线方向，close>EMA50 加 25 分，ADX>25 且 +DI>-DI 再加 25 分 |
@@ -21,6 +22,7 @@ desc_en: H1 5-factor weighted scoring system, scoring 0-100, threshold ≥75 tri
 | ⑤ | 趋势 | 20% | close>MA14 加 30 分，RSI>50 加 20 分 |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 权重 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 结构 | 30% | close<EMA50 加 25 分，ADX>25 且 -DI>+DI 再加 25 分 |

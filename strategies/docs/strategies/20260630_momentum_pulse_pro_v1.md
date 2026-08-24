@@ -12,6 +12,7 @@ desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profi
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | AMC 强度 | +1 | 自适应动量复合 (RSI+MACD+ROC Z-score) > 0.3 |
@@ -23,6 +24,7 @@ desc_en: H1 7-dimensional multi-factor scoring system with three-tier take-profi
 | ⑦ | 无衰竭 | +1 | BB 位置在 20%~80% 之间（非极端） |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | AMC 强度 | +1 | 自适应动量复合 < -0.3 |

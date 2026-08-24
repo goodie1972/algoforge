@@ -50,6 +50,7 @@ desc_en: H1 Stoch trend-following with 3-TF trend confirmation + Stoch cross
 | 4 | Stoch K > 20 | 未超卖 |
 
 ## 出场逻辑
+n## Exit Logic
 
 | # | 条件 | 说明 |
 |:-:|:----|:----|

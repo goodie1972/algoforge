@@ -19,6 +19,7 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | H2 趋势向上 | +1 | EMA10 > EMA30 且间距≥$1.0 |
@@ -26,6 +27,7 @@ desc_en: Original TimeProfitEA port, H2 trend, 00 round-number box trading
 | 3 | 突破入场 | +1 | 价格强势突破上方关口 |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | 1 | H2 趋势向下 | +1 | EMA10 < EMA30 且间距≥$1.0 |

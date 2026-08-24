@@ -12,6 +12,7 @@ desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only wh
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 趋势 | +1 | H1 EMA10 > EMA20 |
@@ -20,6 +21,7 @@ desc_en: H1 Four-Factor Consensus Voting Strategy: Signals are triggered only wh
 | ④ | 安全 | +1 | RSI(10) 未超买 + 价格未在 BB 上轨外 |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 趋势 | +1 | H1 EMA10 < EMA20 |

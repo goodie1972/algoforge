@@ -12,6 +12,7 @@ desc_en: H1: 14 technical indicator factor scores, signal triggered when ≥10/1
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | EMA Ribbon | +1 | EMA20 > EMA50 |
@@ -30,6 +31,7 @@ desc_en: H1: 14 technical indicator factor scores, signal triggered when ≥10/1
 | ⑭ | RSI 过度延伸 | -1 | RSI > 70 时扣分（超买不追多） |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | EMA Ribbon | +1 | EMA20 < EMA50 |

@@ -12,6 +12,7 @@ desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 ## 评分因子
 
 ### BUY（做多）
+n### BUY (Long)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 价格 vs EMA | +1 | close > EMA21（VWAP 替代） |
@@ -23,6 +24,7 @@ desc_en: H1 7-factor scoring, multi-level RR exit (1R/2R/3R/4R/5R)
 | ⑦ | 次级 RSI | +1 | M15 RSI(14) > 50 |
 
 ### SELL（做空）
+n### SELL (Short)
 | # | 因子 | 得分 | 说明 |
 |:-:|:----|:----:|:----|
 | ① | 价格 vs EMA | +1 | close < EMA21 |
