@@ -6,6 +6,8 @@ display: Viprasol Sniper — 7因子共识 + 多级RR出场
 desc: H1 7因子评分系统，多级RR出场（1R/2R/3R/4R/5R）
 ---
 
+**适用周期：** M30
+
 ## 评分因子
 | # | 因子 | 得分 | 说明 |
 |---|---|---|---|
@@ -35,6 +37,23 @@ desc: H1 7因子评分系统，多级RR出场（1R/2R/3R/4R/5R）
 | ⑥ | ATR 移动追踪 | 峰值回撤超过 1.0 ATR 且峰值利润 > 0.5ATR |
 | ⑦ | 硬止损 | 亏损超过 1.5 ATR |
 **RR 出场：** 入场时锁定 1R = SL_ATR × ATR，各级 TP 价位基于锁定的 1R（不随后续 ATR 漂移）。
+## 风控
+- 方向优势：优势方向得分必须严格大于另一方且 ≥阈值才触发
+- 初始止损：1.5×ATR（=1R），订单级挂出
+- 保本移位：盈利触及 1R 后将订单 SL 移至入场价
+- 移动追踪：峰值回撤超过 1.0×ATR 且峰值利润 >0.5×ATR 才触发出场
+- 硬止损：亏损超过 1.5×ATR 出场
+- 最大持仓：1 单（STRATEGY_POOL 配置）
+## 参数说明
+| 参数 | 取值 | 说明 |
+|---|---|---|
+| score_threshold | 4 | 7 因子触发阈值（≥4/7） |
+| sl_atr | 1.5 | 初始止损 ATR 倍数（=1R） |
+| breakeven_r | 1.0 | 保本激活级别（1R 命中后移动止损至入场价） |
+| rr_levels | [2, 3, 4, 5] | 逐级出场 RR 级别（2R/3R/4R/5R） |
+| trail_atr | 1.0 | 移动追踪 ATR 倍数 |
+| rsi_period / atr_period | 14 / 14 | RSI、ATR 计算周期 |
+| ema_fast / ema_slow | 9 / 21 | EMA 排列快慢线 |
 ## 特别规则
 - 来源：TradingView Viprasol Sniper Confluence Entry/Exit
 - K 线收盘确认入场

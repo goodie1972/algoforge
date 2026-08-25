@@ -6,6 +6,8 @@ display_en: fish_eaten v2 — M30 Price Reversion Strategy
 desc_en: Gate + 3-layer filter entry, RSI/MFI dual-extreme fish exit, M30 timeframe
 ---
 
+**Timeframe:** M30
+
 ## Entry Logic
 ### Gate (Pre-conditions)
 | # | Condition | Description |

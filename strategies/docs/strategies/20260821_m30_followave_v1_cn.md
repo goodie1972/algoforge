@@ -6,6 +6,8 @@ display: M30 FollowAve — Stoch+BBI+BB 趋势跟踪（带 Trailing Stop）
 desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2.0×ATR trailing stop
 ---
 
+**适用周期：** M30
+
 ## 入场逻辑
 ### 门禁（前置条件）
 | # | 条件 | 说明 |
@@ -46,6 +48,16 @@ desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2
 | 盈亏比 | 2.20 |
 | 最大赢利 | +$154 |
 | 最大亏损 | -$86 |
+## 参数说明
+| 参数 | 取值 | 说明 |
+| --- | --- | --- |
+| TIMEFRAME | M30 | 主运行周期 |
+| DI_GATE | 5 | ±DI 差值门禁 |
+| EXIT_CONFIRM_BARS | 3 | 趋势反转出场确认 K 线数 |
+| TRAIL_ATR | 2.0 | 2.0×ATR trailing stop（从极值点回撤止盈） |
+| STOCH_K_OVERBOUGHT / OVERSOLD | 80 / 20 | Stoch K 超买 / 超卖阈值 |
+| FIXED_LOTS | 0.01 | 固定手数 |
+| MAX_SLIPPAGE | 30 | 最大滑点 |
 ## 数据源
 - 全部指标从 DataFactory TA-Lib 读取
 - 依赖指标：`close`, `bbi`, `stoch_5_3_3`, `bb`, `bb_mid_direction`, `pdi`, `ndi`, `atr`

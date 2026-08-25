@@ -6,6 +6,8 @@ display: Entry Score PRO — 5因子加权评分
 desc: H1 5因子加权评分系统，评分0-100，阈值≥75触发
 ---
 
+**适用周期：** M30
+
 ## 评分因子
 | # | 因子 | 权重 | 说明 |
 |---|---|---|---|
@@ -26,6 +28,21 @@ desc: H1 5因子加权评分系统，评分0-100，阈值≥75触发
 | ① | 初始 SL | ±0.55 ATR |
 | ② | ATR 移动追踪 | 峰值回撤超过 1.5 ATR 触发 |
 | ③ | 初始 TP | 3×SL（R:R=3:1） |
+## 风控
+- 方向优势：仅当该方向评分严格高于对手方向时触发信号
+- 初始硬止损：入场区 ±0.55×ATR（订单级 SL，同时作为运行时硬止损）
+- 移动追踪：峰值回撤超过 1.5×ATR 出场
+- 初始止盈：3×SL（固定盈亏比 R:R=3:1）
+- 最大持仓：1 单（STRATEGY_POOL 配置）
+## 参数说明
+| 参数 | 取值 | 说明 |
+|---|---|---|
+| w_structure / w_proximity / w_momentum / w_volatility / w_trend | 30 / 25 / 15 / 10 / 20 | 5 因子加权权重（%） |
+| score_entry | 75 | ENTRY WINDOW 触发阈值 |
+| score_prime | 80 | PRIME 等级阈值 |
+| sl_atr | 0.55 | 初始止损 = ±0.55×ATR |
+| trail_atr | 1.5 | 移动追踪倍数 |
+| rsi_period / atr_period | 14 / 14 | RSI、ATR 计算周期 |
 ## 特别规则
 - 来源：TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
 - SL=入场区 ±0.55ATR，TP=3×SL（固定盈亏比 R:R=3:1）

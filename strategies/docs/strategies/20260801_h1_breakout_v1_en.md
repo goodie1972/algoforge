@@ -6,6 +6,8 @@ display_en: H1 Breakout Trend Strategy
 desc_en: H1 range breakout + ADX confirmation, EMA20 trailing stop, 6-point scoring system
 ---
 
+**Timeframe:** H1
+
 ## Scoring Factors
 
 ### BUY (Long)
@@ -51,6 +53,28 @@ desc_en: H1 range breakout + ADX confirmation, EMA20 trailing stop, 6-point scor
 | Range (ADX ≤ 25) | 1.0 ATR | 1.5 ATR |
 | Medium (25 < ADX ≤ 35) | 1.5 ATR | 2.5 ATR |
 | Strong Trend (ADX > 35) | 2.0 ATR | 3.5 ATR |
+
+## Parameter Reference
+
+| Parameter | Value | Description |
+|:------------------|:------:|:----------------------|
+| Range lookback period | 20 bars | Breakout range uses the high/low of the last 20 H1 bars |
+| ADX trend gate | 25 | ADX > 25 confirms trending market (+3 points) |
+| Entry score threshold | 6 points | Max 11 (breakout 4 + ADX 3 + DI 2 + EMA9/20 one each) |
+| Hard stop | 1.5×ATR | p_hard_atr, also used for opening SL |
+| Take profit | 1.5 / 2.5 / 3.5 ×ATR | Range (≤25) / Medium (25~35) / Strong trend (>35) |
+| Trailing stop | 1.0 / 1.5 / 2.0 ×ATR | Adaptive across three ADX tiers (parallel with EMA20 trail) |
+| Profit drawdown protection | Hold >600s and drawdown >50% and DI not aligned | _min_hold_seconds=600 |
+| DI flip exit | Hold >300s | Requires next-bar confirmation |
+
+## Risk Control
+
+- Hard stop: 1.5×ATR, exit immediately when loss exceeds limit (highest priority)
+- Position gate: within a 60-bar window, price in top 10% (price_position>0.90) blocks long (TOP-GATE); bottom 10% (<0.10) blocks short (BOTTOM-GATE), score zeroed
+- Profit drawdown protection: exit only when held >600s, peak profit drawdown >50%, and DI direction not aligned (not shaken out while trend intact)
+- DI flip exit: detected after holding >300s, requires next-bar confirmation before exiting, preventing false flips
+- EMA20 trailing stop: exit when BUY bid<EMA20 / SELL ask>EMA20
+- Max position: 1 order (STRATEGY_POOL config)
 
 ## Special Rules
 

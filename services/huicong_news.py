@@ -300,40 +300,79 @@ def _rule_based_judge(content: str) -> str:
     """关键词规则判断（LLM 回退方案）"""
     content_lower = content.lower()
 
+    # 特定短语覆盖（优先级最高）
+    # 美元相关（美元走强→利空黄金，美元走弱→利多黄金）
+    if "美元走强" in content or "美元大涨" in content:
+        return "bearish"
+    if "美元走弱" in content or "美元下跌" in content:
+        return "bullish"
+
     # 利多模式
     bullish = [
         "飙涨", "狂飙", "大涨", "走高", "攀升", "拉升",
+        "上涨", "升势", "看涨", "上行", "突破", "走强",
         "利多黄金", "利好黄金", "黄金上涨", "黄金飙升",
         "非农减少", "非农爆冷", "就业意外", "失业率上升",
         "意外降息", "降息", "鸽派", "避险", "冲突",
         "通胀降温", "CPI低于预期", "物价回落",
         "美联储放鸽", "美元走弱", "美元下跌",
         "地缘紧张", "战争", "制裁", "导弹",
+        "美债收益率下跌", "美债收益率下行", "收益率曲线倒挂",
+        "央行购金", "增持黄金", "黄金储备", "资金流入",
+        "数据疲软", "经济放缓", "衰退担忧", "GDP低于预期",
+        "就业数据疲弱", "薪资增长放缓", "零售销售下滑",
+        "刺激计划", "宽松政策", "QE", "量化宽松",
+        "油价上涨", "原油飙升", "通胀预期上升",
+        "地缘博弈", "军事行动", "武装冲突", "局势升级",
     ]
     # 利空模式
     bearish = [
         "暴跌", "狂跌", "大跌", "走低", "下滑", "承压",
-        "利空黄金", "利空黄金", "黄金下跌", "黄金跳水",
+        "下跌", "跌势", "看空", "下行", "破位", "走弱",
+        "利空黄金", "黄金下跌", "黄金跳水",
         "非农增加", "非农超预期", "就业强劲", "失业率下降",
         "意外加息", "加息", "鹰派", "美元走强",
         "通胀升温", "CPI高于预期", "物价上涨",
         "美联储放鹰", "美元上涨",
         "避险消退", "停火", "风险偏好",
+        "美债收益率上升", "美债收益率上行",
+        "缩减购债", "缩表", "taper", "收紧政策",
+        "经济数据强劲", "GDP高于预期", "消费支出增长",
+        "就业数据强劲", "薪资增长加速", "零售销售增长",
+        "风险情绪改善", "股市上涨", "加密货币上涨",
+        "央行减持", "黄金ETF流出", "资金流出",
+        "谈判进展", "缓和信号", "和平协议", "局势降温",
     ]
     # 英文利多模式
     bullish_en = [
         "surge", "rally", "soar", "jump", "higher", "gain", "climb",
+        "rise", "upside", "rallying", "surged", "rallied",
         "rate cut", "dovish", "safe haven", "risk-off",
         "weak dollar", "dollar weak", "inflation cools", "yields fall",
+        "yield decline", "treasury yield down",
         "sanctions", "geopolitical tension", "war", "strike",
         "philly fed", "below expectations", "unemployment up",
+        "gold buying", "gold demand", "central bank", "gold reserve",
+        "economic slowdown", "recession fear", "gdp miss",
+        "weak data", "weak jobs", "stimulus", "qe", "quantitative easing",
+        "oil surge", "inflation expectation",
+        "bullish", "overbought", "undervalued",
     ]
     # 英文利空模式
     bearish_en = [
         "slump", "plunge", "drop", "fall", "lower", "decline", "slide",
+        "downside", "slumped", "plunged", "declined", "slipped",
         "rate hike", "hawkish", "risk-on", "strong dollar", "dollar firm",
-        "inflation hot", "yields rise", "ceasefire", "risk appetite",
+        "dollar gains", "dollar strengthens",
+        "inflation hot", "yields rise", "yields surge", "yield up",
+        "ceasefire", "risk appetite", "risk taking",
         "unemployment down", "above expectations", "bounce",
+        "gold outflow", "etf outflow", "gold selling",
+        "tightening", "taper", "balance sheet reduction",
+        "strong data", "strong economy", "gdp beat",
+        "strong jobs", "wage growth", "risk sentiment improve",
+        "stock rally", "crypto rally", "trade deal", "peace deal",
+        "bearish", "overbought", "profit taking",
     ]
 
     for kw in bullish:
@@ -344,6 +383,16 @@ def _rule_based_judge(content: str) -> str:
             return "bearish"
     # 英文：黄金自身涨跌优先（gold/xau + 涨跌词）
     gold_mentions_gold = "gold" in content_lower or "xau" in content_lower
+
+    # 非黄金相关的风险偏好/股市→利空
+    if not gold_mentions_gold:
+        non_gold_bearish = ["stock market", "stock rally", "equity rally", "equities rise",
+                          "risk appetite", "risk-on", "risk on", "trade deal", "peace deal",
+                          "crypto rally", "bitcoin", "corporate earnings"]
+        for kw in non_gold_bearish:
+            if kw in content_lower:
+                return "bearish"
+
     if gold_mentions_gold:
         for kw in ["rally", "surge", "soar", "jump", "gain", "climb", "higher", "highs",
                    "breaks above", "up", "rebound", "firm", "steady gains"]:

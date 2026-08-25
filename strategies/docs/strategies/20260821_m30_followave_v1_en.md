@@ -6,6 +6,8 @@ display_en: M30 FollowAve — Stoch+BBI+BB Trend Following (with Trailing Stop)
 desc_en: M30 trend following, ±DI gate + Stoch golden/death cross + BBI + BB mid-band + 2.0×ATR trailing stop
 ---
 
+**Timeframe:** M30
+
 ## Entry Logic
 ### Gate (Pre-conditions)
 | # | Condition | Description |
@@ -46,6 +48,16 @@ desc_en: M30 trend following, ±DI gate + Stoch golden/death cross + BBI + BB mi
 | Profit Factor | 2.20 |
 | Max Win | +$154 |
 | Max Loss | -$86 |
+## Parameter Reference
+| Parameter | Value | Description |
+| --- | --- | --- |
+| TIMEFRAME | M30 | Primary running timeframe |
+| DI_GATE | 5 | ±DI difference gate |
+| EXIT_CONFIRM_BARS | 3 | Confirmation candle count for trend reversal exit |
+| TRAIL_ATR | 2.0 | 2.0×ATR trailing stop (take profit on drawdown from extreme) |
+| STOCH_K_OVERBOUGHT / OVERSOLD | 80 / 20 | Stoch K overbought / oversold thresholds |
+| FIXED_LOTS | 0.01 | Fixed lot size |
+| MAX_SLIPPAGE | 30 | Max slippage |
 ## Data Source
 - All indicators from DataFactory TA-Lib
 - Dependencies: `close`, `bbi`, `stoch_5_3_3`, `bb`, `bb_mid_direction`, `pdi`, `ndi`, `atr`
