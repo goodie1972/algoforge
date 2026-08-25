@@ -1034,30 +1034,49 @@ def load_news_events() -> list[dict]:
 # ── Gold News（汇通/金十快讯）───────────────────────────────
 
 def insert_gold_news(items: list[dict]) -> int:
-    """批量插入黄金新闻快讯。返回插入条数"""
+    """批量插入黄金新闻快讯（带去重：同content+source不重复插入，仅更新方向）。返回操作条数"""
     conn = get_conn()
     try:
         count = 0
         for item in items:
-            conn.execute(
-                """INSERT INTO gold_news
-                   (source, content, direction, direction_reason,
-                    direction_confidence, news_time, content_en, fetched_at, url, lang)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    item.get("source", "huicong"),
-                    item.get("content", ""),
-                    item.get("direction", "neutral"),
-                    item.get("direction_reason", ""),
-                    item.get("direction_confidence", "low"),
-                    item.get("time", ""),
-                    item.get("content_en", ""),
-                    item.get("fetched_at", time.time()),
-                    item.get("url", ""),
-                    item.get("lang", "zh"),
-                ),
-            )
-            count += 1
+            content = item.get("content", "")
+            source = item.get("source", "huicong")
+            lang = item.get("lang", "zh")
+            # 检查是否已存在（相同 source + 内容前缀 >= 40 字符）
+            existing = conn.execute(
+                "SELECT id, direction FROM gold_news WHERE source=? AND lang=? AND substr(content,1,40)=? ORDER BY id DESC LIMIT 1",
+                (source, lang, content[:40]),
+            ).fetchone()
+            if existing:
+                # 已存在：更新方向（只覆盖低置信度判断）
+                old_dir = existing[1]
+                new_dir = item.get("direction", "neutral")
+                if new_dir != old_dir:
+                    conn.execute(
+                        "UPDATE gold_news SET direction=?, direction_reason=?, direction_confidence=?, fetched_at=? WHERE id=?",
+                        (new_dir, item.get("direction_reason", ""), item.get("direction_confidence", "low"), item.get("fetched_at", time.time()), existing[0]),
+                    )
+                    count += 1
+            else:
+                conn.execute(
+                    """INSERT INTO gold_news
+                       (source, content, direction, direction_reason,
+                        direction_confidence, news_time, content_en, fetched_at, url, lang)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        source,
+                        content,
+                        item.get("direction", "neutral"),
+                        item.get("direction_reason", ""),
+                        item.get("direction_confidence", "low"),
+                        item.get("time", ""),
+                        item.get("content_en", ""),
+                        item.get("fetched_at", time.time()),
+                        item.get("url", ""),
+                        lang,
+                    ),
+                )
+                count += 1
         conn.commit()
         return count
     except Exception as e:
