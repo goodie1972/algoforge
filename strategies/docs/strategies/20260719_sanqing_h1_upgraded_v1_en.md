@@ -46,8 +46,8 @@ desc_en: EMA9/21 trend scoring + high-position interception + dynamic profit dra
 | ① | ADX adaptive trailing stop | 1.5 ATR drawdown | 2.5 ATR drawdown | 3.5 ATR drawdown |
 | ② | ADX adaptive take profit | 2.5 ATR | 4.0 ATR | 6.0 ATR |
 | ③ | Hard stop (fixed) | 1.2 ATR | 1.2 ATR | 1.2 ATR |
-| ④ | Profit drawdown + DI protection | Peak drawdown 25%, skip drawdown take profit when DI aligned (trend intact) |
-| ⑤ | DI reversal exit | 5 min after open: BUY pos NDI>PDI / SELL pos PDI>NDI |
+| ④ | Profit drawdown + DI protection | Peak drawdown 25%, skip drawdown take profit when DI aligned (trend intact) |  |  |
+| ⑤ | DI reversal exit | 5 min after open: BUY pos NDI>PDI / SELL pos PDI>NDI |  |  |
 
 ## Parameter Reference
 

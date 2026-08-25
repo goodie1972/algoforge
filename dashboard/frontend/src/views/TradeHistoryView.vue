@@ -475,7 +475,7 @@ const statsColumns = [
       <n-h2 class="history-title">{{ t('trades.title') }}</n-h2>
       <n-space size="small">
         <n-tag :bordered="false" type="info">{{ t('trades.total_count', { count: store.items.length }) }}</n-tag>
-        <n-tag :bordered="false" :type="totalPnl >= 0 ? 'success' : 'error'">{{ t('trades.total_pnl') }}: {{ totalPnl >= 0 ? '+' : '' }}${{ Math.abs(totalPnl).toFixed(2) }}</n-tag>
+        <n-tag :bordered="false" :type="totalPnl >= 0 ? 'success' : 'error'">{{ t('trades.total_pnl') }}: {{ totalPnl >= 0 ? '+' : '-' }}${{ Math.abs(totalPnl).toFixed(2) }}</n-tag>
         <n-button size="small" secondary :loading="refreshLoading" @click="refresh">
           {{ t('trades.refresh') }}
         </n-button>
