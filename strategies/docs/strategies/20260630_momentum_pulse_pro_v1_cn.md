@@ -3,7 +3,7 @@ name: momentum_pulse_pro
 magic: 661301
 type: 反转
 display: Momentum Pulse PRO — 7维度多因子评分 + 三层TP出场
-desc: H1 7维度多因子评分系统，三层TP分步出场
+desc: M30 7维度多因子评分系统，三层TP分步出场
 ---
 
 **适用周期：** M30

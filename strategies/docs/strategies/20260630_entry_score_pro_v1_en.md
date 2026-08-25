@@ -3,8 +3,10 @@ name: entry_score_pro
 magic: 661501
 type: Scoring
 display_en: Entry Score PRO — 5-Factor Weighted Scoring
-desc_en: H1 5-factor weighted scoring system, score 0-100, trigger threshold ≥75
+desc_en: M30 5-factor weighted scoring system, score 0-100, trigger threshold ≥75
 ---
+
+**Timeframe:** M30
 
 ## Scoring Factors
 | # | Factor | Weight | Description |
@@ -26,6 +28,21 @@ desc_en: H1 5-factor weighted scoring system, score 0-100, trigger threshold ≥
 | ① | Initial SL | ±0.55 ATR |
 | ② | ATR Trailing | Triggered when peak pullback exceeds 1.5 ATR |
 | ③ | Initial TP | 3×SL (R:R=3:1) |
+## Risk Control
+- Directional Edge: Signal triggered only when this direction's score is strictly higher than the opposite direction's
+- Initial Hard Stop: entry zone ±0.55×ATR (order-level SL, also serves as the runtime hard stop)
+- Trailing: Exit when peak pullback exceeds 1.5×ATR
+- Initial Take-Profit: 3×SL (fixed risk-reward R:R=3:1)
+- Max Positions: 1 (STRATEGY_POOL config)
+## Parameter Reference
+| Parameter | Value | Description |
+|---|---|---|
+| w_structure / w_proximity / w_momentum / w_volatility / w_trend | 30 / 25 / 15 / 10 / 20 | Weighted weights of the 5 factors (%) |
+| score_entry | 75 | ENTRY WINDOW trigger threshold |
+| score_prime | 80 | PRIME tier threshold |
+| sl_atr | 0.55 | Initial stop loss = ±0.55×ATR |
+| trail_atr | 1.5 | Trailing multiplier |
+| rsi_period / atr_period | 14 / 14 | Calculation periods for RSI, ATR |
 ## Special Rules
 - Source: TradingView No-Repaint Entry Score Multi-Factor Confluence [LunqFX]
 - SL = entry zone ±0.55ATR, TP = 3×SL (fixed risk-reward R:R=3:1)

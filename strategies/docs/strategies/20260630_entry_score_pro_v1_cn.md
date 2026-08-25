@@ -3,7 +3,7 @@ name: entry_score_pro
 magic: 661501
 type: 评分
 display: Entry Score PRO — 5因子加权评分
-desc: H1 5因子加权评分系统，评分0-100，阈值≥75触发
+desc: M30 5因子加权评分系统，评分0-100，阈值≥75触发
 ---
 
 **适用周期：** M30

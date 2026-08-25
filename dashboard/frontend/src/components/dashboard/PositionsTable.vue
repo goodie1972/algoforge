@@ -99,7 +99,7 @@ const columns = [
             size: 'tiny', type: 'error', secondary: true,
             loading: loadingClose.value === row.ticket,
             onClick: () => {
-              dialog.warning({
+              const d = dialog.warning({
                 title: t('positions.confirm_close'),
                 content: t('positions.confirm_close_msg', { ticket: row.ticket }),
                 positiveText: t('common.confirm'),
@@ -109,17 +109,21 @@ const columns = [
                   try {
                     await store.close(row.ticket)
                     message.success(t('positions.close_success', { ticket: row.ticket }))
+                    d.destroy()
                   } catch (e: any) {
                     if (e?.notFound) {
                       message.warning(t('positions.close_not_found', { ticket: row.ticket }))
                     } else if (e?.timeoutButClosed) {
-                      // 请求超时但 MT4 已执行平仓（刷新后确认），按成功提示
                       message.warning(t('positions.close_timeout_submitted', { ticket: row.ticket }))
                     } else {
                       message.error(e?.message || t('positions.close_failed'))
                     }
+                    d.destroy()
                   }
                   loadingClose.value = null
+                },
+                onNegativeClick: () => {
+                  d.destroy()
                 }
               })
             }

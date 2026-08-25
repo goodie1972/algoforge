@@ -3,7 +3,7 @@ name: multi_confluence_quant
 magic: 661601
 type: 评分
 display: Multi-Confluence Quant — 14因子综合评分
-desc: H1 14个技术指标因子评分，≥10/14触发信号
+desc: M30 14个技术指标因子评分，≥10/14触发信号
 ---
 
 **适用周期：** M30

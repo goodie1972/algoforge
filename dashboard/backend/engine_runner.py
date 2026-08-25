@@ -161,7 +161,23 @@ class EngineRunner:
             # 更新引擎风险状态（realized_pnl / 连续亏损 / 快速出场等）
             self._engine._record_close(ticket, pnl, magic, direction)
 
-            # 写入 trades 表
+            # 写入 trades 表（从桥接获取开仓时间）
+            open_time_str = ""
+            hold_sec = 0
+            try:
+                if self._engine and hasattr(self._engine, 'bridge'):
+                    from config import settings as _cfg
+                    histories = self._engine.bridge.get_order_history(_cfg.SYMBOL)
+                    for h in histories:
+                        if h["ticket"] == ticket:
+                            if h.get("open_time") and h.get("close_time"):
+                                open_dt = self._engine._mt4_to_local(h["open_time"])
+                                close_dt = self._engine._mt4_to_local(h["close_time"])
+                                open_time_str = open_dt.strftime('%Y-%m-%d %H:%M:%S')
+                                hold_sec = int(h["close_time"] - h["open_time"])
+                            break
+            except Exception:
+                pass
             try:
                 from data import database as db
                 record = {
@@ -178,9 +194,9 @@ class EngineRunner:
                     "commission": closed_record.get("commission", 0),
                     "magic": magic,
                     "strategy": closed_record.get("strategy", ""),
-                    "open_time": "",
+                    "open_time": open_time_str,
                     "close_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    "hold_seconds": 0,
+                    "hold_seconds": hold_sec,
                     "exit_reason": "manual_close",
                 }
                 db.insert_trade(record)
