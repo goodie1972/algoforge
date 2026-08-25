@@ -199,5 +199,47 @@ export interface TradeStats {
   by_strategy: Record<string, StrategyFamilyStats>
 }
 
+// 单笔成交分析（GET /api/trades/analysis/{ticket}）
+export interface TradeStrategyMeta {
+  internal_name: string
+  display: string
+  timeframe: string
+  version: string
+  resolved_by: string
+  desc: string
+}
+
+export interface TradeAiAnalysis {
+  entry_logic: string
+  exit_reason: string
+  pnl_note: string
+  model: string
+}
+
+export interface TradeAnalysis {
+  entry_analysis?: {
+    system?: string
+    likely_conditions?: string[]
+    factors?: { name: string; desc: string }[]
+  }
+  exit_analysis?: {
+    label?: string
+    logic?: string
+    is_loss?: boolean
+    loss_analysis?: { possible_reasons?: string[]; suggestions?: string[] }
+  }
+  // ── LLM 分析新增字段（可选，后端渐进上线）──
+  strategy_meta?: TradeStrategyMeta | null
+  ai_analysis?: TradeAiAnalysis | null
+  analysis_source?: 'llm' | 'fallback'
+  [key: string]: any
+}
+
+// LLM 服务状态
+export interface LlmStatus {
+  available: boolean
+  model: string | null
+}
+
 // 新闻预判报告
 // 新闻预判报告（已迁移至 gold_news 系统，此接口不再使用）

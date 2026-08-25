@@ -1,6 +1,6 @@
 // REST API 客户端
 import axios from 'axios'
-import type { AccountInfo, Position, Candle, TickPrice, LogEntry, EngineStatus, BacktestRequest, BacktestJob, BacktestResult, BacktestHistoryItem, ClosedTrade, TradeStats } from '@/types'
+import type { AccountInfo, Position, Candle, TickPrice, LogEntry, EngineStatus, BacktestRequest, BacktestJob, BacktestResult, BacktestHistoryItem, ClosedTrade, TradeStats, TradeAnalysis, LlmStatus } from '@/types'
 
 const http = axios.create({
   baseURL: '/api',
@@ -141,8 +141,17 @@ export async function getTradeStats(params?: {
   return data
 }
 
-export async function getTradeAnalysis(ticket: number): Promise<any> {
-  const { data } = await http.get(`/trades/analysis/${ticket}`)
+export async function getLlmStatus(): Promise<LlmStatus> {
+  const { data } = await http.get('/llm/status')
+  return data
+}
+
+export async function getTradeAnalysis(ticket: number, ai: boolean = false): Promise<TradeAnalysis> {
+  // ai=true 时 LLM 分析生成可能耗时 ~40s，放宽单次请求超时
+  const { data } = await http.get(`/trades/analysis/${ticket}`, {
+    params: { ai },
+    timeout: ai ? 60000 : 10000,
+  })
   return data
 }
 

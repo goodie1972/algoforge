@@ -605,17 +605,38 @@ def _analyze_loss(pnl: float, strategy: str, direction: str, exit_reason: str) -
 
 
 @router.get("/analysis/{ticket}")
-async def get_trade_analysis(ticket: int):
+async def get_trade_analysis(ticket: int, ai: bool = False):
     """分析单笔成交的开仓/平仓逻辑及优化建议"""
-    if not engine_runner or not engine_runner._engine:
-        raise HTTPException(400, "引擎未运行")
+    # 延迟导入：避免与 trade_analysis_ai 形成模块级循环引用，并控制启动开销
+    from dashboard.backend.trade_analysis_ai import (
+        analyze_trade_ai,
+        build_strategy_meta,
+        resolve_strategy,
+    )
 
-    trades = list(engine_runner._engine.closed_trades)
+    # 1) 优先从引擎内存（最近 200 条）查找
     trade = None
-    for t in trades:
-        if t.get("ticket") == ticket:
-            trade = t
-            break
+    if engine_runner and engine_runner._engine:
+        for t in list(engine_runner._engine.closed_trades):
+            if str(t.get("ticket")) == str(ticket):
+                trade = t
+                break
+
+    # 2) 内存找不到 → 从数据库 trades 表全量查（内存只保留最近 200 条）
+    if not trade:
+        try:
+            from data import database as db
+            conn = db.get_conn()
+            try:
+                row = conn.execute(
+                    "SELECT * FROM trades WHERE ticket=?", (ticket,)
+                ).fetchone()
+            finally:
+                conn.close()
+            if row:
+                trade = dict(row)  # get_conn() 已设置 row_factory=sqlite3.Row
+        except Exception as e:
+            raise HTTPException(500, f"查询数据库失败: {e}")
 
     if not trade:
         raise HTTPException(404, f"未找到成交记录 ticket={ticket}")
@@ -644,6 +665,19 @@ async def get_trade_analysis(ticket: int):
     entry_factors = snapshot.get("entry_factors", {})
     exit_detail = snapshot.get("exit_detail", {})
 
+    # 注册表驱动策略解析（优先序：激活POOL → 历史映射 → 扫描器元数据 → 名称回退）
+    _resolved_name, _resolved_by = resolve_strategy(trade)
+    strategy_meta = build_strategy_meta(_resolved_name, _resolved_by)
+
+    # 策略规则背景（供 LLM 注入，可能为 None，容错）
+    _strategy_logic = None
+    if _resolved_name:
+        try:
+            from dashboard.backend.strategy_logics import get_strategy_logic
+            _strategy_logic = get_strategy_logic(_resolved_name)
+        except Exception:
+            _strategy_logic = None
+
     if entry_factors.get("long") or entry_factors.get("short"):
         scores = snapshot.get("scores", {})
         indicator_values = snapshot.get("indicator_values", {})
@@ -659,7 +693,12 @@ async def get_trade_analysis(ticket: int):
             "factors": [{"name": f, "desc": f} for f in factors_list],
         }
     else:
-        strategy_lower = strategy.lower()
+        # 注册表解析优先：解析成功用内部名匹配，否则回退原始 strategy 字段；
+        # 4 类硬编码分析器保留为 fallback 语义（不删除）
+        if _resolved_name:
+            strategy_lower = _resolved_name.lower()
+        else:
+            strategy_lower = strategy.lower()
         if "m30_rsi" in strategy_lower or "rsi_bb" in strategy_lower:
             entry = _analyze_entry_m30_rsi_bb(direction, entry_price)
         elif "sanqing" in strategy_lower:
@@ -706,5 +745,17 @@ async def get_trade_analysis(ticket: int):
 
     if snapshot.get("indicator_values"):
         result["indicator_snapshot"] = snapshot
+
+    result["strategy_meta"] = strategy_meta
+
+    if ai:
+        # LLM 实时分析（运行时可用性检测：无激活 provider/超时/异常/解析失败一律降级）
+        _ai_result = await analyze_trade_ai(trade, strategy_meta, _strategy_logic, exit_detail)
+        result["ai_analysis"] = _ai_result["ai_analysis"]
+        result["analysis_source"] = _ai_result["analysis_source"]
+    else:
+        # 降级模式：不调用 LLM，仅返回本地分析数据
+        result["ai_analysis"] = None
+        result["analysis_source"] = "fallback"
 
     return result

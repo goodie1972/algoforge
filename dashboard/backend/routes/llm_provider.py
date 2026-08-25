@@ -101,3 +101,17 @@ def chat(req: ChatRequest):
 def test_provider(provider_id: str):
     result = manager.test_connection(provider_id)
     return {"success": True, "data": result}
+
+
+@router.get("/status")
+def llm_status():
+    """LLM 可用性状态（每次新建实例，保证读到最新配置）"""
+    try:
+        mgr = LLMProviderManager()
+        provider = mgr.get_active_raw()
+        available = bool(provider and provider.get("api_key"))
+        model = provider.get("selected_model") if available else None
+        return {"available": available, "model": model}
+    except Exception as e:
+        logger.warning(f"[LLM] /status 检查失败: {e}")
+        return {"available": False, "model": None}

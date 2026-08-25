@@ -3,8 +3,8 @@ import { h, ref, computed, onMounted, watch, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { fmtRowTime } from '@/utils/timeFormat'
 import { useTradeStore } from '@/stores/trades'
-import { getTradeStats, getTradeAnalysis } from '@/api/client'
-import type { TradeStats } from '@/types'
+import { getTradeStats, getTradeAnalysis, getLlmStatus } from '@/api/client'
+import type { TradeStats, TradeAnalysis } from '@/types'
 import { NTag, NButton, NDataTable, NEmpty, NSkeleton, NAlert, NSpace, NTabs, NTabPane, NGrid, NGi, NStatistic, NCard, NSelect, NDatePicker, NIcon, NSpin, NInput, NModal, NProgress } from 'naive-ui'
 import { SearchOutline } from '@vicons/ionicons5'
 import StrategyRadar from '@/components/dashboard/StrategyRadar.vue'
@@ -34,7 +34,15 @@ const totalPnl = computed(() => {
 
 // ── 成交明细标签页（原代码）────────────────────────────
 
-onMounted(() => store.fetch())
+onMounted(async () => {
+  store.fetch()
+  try {
+    const status = await getLlmStatus()
+    llmAvailable.value = status.available
+  } catch {
+    llmAvailable.value = false
+  }
+})
 
 async function refresh() {
   refreshLoading.value = true
@@ -45,14 +53,16 @@ async function refresh() {
 
 // ── 展开行分析 ──
 const expandedRowKeys = ref<(string | number)[]>([])
-const analysisCache = reactive<Record<number, any>>({})
+const analysisCache = reactive<Record<number, TradeAnalysis>>({})
 const analysisLoading = reactive<Record<number, boolean>>({})
+const llmAvailable = ref(false)
+const aiButtonLoading = reactive<Record<number, boolean>>({})
 
 async function onExpand(ticket: number) {
   if (analysisCache[ticket]) return
   analysisLoading[ticket] = true
   try {
-    const result = await getTradeAnalysis(ticket)
+    const result = await getTradeAnalysis(ticket, false)
     analysisCache[ticket] = result
   } catch (e: any) {
     analysisCache[ticket] = { error: e?.message || t('trades.analysis_fail') }
@@ -61,18 +71,32 @@ async function onExpand(ticket: number) {
   }
 }
 
+async function triggerAiAnalysis(ticket: number) {
+  if (aiButtonLoading[ticket]) return
+  aiButtonLoading[ticket] = true
+  try {
+    const result = await getTradeAnalysis(ticket, true)
+    analysisCache[ticket] = { ...analysisCache[ticket], ...result }
+  } catch (e: any) {
+    analysisCache[ticket] = { ...analysisCache[ticket], error: e?.message || t('trades.analysis_fail') }
+  } finally {
+    aiButtonLoading[ticket] = false
+  }
+}
+
 function renderAnalysis(row: any) {
   const ticket = row.ticket
   if (analysisLoading[ticket]) {
-    return h(NSpin, {}, { default: () => t('trades.analysis_loading') })
+    return h(NSpin, {}, { default: () => h('div', { style: 'font-size: 13px; color: #888;' }, [t('trades.analysis_loading')]) })
   }
   const data = analysisCache[ticket]
   if (!data) return h('span', t('trades.analysis_click'))
   if (data.error) return h('span', { style: { color: '#f6465d' } }, t('trades.analysis_error', { error: data.error }))
 
-  const sec = (s: number) => s < 60 ? `${s}s` : s < 3600 ? `${Math.round(s/60)}m` : `${(s/3600).toFixed(1)}h`
+  const children: any[] = []
 
-  return h('div', { style: 'padding: 12px 24px; font-size: 13px; line-height: 1.6;' }, [
+  // ── 降级数据（始终显示）──
+  children.push(
     h('div', { style: 'display: grid; grid-template-columns: 1fr 1fr; gap: 16px;' }, [
       // 左列：开仓分析
       h('div', {}, [
@@ -112,8 +136,69 @@ function renderAnalysis(row: any) {
             ])
           : h('div', { style: 'margin-top: 8px; color: #0ecb81;' }, t('trades.profit_trade')),
       ]),
-    ]),
+    ])
+  )
+
+  // ── AI 分析区域（按钮 + 结果）──
+  const hasAiAnalysis = data.ai_analysis && data.analysis_source === 'llm'
+  const isAiLoading = aiButtonLoading[ticket]
+
+  // AI 按钮
+  const aiButton = h('div', { style: 'margin-top: 16px; padding-top: 12px; border-top: 1px dashed #333;' }, [
+    llmAvailable.value
+      ? h(NButton, {
+          type: 'primary',
+          size: 'small',
+          loading: isAiLoading,
+          disabled: hasAiAnalysis || isAiLoading,
+          onClick: () => triggerAiAnalysis(ticket),
+        }, { default: () => isAiLoading ? t('trades.ai_button_loading') : t('trades.ai_button') })
+      : h(NButton, {
+          size: 'small',
+          disabled: true,
+        }, { default: () => t('trades.ai_button') }),
+    !llmAvailable.value
+      ? h('span', { style: 'margin-left: 8px; font-size: 12px; color: #888;' }, t('trades.ai_unavailable_tooltip'))
+      : null,
+    hasAiAnalysis
+      ? h('span', { style: 'margin-left: 8px; font-size: 12px; color: #0ecb81;' }, '✓')
+      : null,
   ])
+  children.push(aiButton)
+
+  // AI 分析结果（如果已有）
+  if (hasAiAnalysis) {
+    const ai = data.ai_analysis!
+    const meta = data.strategy_meta
+    const metaText = meta
+      ? [meta.display, meta.timeframe, meta.version].filter(Boolean).join(' · ')
+      : ''
+    const aiSection = (label: string, color: string, text?: string) =>
+      text
+        ? h('div', { style: 'margin-top: 10px;' }, [
+            h('div', { style: `font-weight: 700; margin-bottom: 4px; color: ${color};` }, label),
+            h('div', { style: 'font-size: 13px; white-space: pre-wrap;' }, text),
+          ])
+        : null
+    children.push(
+      h('div', { style: 'margin-top: 16px; padding: 12px; background: #0d1117; border-radius: 6px;' }, [
+        h('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;' }, [
+          h('div', { style: 'font-weight: 700; font-size: 14px;' }, '✨ ' + t('trades.ai_analysis_title')),
+          metaText
+            ? h('div', { style: 'font-size: 12px; color: #888; background: #1a1a2e; padding: 2px 8px; border-radius: 4px;' }, metaText)
+            : null,
+        ]),
+        aiSection(t('trades.ai_entry_logic'), '#0ecb81', ai.entry_logic),
+        aiSection(t('trades.ai_exit_reason'), '#f6465d', ai.exit_reason),
+        aiSection(t('trades.ai_pnl_note'), '#f0a020', ai.pnl_note),
+        ai.model
+          ? h('div', { style: 'margin-top: 10px; font-size: 11px; color: #666;' }, `${t('trades.ai_model')}: ${ai.model}`)
+          : null,
+      ])
+    )
+  }
+
+  return h('div', { style: 'padding: 12px 24px; font-size: 13px; line-height: 1.6;' }, children)
 }
 
 const exitReasonLabels: Record<string, string> = {
@@ -263,7 +348,7 @@ const voidedLoading = ref(false)
 const voidedExpandedKeys = ref<(string | number)[]>([])
 
 const voidedColumns = [
-  { type: 'expand', width: 35, renderExpand: (row: any) => {
+  { type: 'expand' as const, width: 35, renderExpand: (row: any) => {
     const fl = row.factors_long ? JSON.parse(row.factors_long) : []
     const fs = row.factors_short ? JSON.parse(row.factors_short) : []
     let iv: Record<string, any> = {}
