@@ -2,5 +2,5 @@
   "dependencies": {
     "playwright": "^1.62.1"
   },
-  "version": "3.3.6"
+  "version": "3.4.2"
 }
