@@ -18,7 +18,7 @@ desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2
 | 层 | 条件 | 说明 |
 | --- | --- | --- |
 | 第1层 | close > BBI | 价格在均线簇上方 |
-| 第2层 | Stoch K > D（金叉）且 K < 80 | 动量向上，但未超买 |
+| 第2层 | Stoch K > D（金叉）且 K < 70 | 动量向上，但未超买 |
 | 第3层 | close ≥ BB 中轨 | 价格在布林带中轨之上 |
 ### 三层筛子（做空：−DI > +DI）
 | 层 | 条件 | 说明 |
@@ -55,7 +55,7 @@ desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2
 | DI_GATE | 5 | ±DI 差值门禁 |
 | EXIT_CONFIRM_BARS | 3 | 趋势反转出场确认 K 线数 |
 | TRAIL_ATR | 2.0 | 2.0×ATR trailing stop（从极值点回撤止盈） |
-| STOCH_K_OVERBOUGHT / OVERSOLD | 80 / 20 | Stoch K 超买 / 超卖阈值 |
+| STOCH_K_OVERBOUGHT / OVERSOLD | 70 / 20 | Stoch K 超买 / 超卖阈值 |
 | FIXED_LOTS | 0.01 | 固定手数 |
 | MAX_SLIPPAGE | 30 | 最大滑点 |
 ## 数据源

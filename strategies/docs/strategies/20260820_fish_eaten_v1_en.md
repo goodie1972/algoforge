@@ -12,7 +12,7 @@ desc_en: Gate + 3-layer filter entry, RSI/MFI dual-extreme fish exit, M30 timefr
 ### Gate (Pre-conditions)
 | # | Condition | Description |
 | --- | --- | --- |
-| ① | ADX > 20 | Trending market, not ranging |
+| ① | ADX > 22 | Trending market, not ranging |
 | ② | \|+DI − -DI\| > 5 | Clear trend direction |
 ### Three-Layer Filter (Long: −DI > +DI)
 | Layer | Condition | Description |
@@ -39,7 +39,7 @@ desc_en: Gate + 3-layer filter entry, RSI/MFI dual-extreme fish exit, M30 timefr
 ### Best Parameters
 | Parameter | Value | Description |
 | --- | --- | --- |
-| ADX_GATE | 20 | Gate threshold |
+| ADX_GATE | 22 | Gate threshold |
 | DI_DIFF_GATE | 5 | DI difference gate |
 | BB_EXIT_OFFSET | 8 | Fish exit offset |
 | TIME_STOP_BARS | 48 | Time stop bar count |
@@ -51,7 +51,7 @@ desc_en: Gate + 3-layer filter entry, RSI/MFI dual-extreme fish exit, M30 timefr
 | Win Rate | 62% |
 | Max Hold | 48 bars (24 hours) |
 ### Parameter Sensitivity
-- **ADX**: 20/22 similar performance, 25 slightly worse
+- **ADX**: 22 best (20→22 improves signal quality, PnL +72%)
 - **DI**: 5 and 10 show no difference
 - **BB**: 8/10 better than 5
 - **TS**: 48 is the best balance point (TS=12 cuts everything off; without TS dead trades remain)

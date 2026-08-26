@@ -18,7 +18,7 @@ desc_en: M30 trend following, ±DI gate + Stoch golden/death cross + BBI + BB mi
 | Layer | Condition | Description |
 | --- | --- | --- |
 | 1 | close > BBI | Price above MA cluster |
-| 2 | Stoch K > D (golden cross) and K < 80 | Momentum up, not overbought |
+| 2 | Stoch K > D (golden cross) and K < 70 | Momentum up, not overbought |
 | 3 | close ≥ BB mid-band | Price above BB mid-band |
 ### Three-Layer Filter (Short: −DI > +DI)
 | Layer | Condition | Description |
@@ -55,7 +55,7 @@ desc_en: M30 trend following, ±DI gate + Stoch golden/death cross + BBI + BB mi
 | DI_GATE | 5 | ±DI difference gate |
 | EXIT_CONFIRM_BARS | 3 | Confirmation candle count for trend reversal exit |
 | TRAIL_ATR | 2.0 | 2.0×ATR trailing stop (take profit on drawdown from extreme) |
-| STOCH_K_OVERBOUGHT / OVERSOLD | 80 / 20 | Stoch K overbought / oversold thresholds |
+| STOCH_K_OVERBOUGHT / OVERSOLD | 70 / 20 | Stoch K overbought / oversold thresholds |
 | FIXED_LOTS | 0.01 | Fixed lot size |
 | MAX_SLIPPAGE | 30 | Max slippage |
 ## Data Source

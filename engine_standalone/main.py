@@ -593,6 +593,43 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             my_pos = [p for p in all_positions if p.magic in magics]
             state.floating_pnl = sum(p.profit for p in my_pos)
 
+
+    def _check_orphan_positions(self, strategies):
+        """检查未被任何策略认领的持仓，按 magic 就近分配兜底"""
+        try:
+            import config.settings as _cfg
+            positions = self.bridge.get_positions(_cfg.SYMBOL)
+        except Exception:
+            return
+        if not positions:
+            return
+        all_magics = set()
+        for s in strategies:
+            all_magics.update(self._strategy_magics(s))
+        orphans = [p for p in positions if p.magic not in all_magics]
+        if not orphans:
+            return
+        logger.warning(f"[OrphanCheck] Found {len(orphans)} orphan positions, assigning to closest strategy")
+        for pos in orphans:
+            best = None
+            best_dist = 999999
+            for s in strategies:
+                for m in self._strategy_magics(s):
+                    dist = abs(m - pos.magic)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best = s
+            if best:
+                logger.warning(f"[OrphanCheck] Assigning ticket={pos.ticket} magic={pos.magic} to {best.name} (diff={best_dist})")
+                try:
+                    best.mark_extreme_entry(pos.ticket)
+                    bid, ask = self.bridge.get_tick_price(_cfg.SYMBOL)
+                    if best.check_ema20_exit(pos, bid, ask):
+                        logger.info(f"[OrphanCheck] Orphan exit triggered, closing ticket={pos.ticket}")
+                        self.bridge.close_order(pos.ticket)
+                except Exception as e:
+                    logger.warning(f"[OrphanCheck] Failed to handle orphan ticket={pos.ticket}: {e}")
+
     def _record_close(self, ticket: int | str, pnl: float, magic: int, direction: str = ""):
         """记录平仓：更新已实现盈亏 + 快速出场检测（legacy magic 自动映射到主策略）"""
         # 如果 magic 是某个策略的 legacy，映射到主 magic
@@ -989,6 +1026,12 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             except Exception as e:
                 logger.error(f"[{strategy.name}] Exit execution error: {e}")
 
+        # 兜底：检查未被任何策略认领的持仓，按 magic 就近分配
+        try:
+            self._check_orphan_positions(snapshot)
+        except Exception as e:
+            logger.warning(f"[OrphanCheck] error: {e}")
+
         # ---- 多策略协调出场：信号盈利时联动平目标 ----
         self._coordinated_exits(snapshot)
 
@@ -1364,6 +1407,11 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             pass
 
         for pos in my_positions:
+            # 自动恢复出场状态：引擎重启后老单子状态丢失，调用 mark_extreme_entry 初始化
+            try:
+                strategy.mark_extreme_entry(pos.ticket)
+            except Exception:
+                pass
             should_exit = strategy.check_ema20_exit(pos, bid, ask)
             if not should_exit:
                 continue
