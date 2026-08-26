@@ -105,9 +105,10 @@ onMounted(loadPersona)
 </script>
 
 <template>
-  <div>
-    <n-divider />
-    <n-h3>AI 人设</n-h3>
+  <n-card size="small" :bordered="true">
+    <template #header>
+      <span>AI 人设</span>
+    </template>
     <n-space vertical :size="14">
       <!-- 基础设定 Soul -->
       <div class="persona-block">
@@ -159,7 +160,7 @@ onMounted(loadPersona)
         />
       </n-space>
     </n-space>
-  </div>
+  </n-card>
 </template>
 
 <style scoped>

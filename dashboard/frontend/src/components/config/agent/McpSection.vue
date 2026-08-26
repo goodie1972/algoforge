@@ -446,9 +446,10 @@ onMounted(loadMcpConnectors)
 </script>
 
 <template>
-  <div>
-    <n-divider />
-    <n-h3>MCP 连接器 ({{ mcpConnectors.length }})</n-h3>
+  <n-card size="small" :bordered="true">
+    <template #header>
+      <span>MCP 连接器 ({{ mcpConnectors.length }})</span>
+    </template>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;padding:4px">
       <div v-for="c in mcpConnectors" :key="c.id">
         <div @click="openMcpEdit(c.id)"
@@ -738,7 +739,7 @@ onMounted(loadMcpConnectors)
         </div>
       </div>
     </n-modal>
-  </div>
+  </n-card>
 </template>
 
 <style scoped>

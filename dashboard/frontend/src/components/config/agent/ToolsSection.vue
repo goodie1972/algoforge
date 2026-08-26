@@ -22,9 +22,10 @@ onMounted(loadTools)
 </script>
 
 <template>
-  <div>
-    <n-divider />
-    <n-h3>可用工具 ({{ tools.length }})</n-h3>
+  <n-card size="small" :bordered="true">
+    <template #header>
+      <span>可用工具 ({{ tools.length }})</span>
+    </template>
     <n-space vertical v-if="tools.length > 0">
       <n-card v-for="tool in tools" :key="tool.name" size="small">
         <template #header>
@@ -38,5 +39,5 @@ onMounted(loadTools)
       </n-card>
     </n-space>
     <n-empty v-else description="暂无工具" />
-  </div>
+  </n-card>
 </template>

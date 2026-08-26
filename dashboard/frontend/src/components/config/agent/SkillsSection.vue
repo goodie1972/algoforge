@@ -276,10 +276,10 @@ onMounted(loadSkills)
 </script>
 
 <template>
-  <div>
-    <n-divider />
-    <div class="skills-header">
-      <n-h3 style="margin:0">已加载技能 ({{ skills.length }})</n-h3>
+  <n-card size="small" :bordered="true">
+    <template #header>
+      <div class="skills-header">
+        <span>已加载技能 ({{ skills.length }})</span>
       <n-space size="small">
         <n-tooltip trigger="hover">
           <template #trigger>
@@ -291,6 +291,7 @@ onMounted(loadSkills)
         <n-button size="small" secondary type="info" @click="openLocalModal">本地添加</n-button>
       </n-space>
     </div>
+    </template>
     <n-space vertical v-if="skills.length > 0">
       <n-card v-for="s in skills" :key="s.name" size="small"
         :style="{ opacity: s.enabled ? 1 : 0.5, transition: 'opacity 0.2s' }">
@@ -418,7 +419,7 @@ onMounted(loadSkills)
         <n-button type="primary" :loading="importingLocal" @click="importLocalContent">导入</n-button>
       </div>
     </n-modal>
-  </div>
+  </n-card>
 </template>
 
 <style scoped>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useMessage } from 'naive-ui'
@@ -17,6 +17,8 @@ const activeTab = ref('risk')
 
 onMounted(() => store.fetch())
 
+watch(activeTab, (v) => console.log('[ConfigView] tab changed to:', v))
+
 async function resetAll() {
   await store.reset()
   message.success(t('config.reset_done'))
@@ -32,19 +34,19 @@ async function resetAll() {
     <n-alert v-else-if="store.error" type="error" :title="store.error" closable />
     <template v-else>
       <n-tabs v-model:value="activeTab" type="line">
-        <n-tab-pane name="risk" :tab="t('config.tab_risk')">
+        <n-tab-pane name="risk" display-directive="show:lazy" :tab="t('config.tab_risk')">
           <RiskConfig />
         </n-tab-pane>
-        <n-tab-pane name="connection" :tab="t('config.tab_connection')">
+        <n-tab-pane name="connection" display-directive="show:lazy" :tab="t('config.tab_connection')">
           <ConnectionConfig />
         </n-tab-pane>
-        <n-tab-pane name="news" :tab="t('config.tab_news')">
+        <n-tab-pane name="news" display-directive="show:lazy" :tab="t('config.tab_news')">
           <NewsFilterConfig />
         </n-tab-pane>
-        <n-tab-pane name="paper" :tab="t('config.tab_paper')">
+        <n-tab-pane name="paper" display-directive="show:lazy" :tab="t('config.tab_paper')">
           <PaperConfig />
         </n-tab-pane>
-        <n-tab-pane name="ai" :tab="t('config.tab_ai')">
+        <n-tab-pane name="ai" display-directive="show:lazy" :tab="t('config.tab_ai')">
           <AiAgentConfig />
         </n-tab-pane>
       </n-tabs>

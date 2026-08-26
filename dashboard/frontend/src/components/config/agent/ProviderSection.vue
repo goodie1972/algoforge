@@ -139,7 +139,10 @@ onMounted(loadProviders)
 </script>
 
 <template>
-  <div>
+  <n-card size="small" :bordered="true">
+    <template #header>
+      <span>LLM 供应商</span>
+    </template>
     <n-spin :show="loading" size="small">
       <div v-if="!loading && providers.length === 0" style="text-align:center;padding:60px 0;color:#8b8f97">
         {{ t('ai.no_providers') }}
@@ -231,5 +234,5 @@ onMounted(loadProviders)
         </div>
       </template>
     </n-modal>
-  </div>
+  </n-card>
 </template>

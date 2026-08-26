@@ -54,7 +54,7 @@ onMounted(loadSettings)
 </script>
 
 <template>
-  <n-card :title="t('ai.agent_settings_title')" size="small" style="margin-bottom:16px">
+  <n-card :title="t('ai.agent_settings_title')" size="small" :bordered="true">
     <n-space vertical size="large">
       <div class="agent-setting-row">
         <div class="agent-setting-info">
