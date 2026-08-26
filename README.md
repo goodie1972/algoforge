@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/MetaTrader4-FreeMT4Bridge-orange" alt="MT4">
   <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite" alt="SQLite">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-3.3.8-gold" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.4.0-gold" alt="Version">
 </p>
 
 <p align="center">
@@ -28,24 +28,35 @@
 ### 🎯 Multi-Strategy Parallel
 - **25+ strategies run simultaneously** with independent Magic Numbers and risk states
 - Auto-scans the `strategies/` directory for new strategies — **zero-config registration**
-- Categories: trend following / reversal / breakout / scoring / combo
+- Categories: trend following / reversal / scoring / breakout / scalping
+- Stoch threshold **K70** (followave) · ADX **22** (fish_eaten) — backtest-optimized parameters
 
 ### 🏗️ Three-Rail Architecture
 - **DataFactory** (data + indicators) → **Strategist** (signal scoring) → **Athlete** (tick verification)
 - Clear separation of duties, real-time entry re-computation, 10s expiry
+- **Engine restart recovery**: positions automatically regain exit state on restart — no orphan trades
 
 ### 🛡️ Complete Risk Control
 - **Three-layer take-profit** + **ATR trailing stop** + **ATR hard stop**
 - **GateManager** (time/volatility/trend/loss gates) · **RiskManager** (per-trade/exposure/position caps) · **TradeManager** (orders/slippage/Magic isolation) — three-layer management
+- **Magic fallback**: orphan positions auto-assigned to nearest strategy
 
 ### 📊 Data-Driven
 - DataFactory computes **26 TA-Lib indicators**, F043 MT4 values preferred
 - **Shared** across strategies, zero redundant computation
 - M5 / M15 / M30 / H1 / H4 multi-timeframe coverage
+- **Lazy multi-timeframe loading**: prioritized by display order, non-blocking startup
 
-### 🧪 Paper Trading
-- Full simulation of entries/exits, strategy-rule-based closes
-- Real-price PnL calculation — **fully validated before going live**
+### 🗞️ Multi-Source News
+- **4 sources**: 汇通 + 金十 (Chinese) + **FXStreet + Kitco** (English)
+- Direction judgment: **LLM-first** with keyword fallback, bilingual
+- Language-aware display: Chinese sources on CN, English sources on EN
+- Source label + original URL link in full-list view
+
+### 📝 Strategy Docs (Bilingual)
+- Every strategy has **parallel `_cn.md` / `_en.md`** docs — one-to-one content mapping
+- Entry/exit logic tables, parameter reference, backtest results — all bilingual
+- Frontend auto-selects by UI language
 
 ### 💪 Self-Healing Monitor
 - Auto health check every 5 minutes, **auto-restart** on crash / bridge disconnect
@@ -158,9 +169,9 @@ Data Flow:  MT4 → FreeMT4Bridge EA → core/bridge.py → DataFactory → Stra
 | `kiss` | Trend | H1 | 880501 | H4 MACD + H1 MA + pivot |
 | `rsi_grading_m30_upgraded` | Scoring | M30 | 660904 | RSI gradient scoring |
 | `m30_bb_deepreturn_optimized` | Reversal | M30 | 661102 | BB deep return |
-| `fish_eaten` | Reversal | M30 | 661301 | RSI+MFI+BB fish exit |
-| `m30_followave` | Trend | M30 | 661402 | Stoch+BBI+BB + 2.0×ATR trailing |
-| `m15_followave` | Trend | M15 | 661401 | Stoch+BBI+BB trend following |
+| `fish_eaten` | Reversal | M30 | 661301 | RSI+MFI+BB fish exit, ADX 22 gate |
+| `m30_followave` | Trend | M30 | 661402 | Stoch+BBI+BB, K70, 2.0×ATR trailing |
+| `m15_followave` | Trend | M15 | 661401 | Stoch+BBI+BB, K70, trend following |
 | `timeprofit_ea` | Scalping | M5 | 880202 | Time-based profit EA |
 
 > Strategy source & docs live in the separate **algoforge-strategies** repository.

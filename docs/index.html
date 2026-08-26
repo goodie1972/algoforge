@@ -411,32 +411,32 @@
         <div class="feature-card fade-in fade-in-delay-1">
           <div class="feature-icon">⚡</div>
           <h3>Multi-Strategy Parallel</h3>
-          <p>25+ strategies run simultaneously with independent magic numbers & risk states. Auto-scans <code>strategies/</code> the strategies/ directory for new strategies — zero-config registration.</p>
+          <p>25+ strategies run simultaneously with independent magic numbers & risk states. Auto-scans <code>strategies/</code> for new strategies — zero-config registration. Backtest-optimized: K70 (followave), ADX 22 (fish_eaten).</p>
         </div>
         <div class="feature-card fade-in fade-in-delay-2">
           <div class="feature-icon">🏗️</div>
           <h3>Three-Rail Architecture</h3>
-          <p>DataFactory (data + indicators) → Strategist (signal scoring) → Athlete (tick verification) — three independent layers, clear separation of duties.</p>
+          <p>DataFactory (data + indicators) → Strategist (signal scoring) → Athlete (tick verification). Engine restart recovery: orphan positions auto-restore exit state.</p>
         </div>
         <div class="feature-card fade-in fade-in-delay-3">
           <div class="feature-icon">🛡️</div>
           <h3>Complete Risk Control</h3>
-          <p>Profit-drawdown take-profit + ATR trailing stop + ATR hard stop. GateManager / RiskManager / TradeManager — three-layer protection.</p>
+          <p>Profit-drawdown take-profit + ATR trailing stop + ATR hard stop. Magic fallback: orphan positions auto-assigned to nearest strategy.</p>
         </div>
         <div class="feature-card fade-in fade-in-delay-1">
           <div class="feature-icon">📊</div>
           <h3>Data-Driven</h3>
-          <p>DataFactory computes 26 TA-Lib indicators, F043 MT4 values preferred, shared cross-strategy cache with zero redundant computation.</p>
+          <p>DataFactory computes 26 TA-Lib indicators, F043 MT4 values preferred, shared cross-strategy cache. Lazy multi-timeframe loading: prioritized by display order.</p>
         </div>
         <div class="feature-card fade-in fade-in-delay-2">
-          <div class="feature-icon">📝</div>
-          <h3>Paper Trading</h3>
-          <p>Full simulation of entries/exits, strategy-rule-based closes, real-price PnL — fully validated before going live.</p>
+          <div class="feature-icon">🗞️</div>
+          <h3>Multi-Source News</h3>
+          <p>4 sources: 汇通 + 金十 (Chinese) + FXStreet + Kitco (English). LLM-first direction judgment with keyword fallback. Language-aware display.</p>
         </div>
         <div class="feature-card fade-in fade-in-delay-3">
-          <div class="feature-icon">🔄</div>
-          <h3>Self-Healing Monitor</h3>
-          <p>Auto health check every 5 minutes, auto-restart on crash / bridge disconnect, real-time WebSocket push, full log tracking.</p>
+          <div class="feature-icon">📝</div>
+          <h3>Bilingual Docs</h3>
+          <p>Every strategy has parallel <code>_cn.md</code> / <code>_en.md</code> docs — entry/exit logic, parameters, backtest results. Frontend auto-selects by UI language.</p>
         </div>
       </div>
     </div>
