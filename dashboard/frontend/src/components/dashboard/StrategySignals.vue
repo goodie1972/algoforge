@@ -335,28 +335,28 @@ onUnmounted(() => {
           <template v-if="strategyLogics[s.name]">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px;">
               <!-- 做空 -->
-              <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #f6465d;">
+              <div style="background: var(--bg-surface); border-radius: 4px; padding: 6px 8px; border-left: 3px solid #f6465d;">
                 <div style="font-weight:700; color:#f6465d; font-size:12px; margin-bottom:4px;">{{ $t('signals.short_label') }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">{{ $t('signals.entry') }}:</div>
+                <div style="font-size:10px; color: var(--text-secondary); margin-bottom:2px;">{{ $t('signals.entry') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.short.entry" :key="'se'+li"
-                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ renderLogic(l) }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">{{ $t('signals.exit') }}:</div>
+                  style="font-size:10px; color: var(--text-primary); padding:1px 0;">{{ renderLogic(l) }}</div>
+                <div style="font-size:10px; color: var(--text-secondary); margin:4px 0 2px;">{{ $t('signals.exit') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.short.exit" :key="'sx'+li"
                   style="font-size:10px; color:#999; padding:1px 0;">{{ renderLogic(l) }}</div>
               </div>
               <!-- 做多 -->
-              <div style="background: #1a1a2e; border-radius: 4px; padding: 6px 8px; border-left: 3px solid #0ecb81;">
+              <div style="background: var(--bg-surface); border-radius: 4px; padding: 6px 8px; border-left: 3px solid #0ecb81;">
                 <div style="font-weight:700; color:#0ecb81; font-size:12px; margin-bottom:4px;">{{ $t('signals.long_label') }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin-bottom:2px;">{{ $t('signals.entry') }}:</div>
+                <div style="font-size:10px; color: var(--text-secondary); margin-bottom:2px;">{{ $t('signals.entry') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.long.entry" :key="'le'+li"
-                  style="font-size:10px; color:#ccc; padding:1px 0;">{{ renderLogic(l) }}</div>
-                <div style="font-size:10px; color:#8b8f97; margin:4px 0 2px;">{{ $t('signals.exit') }}:</div>
+                  style="font-size:10px; color: var(--text-primary); padding:1px 0;">{{ renderLogic(l) }}</div>
+                <div style="font-size:10px; color: var(--text-secondary); margin:4px 0 2px;">{{ $t('signals.exit') }}:</div>
                 <div v-for="(l, li) in strategyLogics[s.name]!.long.exit" :key="'lx'+li"
                   style="font-size:10px; color:#999; padding:1px 0;">{{ renderLogic(l) }}</div>
               </div>
             </div>
           </template>
-          <div v-else style="font-size:11px; color:#8b8f97; padding:4px 0;">{{ $t('signals.no_detail') }}</div>
+          <div v-else style="font-size:11px; color: var(--text-secondary); padding:4px 0;">{{ $t('signals.no_detail') }}</div>
         </n-collapse-item>
         <n-empty v-if="!activeStrategies.length" :description="$t('signals.no_running')" />
       </n-collapse>

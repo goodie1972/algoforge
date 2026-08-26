@@ -53,6 +53,9 @@ def run_backtest(df, params):
     stoch_k_period = params['stoch_k']
     exit_confirm_bars = params['exit_confirm']
     di_gate = params['di_gate']
+    stoch_ob = params.get('stoch_ob', 80)     # Stoch K 超买阈值（可参数化）
+    di_ceil = params.get('di_ceil', 0)        # ±DI 差值上限（0 = 不使用）
+    bbi_dist_pct = params.get('bbi_dist_pct', 0)  # BBI 距离限制（%），0 = 不使用
     trail_atr = params.get('trail_atr', 0)  # 0 = 不使用 trailing stop
     
     df = calc_indicators(df, stoch_k=stoch_k_period)
@@ -173,15 +176,23 @@ def run_backtest(df, params):
             continue
         
         # ── 空仓：入场 ──
-        # ±DI 门禁：趋势方向确认
+        # ±DI 门禁：趋势方向确认（下限 + 可选上限）
         if di_gate > 0 and abs(pdi - ndi) <= di_gate:
             continue
+        if di_ceil > 0 and abs(pdi - ndi) >= di_ceil:
+            continue
         
-        # 多头：+DI > -DI (趋势向上), 价格>BBI, Stoch金叉, K<80, 价格>=BB中轨
-        if pdi > ndi and close_p > bbi and stoch_k > stoch_d and stoch_k < 80 and close_p >= bb_mid:
+        # 多头：+DI > -DI (趋势向上), 价格>BBI, Stoch金叉, K<超买阈值, 价格>=BB中轨, 追高限制
+        dist_ok = True
+        if bbi_dist_pct > 0:
+            dist_ok = close_p <= bbi * (1 + bbi_dist_pct / 100.0)
+        if pdi > ndi and close_p > bbi and stoch_k > stoch_d and stoch_k < stoch_ob and close_p >= bb_mid and dist_ok:
             pending_order = 'buy'
-        # 空头：-DI > +DI (趋势向下), 价格<BBI, Stoch死叉, K>20, 价格<=BB中轨
-        elif ndi > pdi and close_p < bbi and stoch_k < stoch_d and stoch_k > 20 and close_p <= bb_mid:
+        # 空头：-DI > +DI (趋势向下), 价格<BBI, Stoch死叉, K>20, 价格<=BB中轨, 追跌限制
+        dist_ok_s = True
+        if bbi_dist_pct > 0:
+            dist_ok_s = close_p >= bbi * (1 - bbi_dist_pct / 100.0)
+        if ndi > pdi and close_p < bbi and stoch_k < stoch_d and stoch_k > 20 and close_p <= bb_mid and dist_ok_s:
             pending_order = 'sell'
     
     return trades
@@ -190,12 +201,22 @@ def run_backtest(df, params):
 def main():
     timeframes = ['M15', 'M30']
     param_grid = []
+    # 原版：K<80, DI>5 无上限（对照）
     for stoch_k in [5]:
         for exit_cfm in [3]:
             for di_gate in [5]:
-                for trail_atr in [0, 1.5, 2.0, 3.0]:
-                    for tf in timeframes:
+                for trail_atr in [2.0]:
+                    for tf in ['M30']:
                         param_grid.append({'stoch_k': stoch_k, 'exit_confirm': exit_cfm, 'di_gate': di_gate, 'trail_atr': trail_atr, 'timeframe': tf})
+    # 新版：K<60 + DI 5~10 上限
+    for stoch_k in [5]:
+        for exit_cfm in [3]:
+            for di_gate in [5]:
+                for di_ceil in [10]:
+                    for stoch_ob in [60]:
+                        for trail_atr in [2.0]:
+                            for tf in ['M30']:
+                                param_grid.append({'stoch_k': stoch_k, 'exit_confirm': exit_cfm, 'di_gate': di_gate, 'di_ceil': di_ceil, 'stoch_ob': stoch_ob, 'trail_atr': trail_atr, 'timeframe': tf})
     
     header_font = Font(bold=True, color='FFFFFF', size=11)
     header_fill = PatternFill('solid', fgColor='2F5496')
@@ -213,7 +234,7 @@ def main():
     for p in param_grid:
         tf = p['timeframe']
         df = load_data(tf)
-        combo = f"{tf}_Stoch{p['stoch_k']}_Cfm{p['exit_confirm']}_DI{p['di_gate']}_Trail{p['trail_atr']}"
+        combo = f"{tf}_Stoch{p['stoch_k']}_K{str(p.get('stoch_ob','80'))}_Cfm{p['exit_confirm']}_DI{p['di_gate']}{'-'+str(p['di_ceil']) if p.get('di_ceil') else ''}_Trail{p['trail_atr']}"
         print(f'[{combo}] {len(df)}根K线...', end=' ')
         
         trades = run_backtest(df, p)

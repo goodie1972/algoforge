@@ -673,25 +673,25 @@ onUnmounted(() => {
   display: flex; align-items: center; justify-content: center;
 }
 .nb-modal {
-  background: #1a1d23; border-radius: 12px;
+  background: var(--bg-tertiary); border-radius: 12px;
   max-width: 600px; width: 90%; max-height: 80vh;
   display: flex; flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 32px var(--shadow-heavy);
 }
 .nb-modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid #2a2a2a;
+  padding: 16px 20px; border-bottom: 1px solid var(--border-color);
 }
 .nb-modal-title {
   font-weight: 700;
   font-size: 16px;
 }
 .nb-close {
-  background: none; border: none; color: #888; font-size: 24px;
+  background: none; border: none; color: var(--text-secondary); font-size: 24px;
   cursor: pointer; padding: 0 4px; line-height: 1;
   transition: color 0.15s ease;
 }
-.nb-close:hover { color: #fff; }
+.nb-close:hover { color: var(--text-primary); }
 .nb-modal-body {
   padding: 20px; overflow-y: auto;
 }

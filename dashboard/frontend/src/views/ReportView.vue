@@ -304,7 +304,7 @@ function nbVarArrow(score: number): string {
             <n-tag v-if="item.floating_pnl < -10"
               size="tiny" type="error" :bordered="false">{{ $t('report.floating_loss') }}</n-tag>
           </div>
-          <div style="font-size: 12px; color: #888; line-height: 1.4;">
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
             <div>{{ $t('report.balance') }} ${{ (item.account_balance ?? 0).toFixed(2) }}</div>
             <div>
               {{ $t('report.positions') }} {{ item.position_count ?? 0 }} {{ $t('report.orders') }}
@@ -415,7 +415,7 @@ function nbVarArrow(score: number): string {
         <template v-else>
           <div style="margin-bottom: 12px;">
             <div style="font-size: 18px; font-weight: 700;">{{ currentReport.title }}</div>
-            <div style="font-size: 12px; color: #888; margin-top: 4px;">
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
               {{ fmtTimeFull(currentReport.created_at) }}
               <n-tag :type="activeTab === 'daily' ? 'info' : 'success'" size="tiny" :bordered="false" style="margin-left: 8px;">
                 {{ activeTab === 'daily' ? $t('report.daily') : $t('report.weekly') }}
@@ -430,19 +430,19 @@ function nbVarArrow(score: number): string {
             style="margin-bottom: 8px;">
             <div style="display: flex; gap: 16px; flex-wrap: wrap;">
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.engine_status') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.engine_status') }} </span>
                 <n-tag :type="sec.data.verdict === 'GREEN' ? 'success' : 'error'" size="small" :bordered="false">
                   {{ sec.data.status }}
                 </n-tag>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.bridge') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.bridge') }} </span>
                 <n-tag :type="sec.data.bridge === '已连接' ? 'success' : 'warning'" size="small" :bordered="false">
                   {{ sec.data.bridge }}
                 </n-tag>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.runtime') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.runtime') }} </span>
                 <span style="font-weight: 600;">{{ sec.data.uptime }}</span>
               </div>
             </div>
@@ -529,8 +529,8 @@ function nbVarArrow(score: number): string {
                   </div>
                   <!-- 评分 + 阈值 -->
                   <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
-                    <span>L={{ s.score_long }} <span style="color: #888;">/ S={{ s.score_short }}</span></span>
-                    <span v-if="s.threshold" style="color: #888;">
+                    <span>L={{ s.score_long }} <span style="color: var(--text-secondary);">/ S={{ s.score_short }}</span></span>
+                    <span v-if="s.threshold" style="color: var(--text-secondary);">
                       {{ $t('report.threshold') }}{{ s.threshold }}
                       <n-tag v-if="s.threshold_reached" size="tiny" type="success" :bordered="false" style="margin-left: 4px;">{{ $t('report.met') }}</n-tag>
                       <n-tag v-else size="tiny" type="default" :bordered="false" style="margin-left: 4px;">{{ $t('report.unmet') }}</n-tag>
@@ -540,17 +540,17 @@ function nbVarArrow(score: number): string {
                   <div v-if="s.factors_long?.length" style="margin-bottom: 2px;">
                     <span style="color: #0ecb81;">{{ $t('report.long_colon') }} </span>
                     <span v-for="(f, fi) in s.factors_long" :key="'lf'+fi">
-                      <span v-if="fi > 0" style="color: #555;"> → </span>{{ f }}
+                      <span v-if="fi > 0" style="color: var(--text-muted);"> → </span>{{ f }}
                     </span>
                   </div>
                   <div v-if="s.factors_short?.length" style="margin-bottom: 2px;">
                     <span style="color: #f6465d;">{{ $t('report.short_colon') }} </span>
                     <span v-for="(f, fi) in s.factors_short" :key="'sf'+fi">
-                      <span v-if="fi > 0" style="color: #555;"> → </span>{{ f }}
+                      <span v-if="fi > 0" style="color: var(--text-muted);"> → </span>{{ f }}
                     </span>
                   </div>
                   <!-- 指标快照 -->
-                  <div style="color: #888; font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
+                  <div style="color: var(--text-secondary); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px;">
                     <span v-if="s.indicator_values?.close">{{ $t('report.price') }}{{ s.indicator_values.close.toFixed(1) }}</span>
                     <span v-if="s.indicator_values?.rsi">RSI={{ s.indicator_values.rsi.toFixed(1) }}</span>
                     <span v-if="s.indicator_values?.atr">ATR={{ s.indicator_values.atr.toFixed(1) }}</span>
@@ -583,17 +583,17 @@ function nbVarArrow(score: number): string {
             style="margin-bottom: 8px;">
             <div style="display: flex; gap: 24px; align-items: center;">
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.daily_pnl') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.daily_pnl') }} </span>
                 <span :style="{ color: fmtPnlColor(sec.data.daily_pnl), fontWeight: 700, fontSize: '16px' }">
                   {{ fmtPnl(sec.data.daily_pnl) }}
                 </span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.drawdown') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.drawdown') }} </span>
                 <span style="font-weight: 600;">{{ (sec.data.daily_drawdown ?? 0).toFixed(2) }}%</span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.blocked') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.blocked') }} </span>
                 <n-tag v-if="!sec.data.strategy_blocks?.some((b: any) => b.blocks?.length)" size="small" type="success" :bordered="false">{{ $t('report.none') }}</n-tag>
                 <n-tag v-else size="small" type="warning" :bordered="false">
                   {{ sec.data.strategy_blocks.filter((b: any) => b.blocks?.length).length }} {{ $t('report.strategies_blocked') }}
@@ -612,15 +612,15 @@ function nbVarArrow(score: number): string {
             style="margin-bottom: 8px;">
             <div style="display: flex; gap: 24px;">
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.bid') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.bid') }} </span>
                 <span style="font-weight: 700; font-size: 16px;">{{ (sec.data.bid ?? 0).toFixed(2) }}</span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.ask') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.ask') }} </span>
                 <span style="font-weight: 700; font-size: 16px;">{{ (sec.data.ask ?? 0).toFixed(2) }}</span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.spread') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.spread') }} </span>
                 <span style="font-weight: 700; color: #f0b90b;">{{ (sec.data.spread ?? 0).toFixed(2) }}</span>
               </div>
             </div>
@@ -631,21 +631,21 @@ function nbVarArrow(score: number): string {
             style="margin-bottom: 8px;">
             <div style="display: flex; gap: 24px; margin-bottom: 12px;">
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.total') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.total') }} </span>
                 <span style="font-weight: 700;">{{ sec.data.total ?? 0 }} {{ $t('report.items') }}</span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.directional') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.directional') }} </span>
                 <span style="font-weight: 700;">{{ sec.data.directional ?? 0 }} {{ $t('report.items') }}</span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.accuracy') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.accuracy') }} </span>
                 <span :style="{ color: (sec.data.accuracy ?? 0) >= 60 ? '#0ecb81' : '#f6465d', fontWeight: 700 }">
                   {{ sec.data.accuracy ?? 0 }}%
                 </span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.correct_incorrect') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.correct_incorrect') }} </span>
                 <span style="font-weight: 700;">
                   <span style="color: #0ecb81;">{{ sec.data.correct ?? 0 }}</span>
                   /
@@ -653,7 +653,7 @@ function nbVarArrow(score: number): string {
                 </span>
               </div>
               <div>
-                <span style="color: #888; font-size: 12px;">{{ $t('report.neutral_unable') }} </span>
+                <span style="color: var(--text-secondary); font-size: 12px;">{{ $t('report.neutral_unable') }} </span>
                 <span style="font-weight: 700; color: #888;">{{ sec.data.neutral ?? 0 }}</span>
               </div>
             </div>

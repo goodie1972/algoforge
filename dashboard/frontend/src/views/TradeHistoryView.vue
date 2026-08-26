@@ -87,7 +87,7 @@ async function triggerAiAnalysis(ticket: number) {
 function renderAnalysis(row: any) {
   const ticket = row.ticket
   if (analysisLoading[ticket]) {
-    return h(NSpin, {}, { default: () => h('div', { style: 'font-size: 13px; color: #888;' }, [t('trades.analysis_loading')]) })
+    return h(NSpin, {}, { default: () => h('div', { style: 'font-size: 13px; color: var(--text-secondary)' }, [t('trades.analysis_loading')]) })
   }
   const data = analysisCache[ticket]
   if (!data) return h('span', t('trades.analysis_click'))
@@ -104,7 +104,7 @@ function renderAnalysis(row: any) {
         h('div', {}, `系统: ${data.entry_analysis?.system || t('trades.unknown')}`),
         data.entry_analysis?.likely_conditions?.length
           ? h('div', { style: 'margin-top: 4px;' }, [
-              h('span', { style: 'color: #888;' }, t('trades.trigger_condition')),
+              h('span', { style: 'color: var(--text-secondary);' }, t('trades.trigger_condition')),
               ...data.entry_analysis.likely_conditions.map((c: string, i: number) =>
                 h('span', { style: 'background: #1a1a2e; padding: 1px 6px; border-radius: 3px; margin-right: 4px;' }, c)
               ),
@@ -112,7 +112,7 @@ function renderAnalysis(row: any) {
           : null,
         data.entry_analysis?.factors
           ? h('div', { style: 'margin-top: 8px;' }, [
-              h('div', { style: 'color: #888; margin-bottom: 4px;' }, t('trades.score_factors')),
+              h('div', { style: 'color: var(--text-secondary); margin-bottom: 4px;' }, t('trades.score_factors')),
               ...data.entry_analysis.factors.map((f: any) =>
                 h('div', { style: 'font-size: 12px; padding: 2px 0;' }, `• ${f.name}: ${f.desc}`)
               ),
@@ -158,7 +158,7 @@ function renderAnalysis(row: any) {
           disabled: true,
         }, { default: () => t('trades.ai_button') }),
     !llmAvailable.value
-      ? h('span', { style: 'margin-left: 8px; font-size: 12px; color: #888;' }, t('trades.ai_unavailable_tooltip'))
+      ? h('span', { style: 'margin-left: 8px; font-size: 12px; color: var(--text-secondary);' }, t('trades.ai_unavailable_tooltip'))
       : null,
     hasAiAnalysis
       ? h('span', { style: 'margin-left: 8px; font-size: 12px; color: #0ecb81;' }, '✓')
@@ -185,14 +185,14 @@ function renderAnalysis(row: any) {
         h('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;' }, [
           h('div', { style: 'font-weight: 700; font-size: 14px;' }, '✨ ' + t('trades.ai_analysis_title')),
           metaText
-            ? h('div', { style: 'font-size: 12px; color: #888; background: #1a1a2e; padding: 2px 8px; border-radius: 4px;' }, metaText)
+            ? h('div', { style: 'font-size: 12px; color: var(--text-secondary); background: var(--bg-surface); padding: 2px 8px; border-radius: 4px;' }, metaText)
             : null,
         ]),
         aiSection(t('trades.ai_entry_logic'), '#0ecb81', ai.entry_logic),
         aiSection(t('trades.ai_exit_reason'), '#f6465d', ai.exit_reason),
         aiSection(t('trades.ai_pnl_note'), '#f0a020', ai.pnl_note),
         ai.model
-          ? h('div', { style: 'margin-top: 10px; font-size: 11px; color: #666;' }, `${t('trades.ai_model')}: ${ai.model}`)
+          ? h('div', { style: 'margin-top: 10px; font-size: 11px; color: var(--text-muted)' }, `${t('trades.ai_model')}: ${ai.model}`)
           : null,
       ])
     )

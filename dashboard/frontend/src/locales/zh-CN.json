@@ -698,7 +698,8 @@
     "smithery_key_configured": "已配置",
     "smithery_key_not_configured": "未配置",
     "chat_panel_resize_hint": "拖动调节面板大小",
-    "launcher_open_hint": "招财金探：按住可拖动，双击打开 AI 助手"
+    "launcher_open_hint": "招财金探：按住可拖动，双击打开 AI 助手",
+    "quick_presets": "预设"
   },
   "coordinator": {
     "trigger_rate_disabled": "禁用",

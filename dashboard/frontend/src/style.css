@@ -1,3 +1,33 @@
+/* -- Theme CSS Variable System -- */
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1a1d23;
+  --bg-surface: #1c2333;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #7d8590;
+  --border-color: #21262d;
+  --border-subtle: #2d3139;
+  --code-bg: #0d1117;
+  --input-bg: #0d1117;
+  --shadow-heavy: rgba(0, 0, 0, 0.5);
+}
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f7fa;
+  --bg-tertiary: #f5f7fa;
+  --bg-surface: #f0f2f5;
+  --text-primary: #1a1a2e;
+  --text-secondary: #6e7681;
+  --text-muted: #6e7681;
+  --border-color: #e0e4e8;
+  --border-subtle: #d0d4d8;
+  --code-bg: #f0f2f5;
+  --input-bg: #f5f7fa;
+  --shadow-heavy: rgba(0, 0, 0, 0.12);
+}
+
 /* 全局覆盖 - 主题 */
 body {
   margin: 0;

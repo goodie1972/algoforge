@@ -381,6 +381,75 @@ onUnmounted(() => {
   Object.values(paneCharts).forEach(pc => pc.remove())
 })
 
+// ---- 主题切换响应：销毁并重建所有图表实例 ----
+const appStore = useAppStore()
+watch(() => appStore.isDark, () => {
+  // 1. 销毁所有图表
+  chart?.remove()
+  chart = null
+  candleSeries = null
+  overlaySeries = {}
+  Object.values(paneCharts).forEach(pc => pc.remove())
+  paneCharts = {}
+  paneSeries = {}
+
+  nextTick(() => {
+    if (!chartContainer.value) return
+    const w = chartContainer.value.clientWidth
+
+    // 2. 重建主图
+    chart = createChart(chartContainer.value, makeChartOptions(w, chartHeight, true))
+    candleSeries = chart.addCandlestickSeries({
+      upColor: '#0ecb81', downColor: '#f6465d',
+      borderUpColor: '#0ecb81', borderDownColor: '#f6465d',
+      wickUpColor: '#0ecb81', wickDownColor: '#f6465d',
+    })
+
+    // 3. 重新订阅主图事件
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      syncAllChartsFrom(chart!, _chartRef())
+      scheduleAutoScroll()
+      try {
+        const range = chart!.timeScale().getVisibleLogicalRange()
+        if (range && range.from <= 3 && store.candles.length > 0) {
+          const firstCandle = store.candles[0]
+          if (typeof firstCandle.time === 'number') {
+            store.fetchMoreCandles(activeTf.value, firstCandle.time + 1, 500)
+          }
+        }
+      } catch {}
+    })
+    chart.subscribeCrosshairMove((param: any) => {
+      syncAllChartsFrom(chart!, _chartRef())
+      onCrosshairMove(chart!, param, _chartRef())
+      scheduleAutoScroll()
+    })
+
+    // 4. 刷新 K 线数据 + 叠加指标
+    if (store.candles.length > 0) {
+      candleSeries.setData(sanitizeCandleData(store.candles))
+    }
+    applyOverlay()
+
+    // 5. 通过切换副图开关触发重建（watcher 会销毁旧实例并创建新主题实例）
+    const paneFlags: [any, boolean][] = [
+      [showRSI, showRSI.value], [showStoch, showStoch.value],
+      [showMACD, showMACD.value], [showATR, showATR.value],
+      [showVolume, showVolume.value], [showADX, showADX.value],
+      [showDI, showDI.value], [showMFI, showMFI.value],
+      [showBBI, showBBI.value],
+    ]
+    for (const [ref, wasOn] of paneFlags) {
+      if (wasOn) { ref.value = false; ref.value = true }
+    }
+
+    nextTick(() => {
+      scrollAllToRealTime()
+      requestAnimationFrame(() => syncAllPriceScaleWidths())
+    })
+  })
+})
+
 // 数值闪烁 — 内联实现，直接 watch store
 const bidFlash = ref(false)
 let _bTimer: any = null

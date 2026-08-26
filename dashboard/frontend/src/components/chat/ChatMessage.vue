@@ -101,12 +101,12 @@ function _escapeHtml(text: string): string {
 }
 .chat-bubble--user {
   background: rgba(240, 185, 11, 0.15);
-  color: #e6edf3;
+  color: var(--text-primary);
   border-radius: 12px 12px 4px 12px;
 }
 .chat-bubble--ai {
-  background: #1c2333;
-  color: #e6edf3;
+  background: var(--bg-surface);
+  color: var(--text-primary);
   border-radius: 12px 12px 12px 4px;
   border-left: 3px solid #f0b90b;
 }
@@ -115,7 +115,7 @@ function _escapeHtml(text: string): string {
 }
 .chat-tool-status {
   font-size: 11px;
-  color: #7d8590;
+  color: var(--text-muted);
   margin-bottom: 4px;
   opacity: 0.85;
 }
@@ -132,7 +132,7 @@ function _escapeHtml(text: string): string {
 :deep(.chat-h3) { font-size: 13px; font-weight: 600; margin: 6px 0 3px; color: #f0b90b; }
 :deep(.chat-li) { padding-left: 12px; margin: 2px 0; }
 :deep(.chat-code-block) {
-  background: #0d1117;
+  background: var(--code-bg);
   padding: 8px 12px;
   border-radius: 6px;
   margin: 6px 0;
@@ -147,6 +147,6 @@ function _escapeHtml(text: string): string {
 }
 :deep(strong) { color: #f0b90b; }
 :deep(table) { border-collapse: collapse; width: 100%; margin: 8px 0; }
-:deep(th), :deep(td) { border: 1px solid #333; padding: 4px 8px; font-size: 12px; }
+:deep(th), :deep(td) { border: 1px solid var(--border-color); padding: 4px 8px; font-size: 12px; }
 :deep(th) { background: rgba(240, 185, 11, 0.1); }
 </style>

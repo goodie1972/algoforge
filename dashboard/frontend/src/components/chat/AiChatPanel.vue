@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, nextTick, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/stores/chat'
@@ -147,12 +147,12 @@ onBeforeUnmount(() => {
 })
 
 const quickCommands = [
-  { icon: '📊', label: '行情研判', text: '结合当前指标和新闻，给我一个简短的行情研判' },
-  { icon: '💰', label: '持仓诊断', text: '分析我当前的持仓，是否有风险？给止盈止损建议' },
-  { icon: '📰', label: '新闻解读', text: '最近的重要黄金新闻有什么影响？' },
-  { icon: '📋', label: '策略表现', text: '最近哪个策略表现最好/最差？数据分析' },
-  { icon: '⚠️', label: '风险检查', text: '当前有什么风险需要注意的？' },
-  { icon: '📅', label: '今日总结', text: '帮我总结今天的交易情况' },
+  { label: '行情研判', text: '结合当前指标和新闻，给我一个简短的行情研判' },
+  { label: '持仓诊断', text: '分析我当前的持仓，是否有风险？给止盈止损建议' },
+  { label: '新闻解读', text: '最近的重要黄金新闻有什么影响？' },
+  { label: '策略表现', text: '最近哪个策略表现最好/最差？数据分析' },
+  { label: '风险检查', text: '当前有什么风险需要注意的？' },
+  { label: '今日总结', text: '帮我总结今天的交易情况' },
 ]
 
 watch(() => chat.messages.length, () => {
@@ -270,7 +270,7 @@ function handleClose() {
         <div class="chat-empty-hint">试试这些：</div>
         <div class="chat-empty-commands">
           <button v-for="cmd in quickCommands" :key="cmd.label" class="chat-empty-cmd" @click="handleQuickCommand(cmd)">
-            {{ cmd.icon }} {{ cmd.label }}
+            {{ cmd.label }}
           </button>
         </div>
       </div>
@@ -293,34 +293,33 @@ function handleClose() {
       </div>
     </div>
 
-    <!-- 快捷指令栏 -->
-    <div v-if="chat.messages.length > 0" class="chat-quick">
+    <!-- 快捷命令栏 -->
+    <div class="chat-quick">
       <button
         v-for="cmd in quickCommands"
         :key="cmd.label"
         class="chat-quick-btn"
         :disabled="chat.streaming"
         @click="handleQuickCommand(cmd)"
-      >
-        {{ cmd.icon }} {{ cmd.label }}
-      </button>
+      >{{ cmd.label }}</button>
     </div>
 
     <!-- 输入区域 -->
     <div class="chat-input-area">
-      <textarea
-        v-model="inputText"
-        class="chat-input"
-        :placeholder="chat.streaming ? '金探正在思考...' : '问金探任何交易问题...'"
-        :disabled="chat.streaming"
-        @keydown="handleKeydown"
-        rows="1"
-      />
-      <button class="chat-send-btn" :disabled="!inputText.trim() || chat.streaming" @click="handleSend">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-        </svg>
-      </button>
+      <div class="chat-input-wrap">
+        <textarea
+          v-model="inputText"
+          class="chat-input"
+          :placeholder="chat.streaming ? '金探正在思考...' : '问金探任何交易问题...'"
+          :disabled="chat.streaming"
+          @keydown="handleKeydown"
+        />
+        <button class="chat-send-btn" :disabled="!inputText.trim() || chat.streaming" @click="handleSend">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- 调节大小手柄：右侧边 / 底边 / 右下角 -->
@@ -339,13 +338,13 @@ function handleClose() {
   z-index: 9999;
   min-width: 320px;
   min-height: 400px;
-  background: #0d1117;
-  border: 1px solid #21262d;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px var(--shadow-heavy);
   transition: box-shadow 0.15s ease;
 }
 /* 拖动/缩放中的加强反馈 */
@@ -359,8 +358,8 @@ function handleClose() {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #21262d;
-  background: #161b22;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
   cursor: move;
   user-select: none;
   touch-action: none;
@@ -372,32 +371,32 @@ function handleClose() {
   display: flex; align-items: center; justify-content: center;
   font-size: 16px;
 }
-.chat-header-name { font-size: 14px; font-weight: 600; color: #e6edf3; }
-.chat-header-role { font-size: 11px; color: #7d8590; }
+.chat-header-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.chat-header-role { font-size: 11px; color: var(--text-muted); }
 .chat-header-right { display: flex; gap: 4px; }
 .chat-icon-btn {
-  background: transparent; border: none; color: #7d8590;
+  background: transparent; border: none; color: var(--text-muted);
   cursor: pointer; padding: 6px; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
 }
-.chat-icon-btn:hover { background: #21262d; color: #e6edf3; }
-.chat-icon-btn.active { background: #21262d; color: #f0b90b; }
+.chat-icon-btn:hover { background: var(--border-color); color: var(--text-primary); }
+.chat-icon-btn.active { background: var(--border-color); color: #f0b90b; }
 
 /* 会话列表 */
 .chat-sessions {
   position: absolute;
   top: 61px; left: 0; bottom: 0;
   width: 200px;
-  background: #0d1117;
-  border-right: 1px solid #21262d;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
   z-index: 10;
   display: flex;
   flex-direction: column;
 }
 .chat-sessions-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 12px; border-bottom: 1px solid #21262d;
-  font-size: 12px; color: #7d8590;
+  padding: 10px 12px; border-bottom: 1px solid var(--border-color);
+  font-size: 12px; color: var(--text-muted);
 }
 .chat-new-btn {
   background: rgba(240,185,11,0.1); border: 1px solid rgba(240,185,11,0.3);
@@ -409,12 +408,12 @@ function handleClose() {
 .chat-session-item {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 12px; cursor: pointer;
-  border-bottom: 1px solid #161b22;
+  border-bottom: 1px solid var(--border-color);
 }
-.chat-session-item:hover { background: #161b22; }
-.chat-session-item.active { background: #161b22; border-left: 2px solid #f0b90b; }
-.chat-session-title { flex: 1; font-size: 12px; color: #e6edf3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-session-count { font-size: 10px; color: #7d8590; }
+.chat-session-item:hover { background: var(--bg-secondary); }
+.chat-session-item.active { background: var(--bg-secondary); border-left: 2px solid #f0b90b; }
+.chat-session-title { flex: 1; font-size: 12px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-session-count { font-size: 10px; color: var(--text-muted); }
 .chat-session-del {
   background: transparent; border: none; color: #484f58;
   cursor: pointer; font-size: 10px; padding: 2px;
@@ -440,10 +439,10 @@ function handleClose() {
   display: flex; align-items: center; justify-content: center;
   font-size: 24px; margin-bottom: 16px;
 }
-.chat-empty-title { font-size: 16px; font-weight: 600; color: #e6edf3; margin-bottom: 4px; }
-.chat-empty-subtitle { font-size: 13px; color: #7d8590; margin-bottom: 16px; }
-.chat-empty-desc { font-size: 12px; color: #7d8590; margin-bottom: 20px; line-height: 1.6; }
-.chat-empty-hint { font-size: 12px; color: #7d8590; margin-bottom: 8px; }
+.chat-empty-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.chat-empty-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+.chat-empty-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
+.chat-empty-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
 .chat-empty-commands { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-height: 120px; overflow-y: auto; }
 .chat-empty-cmd {
   background: rgba(240,185,11,0.08); border: 1px solid rgba(240,185,11,0.2);
@@ -452,39 +451,44 @@ function handleClose() {
 }
 .chat-empty-cmd:hover { background: rgba(240,185,11,0.15); }
 
-/* 快捷指令 */
+/* 快捷命令栏 */
 .chat-quick {
-  display: flex; gap: 6px; padding: 6px 12px;
-  overflow-x: auto; border-top: 1px solid #21262d;
+  display: flex; flex-direction: row; gap: 4px;
+  padding: 4px 8px; border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary); flex-wrap: nowrap; overflow: hidden;
 }
-.chat-quick::-webkit-scrollbar { display: none; }
 .chat-quick-btn {
   background: rgba(240,185,11,0.08); border: 1px solid rgba(240,185,11,0.2);
-  color: #f0b90b; font-size: 11px; padding: 4px 10px;
-  border-radius: 12px; cursor: pointer; white-space: nowrap;
+  color: #f0b90b; font-size: 11px; padding: 2px 6px;
+  border-radius: 4px; cursor: pointer; white-space: nowrap;
+  flex-shrink: 1; min-width: 0;
+  transition: background 0.12s ease;
 }
-.chat-quick-btn:hover:not(:disabled) { background: rgba(240,185,11,0.15); }
+.chat-quick-btn:hover:not(:disabled) { background: rgba(240,185,11,0.18); }
 .chat-quick-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* 输入区域 */
 .chat-input-area {
-  display: flex; align-items: flex-end; gap: 8px;
-  padding: 10px 12px; border-top: 1px solid #21262d;
-  background: #161b22;
+  padding: 8px 12px; border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+.chat-input-wrap {
+  position: relative;
 }
 .chat-input {
-  flex: 1; background: #0d1117; border: 1px solid #21262d;
-  color: #e6edf3; border-radius: 8px; padding: 8px 12px;
+  width: 100%; background: var(--input-bg); border: 1px solid var(--border-color);
+  color: var(--text-primary); border-radius: 8px; padding: 8px 44px 8px 12px;
   font-size: 13px; resize: none; outline: none;
-  min-height: 40px; max-height: 120px;
+  max-height: 120px;
   font-family: inherit;
 }
 .chat-input:focus { border-color: rgba(240,185,11,0.5); }
-.chat-input::placeholder { color: #484f58; }
+.chat-input::placeholder { color: var(--text-muted); }
 .chat-send-btn {
+  position: absolute; right: 4px; bottom: 4px;
   width: 36px; height: 36px; border-radius: 8px;
   background: linear-gradient(135deg, #f0b90b, #d4a309);
-  border: none; color: #0d1117; cursor: pointer;
+  border: none; color: var(--bg-primary); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }

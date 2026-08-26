@@ -44,6 +44,10 @@ def run_backtest(df, params):
     di_diff_gate = params['di_diff']
     bb_exit_offset = params['bb_exit']
     time_stop_bars = params.get('time_stop', 48)
+    rsi_os = params.get('rsi_os', 30)     # 超卖阈值
+    rsi_ob = params.get('rsi_ob', 70)     # 超买阈值
+    mfi_os = params.get('mfi_os', 25)     # MFI 超卖阈值
+    mfi_ob = params.get('mfi_ob', 75)     # MFI 超买阈值
     
     trades = []
     in_position = False
@@ -102,11 +106,11 @@ def run_backtest(df, params):
             
             if direction == 'LONG':
                 # 跟踪 RSI/MFI 极限
-                if not rsi_extreme and rsi >= 70:
+                if not rsi_extreme and rsi >= rsi_ob:
                     rsi_extreme = True
                     if first_extreme_bar == -1:
                         first_extreme_bar = i
-                if not mfi_extreme and mfi >= 75:
+                if not mfi_extreme and mfi >= mfi_ob:
                     mfi_extreme = True
                     if first_extreme_bar == -1:
                         first_extreme_bar = i
@@ -124,7 +128,7 @@ def run_backtest(df, params):
                 
                 # 吃鱼出场：两个都到了极限，然后任一离开 + 价格回到 BB 上轨下方
                 if both_extreme:
-                    if (rsi < 70 or mfi < 75) and close_p < bb_top - bb_exit_offset:
+                    if (rsi < rsi_ob or mfi < mfi_ob) and close_p < bb_top - bb_exit_offset:
                         exit_price = close_p
                         pnl = exit_price - entry_price
                         trades.append({'entry_time': entry_time, 'exit_time': row['time'], 'direction': 'LONG', 'entry_price': round(entry_price,2),
@@ -133,11 +137,11 @@ def run_backtest(df, params):
                         in_position = False; direction = None; continue
             
             else:  # SHORT
-                if not rsi_extreme and rsi <= 30:
+                if not rsi_extreme and rsi <= rsi_os:
                     rsi_extreme = True
                     if first_extreme_bar == -1:
                         first_extreme_bar = i
-                if not mfi_extreme and mfi <= 25:
+                if not mfi_extreme and mfi <= mfi_os:
                     mfi_extreme = True
                     if first_extreme_bar == -1:
                         first_extreme_bar = i
@@ -154,7 +158,7 @@ def run_backtest(df, params):
                     in_position = False; direction = None; continue
                 
                 if both_extreme:
-                    if (rsi > 30 or mfi > 25) and close_p > bb_bot + bb_exit_offset:
+                    if (rsi > rsi_os or mfi > mfi_os) and close_p > bb_bot + bb_exit_offset:
                         exit_price = close_p
                         pnl = entry_price - exit_price
                         trades.append({'entry_time': entry_time, 'exit_time': row['time'], 'direction': 'SHORT', 'entry_price': round(entry_price,2),
@@ -171,10 +175,10 @@ def run_backtest(df, params):
             continue
         
         if ndi > pdi:  # -DI 大 → 空头主导 → 超卖 BUY
-            if rsi < 30 and mfi < 25 and close_p <= bb_bot + 5 and bb_mid_dir == 'down':
+            if rsi < rsi_os and mfi < mfi_os and close_p <= bb_bot + 5 and bb_mid_dir == 'down':
                 pending_order = 'buy'
         else:  # +DI 大 → 多头主导 → 超买 SELL
-            if rsi > 70 and mfi > 75 and close_p >= bb_top - 5 and bb_mid_dir == 'up':
+            if rsi > rsi_ob and mfi > mfi_ob and close_p >= bb_top - 5 and bb_mid_dir == 'up':
                 pending_order = 'sell'
     
     return trades
