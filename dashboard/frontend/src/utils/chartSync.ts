@@ -94,29 +94,104 @@ export function syncCrosshairToAll(tc: any, t: number, ref: ChartRef) {
   if (ref.lock.value) return
   ref.lock.value = true
   try {
-    const targets: Array<{ chart: any; series: any[] }> = []
-    if (ref.chart && ref.chart !== tc) targets.push({ chart: ref.chart, series: [ref.candleSeries] })
+    const targets: Array<{ chart: any; series: any[]; height: number }> = []
+    if (ref.chart && ref.chart !== tc) {
+      // 获取主图高度
+      const height = getChartHeight(ref.chart)
+      targets.push({ chart: ref.chart, series: [ref.candleSeries], height })
+    }
     for (const name of Object.keys(ref.paneCharts)) {
       const pc = ref.paneCharts[name]
-      if (pc && pc !== tc) targets.push({ chart: pc, series: getPaneSeriesList(name, ref.paneSeries) })
+      if (pc && pc !== tc) {
+        // 获取副图高度
+        const height = getChartHeight(pc)
+        targets.push({ chart: pc, series: getPaneSeriesList(name, ref.paneSeries), height })
+      }
     }
-    for (const { chart: c2, series } of targets) {
+    
+    // 获取源图表的高度
+    const sourceHeight = getChartHeight(tc)
+    
+    for (const { chart: c2, series, height: targetHeight } of targets) {
       if (!c2 || series.length === 0) continue
       let price = 0
       for (const s of series) {
         const map = indexSeriesValues(s)
         if (map.has(t)) { price = map.get(t)!; break }
         let nearest: number | null = null
-        for (const [tt, vv] of map) {
+        const entries = Array.from(map.entries());
+        for (const [tt, vv] of entries) {
           if (tt <= t) nearest = vv
           else break
         }
         if (nearest != null) { price = nearest; break }
       }
-      try { c2.setCrosshairPosition(price, t as any, series[0]) } catch { /* ignore */ }
+      
+      // 使用 setCrosshairPosition 的完整签名，分别处理 X 和 Y 坐标
+      // X 坐标直接使用时间，Y 坐标需要根据图表高度进行转换
+      try {
+        // 对于 Y 坐标，如果当前图表高度与源图表高度不同，则进行坐标转换
+        if (sourceHeight !== targetHeight) {
+          // 尝试获取源图表的 Y 坐标
+          const sourceY = getCrosshairYCoordinate(tc, price)
+          if (sourceY !== null) {
+            // 将源图表的 Y 坐标转换为相对位置，然后映射到目标图表高度
+            const relativeY = sourceY / sourceHeight
+            const targetY = relativeY * targetHeight
+            c2.setCrosshairPosition(targetY, t as any, series[0])
+          } else {
+            // 如果无法获取源 Y 坐标，则直接使用价格值
+            c2.setCrosshairPosition(price, t as any, series[0])
+          }
+        } else {
+          c2.setCrosshairPosition(price, t as any, series[0])
+        }
+      } catch { /* ignore */ }
     }
   } finally {
     ref.lock.value = false
+  }
+}
+
+/**
+ * 获取图表的高度
+ */
+function getChartHeight(chart: any): number {
+  try {
+    // 尝试通过不同的方式获取图表高度
+    if (chart._internal_charts && chart._internal_charts[0] && typeof chart._internal_charts[0].height === 'function') {
+      return chart._internal_charts[0].height()
+    }
+    // 如果上述方法不可用，尝试其他可能的访问方式
+    if (chart.height && typeof chart.height === 'function') {
+      return chart.height()
+    }
+    // 默认返回主图高度
+    return 420 // 默认主图高度
+  } catch {
+    return 420 // 默认主图高度
+  }
+}
+
+/**
+ * 获取十字光标在源图表上的 Y 坐标
+ */
+function getCrosshairYCoordinate(chart: any, price: number): number | null {
+  try {
+    // Lightweight-Charts 提供了将价格转换为 Y 坐标的函数
+    if (chart.priceScale && typeof chart.priceScale === 'function') {
+      const priceScale = chart.priceScale('right') || chart.priceScale('left')
+      if (priceScale && typeof priceScale.priceToCoordinate === 'function') {
+        return priceScale.priceToCoordinate(price)
+      }
+    }
+    // 如果上述方法不可用，尝试其他可能的方式
+    if (chart.priceToCoordinate && typeof chart.priceToCoordinate === 'function') {
+      return chart.priceToCoordinate(price)
+    }
+    return null
+  } catch {
+    return null
   }
 }
 
