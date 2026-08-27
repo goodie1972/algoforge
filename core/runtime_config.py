@@ -15,9 +15,15 @@ _CORE_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_CORE_DIR)
 CONFIG_FILE = os.path.join(_PROJECT_ROOT, "dashboard", "runtime_config.json")
 
+# ── 持仓上限统一兜底常量（供 core / engine_standalone / dashboard 共用） ──
+# 纸面模式单策略默认持仓上限（原散落硬编码 10）
+PAPER_DEFAULT_MAX_POSITIONS = 10
+# 策略池单策略默认持仓上限（原散落硬编码 1）
+STRATEGY_DEFAULT_MAX_POSITIONS = 1
+
 _ENGINE_KEYS = {
     "lot_size", "stop_loss_pips", "take_profit_pips",
-    "max_positions", "max_daily_loss_pct",
+    "max_positions", "per_strategy_max_positions", "max_daily_loss_pct",
     "floating_loss_warn_pct", "floating_loss_block_pct",
     "per_strategy_realized_loss_pct", "per_strategy_loss_block_hours",
     "max_rapid_exits", "rapid_exit_window_seconds", "rapid_exit_cooldown_seconds",
@@ -36,13 +42,6 @@ _STRATEGY_KEYS = {
     "stoch_k", "atr_period",
 }
 
-
-_PAPER_KEYS = {
-    "paper_trading_enabled",
-    "paper_max_positions",
-    "paper_ignore_gates",
-    "paper_initial_balance",
-}
 
 
 class RuntimeConfig:
@@ -91,6 +90,7 @@ class RuntimeConfig:
             "stop_loss_pips": "STOP_LOSS_PIPS",
             "take_profit_pips": "TAKE_PROFIT_PIPS",
             "max_positions": "MAX_POSITIONS",
+            "per_strategy_max_positions": "PER_STRATEGY_MAX_POSITIONS",
             "max_daily_loss_pct": "MAX_DAILY_LOSS_PCT",
             "slippage": "SLIPPAGE",
             "timeframe": "TIMEFRAME",
@@ -182,17 +182,23 @@ class RuntimeConfig:
 
     def get_paper_config(self) -> dict:
         """获取纸面交易配置（覆盖优先）"""
+        with self._data_lock:
+            global_lot = self._overrides.get("lot_size")
+            paper_override = self._overrides.get("paper_trading")
+        if global_lot is None:
+            global_lot = self._get_default("lot_size")
         defaults = {
             "enabled": False,
-            "max_positions": 10,
+            "max_positions": PAPER_DEFAULT_MAX_POSITIONS,
             "ignore_gates": True,
             "initial_balance": 0,
+            "lot_size": global_lot,              # 纸面独立手数，缺失时沿用全局 lot_size
+            "total_max_positions": 0,            # 纸面全局总持仓上限，0 = 不限制
         }
-        with self._data_lock:
-            if "paper_trading" in self._overrides:
-                merged = dict(defaults)
-                merged.update(self._overrides["paper_trading"])
-                return merged
+        if paper_override is not None:
+            merged = dict(defaults)
+            merged.update(paper_override)
+            return merged
         # 从 settings.py 读取 paper_trading_enabled 作为 enabled 兜底
         enabled = self._get_default("paper_trading_enabled")
         if enabled is not None:

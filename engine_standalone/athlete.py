@@ -90,6 +90,16 @@ class Athlete:
 
     def _execute(self, item: dict, tick: dict):
         """开仓"""
+        # 执行前复查：新闻禁售窗口内拒绝开仓（防主循环检查后进入窗口的竞态）
+        try:
+            from services.news_filter import NewsFilter
+            blocked, news_reason = NewsFilter().is_in_blackout()
+            if blocked:
+                logger.warning(f"[Athlete] News blackout ({news_reason}), reject open #{item['signal_id']} {item['direction']}")
+                self._void(item, "news_blackout")
+                return
+        except Exception as e:
+            logger.warning(f"[Athlete] NewsFilter recheck failed: {e}")
         direction = item["direction"]
         order_type = OrderType.BUY if direction == "BUY" else OrderType.SELL
         signal = item["signal"]

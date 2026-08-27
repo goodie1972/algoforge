@@ -81,12 +81,18 @@ class NewsFilter:
         try:
             from core.runtime_config import RuntimeConfig
             rc = RuntimeConfig()
+
+            def _get(key, default):
+                # RuntimeConfig.get(key) 仅接受单参；返回 None 时回退 settings 默认值
+                val = rc.get(key)
+                return default if val is None else val
+
             return {
-                "enabled": rc.get("news_filter_enabled", getattr(settings, "NEWS_FILTER_ENABLED", True)),
-                "before_min": int(rc.get("news_before_minutes", getattr(settings, "NEWS_BEFORE_MINUTES", 30))),
-                "after_min": int(rc.get("news_after_minutes", getattr(settings, "NEWS_AFTER_MINUTES", 120))),
-                "impact": rc.get("news_impact_filter", getattr(settings, "NEWS_IMPACT_FILTER", "High")),
-                "currency": rc.get("news_currency_filter", getattr(settings, "NEWS_CURRENCY_FILTER", "USD")),
+                "enabled": _get("news_filter_enabled", getattr(settings, "NEWS_FILTER_ENABLED", True)),
+                "before_min": int(_get("news_before_minutes", getattr(settings, "NEWS_BEFORE_MINUTES", 30))),
+                "after_min": int(_get("news_after_minutes", getattr(settings, "NEWS_AFTER_MINUTES", 120))),
+                "impact": _get("news_impact_filter", getattr(settings, "NEWS_IMPACT_FILTER", "High")),
+                "currency": _get("news_currency_filter", getattr(settings, "NEWS_CURRENCY_FILTER", "USD")),
             }
         except Exception:
             return {

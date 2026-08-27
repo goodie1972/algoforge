@@ -25,7 +25,7 @@ from core.bridge import create_bridge_pair, OrderType
 from services.news_filter import NewsFilter
 from services.mtf_coordinator import MTFResonanceCoordinator
 from services.supervisor import TradeSupervisor
-from core.runtime_config import RuntimeConfig
+from core.runtime_config import RuntimeConfig, PAPER_DEFAULT_MAX_POSITIONS, STRATEGY_DEFAULT_MAX_POSITIONS
 from data.downloader import download_timeframe
 from data import database as db
 from strategies.scanner import scan_strategies
@@ -35,7 +35,6 @@ from engine_standalone.risk_mgr import StrategyRiskState as _StrategyRiskStateBa
 
 # 第二阶段拆分：Mixin 导入
 from engine_standalone.position_mgr import PositionMgrMixin
-from engine_standalone.entry_exit import EntryExitMixin
 from engine_standalone.core_loop import CoreLoopMixin
 from engine_standalone.events import format_status_report, format_trade_close_log, format_entry_log, format_risk_block_log
 
@@ -97,19 +96,19 @@ def create_strategies(bridge, pool=None):
         if not cfg.get("enabled", True):
             logger.info(f"[StrategyLoad] {name} disabled, skip")
             continue
-        if cfg.get("max_positions", 1) == 0:
+        if cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS) == 0:
             logger.info(f"[StrategyLoad] {name} max_positions=0, skip")
             continue
         strategy = cls(bridge, magic=cfg["magic"], timeframe=cfg["timeframe"])
         strategy.magic = cfg["magic"]
         strategy.double_first = cfg.get("double_first", False)
-        strategy.max_positions = cfg.get("max_positions", 1)
+        strategy.max_positions = cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS)
         strategies.append(strategy)
         logger.info(f"[StrategyLoad] {name} Magic={strategy.magic} TF={strategy.timeframe}")
     return strategies
 
 
-class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
+class TradingEngine(PositionMgrMixin, CoreLoopMixin):
     """多策略交易引擎"""
 
     def __init__(self, config_service=None):
@@ -170,6 +169,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         "stop_loss_pips": "STOP_LOSS_PIPS",
         "take_profit_pips": "TAKE_PROFIT_PIPS",
         "max_daily_loss_pct": "MAX_DAILY_LOSS_PCT",
+        "per_strategy_max_positions": "PER_STRATEGY_MAX_POSITIONS",
         "floating_loss_warn_pct": "FLOATING_LOSS_WARN_PCT",
         "floating_loss_block_pct": "FLOATING_LOSS_BLOCK_PCT",
         "per_strategy_realized_loss_pct": "PER_STRATEGY_REALIZED_LOSS_PCT",
@@ -209,7 +209,11 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             return dict(settings.COORDINATOR_CONFIG)
 
     def _get_paper_config(self):
-        """获取纸面交易配置，RuntimeConfig 覆盖优先，回退 settings.PAPER_MODE"""
+        """获取纸面交易配置，RuntimeConfig 覆盖优先，回退 settings.PAPER_TRADING_ENABLED
+
+        纸面模式唯一真值源是 paper_trading.enabled（RuntimeConfig 纸面配置），
+        旧开关 settings.PAPER_MODE 已废弃移除，不得再引入第二个开关。
+        """
         try:
             from core.runtime_config import RuntimeConfig
             pc = RuntimeConfig().get_paper_config()
@@ -218,10 +222,20 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         except Exception:
             pass
         return {
-            "enabled": getattr(settings, "PAPER_MODE", False),
-            "max_positions": 10,
+            "enabled": getattr(settings, "PAPER_TRADING_ENABLED", False),
+            "max_positions": PAPER_DEFAULT_MAX_POSITIONS,
             "ignore_gates": True,
         }
+
+    def _paper_lot_size(self):
+        """纸面模式优先使用纸面独立手数（paper_trading.lot_size），否则沿用全局 lot_size"""
+        # 单次读取同一配置快照，避免两次读取间配置翻转的窗口
+        _pc = self._get_paper_config()
+        if _pc.get("enabled", False):
+            _pl = _pc.get("lot_size")
+            if _pl:
+                return _pl
+        return self._rt('lot_size')
 
     def _calibrate_mt4_time(self):
         """启动时校准 MT4 服务器时间 vs 本机 UTC 时间"""
@@ -501,7 +515,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
             strategy = cls(self.bridge, magic=magic, timeframe=cfg.get("timeframe", "H1"))
             strategy.magic = magic
             strategy.double_first = cfg.get("double_first", False)
-            strategy.max_positions = cfg.get("max_positions", 1)
+            strategy.max_positions = cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS)
             self.strategies.append(strategy)
             self._init_risk_state(name, magic)
             existing = self.bridge.takeover_existing_positions(settings.SYMBOL, magic)
@@ -541,7 +555,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         # 1. 移除：池中标记为禁用或 max_positions=0 的策略
         for name in list(current.keys()):
             cfg = pool.get(name)
-            if cfg is None or not cfg.get("enabled", True) or cfg.get("max_positions", 1) == 0:
+            if cfg is None or not cfg.get("enabled", True) or cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS) == 0:
                 if name in current:
                     self.remove_strategy(name, close_positions=True)
                     logger.info(f"[StrategyPoolSync] removed {name}")
@@ -552,7 +566,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
 
         # 2. 添加：池中启用但未在运行中的策略
         for name, cfg in pool.items():
-            if not cfg.get("enabled", True) or cfg.get("max_positions", 1) == 0:
+            if not cfg.get("enabled", True) or cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS) == 0:
                 continue
             if name not in current:
                 self.add_strategy(name, cfg)
@@ -564,8 +578,8 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 cfg = pool.get(name)
                 if cfg is None:
                     continue
-                if s.max_positions != cfg.get("max_positions", 1):
-                    s.max_positions = cfg.get("max_positions", 1)
+                if s.max_positions != cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS):
+                    s.max_positions = cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS)
                     logger.info(f"[StrategyPoolSync] {name} max_positions → {s.max_positions}")
                 if s.double_first != cfg.get("double_first", False):
                     s.double_first = cfg.get("double_first", False)
@@ -1075,29 +1089,32 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 except Exception:
                     pass
 
-        # ---- 阻断检查（纸面模式全量测试，跳过所有风控） ----
+        # ---- 新闻阻断检查（独立于交易模式，纸面/实盘均无条件执行） ----
+        news_blocked = self._check_news_blackout()
+
+        # ---- News-Bias 方向阻塞检查 ----
+        bias_blocked = False
+        if not news_blocked:
+            bias_blocked = self._check_news_bias_block()
+            if bias_blocked:
+                logger.warning("[NewsBias] Direction block triggered, skipopen")
+
+        if news_blocked or bias_blocked:
+            # 新闻禁售/方向阻塞时，跳过本轮开仓
+            return
+
+        # ---- 阻断检查（纸面模式全量测试，跳过其余风控） ----
         _pc = self._get_paper_config()
         if not _pc.get("enabled", False):
             global_blocked = self._check_global_loss()
 
-            news_blocked = False
-            if not global_blocked:
-                news_blocked = self._check_news_blackout()
-
-            # ---- News-Bias 方向阻塞检查 ----
-            bias_blocked = False
-            if not global_blocked and not news_blocked:
-                bias_blocked = self._check_news_bias_block()
-                if bias_blocked:
-                    logger.warning("[NewsBias] Direction block triggered, skipopen")
-
             safety_blocked = False
-            if not global_blocked and not news_blocked:
+            if not global_blocked:
                 if self._is_safety_locked():
                     safety_blocked = True
                     logger.warning("[SafetyLock] Lock file detected, pausing new orders")
 
-            if global_blocked or news_blocked or safety_blocked or bias_blocked:
+            if global_blocked or safety_blocked:
                 # 有全局阻断时，跳过本轮开仓
                 return
 
@@ -1578,7 +1595,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         _pc = self._get_paper_config()
         _paper_enabled = _pc.get("enabled", False)
         _paper_ignore = _pc.get("ignore_gates", False)
-        _paper_max = _pc.get("max_positions", 10)
+        _paper_max = _pc.get("max_positions", PAPER_DEFAULT_MAX_POSITIONS)
 
         if _paper_enabled and not _paper_ignore and _paper_max > 0:
             _my_positions = [p for p in self.bridge.get_positions(settings.SYMBOL)
@@ -1593,6 +1610,15 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                 _all_positions = self.bridge.get_positions(settings.SYMBOL)
                 if len(_all_positions) >= _global_max:
                     logger.debug(f"[{strategy.name}] total positions {len(_all_positions)} ≥ {_global_max}, skipopen")
+                    return
+
+        # ── 纸面模式全局总持仓上限检查（与真实模式对称） ──
+        if _paper_enabled:
+            _paper_total_max = _pc.get("total_max_positions", 0)
+            if _paper_total_max and _paper_total_max > 0:
+                _all_positions = self.bridge.get_positions(settings.SYMBOL)
+                if len(_all_positions) >= _paper_total_max:
+                    logger.debug(f"[{strategy.name}] paper total positions {len(_all_positions)} ≥ {_paper_total_max}, skip open")
                     return
 
         # ── 每 tick 计算并输出门禁状态（无论有无信号） ──
@@ -1627,19 +1653,20 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         if n_bridge != n_local:
             logger.warning(f"[{strategy.name}] position mismatch: bridge={n_bridge} local={n_local}, take max={n_total}")
 
-        # 纸面模式：使用 paper_max_positions 作为 orders策略上限（ignore_gates 只跳过门禁，不跳过 max_positions）
-        # 真实模式：使用 strategy.max_positions，且已有持仓则不加仓
+        # 持仓上限单一来源：模式设置（纸面=纸面设置，实盘=风控参数），不再与策略池 strategy.max_positions 取小。
+        # 策略池的 max_positions 仅保留禁用语义（0=禁用，加载/同步时跳过），不参与持仓限制。
         if _paper_enabled and _paper_max > 0:
-            # 纸面上限与策略级 max_positions 取较小值，策略级限制始终生效
-            _limit = min(_paper_max, strategy.max_positions)
+            # 纸面模式：单策略上限 = 纸面设置 paper_trading.max_positions（唯一来源）
+            _limit = _paper_max
             if n_total >= _limit:
-                return  # 达到 orders策略持仓上限
+                return  # 达到单策略持仓上限（纸面）
         else:
-            if n_total >= strategy.max_positions:
-                return  # 已达上限
-            # 已有持仓则不加仓
-            if n_total > 0:
-                return
+            # 实盘模式：单策略上限 = 风控参数 per_strategy_max_positions（唯一来源），保留 None 防御兜底为策略池值
+            _rt_per_strategy_limit = self._rt('per_strategy_max_positions')
+            _live_per_strategy_limit = _rt_per_strategy_limit \
+                if _rt_per_strategy_limit else strategy.max_positions
+            if n_total >= _live_per_strategy_limit:
+                return  # 达到单策略持仓上限（实盘）
 
         # 生成信号
         signal = strategy.on_tick()
@@ -1740,7 +1767,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
                     "score_short": last_sig.get("score_short", 0),
                     "factors_long": last_sig.get("factors_long", []),
                     "factors_short": last_sig.get("factors_short", []),
-                    "entry_price": 0, "lot_size": self._rt('lot_size') or 0.01,
+                    "entry_price": 0, "lot_size": self._paper_lot_size() or 0.01,
                     "sl": None, "tp": None,
                 }
                 # 计算 SL/TP
@@ -1811,7 +1838,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         ticket = self.bridge.open_order(
             symbol=settings.SYMBOL,
             order_type=order_type,
-            volume=self._rt('lot_size'),
+            volume=self._paper_lot_size(),
             price=price,
             sl=sl,
             tp=tp,
@@ -1821,7 +1848,7 @@ class TradingEngine(PositionMgrMixin, EntryExitMixin, CoreLoopMixin):
         if ticket:
             self._known_position_count[strategy.magic] = self._known_position_count.get(strategy.magic, 0) + 1
             logger.info(f"[{strategy.name}] Open {direction} Magic={strategy.magic} "
-                        f"{self._rt('lot_size')}手 @ {price:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
+                        f"{self._paper_lot_size()}手 @ {price:.2f} SL={sl:.2f} TP={tp:.2f} Ticket={ticket}")
             self._entry_times[ticket] = time.time()
             last_sig = getattr(strategy, "_last_signal", None) or {}
             self._entry_signal_data[ticket] = {

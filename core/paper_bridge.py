@@ -39,8 +39,9 @@ class PaperBridge(MT4BridgeBase):
 
     LOT_SCALE = 100  # 0.01 手 → 1 盎司
 
-    def __init__(self, real_bridge: MT4BridgeBase):
+    def __init__(self, real_bridge: MT4BridgeBase, initial_balance: float = 0):
         self._real = real_bridge                     # 真实桥接（只用于数据）
+        self._initial_balance = float(initial_balance or 0)  # 配置的纸面初始余额（0 = 用真实余额）
         self._positions: dict[int | str, Position] = {}  # ticket → 模拟持仓
         self._closed: list[dict] = []                    # 已平仓记录
         self._ticket_seq_next: int = 0                   # 当天 seq
@@ -218,9 +219,15 @@ class PaperBridge(MT4BridgeBase):
         if ok:
             info = self._real.get_account_info()
             if info:
-                self._balance = info.balance
-                self._equity = info.equity
-                self._start_balance = info.balance
+                if self._initial_balance > 0:
+                    # 配置了纸面初始余额 → 使用配置值
+                    self._balance = self._initial_balance
+                    self._start_balance = self._initial_balance
+                    self._equity = self._initial_balance
+                else:
+                    self._balance = info.balance
+                    self._equity = info.equity
+                    self._start_balance = info.balance
                 logger.info(f"[PaperBridge] Started, initial balance=${self._balance:.2f}")
             self._connected = True
         return ok

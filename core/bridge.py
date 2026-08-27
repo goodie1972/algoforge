@@ -152,7 +152,7 @@ def create_bridge() -> MT4BridgeBase:
             paper_cfg = rc.get_paper_config()
             if paper_cfg.get("enabled", False):
                 from core.paper_bridge import PaperBridge
-                bridge = PaperBridge(bridge)
+                bridge = PaperBridge(bridge, initial_balance=paper_cfg.get("initial_balance", 0))
                 logger.info("[bridge] Paper mode: PaperBridge wraps single bridge")
         except (ImportError, AttributeError):
             pass
@@ -179,7 +179,7 @@ def create_bridge_pair():
         paper_cfg = rc.get_paper_config()
         if paper_cfg.get("enabled", False):
             from core.paper_bridge import PaperBridge
-            exec_bridge = PaperBridge(real_exec)
+            exec_bridge = PaperBridge(real_exec, initial_balance=paper_cfg.get("initial_balance", 0))
             logger.info("[bridge] Paper mode: PaperBridge wraps exec bridge")
         else:
             exec_bridge = real_exec

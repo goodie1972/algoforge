@@ -74,7 +74,10 @@ def get_state() -> dict:
     _ensure_dirs()
     if STATE_FILE.exists():
         try:
-            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+            state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+            # 始终从 VERSION 文件刷新 current_version，避免缓存过期
+            state["current_version"] = _get_local_version()
+            return state
         except (json.JSONDecodeError, OSError):
             pass
     state = {

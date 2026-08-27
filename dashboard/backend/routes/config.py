@@ -70,14 +70,58 @@ async def get_paper_config():
     return config_service.get_paper_config()
 
 
+def _sanitize_paper_config(cfg: dict) -> dict:
+    """对纸面配置的数值字段做强制转换与校验
+
+    前端 n-select 带 tag 允许自定义输入，可能产生字符串值（如 "0.03"）；
+    落盘后引擎下单/浮盈计算依赖数值类型，必须在入口拦截，否则纸面交易瘫痪。
+    enabled / ignore_gates 等其余字段原样透传。
+    """
+    cfg = dict(cfg)
+    if "lot_size" in cfg:
+        try:
+            lot = float(cfg["lot_size"])
+        except (TypeError, ValueError):
+            raise HTTPException(422, f"lot_size 必须是数值: {cfg['lot_size']!r}")
+        if lot != lot or lot <= 0:
+            raise HTTPException(422, f"lot_size 必须大于 0: {cfg['lot_size']!r}")
+        cfg["lot_size"] = lot
+    for key in ("initial_balance", "max_positions", "total_max_positions"):
+        if key not in cfg:
+            continue
+        raw = cfg[key]
+        try:
+            num = float(raw)
+        except (TypeError, ValueError):
+            raise HTTPException(422, f"{key} 必须是数值: {raw!r}")
+        if num != num or num < 0:
+            raise HTTPException(422, f"{key} 必须 >= 0: {raw!r}")
+        cfg[key] = int(num) if num == int(num) else num
+    return cfg
+
+
 @router.post("/paper")
 async def update_paper_config(req: PaperConfigUpdate):
-    """更新纸面交易配置"""
+    """更新纸面交易配置
+
+    若 paper_trading.enabled 发生翻转（保存前后对比），响应中附带
+    mode_switch=true 与提示 message，通知前端提示用户确认重启；
+    前端确认后调用 POST /api/engine/restart 完成重启。本接口不自动重启。
+    """
     if not config_service:
         raise HTTPException(500, "配置服务未初始化")
+    # 数值字段强制转换/校验放在 try 外，保留清晰的 422 错误信息
+    cfg = _sanitize_paper_config(req.config)
     try:
-        updated = config_service.set_paper_config(req.config)
-        return {"message": "纸面配置已更新", "config": updated}
+        enabled_before = bool(config_service.get_paper_config().get("enabled", False))
+        updated = config_service.set_paper_config(cfg)
+        enabled_after = bool(updated.get("enabled", False))
+        resp = {"message": "纸面配置已更新", "config": updated}
+        if enabled_after != enabled_before:
+            # 引擎执行模式（纸面/实盘桥接）在启动时一次性构建，模式切换必须重启引擎
+            resp["mode_switch"] = True
+            resp["message"] = "切换模式将重启引擎"
+        return resp
     except Exception as e:
         raise HTTPException(422, f"纸面配置更新失败: {e}")
 

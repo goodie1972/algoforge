@@ -4,6 +4,7 @@
 import logging
 import time
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from config import settings
@@ -60,6 +61,28 @@ async def stop_engine():
         raise HTTPException(409, "引擎未在运行")
     engine_runner.stop()
     return {"message": "引擎已停止"}
+
+
+@router.post("/restart")
+async def restart_engine():
+    """一键重启引擎（stop → start），用于纸面/实盘模式切换后重建桥接
+
+    前端契约：保存纸面配置收到 mode_switch=true 且用户确认后调用本接口。
+    边界处理：引擎未运行时跳过 stop 直接 start（等价于 /start 的效果），
+    start 失败返回 500；引擎未初始化返回 500。
+    """
+    if not engine_runner:
+        raise HTTPException(500, "引擎未初始化")
+    was_running = engine_runner.is_running
+    if was_running:
+        # stop() 内部 join(timeout=15) 同步阻塞，放线程池避免卡死事件循环 ~16s
+        await run_in_threadpool(engine_runner.stop)
+        if engine_runner.is_running:
+            raise HTTPException(503, "旧进程尚未退出，请稍候重试")
+    ok = await run_in_threadpool(engine_runner.start)
+    if not ok:
+        raise HTTPException(500, "引擎重启失败，请检查日志")
+    return {"status": "restarted" if was_running else "started"}
 
 
 @router.get("/strategies")

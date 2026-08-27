@@ -17,7 +17,13 @@ VERSION_FILE = BASE_DIR / "VERSION"
 def get_version() -> str:
     """读取 VERSION 文件，返回 '0.5.0' 这样的 semver 字符串"""
     try:
-        return VERSION_FILE.read_text(encoding="utf-8").strip()
+        # 优先 utf-8（含 utf-8-sig BOM 兼容），失败后尝试 utf-16
+        for enc in ("utf-8", "utf-16"):
+            try:
+                return VERSION_FILE.read_text(encoding=enc).strip()
+            except UnicodeDecodeError:
+                continue
+        return "0.0.0"
     except FileNotFoundError:
         return "0.0.0"
 

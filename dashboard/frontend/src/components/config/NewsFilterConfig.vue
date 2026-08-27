@@ -90,6 +90,8 @@ const currencyOpts = ['USD','EUR','GBP','JPY','CNY','AUD','CAD','CHF'].map(v => 
 
 <template>
   <n-space vertical size="large">
+    <!-- 新闻过滤独立于交易模式 -->
+    <n-alert type="info" :bordered="false">{{ $t('config.news_mode_note') }}</n-alert>
     <!-- 左列 -->
     <n-grid :cols="2" :x-gap="24">
       <n-grid-item>

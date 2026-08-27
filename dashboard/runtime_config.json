@@ -53,6 +53,13 @@
       "max_positions": 1,
       "double_first": false
     },
+    "mfi_bb_m30": {
+      "enabled": false,
+      "magic": 661001,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
     "momentum_pulse_pro": {
       "enabled": false,
       "magic": 661301,
@@ -151,6 +158,20 @@
       "max_positions": 0,
       "double_first": false
     },
+    "timeprofit_ea": {
+      "enabled": true,
+      "magic": 880202,
+      "timeframe": "M5",
+      "max_positions": 1,
+      "double_first": false
+    },
+    "xaubot_backup": {
+      "enabled": false,
+      "magic": 777005,
+      "timeframe": "M30",
+      "max_positions": 0,
+      "double_first": false
+    },
     "goodma": {
       "enabled": true,
       "magic": 880401,
@@ -162,13 +183,6 @@
       "enabled": true,
       "magic": 880501,
       "timeframe": "H1",
-      "max_positions": 1,
-      "double_first": false
-    },
-    "timeprofit_ea": {
-      "enabled": true,
-      "magic": 880202,
-      "timeframe": "M5",
       "max_positions": 1,
       "double_first": false
     },
@@ -198,47 +212,9 @@
     "enabled": true,
     "max_positions": 5,
     "ignore_gates": true,
-    "initial_balance": 5000
-  },
-  "mfi_bb_m30": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "mfi_bb_m30_optimized": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "m30_bb_deepreturn": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "m30_bb_deepreturn_optimized": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "rsi_grading_m30": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "rsi_grading_m30_upgraded": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "momentum_pulse_pro": {
-    "enabled": true,
-    "max_positions": 5
-  },
-  "h1_breakout": {
-    "enabled": true,
-    "max_positions": 3
-  },
-  "sanqing_h1_upgraded": {
-    "enabled": true,
-    "max_positions": 3
-  },
-  "gold_auto_research": {
-    "enabled": true,
-    "max_positions": 3
+    "initial_balance": 5000,
+    "lot_size": 0.01,
+    "total_max_positions": 0
   },
   "lot_size": 0.01,
   "stop_loss_pips": 50,
@@ -255,5 +231,6 @@
   "per_strategy_realized_loss_amount": 30,
   "max_consecutive_losses": 3,
   "consecutive_loss_cooldown_hours": 4,
-  "language": "en-US"
+  "language": "en-US",
+  "per_strategy_max_positions": 1
 }

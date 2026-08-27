@@ -65,8 +65,9 @@ export const useConfigStore = defineStore('config', () => {
   async function updatePaperConfig(cfg: Record<string, any>) {
     error.value = null
     try {
-      await updatePaperApi(cfg)
+      const res = await updatePaperApi(cfg)
       await fetch()
+      return res
     } catch (e: any) {
       error.value = e?.message || '更新纸面交易配置失败'
       throw e

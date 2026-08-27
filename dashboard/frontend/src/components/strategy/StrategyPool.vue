@@ -354,11 +354,6 @@ async function confirmDeleteClick() {
         <div v-if="expanded.has(meta.id)" style="margin-top: 6px;">
           <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 8px;">
             <n-space align="center" size="small">
-              <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.max_positions') }}</n-text>
-              <app-input-number v-model:value="pool[meta.id].max_positions"
-                size="tiny" :min="1" :max="5" style="width: 60px;" @click.stop />
-            </n-space>
-            <n-space align="center" size="small">
               <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.double_first') }}</n-text>
               <n-switch v-model:value="pool[meta.id].double_first" size="small" @click.stop />
             </n-space>

@@ -48,6 +48,12 @@ SLIPPAGE = 30               # 最大滑点（points）
 # === 账户级硬止损（balance-based） ===
 MAX_DAILY_LOSS_PCT = 12.0   # 全局已实现亏损上限，触发后所有策略停开仓
 
+# === 单策略持仓上限（实盘） ===
+# 持仓上限单一来源：本值为实盘模式下单个策略最大同时持仓数的唯一来源，
+# 不再与策略池策略的 max_positions 取较小值（策略池值仅保留 0=禁用 的开关语义）。
+# 默认 1：保持与历史实盘行为兼容（之前实盘每策略恒 1 仓），用户可自行调大。
+PER_STRATEGY_MAX_POSITIONS = 1
+
 # === 浮动亏损（equity-based，单策略） ===
 FLOATING_LOSS_WARN_PCT = 5.0       # 警告线，仅日志
 FLOATING_LOSS_BLOCK_PCT = 10.0     # 阻断线，不能开单，浮动降低后自动恢复
@@ -76,9 +82,10 @@ TAKE_PROFIT_PIPS = 100      # 默认止盈点数
 # 策略池配置 — 支持多策略同时运行
 # 每个策略有独立的 magic number、时间周期、仓位
 # ============================================================
-# 纸面交易模式 — True=模拟交易（不真实发单，策略进出场逻辑原样运行）
-PAPER_MODE = True
-# 纸面交易配置开关（RuntimeConfig 覆盖用，settings.py 仅作为兜底 fallback）
+# 纸面交易开关 — 唯一真值源为 paper_trading.enabled
+# （RuntimeConfig / dashboard/runtime_config.json，经 POST /api/config/paper 修改）
+# 旧常量 PAPER_MODE 已于 Phase 2 移除：双开关并存会导致语义冲突，请勿重新引入。
+# 本常量仅作为 RuntimeConfig 无 paper_trading 覆盖时的兜底默认值。
 PAPER_TRADING_ENABLED = False
 
 STRATEGY_POOL = {

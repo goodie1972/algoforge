@@ -1,6 +1,6 @@
 {
   "state": "idle",
-  "current_version": "3.2.2",
+  "current_version": "3.4.2",
   "remote_version": null,
   "remote_commit": null,
   "remote_ahead": 0,
@@ -8,5 +8,5 @@
   "pending_path": null,
   "message": "已是最新版本",
   "error": null,
-  "updated_at": "2026-08-26T12:08:29.958485+00:00"
+  "updated_at": "2026-08-27T06:26:12.526571+00:00"
 }

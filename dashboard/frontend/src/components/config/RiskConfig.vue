@@ -12,6 +12,7 @@ function defaults() {
   return {
     lot_size: store.items.lot_size ?? 0.01,
     max_positions: store.items.max_positions ?? 3,
+    per_strategy_max_positions: store.items.per_strategy_max_positions ?? 1,
     stop_loss_pips: store.items.stop_loss_pips ?? 50,
     take_profit_pips: store.items.take_profit_pips ?? 100,
     slippage: store.items.slippage ?? 30,
@@ -24,6 +25,7 @@ function defaults() {
     rapid_exit_window_seconds: store.items.rapid_exit_window_seconds ?? 300,
     rapid_exit_cooldown_seconds: store.items.rapid_exit_cooldown_seconds ?? 7200,
     per_strategy_realized_loss_amount: store.items.per_strategy_realized_loss_amount ?? 30.0,
+    max_daily_loss_pct: store.items.max_daily_loss_pct ?? 12,
     max_consecutive_losses: store.items.max_consecutive_losses ?? 3,
     consecutive_loss_cooldown_hours: store.items.consecutive_loss_cooldown_hours ?? 4,
     safety_lock_timeout_minutes: store.items.safety_lock_timeout_minutes ?? 90,
@@ -91,14 +93,14 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
           <n-form-item label-placement="left" :label="$t('config.max_positions_label')">
             <n-select :value="local.max_positions" :options="maxPosOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.max_positions = v)" style="width: 80px;" />
-            <template #feedback>{{ $t('config.max_positions_desc') }}</template>
+            <template #feedback>{{ $t('config.max_positions_live_desc') }}</template>
           </n-form-item>
         </n-grid-item>
         <n-grid-item>
-          <n-form-item label-placement="left" :label="$t('config.abs_loss_limit')">
-            <n-select :value="local.per_strategy_realized_loss_amount" :options="lossLimitOpts" size="tiny" filterable tag
-              @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width: 80px;" />
-            <template #feedback>{{ $t('config.abs_loss_limit_desc') }}</template>
+          <n-form-item label-placement="left" :label="$t('config.per_strategy_max_positions')">
+            <n-input-number v-model:value="local.per_strategy_max_positions" :min="1" :max="10" :step="1"
+              size="tiny" style="width: 80px;" />
+            <template #feedback>{{ $t('config.per_strategy_max_positions_desc') }}</template>
           </n-form-item>
         </n-grid-item>
       </n-grid>
@@ -151,6 +153,20 @@ const pctOpts = opts([1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50])
             <n-select :value="local.safety_lock_timeout_minutes" :options="safetyLockOpts" size="tiny" filterable tag
               @update:value="(v: any) => v != null && (local.safety_lock_timeout_minutes = v)" style="width: 80px;" />
             <template #feedback>{{ $t('config.safety_lock_desc') }}</template>
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item label-placement="left" :label="$t('config.abs_loss_limit')">
+            <n-select :value="local.per_strategy_realized_loss_amount" :options="lossLimitOpts" size="tiny" filterable tag
+              @update:value="(v: any) => v != null && (local.per_strategy_realized_loss_amount = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.abs_loss_limit_desc') }}</template>
+          </n-form-item>
+        </n-grid-item>
+        <n-grid-item>
+          <n-form-item label-placement="left" :label="$t('config.max_daily_loss_pct')">
+            <n-input-number :value="local.max_daily_loss_pct" :min="0" :max="100" :step="0.5" size="tiny"
+              @update:value="(v: any) => v != null && (local.max_daily_loss_pct = v)" style="width: 80px;" />
+            <template #feedback>{{ $t('config.max_daily_loss_desc') }}</template>
           </n-form-item>
         </n-grid-item>
       </n-grid>

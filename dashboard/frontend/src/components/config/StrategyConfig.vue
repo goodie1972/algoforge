@@ -143,12 +143,6 @@ async function savePool() {
                   </n-form-item>
                 </n-grid-item>
                 <n-grid-item>
-                  <n-form-item :label="$t('strategy.max_positions')" label-placement="left" size="small">
-                    <app-input-number v-model:value="pool[meta.id].max_positions" :min="1" :max="5"
-                      style="width: 30px;" size="small" />
-                  </n-form-item>
-                </n-grid-item>
-                <n-grid-item>
                   <n-form-item :label="$t('strategy.double_first')" :label-placement="'top'" size="small">
                     <n-switch v-model:value="pool[meta.id].double_first" size="small" />
                   </n-form-item>

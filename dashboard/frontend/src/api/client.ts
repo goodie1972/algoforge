@@ -21,6 +21,12 @@ export async function stopEngine(): Promise<void> {
   await http.post('/engine/stop')
 }
 
+export async function restartEngine(): Promise<{ status: string }> {
+  // stop() 内部 join 最长 ~16s，单独放宽超时避免全局 10s 造成虚假失败提示
+  const { data } = await http.post('/engine/restart', null, { timeout: 30000 })
+  return data
+}
+
 // === 账户 ===
 export async function getAccount(): Promise<AccountInfo> {
   const { data } = await http.get('/account')
@@ -82,8 +88,9 @@ export async function getPaperConfig(): Promise<any> {
   return data
 }
 
-export async function updatePaperConfig(cfg: Record<string, any>): Promise<void> {
-  await http.post('/config/paper', { config: cfg })
+export async function updatePaperConfig(cfg: Record<string, any>): Promise<Record<string, any>> {
+  const { data } = await http.post('/config/paper', { config: cfg })
+  return data
 }
 
 export async function resetPaperData(): Promise<void> {

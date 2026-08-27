@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { useConfigStore } from '@/stores/config'
+import { restartEngine } from '@/api/client'
 import { useMessage, useDialog } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 
@@ -11,14 +12,19 @@ const { t } = useI18n()
 
 // 持仓数下拉选项
 const maxPosOpts = [1,2,3,4,5,6,7,8,9,10,12,15,20,25,30,40,50].map(v => ({ label: String(v), value: v }))
+// 手数下拉选项
+const lotSizeOpts = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0].map(v => ({ label: String(v), value: v }))
 
 function defaults() {
   const pt = store.items.paper_trading
   return {
     enabled: pt?.enabled ?? false,
+    // 兜底值 10 与后端 core/runtime_config.py 的 PAPER_DEFAULT_MAX_POSITIONS 保持一致
     max_positions: pt?.max_positions ?? 10,
     ignore_gates: pt?.ignore_gates ?? true,
     initial_balance: pt?.initial_balance ?? 0,
+    lot_size: pt?.lot_size ?? 0.01,
+    total_max_positions: pt?.total_max_positions ?? 0,
   }
 }
 
@@ -30,8 +36,34 @@ const changed = computed(() => JSON.stringify(local) !== JSON.stringify(original
 watch(() => store.items, () => Object.assign(local, defaults()), { deep: true })
 
 async function save() {
-  await store.updatePaperConfig({ ...local })
-  message.success(t('config.saved'))
+  try {
+    const res = await store.updatePaperConfig({ ...local })
+    message.success(t('config.saved'))
+    if (res?.mode_switch) confirmRestart()
+  } catch {
+    message.error(t('common.failed'))
+  }
+}
+
+// 模式切换确认：配置已保存但未自动重启，由用户决定是否立即重启引擎
+function confirmRestart() {
+  dialog.warning({
+    title: t('config.mode_switch_title'),
+    content: t('config.mode_switch_content'),
+    positiveText: t('config.mode_switch_yes'),
+    negativeText: t('common.cancel'),
+    onPositiveClick: async () => {
+      try {
+        const res = await restartEngine()
+        message.success(t('config.restart_done', { status: res?.status || '' }))
+      } catch {
+        message.error(t('config.restart_fail'))
+      }
+    },
+    onNegativeClick: () => {
+      message.info(t('config.mode_switch_manual'))
+    },
+  })
 }
 
 function confirmReset() {
@@ -101,6 +133,23 @@ function confirmReset() {
                     @update:value="(v: any) => v != null && (local.initial_balance = v)" style="width: 110px;" />
                 </n-form-item>
                 <n-text depth="3" style="font-size:11px;">{{ $t('config.init_balance_desc') }}</n-text>
+              </n-grid-item>
+            </n-grid>
+            <!-- 手数 + 总持仓上限 同一行 -->
+            <n-grid :cols="2" :x-gap="12">
+              <n-grid-item>
+                <n-form-item label-placement="top" :label="$t('config.paper_lot_size')">
+                  <n-select :value="local.lot_size" :options="lotSizeOpts" size="tiny" filterable tag
+                    @update:value="(v: any) => v != null && (local.lot_size = v)" style="width: 110px;" />
+                </n-form-item>
+                <n-text depth="3" style="font-size:11px;">{{ $t('config.paper_lot_size_desc') }}</n-text>
+              </n-grid-item>
+              <n-grid-item>
+                <n-form-item label-placement="top" :label="$t('config.total_max_positions')">
+                  <n-input-number :value="local.total_max_positions" :min="0" :max="1000" :step="1" size="tiny" filterable tag
+                    @update:value="(v: any) => v != null && (local.total_max_positions = v)" style="width: 110px;" />
+                </n-form-item>
+                <n-text depth="3" style="font-size:11px;">{{ $t('config.total_max_positions_desc') }}</n-text>
               </n-grid-item>
             </n-grid>
           </n-card>
