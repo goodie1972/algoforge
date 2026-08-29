@@ -132,7 +132,7 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         from services.data_factory import DataFactory, get_cache, get_tick
         from engine_standalone.athlete import Athlete
         self._engine_mode = engine_mode
-        self._data_bridge, self._exec_bridge = create_bridge_pair(engine_mode=engine_mode)
+        self._data_bridge, self._exec_bridge = create_bridge_pair()
         self.bridge = self._exec_bridge            # 引擎主桥接 = 执行通道
         self._data_factory = DataFactory(self._data_bridge)
         self._athlete = Athlete(self._exec_bridge)
