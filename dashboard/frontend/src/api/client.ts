@@ -133,8 +133,10 @@ export async function getLogs(level?: string, limit = 100, since?: string): Prom
 }
 
 // === 历史成交 ===
-export async function getTradeHistory(limit = 100): Promise<ClosedTrade[]> {
-  const { data } = await http.get('/trades/history', { params: { limit } })
+export async function getTradeHistory(limit = 100, mode?: string): Promise<ClosedTrade[]> {
+  const params: any = { limit }
+  if (mode) params.mode = mode
+  const { data } = await http.get('/trades/history', { params })
   return data
 }
 

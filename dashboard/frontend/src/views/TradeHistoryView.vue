@@ -17,14 +17,25 @@ const activeTab = ref('history')
 
 // ── 搜索过滤 ──
 const searchQuery = ref('')
+const modeFilter = ref<string | null>(null)
 const filteredData = computed(() => {
+  let data = store.items
+  // mode filter
+  if (modeFilter.value === 'live') {
+    data = data.filter((t: any) => t.mode !== 'paper')
+  } else if (modeFilter.value === 'paper') {
+    data = data.filter((t: any) => t.mode === 'paper')
+  }
+  // text search
   const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return store.items
-  return store.items.filter((t: any) =>
-    (t.strategy && t.strategy.toLowerCase().includes(q)) ||
-    (t.magic && t.magic.toString().includes(q)) ||
-    (t.ticket && t.ticket.toString().includes(q))
-  )
+  if (q) {
+    data = data.filter((t: any) =>
+      (t.strategy && t.strategy.toLowerCase().includes(q)) ||
+      (t.magic && t.magic.toString().includes(q)) ||
+      (t.ticket && t.ticket.toString().includes(q))
+    )
+  }
+  return data
 })
 
 // 全部成交的总盈亏
@@ -46,7 +57,7 @@ onMounted(async () => {
 
 async function refresh() {
   refreshLoading.value = true
-  await store.fetch()
+  await store.fetch(100, modeFilter.value || undefined)
   if (activeTab.value === 'stats') await loadStats()
   refreshLoading.value = false
 }
@@ -308,6 +319,12 @@ const selectedVersion = ref('')
 // 筛选器
 const selectedStrategies = ref<string[]>([])
 const dateRange = ref<[number, number] | null>(null)
+
+const modeFilterOptions = computed(() => [
+  { label: t('trades.mode_filter_all'), value: '' },
+  { label: t('trades.mode_filter_live'), value: 'live' },
+  { label: t('trades.mode_filter_paper'), value: 'paper' },
+])
 
 const strategyOptions = computed(() => {
   const names = [...new Set(store.items.map((t: any) => t.strategy).filter(Boolean))]
@@ -577,6 +594,7 @@ const statsColumns = [
               <n-icon :component="SearchOutline" />
             </template>
           </n-input>
+          <n-select v-model:value="modeFilter" :options="modeFilterOptions" class="mode-filter-select" />
           <n-tag :bordered="false" type="info">{{ t('trades.filtered_count', { count: filteredData.length }) }}</n-tag>
         </n-space>
         <n-data-table v-if="store.loading" :columns="columns" :data="[]" :loading="true" :bordered="true" :max-height="600" />
@@ -692,6 +710,9 @@ const statsColumns = [
 }
 .search-input {
   width: 360px;
+}
+.mode-filter-select {
+  width: 120px;
 }
 .stats-card {
   margin-bottom: 12px;

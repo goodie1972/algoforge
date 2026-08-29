@@ -171,6 +171,10 @@
   "trades.trade_count": "交易次数",
   "trades.money": "盈亏",
   "trades.stats_fail": "获取统计失败",
+  "trades.paper_tag": "纸面",
+  "trades.mode_filter_all": "全部",
+  "trades.mode_filter_live": "实盘",
+  "trades.mode_filter_paper": "纸面",
   "strategy.title": "策略中心",
   "strategy.tab_pool": "策略组合",
   "strategy.tab_backtest": "回测",
@@ -801,7 +805,8 @@
     "open_time": "开仓时间",
     "direction": "方向",
     "close_not_found": "该单已平仓或不存在",
-    "close_timeout_submitted": "请求超时，但平仓已提交成功（持仓已刷新）"
+    "close_timeout_submitted": "请求超时，但平仓已提交成功（持仓已刷新）",
+    "paper_tag": "纸面"
   },
   "backtest": {
     "archived": "已归档",
@@ -1053,5 +1058,9 @@
   "strategy.import_strategy": "导入策略",
   "strategy.delete_strategy": "删除策略",
   "strategy.confirm_delete": "确认删除",
-  "strategy.running": "运行中"
+  "strategy.running": "运行中",
+  "strategy.mode": "模式",
+  "strategy.mode_live": "实盘",
+  "strategy.mode_paper": "纸面",
+  "strategy.mode_switch_confirm": "切换模式将影响 {count} 笔持仓，确认继续？"
 }

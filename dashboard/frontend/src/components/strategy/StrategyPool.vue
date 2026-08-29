@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useConfigStore } from '@/stores/config'
-import { useMessage } from 'naive-ui'
+import { useMessage, useDialog } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 import { translateFactor, translateMethod, translateDetail, translateDisplay } from '@/utils/strategyTranslations'
 
 const store = useConfigStore()
 const message = useMessage()
+const dialog = useDialog()
 const { t, locale } = useI18n()
 const saving = ref(false)
 const fileInput = ref<HTMLInputElement>()
@@ -33,6 +34,7 @@ interface PoolEntry {
   timeframe: string
   max_positions: number
   double_first: boolean
+  mode: string  // "live" | "paper"
 }
 
 const allStrategies = ref<StrategyMeta[]>([])
@@ -125,12 +127,25 @@ onMounted(async () => {
       timeframe: curr?.timeframe || meta.default_timeframe,
       max_positions: curr?.max_positions ?? 1,
       double_first: curr?.double_first ?? false,
+      mode: curr?.mode || 'live',
     }
   }
   pool.value = merged
   allStrategies.value = fetched
   loading.value = false
 })
+
+function handleModeChange(id: string, newMode: string) {
+  const entry = pool.value[id]
+  if (!entry || entry.mode === newMode) return
+  dialog.warning({
+    title: t('strategy.mode'),
+    content: t('strategy.mode_switch_confirm', { count: entry.max_positions || 0 }),
+    positiveText: t('common.confirm'),
+    negativeText: t('common.cancel'),
+    onPositiveClick: () => { entry.mode = newMode },
+  })
+}
 
 function toggleStrategy(id: string) {
   if (pool.value[id]) {
@@ -170,6 +185,7 @@ async function save() {
         timeframe: cfg.timeframe,
         max_positions: cfg.enabled ? (cfg.max_positions || 1) : 0,
         double_first: cfg.double_first,
+        mode: cfg.mode || 'live',
       }
     }
     await store.updateStrategyPool(payload)
@@ -328,12 +344,25 @@ async function confirmDeleteClick() {
               {{ meta.name }}
             </n-tag>
             <n-tag v-if="runningStrategies.has(meta.name)" size="tiny" type="success" :bordered="false" style="font-weight:600;">{{ $t('strategy.running') }}</n-tag>
+            <n-tag v-if="pool[meta.id]?.mode === 'paper'" size="tiny" :bordered="false" type="warning" style="font-weight:600;">{{ $t('strategy.mode_paper') }}</n-tag>
             <n-tag v-if="meta.backup_file" size="tiny" :bordered="false" type="info">
               {{ meta.backup_file }}
             </n-tag>
           </div>
 
           <div style="display: flex; align-items: center; gap: 12px;">
+            <n-space size="small" align="center">
+              <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.mode') }}</n-text>
+              <n-select
+                :value="pool[meta.id]?.mode || 'live'"
+                @update:value="(v: string) => handleModeChange(meta.id, v)"
+                :options="[{ label: $t('strategy.mode_live'), value: 'live' }, { label: $t('strategy.mode_paper'), value: 'paper' }]"
+                size="tiny"
+                style="width: 62px;"
+                :disabled="!pool[meta.id]?.enabled"
+                @click.stop
+              />
+            </n-space>
             <n-space size="small" align="center">
               <n-text depth="3" style="font-size: 11px;">{{ $t('strategy.magic') }}</n-text>
               <n-input :value="String(pool[meta.id]?.magic || '')" size="tiny"

@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS trades (
     hold_seconds INTEGER DEFAULT 0,
     exit_reason TEXT DEFAULT '',
     indicator_snapshot TEXT DEFAULT '',
+    mode TEXT DEFAULT 'live',
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_trades_close_time ON trades(close_time);
@@ -295,12 +296,6 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id
 """
 
 
-import threading
-
-
-import threading
-
-
 _db_lock = threading.Lock()
 
 
@@ -371,6 +366,20 @@ def init_db():
         migrate_signals_lifecycle()
         migrate_risk_states_exit_timestamps()
         migrate_timezone_fix()
+        migrate_trades_mode_column()
+    finally:
+        conn.close()
+
+
+def migrate_trades_mode_column():
+    """为 trades 表增加 mode 列，区分实盘/纸面交易"""
+    conn = get_conn()
+    try:
+        cursor = conn.execute("PRAGMA table_info(trades)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "mode" not in columns:
+            conn.execute("ALTER TABLE trades ADD COLUMN mode TEXT DEFAULT 'live'")
+            logger.info("trades 表已增加 mode 列")
     finally:
         conn.close()
 
@@ -670,8 +679,8 @@ def insert_trade(record: dict) -> int:
             """INSERT OR REPLACE INTO trades
                (ticket, symbol, order_type, volume, entry_price, exit_price,
                 pnl, stop_loss, take_profit, swap, commission, magic, strategy,
-                open_time, close_time, hold_seconds, exit_reason, indicator_snapshot)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                open_time, close_time, hold_seconds, exit_reason, indicator_snapshot, mode)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 record.get("ticket"), record.get("symbol", "XAUUSD"),
                 record.get("order_type"), record.get("volume"),
@@ -682,6 +691,7 @@ def insert_trade(record: dict) -> int:
                 record.get("open_time"), record.get("close_time"),
                 record.get("hold_seconds", 0), record.get("exit_reason", ""),
                 record.get("indicator_snapshot", ""),
+                record.get("mode", "live"),
             ),
         )
         conn.commit()
@@ -703,8 +713,8 @@ def insert_trades_batch(records: list[dict]) -> int:
                     """INSERT OR REPLACE INTO trades
                        (ticket, symbol, order_type, volume, entry_price, exit_price,
                         pnl, stop_loss, take_profit, swap, commission, magic, strategy,
-                        open_time, close_time, hold_seconds, exit_reason)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        open_time, close_time, hold_seconds, exit_reason, indicator_snapshot, mode)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         r.get("ticket"), r.get("symbol", "XAUUSD"),
                         r.get("order_type"), r.get("volume"),
@@ -714,6 +724,8 @@ def insert_trades_batch(records: list[dict]) -> int:
                         r.get("magic"), r.get("strategy", ""),
                         r.get("open_time"), r.get("close_time"),
                         r.get("hold_seconds", 0), r.get("exit_reason", ""),
+                        r.get("indicator_snapshot", ""),
+                        r.get("mode", "live"),
                     ),
                 )
                 inserted += 1
@@ -725,14 +737,20 @@ def insert_trades_batch(records: list[dict]) -> int:
     return inserted
 
 
-def get_trades(strategy: str = None, limit: int = 100, offset: int = 0) -> list[dict]:
+def get_trades(strategy: str = None, limit: int = 100, offset: int = 0, mode: str = None) -> list[dict]:
     conn = get_conn()
     try:
         query = "SELECT * FROM trades"
+        conditions = []
         params: list = []
         if strategy:
-            query += " WHERE strategy = ?"
+            conditions.append("strategy = ?")
             params.append(strategy)
+        if mode is not None:
+            conditions.append("mode = ?")
+            params.append(mode)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY close_time DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         return [dict(r) for r in conn.execute(query, params).fetchall()]

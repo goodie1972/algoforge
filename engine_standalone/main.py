@@ -83,12 +83,26 @@ class StrategyRiskState(_StrategyRiskStateBase):
     pass
 
 
-def create_strategies(bridge, pool=None):
-    """从 STRATEGY_POOL 创建策略实例列表（enabled=false 或 max_positions=0 跳过）"""
+def create_strategies(bridge, pool=None, engine_mode="live"):
+    """从 STRATEGY_POOL 创建策略实例列表（enabled=false 或 max_positions=0 跳过）
+    
+    Args:
+        bridge: 交易桥接实例
+        pool: 策略池字典，默认使用 settings.STRATEGY_POOL
+        engine_mode: 引擎模式，"live" 只加载 live 策略，"paper" 只加载 paper 策略
+    """
     if pool is None:
         pool = settings.STRATEGY_POOL
     strategies = []
     for name, cfg in pool.items():
+        # mode 过滤：向后兼容，无 mode 字段视为 "live"
+        cfg_mode = cfg.get("mode", "live")
+        if engine_mode == "live" and cfg_mode != "live":
+            logger.info(f"[StrategyLoad] {name} mode={cfg_mode} != live, skip (engine_mode=live)")
+            continue
+        if engine_mode == "paper" and cfg_mode != "paper":
+            logger.info(f"[StrategyLoad] {name} mode={cfg_mode} != paper, skip (engine_mode=paper)")
+            continue
         cls = scan_strategies().get(name)
         if cls is None:
             logger.warning(f"Unknown strategy: {name}, skip")
@@ -111,19 +125,20 @@ def create_strategies(bridge, pool=None):
 class TradingEngine(PositionMgrMixin, CoreLoopMixin):
     """多策略交易引擎"""
 
-    def __init__(self, config_service=None):
+    def __init__(self, config_service=None, engine_mode="live"):
         self._config_service = config_service
         # 三轨架构：双桥接 + 数据工厂 + 运动员
         # 数据桥接(推送K线/报价) 和 执行桥接(下 orders)，纸面模式下执行桥接用PaperBridge包装
         from services.data_factory import DataFactory, get_cache, get_tick
         from engine_standalone.athlete import Athlete
-        self._data_bridge, self._exec_bridge = create_bridge_pair()
+        self._engine_mode = engine_mode
+        self._data_bridge, self._exec_bridge = create_bridge_pair(engine_mode=engine_mode)
         self.bridge = self._exec_bridge            # 引擎主桥接 = 执行通道
         self._data_factory = DataFactory(self._data_bridge)
         self._athlete = Athlete(self._exec_bridge)
         logger.info("[ThreeRail] dual bridge + DataFactory + Athlete initialized successfully, awaiting connection")
         pool = self._get_strategy_pool()
-        self.strategies = create_strategies(self.bridge, pool)
+        self.strategies = create_strategies(self.bridge, pool, engine_mode=engine_mode)
         self._strategies_lock = threading.Lock()
         self.news_filter = NewsFilter()
         self._mtf_coordinator = None  # lazy init
@@ -155,6 +170,8 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         self._MAX_CLOSED_TRADES = 200
         self._trades_file = os.path.join(settings.LOG_DIR, "closed_trades.jsonl")
         self._profit_exit_cooldown: dict[int, dict[str, float]] = {}  # magic → {方向 → 盈利平仓时间}
+        self._closing_only_strategies: set[str] = set()   # 只平不开策略名称集合
+        self._closing_only_lock = threading.Lock()         # 保护 _closing_only_strategies 的线程安全锁
         self._last_account_info = None
         self._last_account_info_time = 0.0
         # 监督者系统
@@ -432,6 +449,7 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                 "close_time": close_dt.strftime("%Y-%m-%d %H:%M:%S"),
                 "hold_seconds": hold_sec,
                 "exit_reason": "mt4_history",
+                "mode": self._engine_mode,
             }
             records.append(record)
             self._closed_trades.append(record)
@@ -525,6 +543,57 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
             logger.info(f"[StrategyAdd] {name} Magic={magic} TF={cfg.get('timeframe','H1')}")
             return True
 
+    # ── 只平不开（Closing-Only）过渡逻辑 ──────────────────────────────
+
+    def mark_closing_only(self, strategy_name: str):
+        """标记策略为只平不开模式：跳过入场，只执行出场，持仓清空后自动移除"""
+        with self._closing_only_lock:
+            if strategy_name not in self._closing_only_strategies:
+                self._closing_only_strategies.add(strategy_name)
+                logger.info("[ClosingOnly] 策略 %s 标记为只平不开", strategy_name)
+
+    def is_closing_only(self, strategy_name: str) -> bool:
+        """检查策略是否为只平不开状态"""
+        with self._closing_only_lock:
+            return strategy_name in self._closing_only_strategies
+
+    def _check_closing_only_cleanup(self, snapshot):
+        """检查只平不开策略是否已清空持仓，若已清空则自动移除"""
+        # 阶段1：锁内收集待检查名称
+        with self._closing_only_lock:
+            names_to_check = list(self._closing_only_strategies)
+
+        if not names_to_check:
+            return
+
+        # 阶段2：锁外执行 IO 和判断
+        to_remove = []
+        for name in names_to_check:
+            strategy = next((s for s in snapshot if s.name == name), None)
+            if strategy is None:
+                to_remove.append(name)
+                continue
+            positions = self.bridge.get_positions(settings.SYMBOL)
+            my_positions = [p for p in positions if p.magic in self._strategy_magics(strategy)]
+            if not my_positions:
+                to_remove.append(name)
+
+        if not to_remove:
+            return
+
+        # 阶段3：锁内清理集合
+        with self._closing_only_lock:
+            for name in to_remove:
+                self._closing_only_strategies.discard(name)
+
+        # 阶段4：锁外移除策略实例
+        for name in to_remove:
+            logger.info("[ClosingOnly] 策略 %s 持仓已清空，自动移除", name)
+            for s in list(snapshot):
+                if s.name == name:
+                    self.remove_strategy(name, close_positions=False)
+                    break
+
     def remove_strategy(self, name: str, close_positions: bool = True) -> bool:
         """动态移除策略（运行中），返回是否成功"""
         with self._strategies_lock:
@@ -557,33 +626,79 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
             cfg = pool.get(name)
             if cfg is None or not cfg.get("enabled", True) or cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS) == 0:
                 if name in current:
-                    self.remove_strategy(name, close_positions=True)
-                    logger.info(f"[StrategyPoolSync] removed {name}")
+                    # 只平不开策略：不平仓，由出场逻辑自然处理
+                    is_closing = self.is_closing_only(name)
+                    self.remove_strategy(name, close_positions=not is_closing)
+                    if is_closing:
+                        with self._closing_only_lock:
+                            self._closing_only_strategies.discard(name)
+                    logger.info(f"[StrategyPoolSync] removed {name} (closing_only={is_closing})")
 
         # 重新获取快照（移除后 list 已变）
         with self._strategies_lock:
             current = {s.name: s for s in self.strategies}
 
-        # 2. 添加：池中启用但未在运行中的策略
+        # 2. 添加：池中启用但未在运行中的策略（只添加匹配当前引擎 mode 的）
         for name, cfg in pool.items():
             if not cfg.get("enabled", True) or cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS) == 0:
                 continue
+            # 只添加匹配当前引擎 mode 的策略
+            cfg_mode = cfg.get("mode", "live")
+            if cfg_mode != self._engine_mode:
+                continue
             if name not in current:
                 self.add_strategy(name, cfg)
-                logger.info(f"[StrategyPoolSync] added {name}")
+                logger.info(f"[StrategyPoolSync] added {name} (mode={cfg_mode})")
 
-        # 3. 更新：参数变更（max_positions / double_first）
+        # 3. mode 变更检测 + 参数更新（max_positions / double_first）
         with self._strategies_lock:
+            # 先重新获取快照（添加后 list 已变）
+            current = {s.name: s for s in self.strategies}
+            # 收集本轮需要移除的策略名（mode 变更且无持仓）
+            mode_changed_remove: set[str] = set()
+
             for name, s in current.items():
                 cfg = pool.get(name)
                 if cfg is None:
                     continue
+
+                cfg_mode = cfg.get("mode", "live")
+
+                # ── mode 变更检测 ──
+                if cfg_mode != self._engine_mode:
+                    # 策略 mode 已变更为当前引擎不处理的模式
+                    if self.is_closing_only(name):
+                        # 已经标记过，跳过（不重复日志/操作）
+                        continue
+                    positions = self.bridge.get_positions(settings.SYMBOL)
+                    my_positions = [p for p in positions if p.magic in self._strategy_magics(s)]
+                    if my_positions:
+                        # 有持仓：标记为只平不开，不移除
+                        self.mark_closing_only(name)
+                        logger.info(
+                            "[StrategyPoolSync] %s mode→%s (engine=%s), %d positions → closing_only",
+                            name, cfg_mode, self._engine_mode, len(my_positions),
+                        )
+                    else:
+                        # 无持仓：标记待移除
+                        logger.info(
+                            "[StrategyPoolSync] %s mode→%s (engine=%s), no positions → remove",
+                            name, cfg_mode, self._engine_mode,
+                        )
+                        mode_changed_remove.add(name)
+                    continue  # mode 变更 → 跳过后续参数更新
+
+                # ── 常规参数更新 ──
                 if s.max_positions != cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS):
                     s.max_positions = cfg.get("max_positions", STRATEGY_DEFAULT_MAX_POSITIONS)
                     logger.info(f"[StrategyPoolSync] {name} max_positions → {s.max_positions}")
                 if s.double_first != cfg.get("double_first", False):
                     s.double_first = cfg.get("double_first", False)
                     logger.info(f"[StrategyPoolSync] {name} double_first → {s.double_first}")
+
+        # 锁外执行移除（remove_strategy 内部获取 _strategies_lock）
+        for name in mode_changed_remove:
+            self.remove_strategy(name, close_positions=False)
 
     @staticmethod
     def _strategy_magics(strategy) -> set[int]:
@@ -1039,6 +1154,9 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                 self._run_exits(strategy)
             except Exception as e:
                 logger.error(f"[{strategy.name}] Exit execution error: {e}")
+
+        # ---- 只平不开策略持仓清空后自动移除 ----
+        self._check_closing_only_cleanup(snapshot)
 
         # 兜底：检查未被任何策略认领的持仓，按 magic 就近分配
         try:
@@ -1514,6 +1632,7 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                 hold_seconds=actual_hold,
                 exit_reason="strategy_exit",
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
+                mode=self._engine_mode,
             )
             self._closed_trades.append(record)
             self._trim_closed_trades()
@@ -1591,6 +1710,10 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
 
     def _run_strategy(self, strategy):
         """ orders个策略的一次 tick — 信号生成 + 开仓"""
+        # ── 只平不开模式：跳过入场，只允许出场 ──
+        with self._closing_only_lock:
+            if strategy.name in self._closing_only_strategies:
+                return
         # ── 纸面交易 orders策略持仓上限检查 ──
         _pc = self._get_paper_config()
         _paper_enabled = _pc.get("enabled", False)
@@ -1973,6 +2096,7 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                 close_time=close_time_str, hold_seconds=hold_sec,
                 exit_reason=reason,
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
+                mode=self._engine_mode,
             )
             self._closed_trades.append(record)
             self._trim_closed_trades()

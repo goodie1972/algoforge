@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api/engine", tags=["engine"])
 
 # 由 main.py 在启动时注入
 engine_runner = None
+paper_engine_manager = None
 # 由 main.py 注入 STRATEGY_MAP 的 name→label 信息
 available_strategies: dict = {}
 
@@ -33,10 +34,16 @@ class RemoveStrategyRequest(BaseModel):
 
 @router.get("/status")
 async def get_status():
-    """获取引擎运行状态"""
+    """获取引擎运行状态（含纸面引擎子进程状态）"""
     if not engine_runner:
         return {"status": "uninitialized", "uptime_seconds": 0}
-    return engine_runner.get_status()
+    result = engine_runner.get_status()
+    # 附加纸面引擎状态
+    if paper_engine_manager is not None:
+        result["paper_engine"] = paper_engine_manager.get_status()
+    else:
+        result["paper_engine"] = {"status": "not_configured"}
+    return result
 
 
 @router.post("/start")
@@ -173,7 +180,11 @@ async def get_health():
 def _build_engine_block() -> dict:
     if not engine_runner:
         return {"status": "uninitialized", "uptime_seconds": 0}
-    return engine_runner.get_status()
+    block = engine_runner.get_status()
+    # 附加纸面引擎状态到 health 端点
+    if paper_engine_manager is not None:
+        block["paper_engine"] = paper_engine_manager.get_status()
+    return block
 
 
 def _build_datafactory_block() -> dict:

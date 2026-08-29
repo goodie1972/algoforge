@@ -1,6 +1,6 @@
 ---
 name: viprasol_sniper
-magic: 661401
+magic: 661400
 type: Other
 display_en: Viprasol Sniper — 7-Factor Consensus + Multi-Level RR Exit
 desc_en: M30 7-factor scoring system, multi-level RR exit (1R/2R/3R/4R/5R)

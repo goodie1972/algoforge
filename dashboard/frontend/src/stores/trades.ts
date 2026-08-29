@@ -8,11 +8,11 @@ export const useTradeStore = defineStore('trades', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetch(limit = 100) {
+  async function fetch(limit = 100, mode?: string) {
     loading.value = true
     error.value = null
     try {
-      items.value = await getTradeHistory(limit)
+      items.value = await getTradeHistory(limit, mode)
     } catch (e: any) {
       error.value = e?.message || '获取历史成交失败'
     } finally {

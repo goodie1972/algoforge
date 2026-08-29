@@ -3,6 +3,26 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.5.2] - 2026-08-28 — FollowAve v1.2 出场逻辑重构
+
+### 变更
+- **bbi_dir 修正**：改用 `get_indicator("bb_mid_direction")`，趋势反转出场真正生效（v1.1 恒 flat 导致永不触发）
+- **新增超买死叉止盈**：曾触 BB 上轨（high≥bb_top−3）+ Stoch K>80 死叉 → 主动止盈（最高优先级），空头对称
+- **m15 新增 Trailing Stop**：2.0×ATR（v1.1 无 TS），与 m30 对齐
+- **出场优先级调整**：① 超买死叉止盈 → ② 趋势反转 → ③ BB 硬止损 → ④ Trailing Stop（止盈在前，止损在后）
+- **Stoch 参数分离**：入场 70/30，止盈 80/20
+- **文档同步**：m15/m30 策略说明（cn/en）
+
+## [3.5.1] - 2026-08-28 — Magic Number 规则升级（策略类型 PP 划分）
+
+### 变更
+- **Magic Number 编号规则**：新增策略类型 PP 表（11 多因子 / 22 事件驱动 / 33 机器学习 / 66 趋势追踪 / 77 价值回归 / 88 价格回归 / 99 不能定位），仅用于 2026-08-28 后**新增**策略
+- **存量策略 magic 不变**：唯一例外 `viprasol_sniper` 661401 → 661400（原号已由 m15_followave 占用，避免撞号）
+- **文档同步**：STRATEGY_VERSIONING.md、strategy_manual.md/html、viprasol 策略说明（cn/en）
+
+### 说明
+- 历史 `66`/`88` 前缀（自研/借鉴）仅对存量策略有效
+
 ## [3.4.0] - 2026-08-24 — 策略文档双语 + 新闻多源分离
 
 ### 新增

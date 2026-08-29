@@ -171,6 +171,10 @@
   "trades.trade_count": "Trades",
   "trades.money": "P&L",
   "trades.stats_fail": "Failed to load statistics",
+  "trades.paper_tag": "Paper",
+  "trades.mode_filter_all": "All",
+  "trades.mode_filter_live": "Live",
+  "trades.mode_filter_paper": "Paper",
   "strategy.title": "Strategy Center",
   "strategy.tab_pool": "Strategy Pool",
   "strategy.tab_backtest": "Backtest",
@@ -801,7 +805,8 @@
     "open_time": "Open Time",
     "direction": "Direction",
     "close_not_found": "Position already closed or not found",
-    "close_timeout_submitted": "Request timed out, but the close was submitted successfully (positions refreshed)"
+    "close_timeout_submitted": "Request timed out, but the close was submitted successfully (positions refreshed)",
+    "paper_tag": "Paper"
   },
   "backtest": {
     "archived": "Archived",
@@ -1053,5 +1058,9 @@
   "strategy.import_strategy": "Import Strategy",
   "strategy.delete_strategy": "Delete Strategy",
   "strategy.confirm_delete": "Confirm Delete",
-  "strategy.running": "Running"
+  "strategy.running": "Running",
+  "strategy.mode": "Mode",
+  "strategy.mode_live": "Live",
+  "strategy.mode_paper": "Paper",
+  "strategy.mode_switch_confirm": "Switching mode will affect {count} positions. Continue?"
 }

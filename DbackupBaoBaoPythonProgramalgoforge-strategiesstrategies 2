@@ -1,0 +1,311 @@
+"""
+m15_followave v1.1 — M15 Stoch+BBI+BB 趋势跟踪策略
+====================================================
+核心逻辑：
+- 趋势方向：±DI 门禁确认（|+DI - -DI| > 5）+ 方向（+DI > -DI 做多，-DI > +DI 做空）
+- 入场：BBI 上方 + Stoch 金叉穿越 + K < 70 + 价格 ≥ BB 中轨
+- 出场：连续 3 根已完成 K 线 < BBI + BBI 斜率向下 → 趋势反转出场
+- 硬止损：已完成 K 线收盘跌破 BB 下轨
+- 所有信号基于已完成 K 线（candles[-2]），避免未完成 K 线噪音
+
+时间周期：M15
+
+v1.1 修复：
+- 出场确认改为 K 线级（last_bar_time + candles[-2] 收盘价）
+- BBI 斜率条件实际启用
+- 金叉/死叉改为穿越检测（对比前一根已完成 K 线 Stoch）
+- 超买超卖阈值 70/30 对称
+"""
+import logging
+import time
+from typing import Optional
+
+import numpy as np
+
+from core.bridge import MT4BridgeBase, OrderType
+from strategies.base import BaseStrategy
+
+logger = logging.getLogger(__name__)
+
+STRATEGY_VERSION = "v1.1"
+STRATEGY_MAGIC = 661401
+STRATEGY_LEGACY_MAGICS: list[int] = []
+STRATEGY_CHANGELOG = [
+    {"version": "v1", "magic": 661401, "date": "2026-08-21",
+     "desc": "首次发布：M15 Stoch+BBI+BB 趋势跟踪，±DI门禁，无 trailing stop"},
+    {"version": "v1.1", "magic": 661401, "date": "2026-08-27",
+     "desc": "修复：K线级出场确认、BBI斜率启用、穿越检测、阈值70/30对称"},
+]
+
+
+class M15FollowAveStrategy(BaseStrategy):
+    """M15 FollowAve — Stoch+BBI+BB 趋势跟踪"""
+
+    name = "m15_followave"
+    default_timeframe = "M15"
+    TIMEFRAME = "M15"
+    legacy_magics = STRATEGY_LEGACY_MAGICS
+
+    # ── 参数（回测确定）──
+    DI_GATE = 5               # ±DI 差值门禁
+    EXIT_CONFIRM_BARS = 3     # 出场确认 K 线数
+    TRAIL_ATR = 0             # 不使用 trailing stop
+
+    # ── Stoch ──
+    STOCH_K_OVERBOUGHT = 70   # 超买阈值（70/30 对称）
+    STOCH_K_OVERSOLD = 30     # 超卖阈值（70/30 对称）
+
+    # ── 风控 ──
+    FIXED_LOTS = 0.01
+    MAX_SLIPPAGE = 30
+
+    # 禁用 BaseStrategy 的默认出场（我们用自己的）
+    breakeven_enabled = False
+    profit_drawdown_enabled = False
+    trailing_stop_enabled = False
+
+    @staticmethod
+    def _verify_entry(signal, tick_price, latest, item=None):
+        """入场验证：检查当前价格与 K 线方向是否一致"""
+        direction = signal.get("direction", "BUY")
+        bbi = latest.get("bbi", 0)
+        bb = latest.get("bb") or {}
+        bb_mid = bb.get("mid", 0)
+        candles = latest.get("candles", [])
+        
+        # 检查 K 线方向
+        candle_trending_up = False
+        candle_trending_down = False
+        if len(candles) >= 2:
+            # 当前未完成 K 线 (candles[-1]) 和前一已完成 K 线 (candles[-2])
+            curr = candles[-1]
+            prev = candles[-2]
+            # 检查当前 K 线是否在上涨 (收盘价 > 开盘价)
+            if hasattr(curr, 'close') and hasattr(curr, 'open'):
+                candle_trending_up = curr.close > curr.open
+                candle_trending_down = curr.close < curr.open
+            # 或者检查连续两根 K 线
+            if not candle_trending_up and not candle_trending_down:
+                candle_trending_up = curr > prev  # 假设支持比较
+            elif hasattr(curr, 'close'):
+                candle_trending_up = curr.close > prev.close
+                candle_trending_down = curr.close < prev.close
+        
+        if direction == "BUY":
+            # 多头入场：价格必须在 BBI 上方
+            if bbi and tick_price < bbi:
+                logger.info(f"[M15FollowAve] 拒绝 BUY 入场：价格 {tick_price:.2f} < BBI {bbi:.2f}")
+                return False
+            # 价格必须在 BB 中轨上方
+            if bb_mid and tick_price < bb_mid:
+                logger.info(f"[M15FollowAve] 拒绝 BUY 入场：价格 {tick_price:.2f} < BB中轨 {bb_mid:.2f}")
+                return False
+            # K 线方向必须上涨（或至少不强烈下跌）
+            if candle_trending_down and not candle_trending_up:
+                logger.info(f"[M15FollowAve] 拒绝 BUY 入场：K 线方向下跌")
+                return False
+        else:
+            # 空头入场：价格必须在 BBI 下方
+            if bbi and tick_price > bbi:
+                logger.info(f"[M15FollowAve] 拒绝 SELL 入场：价格 {tick_price:.2f} > BBI {bbi:.2f}")
+                return False
+            # 价格必须在 BB 中轨下方
+            if bb_mid and tick_price > bb_mid:
+                logger.info(f"[M15FollowAve] 拒绝 SELL 入场：价格 {tick_price:.2f} > BB中轨 {bb_mid:.2f}")
+                return False
+            # K 线方向必须下跌（或至少不强烈上涨）
+            if candle_trending_up and not candle_trending_down:
+                logger.info(f"[M15FollowAve] 拒绝 SELL 入场：K 线方向上涨")
+                return False
+        
+        return True
+
+    def __init__(self, bridge: MT4BridgeBase, magic: int = 0, timeframe: str = ""):
+        super().__init__(bridge, magic, timeframe)
+        # 出场状态跟踪
+        self._exit_state: dict = {}
+
+    # ─────────────── 辅助 ───────────────
+
+    def _get_bb(self) -> Optional[dict]:
+        bb = self.get_indicator("bb")
+        if isinstance(bb, dict) and "mid" in bb:
+            return bb
+        return None
+
+    def _compute_stoch_completed(self) -> Optional[tuple]:
+        """计算已完成 K 线的 Stoch(5,3,3)，返回 (k_curr, d_curr, k_prev, d_prev)
+        curr = candles[-2]（最近已完成），prev = candles[-3]（前一根已完成）"""
+        candles = self.candles
+        if len(candles) < 13:
+            return None
+        try:
+            import talib
+            # 取最近 13 根，排除当前未完成 K 线 (candles[-1])
+            seg = candles[-13:-1]
+            highs = np.array([c.high for c in seg], dtype=float)
+            lows = np.array([c.low for c in seg], dtype=float)
+            closes = np.array([c.close for c in seg], dtype=float)
+            sk, sd = talib.STOCH(highs, lows, closes,
+                                 fastk_period=5, slowk_period=3, slowd_period=3)
+            if (np.isnan(sk[-1]) or np.isnan(sd[-1]) or
+                    np.isnan(sk[-2]) or np.isnan(sd[-2])):
+                return None
+            return float(sk[-1]), float(sd[-1]), float(sk[-2]), float(sd[-2])
+        except Exception:
+            return None
+
+    # ─────────────── 入场逻辑 ───────────────
+
+    def generate_signal(self) -> Optional[tuple]:
+        candles = self.candles
+        if len(candles) < 30:
+            return None
+
+        # 使用已完成 K 线（candles[-2]）
+        completed = candles[-2]
+        close = completed.close
+        bbi = self.get_indicator("bbi")
+        bb = self._get_bb()
+        pdi = self.get_indicator("pdi")
+        ndi = self.get_indicator("ndi")
+
+        if any(v is None for v in [bbi, pdi, ndi, bb]):
+            return None
+
+        # 计算已完成 K 线的 Stoch 穿越检测
+        stoch_vals = self._compute_stoch_completed()
+        if stoch_vals is None:
+            return None
+        stoch_k, stoch_d, stoch_k_prev, stoch_d_prev = stoch_vals
+
+        bb_mid = bb.get("mid", 0)
+
+        # ── ±DI 门禁 ──
+        di_diff = abs(pdi - ndi)
+        if di_diff <= self.DI_GATE:
+            return None
+
+        # ── 多头：+DI > -DI, 价格>BBI, Stoch金叉穿越, K<70, 价格>=BB中轨 ──
+        if pdi > ndi:
+            golden_cross = (stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev)
+            if close > bbi and golden_cross and stoch_k < self.STOCH_K_OVERBOUGHT and close >= bb_mid:
+                logger.info(f"[{self.name}] 信号做多: +DI={pdi:.1f} > -DI={ndi:.1f} "
+                            f"BBI={bbi:.2f} StochK={stoch_k:.1f} close={close:.2f}")
+                return (OrderType.BUY, 1, 0, ["FOLLOWAVE-LONG"], [], {
+                    "bbi": round(bbi, 2), "stoch_k": round(stoch_k, 1), "stoch_d": round(stoch_d, 1),
+                    "pdi": round(pdi, 1), "ndi": round(ndi, 1), "bb_mid": round(bb_mid, 2)
+                })
+
+        # ── 空头：-DI > +DI, 价格<BBI, Stoch死叉穿越, K>30, 价格<=BB中轨 ──
+        else:
+            death_cross = (stoch_k < stoch_d and stoch_k_prev >= stoch_d_prev)
+            if close < bbi and death_cross and stoch_k > self.STOCH_K_OVERSOLD and close <= bb_mid:
+                logger.info(f"[{self.name}] 信号做空: -DI={ndi:.1f} > +DI={pdi:.1f} "
+                            f"BBI={bbi:.2f} StochK={stoch_k:.1f} close={close:.2f}")
+                return (OrderType.SELL, 0, 1, [], ["FOLLOWAVE-SHORT"], {
+                    "bbi": round(bbi, 2), "stoch_k": round(stoch_k, 1), "stoch_d": round(stoch_d, 1),
+                    "pdi": round(pdi, 1), "ndi": round(ndi, 1), "bb_mid": round(bb_mid, 2)
+                })
+
+        return None
+
+    # ─────────────── SL/TP ───────────────
+
+    def get_dynamic_sl_tp(self, direction: str, entry_price: float, atr_val: float = None,
+                          position_type: str = "entry") -> tuple[float, float]:
+        """宽止损兜底（BB 下轨止损更灵敏，但用 ATR 兜底）"""
+        if atr_val is None:
+            atr_val = self.get_indicator("atr") or 10.0
+        if atr_val <= 0:
+            atr_val = 10.0
+        stop_dist = max(atr_val * 3.0, 30.0)  # 宽止损，BB 下轨才是主要止损
+        if direction == "BUY":
+            return entry_price - stop_dist, 0
+        else:
+            return entry_price + stop_dist, 0
+
+    # ─────────────── 出场逻辑 ───────────────
+
+    def mark_extreme_entry(self, ticket: int | str):
+        """引擎告知入场已成交，初始化出场状态（幂等：已有状态不覆盖）"""
+        if str(ticket) in self._exit_state:
+            return
+        self._exit_state[str(ticket)] = {
+            "exit_count": 0,           # 连续 K 线在 BBI 另一侧的计数
+            "trail_peak": None,        # trailing stop 跟踪峰值
+            "last_bar_time": None,     # 上次处理的已完成 K 线时间
+        }
+
+    def check_ema20_exit(self, position, bid: float, ask: float) -> bool:
+        """趋势反转出场 + BB 硬止损（基于已完成 K 线）"""
+        ticket = str(getattr(position, 'ticket', id(position)))
+        state = self._exit_state.get(ticket)
+        if state is None:
+            return False
+
+        candles = self.candles
+        if not candles or len(candles) < 3:
+            return False
+
+        # 使用已完成 K 线（candles[-2]）
+        completed = candles[-2]
+        completed_time = completed.time
+        close = completed.close
+
+        # 同一根已完成 K 线只处理一次，避免重复触发
+        if state.get("last_bar_time") == completed_time:
+            return False
+
+        is_buy = (getattr(position, 'order_type', 'BUY') in ('OP_BUY', 'BUY'))
+
+        bbi = self.get_indicator("bbi")
+        bb = self._get_bb()
+        if bbi is None or bb is None:
+            return False
+
+        bb_bot = bb.get("lower", 0)
+        bb_top = bb.get("upper", 0)
+
+        # 获取已完成 K 线的 BBI 斜率方向（从缓存按时间戳查找）
+        bbi_dir = "flat"
+        if hasattr(self, '_cached_indicators') and self._cached_indicators:
+            prev_ind = self._cached_indicators.get(completed_time, {})
+            bbi_dir = prev_ind.get("bb_mid_direction", "flat")
+
+        # 标记已处理此 K 线
+        state["last_bar_time"] = completed_time
+
+        if is_buy:
+            # BB 硬止损（已完成 K 线收盘低于下轨）
+            if close < bb_bot:
+                logger.info(f"[{self.name}] BB硬止损 LONG: close={close:.2f} < BB下轨={bb_bot:.2f}")
+                return True
+
+            # 趋势反转出场：连续 EXIT_CONFIRM_BARS 根已完成 K 线 < BBI + BBI 斜率向下
+            if close < bbi and bbi_dir == "down":
+                state["exit_count"] += 1
+            else:
+                state["exit_count"] = 0
+
+            if state["exit_count"] >= self.EXIT_CONFIRM_BARS:
+                logger.info(f"[{self.name}] 趋势反转 LONG: close={close:.2f} < BBI={bbi:.2f} "
+                            f"BBI斜率={bbi_dir} 连续{state['exit_count']}根")
+                return True
+
+        else:  # SHORT
+            if close > bb_top:
+                logger.info(f"[{self.name}] BB硬止损 SHORT: close={close:.2f} > BB上轨={bb_top:.2f}")
+                return True
+
+            if close > bbi and bbi_dir == "up":
+                state["exit_count"] += 1
+            else:
+                state["exit_count"] = 0
+
+            if state["exit_count"] >= self.EXIT_CONFIRM_BARS:
+                logger.info(f"[{self.name}] 趋势反转 SHORT: close={close:.2f} > BBI={bbi:.2f} "
+                            f"BBI斜率={bbi_dir} 连续{state['exit_count']}根")
+                return True
+
+        return False

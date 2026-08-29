@@ -3,7 +3,7 @@ name: m30_followave
 magic: 661402
 type: 趋势跟踪
 display: M30 FollowAve — Stoch+BBI+BB 趋势跟踪（带 Trailing Stop）
-desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2.0×ATR trailing stop
+desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 超买死叉止盈 + 2.0×ATR trailing stop
 ---
 
 **适用周期：** M30
@@ -27,17 +27,27 @@ desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2
 | 第2层 | Stoch K < D（死叉）且 K > 20 | 动量向下，但未超卖 |
 | 第3层 | close ≤ BB 中轨 | 价格在布林带中轨之下 |
 ## 出场逻辑
+出场按优先级从高到低检查，任一触发即平仓：
+### ① 超买死叉止盈（主动止盈，最高优先级）
 | 方向 | 条件 | 说明 |
 | --- | --- | --- |
-| **做多** | close < 最高点 − 2.0×ATR | 从最高点回撤止盈 |
-| **做空** | close > 最低点 + 2.0×ATR | 从最低点反弹止盈 |
-### 趋势反转出场（辅助出场）
-| 方向 | 条件 |
-| --- | --- |
-| 做多 | close < BBI 连续 **3 根** K 线 |
-| 做空 | close > BBI 连续 **3 根** K 线 |
-| 做多 | close < BB 下轨 |
-| 做空 | close > BB 上轨 |
+| 做多 | 曾触 BB 上轨（high≥bb_top−3）+ Stoch K>80 死叉 | 超买后动量衰退即止盈 |
+| 做空 | 曾触 BB 下轨（low≤bb_bot+3）+ Stoch K<20 金叉 | 超卖后动量回升即止盈 |
+### ② 趋势反转止盈
+| 方向 | 条件 | 说明 |
+| --- | --- | --- |
+| 做多 | close < BBI + bbi_dir=down，连续 3 根 | 趋势已反转 |
+| 做空 | close > BBI + bbi_dir=up，连续 3 根 | 趋势已反转 |
+### ③ BB 硬止损
+| 方向 | 条件 | 说明 |
+| --- | --- | --- |
+| 做多 | close < BB 下轨 | 止损纯底 |
+| 做空 | close > BB 上轨 | 止损纯底 |
+### ④ Trailing Stop
+| 方向 | 条件 | 说明 |
+| --- | --- | --- |
+| 做多 | close < peak − 2.0×ATR | 从最高点回撤锁利 |
+| 做空 | close > peak + 2.0×ATR | 从最低点反弹锁利 |
 ## 回测结果
 **最佳参数：M30 + Stoch5 + 确认3根 + DI门禁=5 + Trail=2.0×ATR**
 | 指标 | 值 |
@@ -54,8 +64,10 @@ desc: M30 趋势跟踪，±DI 门禁 + Stoch 金叉/死叉 + BBI + BB 中轨 + 2
 | TIMEFRAME | M30 | 主运行周期 |
 | DI_GATE | 5 | ±DI 差值门禁 |
 | EXIT_CONFIRM_BARS | 3 | 趋势反转出场确认 K 线数 |
-| TRAIL_ATR | 2.0 | 2.0×ATR trailing stop（从极值点回撤止盈） |
-| STOCH_K_OVERBOUGHT / OVERSOLD | 70 / 20 | Stoch K 超买 / 超卖阈值 |
+| TRAIL_ATR | 2.0 | 2.0×ATR trailing stop（从极值点回撤锁利） |
+| STOCH_K_OVERBOUGHT / OVERSOLD | 70 / 30 | Stoch K 入场超买 / 超卖阈值 |
+| STOCH_EXIT_OVERBOUGHT / OVERSOLD | 80 / 20 | Stoch K 止盈超买 / 超卖阈值 |
+| BB_EXTREME_TOLERANCE | 3 | 接近 BB 上/下轨多少点算"触碰过" |
 | FIXED_LOTS | 0.01 | 固定手数 |
 | MAX_SLIPPAGE | 30 | 最大滑点 |
 ## 数据源

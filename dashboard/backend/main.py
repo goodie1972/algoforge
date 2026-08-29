@@ -68,6 +68,10 @@ if not logging.getLogger().handlers:
 engine_runner = EngineRunner(config_service=config_service)
 EngineRunner.set_instance(engine_runner)
 
+# 纸面引擎子进程管理器（即使没有 paper 策略也创建，状态返回 not_configured）
+from dashboard.backend.paper_engine_manager import PaperEngineManager
+paper_engine_manager = PaperEngineManager()
+
 # 注册 AI 内置工具（工具 handler 通过 _get_engine() 延迟获取引擎，
 # 引擎尚未启动时调用工具会返回友好错误，因此此处注册是安全的）
 from services.agent.tool_registry import register_builtin_tools
@@ -254,6 +258,38 @@ async def lifespan(app: FastAPI):
         logger.warning(f"[Startup] MCP 预热调度失败: {e}")
     # 在后台线程启动引擎（不阻塞 asyncio 事件循环，也不阻塞 lifespan 完成）
     asyncio.create_task(asyncio.to_thread(engine_runner.start))
+
+    # 检查策略池中是否有 mode='paper' 的策略，有则启动纸面引擎子进程
+    async def _maybe_start_paper_engine():
+        # 等待实盘引擎基本就绪（给 3 秒缓冲）
+        await asyncio.sleep(3)
+        try:
+            paper_strategies = config_service.get_strategy_pool_by_mode("paper")
+            enabled_paper = {
+                n: c for n, c in paper_strategies.items()
+                if c.get("enabled", False)
+            }
+            if enabled_paper:
+                logger.info(
+                    "[PaperEngine] 检测到 %d 个纸面策略 %s，启动子进程...",
+                    len(enabled_paper), list(enabled_paper.keys()),
+                )
+                await asyncio.to_thread(paper_engine_manager.start)
+            else:
+                logger.info("[PaperEngine] 无已启用的纸面策略，跳过子进程启动")
+        except Exception as e:
+            logger.warning("[PaperEngine] 纸面引擎启动检查异常: %s", e)
+
+    asyncio.create_task(_maybe_start_paper_engine())
+
+    # 纸面引擎健康检查轮询（每 30 秒）
+    async def paper_engine_watchdog():
+        while PollerState.running:
+            try:
+                paper_engine_manager.ensure_running()
+            except Exception as e:
+                logger.warning("[PaperEngine] watchdog 异常: %s", e)
+            await asyncio.sleep(30)
     # 后台延迟检查远程更新（默认 15s 后，避免启动同步 fetch 网络）
     try:
         from core.version import start_background_update_check
@@ -297,6 +333,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(broadcast_engine_status()),
         asyncio.create_task(report_daily_loop()),
         asyncio.create_task(report_weekly_loop()),
+        asyncio.create_task(paper_engine_watchdog()),
     ]
     yield
     # === Shutdown: 完整释放资源 ===
@@ -314,6 +351,11 @@ async def lifespan(app: FastAPI):
         logger.info("[Shutdown] MCP runtime closed")
     except Exception as e:
         logger.warning(f"[Shutdown] MCP runtime close failed: {e}")
+    # 1.6 停止纸面引擎子进程
+    try:
+        paper_engine_manager.stop()
+    except Exception as e:
+        logger.warning(f"[Shutdown] 纸面引擎停止异常: {e}")
     # 2. 停止引擎（含策略线程、桥接心跳）
     try:
         engine_runner.stop()
@@ -428,6 +470,7 @@ if os.path.isdir(FRONTEND_DIST):
 app.state.engine_runner = engine_runner
 app.state.ws_manager = ws_manager
 route_engine.engine_runner = engine_runner
+route_engine.paper_engine_manager = paper_engine_manager
 route_account.engine_runner = engine_runner
 route_positions.engine_runner = engine_runner
 route_config.config_service = config_service

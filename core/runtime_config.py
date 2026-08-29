@@ -157,6 +157,15 @@ class RuntimeConfig:
                 return dict(self._overrides["strategy_pool"])
         return dict(getattr(settings, 'STRATEGY_POOL', {}))
 
+
+    def get_strategy_pool_by_mode(self, mode: str = "live") -> dict[str, Any]:
+        """获取指定 mode 的策略池子集（向后兼容：无 mode 字段视为 "live"）"""
+        pool = self.get_strategy_pool()
+        return {
+            name: cfg for name, cfg in pool.items()
+            if cfg.get("mode", "live") == mode
+        }
+
     def set_strategy_pool(self, pool: dict[str, Any]) -> dict[str, Any]:
         """设置策略池覆盖"""
         with self._data_lock:

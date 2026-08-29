@@ -24,6 +24,7 @@ export interface Position {
   magic: number
   comment: string
   open_time: string
+  is_paper?: boolean
 }
 
 export interface Candle {
@@ -63,6 +64,8 @@ export interface WsMessage {
 }
 
 export type EngineStatusType = 'running' | 'stopped' | 'uninitialized' | 'error'
+
+export type StrategyMode = 'live' | 'paper'
 
 // 监控告警
 export interface PatrolAlert {
@@ -140,6 +143,7 @@ export interface ClosedTrade {
   close_time: string
   hold_seconds: number
   exit_reason: string
+  mode?: string
 }
 
 export interface BacktestHistoryItem {

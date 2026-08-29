@@ -213,10 +213,10 @@ def _calc_stats(trades: list[dict]) -> dict:
 # ── 历史成交 ──────────────────────────────────────────
 
 @router.get("/history")
-async def get_trade_history(limit: int = 100):
+async def get_trade_history(limit: int = 100, mode: str = None):
     """获取最近 N 条已平��记录（从 SQLite 读取，按平��时间倒序）"""
     try:
-        trades = db.get_trades(limit=limit)
+        trades = db.get_trades(limit=limit, mode=mode)
         trades = [_add_ts_fields(t) for t in trades]
         return trades
     except Exception as e:

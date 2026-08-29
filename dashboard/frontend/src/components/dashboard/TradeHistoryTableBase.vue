@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h } from 'vue'
-import { NTag, NDataTable, NEmpty, NText, NAlert } from 'naive-ui'
+import { NTag, NDataTable, NEmpty, NText, NAlert, NSpace } from 'naive-ui'
 import { getStrategyColor, getStrategyTextColor } from '@/utils/strategyColors'
 import { useI18n } from 'vue-i18n'
 import { fmtRowTime } from '@/utils/timeFormat'
@@ -29,9 +29,15 @@ const columns = [
       const name = row.strategy || row.comment || ''
       const color = getStrategyColor(name)
       const txtColor = getStrategyTextColor(name)
-      return h(NTag, { color: { color, textColor: txtColor }, size: 'small', style: 'font-weight: 600;' },
+      const strategyTag = h(NTag, { color: { color, textColor: txtColor }, size: 'small', style: 'font-weight: 600;' },
         { default: () => name || '-' }
       )
+      if (row.mode === 'paper') {
+        return h(NSpace, { size: 4, align: 'center' }, {
+          default: () => [strategyTag, h(NTag, { type: 'warning', size: 'tiny' }, { default: () => t('trades.paper_tag') })]
+        })
+      }
+      return strategyTag
     }
   },
   {

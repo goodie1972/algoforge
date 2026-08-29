@@ -1,6 +1,6 @@
 ---
 name: viprasol_sniper
-magic: 661401
+magic: 661400
 type: 其他
 display: Viprasol Sniper — 7因子共识 + 多级RR出场
 desc: M30 7因子评分系统，多级RR出场（1R/2R/3R/4R/5R）

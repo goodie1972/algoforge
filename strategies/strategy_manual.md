@@ -79,7 +79,7 @@ strategies/docs/{YYYYMMDD}_{策略名}_v{版本号}.md
 | 661201 | stoch_trend_h1 | M30 | 多周期 Stoch 回调顺势（原版） |
 | 661204 | stoch_trend_h1_upgraded | H1 | ADX>25过滤+Stoch极值反转+BBI方向确认 |
 | 661301 | momentum_pulse_pro | M30 | 7维度多因子评分，三层TP |
-| 661401 | viprasol_sniper | M30 | 7因子评分，多级RR出场 |
+| 661400 | viprasol_sniper | M30 | 7因子评分，多级RR出场 |
 | 661501 | entry_score_pro | M30 | 5因子加权评分0-100 |
 | 661601 | multi_confluence_quant | M30 | 14因子综合评分 |
 | 777004 | bakome_backup | M30 | ICT FVG+OB+Silver Bullet（原版） |

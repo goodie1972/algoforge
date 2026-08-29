@@ -248,6 +248,7 @@ class PositionMgrMixin:
                 close_time=close_time_str, hold_seconds=hold_sec,
                 exit_reason=reason,
                 indicator_snapshot=json.dumps(snapshot, ensure_ascii=False),
+                mode=self._engine_mode,
             )
             self._closed_trades.append(record)
             self._trim_closed_trades()

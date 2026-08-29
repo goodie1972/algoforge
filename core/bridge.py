@@ -164,27 +164,38 @@ def create_bridge() -> MT4BridgeBase:
         raise ValueError(f"不支持的 MT4_MODE: {MT4_MODE}")
 
 
-def create_bridge_pair():
+def create_bridge_pair(engine_mode: str = "live"):
     """创建双桥接：data_bridge(推流) + exec_bridge(下单)
 
-    纸面模式 (RuntimeConfig paper_trading.enabled=True) 时 exec_bridge 使用 PaperBridge 包装，
-    数据委托给真实桥接，交易操作本地模拟。
+    纸面模式 (engine_mode="paper" 或 RuntimeConfig paper_trading.enabled=True) 时
+    exec_bridge 使用 PaperBridge 包装，数据委托给真实桥接，交易操作本地模拟。
     """
     from core.freemt4_bridge import FreeMT4Bridge
     real_exec = FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="exec")
     # 纸面模式：用 PaperBridge 包装执行桥接
+    use_paper = (engine_mode == "paper")
     try:
         from core.runtime_config import RuntimeConfig
         rc = RuntimeConfig()
         paper_cfg = rc.get_paper_config()
         if paper_cfg.get("enabled", False):
+            use_paper = True
+        if use_paper:
             from core.paper_bridge import PaperBridge
             exec_bridge = PaperBridge(real_exec, initial_balance=paper_cfg.get("initial_balance", 0))
             logger.info("[bridge] Paper mode: PaperBridge wraps exec bridge")
         else:
             exec_bridge = real_exec
     except (ImportError, AttributeError):
-        exec_bridge = real_exec
+        if use_paper:
+            try:
+                from core.paper_bridge import PaperBridge
+                exec_bridge = PaperBridge(real_exec, initial_balance=0)
+                logger.info("[bridge] Paper mode (fallback): PaperBridge wraps exec bridge")
+            except ImportError:
+                exec_bridge = real_exec
+        else:
+            exec_bridge = real_exec
 
     return (
         FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="data"),

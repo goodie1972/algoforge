@@ -37,175 +37,200 @@
       "magic": 660706,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "entry_score_pro": {
       "enabled": false,
       "magic": 661501,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "gold_auto_research": {
       "enabled": true,
       "magic": 880306,
       "timeframe": "H1",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "mfi_bb_m30": {
       "enabled": false,
       "magic": 661001,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "momentum_pulse_pro": {
       "enabled": false,
       "magic": 661301,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "multi_confluence_quant": {
       "enabled": false,
       "magic": 661601,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "sanqing_h1": {
       "enabled": false,
       "magic": 880107,
       "timeframe": "H1",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "viprasol_sniper": {
       "enabled": false,
-      "magic": 661401,
+      "magic": 661400,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "m30_bb_deepreturn_optimized": {
       "enabled": true,
       "magic": 661102,
       "timeframe": "M30",
       "max_positions": 5,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "mfi_bb_m30_optimized": {
       "enabled": false,
       "magic": 661002,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "stoch_trend_h1_optimized": {
       "enabled": false,
       "magic": 661202,
       "timeframe": "H1",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "mfi_bb_m30_upgraded": {
       "enabled": false,
       "magic": 661003,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "rsi_grading_m30_upgraded": {
       "enabled": true,
       "magic": 660904,
       "timeframe": "M30",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "sanqing_h1_upgraded": {
       "enabled": true,
       "magic": 880108,
       "timeframe": "H1",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "h1_breakout": {
       "enabled": false,
       "magic": 880301,
       "timeframe": "H1",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "m30_vol_return": {
       "enabled": false,
       "magic": 880302,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "bakome_gold_scalper_original": {
       "enabled": false,
       "magic": 880303,
       "timeframe": "M5",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "bakome_trinity_ea_original": {
       "enabled": false,
       "magic": 880304,
       "timeframe": "M5",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "timeprofit_ea": {
       "enabled": true,
       "magic": 880202,
       "timeframe": "M5",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "xaubot_backup": {
       "enabled": false,
       "magic": 777005,
       "timeframe": "M30",
       "max_positions": 0,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "goodma": {
       "enabled": true,
       "magic": 880401,
       "timeframe": "H1",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "kiss": {
       "enabled": true,
       "magic": 880501,
       "timeframe": "H1",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "fish_eaten": {
       "enabled": true,
-      "magic": 661301,
+      "magic": 661302,
       "timeframe": "M30",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "m15_followave": {
       "enabled": true,
       "magic": 661401,
       "timeframe": "M15",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     },
     "m30_followave": {
       "enabled": true,
       "magic": 661402,
       "timeframe": "M30",
       "max_positions": 1,
-      "double_first": false
+      "double_first": false,
+      "mode": "live"
     }
   },
   "paper_trading": {
