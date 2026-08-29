@@ -1,0 +1,121 @@
+{
+  "summary": {
+    "projectName": "xauusd",
+    "locale": "zh-CN",
+    "modelId": "agent-work-loop-v4",
+    "reportContractVersion": 26,
+    "overview": "三个项目级 Skill（market_analysis、position_diagnosis、risk_check）均缺少完整的 SKILL.md 结构，导致 Agent 无法可靠触发和标准化执行。",
+    "aiAgentPractice": {
+      "inspectedSurfaces": [
+        "Skills"
+      ],
+      "coverageRows": [
+        {
+          "surface": "Skills",
+          "scopes": [
+            "Project"
+          ],
+          "count": 3,
+          "paths": [
+            "skills/market_analysis/SKILL.md",
+            "skills/position_diagnosis/SKILL.md",
+            "skills/risk_check/SKILL.md"
+          ]
+        }
+      ]
+    },
+    "assignmentSummaries": [],
+    "dimensions": [
+      {
+        "id": "task-understanding",
+        "label": "任务理解",
+        "score": 30,
+        "summary": "Skill 的 description 字段未包含触发关键词，Agent 无法可靠识别何时应触发该 Skill。",
+        "findingRefs": [
+          "skill-market-analysis-structure",
+          "skill-position-diagnosis-structure",
+          "skill-risk-check-structure"
+        ]
+      },
+      {
+        "id": "controlled-execution",
+        "label": "可控执行",
+        "score": 25,
+        "summary": "Skill 仅列出分析要点，缺少分步执行流程，Agent 无法按标准化步骤执行。",
+        "findingRefs": [
+          "skill-market-analysis-structure",
+          "skill-position-diagnosis-structure",
+          "skill-risk-check-structure"
+        ]
+      },
+      {
+        "id": "change-validation",
+        "label": "改动验证",
+        "score": 20,
+        "summary": "无输出契约和验证步骤，无法确认 Skill 执行结果是否正确。",
+        "findingRefs": []
+      },
+      {
+        "id": "reliable-delivery",
+        "label": "可靠交付",
+        "score": 15,
+        "summary": "Skill 结构不完整，每次调用可能产生不一致的输出格式和质量。",
+        "findingRefs": []
+      },
+      {
+        "id": "learning-capture",
+        "label": "经验沉淀",
+        "score": 35,
+        "summary": "无验证步骤意味着无法衡量 Skill 执行效果或积累改进数据。",
+        "findingRefs": []
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "skill-market-analysis-structure",
+      "title": "market_analysis SKILL.md 缺少触发条件、执行流程、输出契约和验证步骤",
+      "severity": "Medium",
+      "reason": "SKILL.md 仅 11 行，包含 frontmatter + 简要描述 + 5 条分析要点，但 description 字段无触发关键词，无分步执行流程，无输出格式契约，无验证方法。Agent 无法可靠识别何时触发 market_analysis Skill，也无法按标准化流程执行行情研判。",
+      "expectedOutput": [
+        "Update the existing Skill owner identified by the reviewed evidence and retain a focused validation result."
+      ],
+      "expectedArtifact": "Skill",
+      "aiFixPrompt": "为 market_analysis/SKILL.md 补充完整的 SKILL.md 结构：触发条件、执行流程、输出契约、验证步骤。",
+      "dimensionRefs": [
+        "task-understanding",
+        "controlled-execution"
+      ]
+    },
+    {
+      "id": "skill-position-diagnosis-structure",
+      "title": "position_diagnosis SKILL.md 缺少触发条件、执行流程、输出契约和验证步骤",
+      "severity": "Medium",
+      "reason": "SKILL.md 仅 11 行，包含 frontmatter + 简要描述 + 5 条诊断要点，但 description 字段无触发关键词，无分步执行流程，无输出格式契约，无验证方法。Agent 无法可靠识别何时触发持仓诊断 Skill。",
+      "expectedOutput": [
+        "Update the existing Skill owner identified by the reviewed evidence and retain a focused validation result."
+      ],
+      "expectedArtifact": "Skill",
+      "aiFixPrompt": "为 position_diagnosis/SKILL.md 补充完整的 SKILL.md 结构：触发条件、执行流程、输出契约、验证步骤。",
+      "dimensionRefs": [
+        "task-understanding",
+        "controlled-execution"
+      ]
+    },
+    {
+      "id": "skill-risk-check-structure",
+      "title": "risk_check SKILL.md 缺少触发条件、执行流程、输出契约和验证步骤",
+      "severity": "Medium",
+      "reason": "SKILL.md 仅 11 行，包含 frontmatter + 简要描述 + 6 条检查要点，但 description 字段无触发关键词，无分步执行流程，无输出格式契约，无验证方法。Agent 无法可靠识别何时触发系统风险检查 Skill。",
+      "expectedOutput": [
+        "Update the existing Skill owner identified by the reviewed evidence and retain a focused validation result."
+      ],
+      "expectedArtifact": "Skill",
+      "aiFixPrompt": "为 risk_check/SKILL.md 补充完整的 SKILL.md 结构：触发条件、执行流程、输出契约、验证步骤。",
+      "dimensionRefs": [
+        "task-understanding",
+        "controlled-execution"
+      ]
+    }
+  ]
+}
