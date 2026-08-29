@@ -131,7 +131,7 @@ class MT4BridgeBase(abc.ABC):
         positions = self.get_positions(symbol)
         if magic:
             positions = [p for p in positions if p.magic == magic]
-        logger.info(f"[positiontakeover] Magic={magic} found {len(positions)}  existing positions:")
+        logger.info(f"[持仓接管] Magic={magic} 发现 {len(positions)} 个现有持仓:")
         for pos in positions:
             logger.info(
                 f"  Ticket={pos.ticket} {pos.order_type} "
@@ -152,8 +152,8 @@ def create_bridge() -> MT4BridgeBase:
             paper_cfg = rc.get_paper_config()
             if paper_cfg.get("enabled", False):
                 from core.paper_bridge import PaperBridge
-                bridge = PaperBridge(bridge, initial_balance=paper_cfg.get("initial_balance", 0))
-                logger.info("[bridge] Paper mode: PaperBridge wraps single bridge")
+                bridge = PaperBridge(bridge)
+                logger.info("[桥接] 纸面模式：PaperBridge 包装单桥接")
         except (ImportError, AttributeError):
             pass
         return bridge
@@ -164,38 +164,27 @@ def create_bridge() -> MT4BridgeBase:
         raise ValueError(f"不支持的 MT4_MODE: {MT4_MODE}")
 
 
-def create_bridge_pair(engine_mode: str = "live"):
+def create_bridge_pair():
     """创建双桥接：data_bridge(推流) + exec_bridge(下单)
 
-    纸面模式 (engine_mode="paper" 或 RuntimeConfig paper_trading.enabled=True) 时
-    exec_bridge 使用 PaperBridge 包装，数据委托给真实桥接，交易操作本地模拟。
+    纸面模式 (RuntimeConfig paper_trading.enabled=True) 时 exec_bridge 使用 PaperBridge 包装，
+    数据委托给真实桥接，交易操作本地模拟。
     """
     from core.freemt4_bridge import FreeMT4Bridge
     real_exec = FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="exec")
     # 纸面模式：用 PaperBridge 包装执行桥接
-    use_paper = (engine_mode == "paper")
     try:
         from core.runtime_config import RuntimeConfig
         rc = RuntimeConfig()
         paper_cfg = rc.get_paper_config()
         if paper_cfg.get("enabled", False):
-            use_paper = True
-        if use_paper:
             from core.paper_bridge import PaperBridge
-            exec_bridge = PaperBridge(real_exec, initial_balance=paper_cfg.get("initial_balance", 0))
-            logger.info("[bridge] Paper mode: PaperBridge wraps exec bridge")
+            exec_bridge = PaperBridge(real_exec)
+            logger.info("[桥接] 纸面模式：PaperBridge 包装执行桥接")
         else:
             exec_bridge = real_exec
     except (ImportError, AttributeError):
-        if use_paper:
-            try:
-                from core.paper_bridge import PaperBridge
-                exec_bridge = PaperBridge(real_exec, initial_balance=0)
-                logger.info("[bridge] Paper mode (fallback): PaperBridge wraps exec bridge")
-            except ImportError:
-                exec_bridge = real_exec
-        else:
-            exec_bridge = real_exec
+        exec_bridge = real_exec
 
     return (
         FreeMT4Bridge(host=FREEMT4_HOST, port=FREEMT4_PORT, name="data"),

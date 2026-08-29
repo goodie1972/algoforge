@@ -23,29 +23,15 @@ async def run_bridge(func, *args):
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
-# 以脚本方式运行（python main.py）时，提前用规范模块名注册自身；
-# 否则运行中任何 `from dashboard.backend.main import XX` 都会二次执行本文件顶层代码，
-# 产生第二份 engine_runner/app 并覆盖路由引用，导致 API 与真实引擎状态脱节（平仓失败等问题）。
-if "__main__" in sys.modules:
-    try:
-        _main_mod = sys.modules["__main__"]
-        _main_file = getattr(_main_mod, "__file__", "") or ""
-        if _main_file.replace("\\", "/").endswith("/main.py") and "dashboard.backend.main" not in sys.modules:
-            sys.modules["dashboard.backend.main"] = _main_mod
-    except Exception:
-        pass
-
 # === 服务初始化 ===
 from dashboard.backend.config_service import RuntimeConfig
 from dashboard.backend.engine_runner import EngineRunner
 from dashboard.backend.web_manager import WebSocketManager
 from dashboard.backend.log_service import LogCaptureHandler
-from dashboard.backend.broadcast_hub import BroadcastHub
 
 config_service = RuntimeConfig()
 ws_manager = WebSocketManager()
 log_handler = LogCaptureHandler()
-broadcast_hub = BroadcastHub()
 
 logger = logging.getLogger("dashboard")
 
@@ -66,30 +52,6 @@ if not logging.getLogger().handlers:
     logging.getLogger().addHandler(_console)
 
 engine_runner = EngineRunner(config_service=config_service)
-EngineRunner.set_instance(engine_runner)
-
-# 纸面引擎子进程管理器（即使没有 paper 策略也创建，状态返回 not_configured）
-from dashboard.backend.paper_engine_manager import PaperEngineManager
-paper_engine_manager = PaperEngineManager()
-
-# 注册 AI 内置工具（工具 handler 通过 _get_engine() 延迟获取引擎，
-# 引擎尚未启动时调用工具会返回友好错误，因此此处注册是安全的）
-from services.agent.tool_registry import register_builtin_tools
-try:
-    register_builtin_tools()
-except Exception as e:
-    logger.warning(f"[ToolRegistry] 内置工具注册失败: {e}")
-
-# 启动时把 agent_settings 持久化的 smithery_api_key 载入环境变量（环境变量已有则不覆盖），
-# 使 MCP 市场无需重启即可使用 API 级能力；失败仅记日志，不影响启动。
-try:
-    from services.agent.agent_settings import get_setting as _get_agent_setting
-    _smithery_key = str(_get_agent_setting("smithery_api_key") or "").strip()
-    if _smithery_key and not os.environ.get("SMITHERY_API_KEY"):
-        os.environ["SMITHERY_API_KEY"] = _smithery_key
-        logger.info("[AgentSettings] smithery_api_key 已从持久化配置载入环境变量")
-except Exception as e:
-    logger.warning(f"[AgentSettings] smithery_api_key 载入失败: {e}")
 
 # === 注入依赖到路由模块 ===
 from dashboard.backend.routes import engine as route_engine
@@ -104,15 +66,11 @@ from dashboard.backend.routes import trades as route_trades
 from dashboard.backend.routes import data as route_data
 from dashboard.backend.routes import signals as route_signals
 from dashboard.backend.routes import reports as route_reports
+from dashboard.backend.routes import news_bias as route_news_bias
 from dashboard.backend.routes import version as route_version
 from dashboard.backend.routes import strategies as route_strategies
 from dashboard.backend.routes import supervisor as route_supervisor
 from dashboard.backend.routes import paper_trading as route_paper_trading
-from dashboard.backend.routes.llm_provider import router as llm_provider_router
-from dashboard.backend.routes.ai import router as ai_router
-from dashboard.backend.routes.mcp import router as mcp_router
-from dashboard.backend.routes.skill_store import router as skill_store_router
-from dashboard.backend.routes.mcp_store import router as mcp_store_router
 
 # run_bridge 是纯函数，不需要 __name__ 守卫
 route_account.run_bridge = run_bridge
@@ -129,31 +87,27 @@ class PollerState:
 
 
 async def broadcast_prices():
-    """每 0.3 秒推送一次价格 — 通过 BroadcastHub 背压控制"""
+    """每 0.3 秒推送一次价格（引擎高速采样缓存，使前端 K 线实时跳动）"""
     while PollerState.running:
         try:
             cached = engine_runner._cached_price
             if cached:
-                data = {
+                await ws_manager.broadcast("prices", {
                     "bid": cached["bid"],
                     "ask": cached["ask"],
                     "spread": round(cached["ask"] - cached["bid"], 2),
-                }
-                await broadcast_hub.publish("prices", data)
-                # 同时推送给未升级的 WebSocket 客户端（兼容）
-                await ws_manager.broadcast("prices", data)
+                })
         except Exception:
             pass
         await asyncio.sleep(0.3)
 
 
 async def broadcast_positions():
-    """每 5 秒推送一次持仓 — 通过 BroadcastHub 背压控制"""
+    """每 5 秒推送一次持仓（用最新价格刷新 current_price）"""
     while PollerState.running:
         try:
             positions = engine_runner._fresh_positions()
             if positions:
-                await broadcast_hub.publish("positions", positions)
                 await ws_manager.broadcast("positions", positions)
         except Exception:
             pass
@@ -161,12 +115,11 @@ async def broadcast_positions():
 
 
 async def broadcast_account():
-    """每 10 秒推送一次账户信息 — 通过 BroadcastHub 背压控制"""
+    """每 10 秒推送一次账户信息（从引擎线程缓存读取）"""
     while PollerState.running:
         try:
             account = engine_runner._cached_account
             if account:
-                await broadcast_hub.publish("account", account)
                 await ws_manager.broadcast("account", account)
         except Exception:
             pass
@@ -199,131 +152,77 @@ async def report_daily_loop():
     while PollerState.running:
         try:
             _gather_daily_report()
-            logger.info("[Report] daily reportgenerated")
+            logger.info("[报告] 日报已生成")
         except Exception as e:
-            logger.warning(f"[Report] daily reportgeneratedfailed: {e}")
+            logger.warning(f"[报告] 日报生成失败: {e}")
         await asyncio.sleep(600)
 
 
 async def report_weekly_loop():
-    """每 6 小时生成一次快照报告，保留历史记录"""
+    """每天 00:00 生成前一天的周报"""
     from dashboard.backend.routes.reports import _gather_weekly_report
     while PollerState.running:
-        _gather_weekly_report()
-        logger.info("[Report] snapshotgenerated")
-        # 每 6 小时
-        for _ in range(21600):
-            if not PollerState.running:
-                return
-            await asyncio.sleep(1)
+        now = datetime.now()
+        # 计算到下一个 00:00 的秒数
+        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        wait_sec = (next_midnight - now).total_seconds()
+        await asyncio.sleep(wait_sec)
+        if not PollerState.running:
+            break
+        try:
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            _gather_weekly_report(target_date=yesterday)
+            logger.info(f"[报告] 周报已生成 ({yesterday})")
+        except Exception as e:
+            logger.warning(f"[报告] 周报生成失败: {e}")
+
+
+async def news_bias_loop():
+    """交易日 8:00 和 20:00 北京时间生成新闻预判报告 + 弹窗推送"""
+    from services.news_bias import NewsBiasEvaluator
+    await asyncio.sleep(60)
+    last_run_key = ""
+    while PollerState.running:
+        try:
+            now = datetime.now()
+            # 非交易日跳过
+            if now.weekday() >= 5:
+                await asyncio.sleep(3600)
+                continue
+
+            hour = now.hour
+            minute = now.minute
+
+            # 8:00-8:04 或 20:00-20:04 生成（每天两次）
+            if hour in (8, 20) and minute < 5:
+                today = now.strftime("%Y-%m-%d")
+                run_key = f"{today}-{hour}"
+                if run_key != last_run_key:
+                    last_run_key = run_key
+                    current_price = 0
+                    cached = getattr(engine_runner, "_cached_price", None)
+                    if cached:
+                        current_price = cached.get("bid", 0)
+
+                    evaluator = NewsBiasEvaluator()
+                    evaluator.verify_old_predictions(current_price=current_price)
+                    report = evaluator.generate_prediction_report(current_price=current_price)
+                    if report:
+                        await ws_manager.broadcast("news_bias_popup", report)
+                        logger.info(f"[NewsBias] 已生成并推送报告 #{report.get('id')}")
+
+            await asyncio.sleep(300)  # 每 5 分钟检查一次
+        except Exception as e:
+            logger.warning(f"[NewsBias] 循环异常: {e}")
+            await asyncio.sleep(300)
 
 
 # === FastAPI 生命周期 ===
-# 启动期预热的后台任务引用（模块级集合防 GC）
-_lifespan_bg_tasks: set = set()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动/关闭事件 — 自动启动引擎线程 + 后台预热策略缓存
-    
-    Shutdown 时完整释放：引擎、桥接、WebSocket、后台任务、日志句柄。
-    """
-    # 后台任务：预热策略缓存（不阻塞服务器启动）
-    async def _warm_cache():
-        t0 = datetime.now()
-        try:
-            from strategies.scanner import scan_strategy_metadata
-            await asyncio.to_thread(scan_strategy_metadata)
-            logger.info(f"策略缓存预热完成: {(datetime.now()-t0).total_seconds():.2f}s")
-        except Exception as e:
-            logger.warning(f"策略缓存预热失败: {e}")
-    asyncio.create_task(_warm_cache())
-    # 预热 MCP 工具目录（避免首条聊天 +8s 发现延迟）；
-    # get_openai_tools 内部对失败连接器已有容错，预热异常只记日志不影响启动。
-    try:
-        from services.agent.mcp_runtime import get_mcp_runtime
-
-        async def _warm_mcp_tools():
-            try:
-                await get_mcp_runtime().get_openai_tools()
-                logger.info("[Startup] MCP 工具目录预热完成")
-            except Exception as e:
-                logger.warning(f"[Startup] MCP 工具目录预热失败: {e}")
-
-        _mcp_warm_task = asyncio.create_task(_warm_mcp_tools())
-        _lifespan_bg_tasks.add(_mcp_warm_task)
-        _mcp_warm_task.add_done_callback(_lifespan_bg_tasks.discard)
-    except Exception as e:
-        logger.warning(f"[Startup] MCP 预热调度失败: {e}")
-    # 在后台线程启动引擎（不阻塞 asyncio 事件循环，也不阻塞 lifespan 完成）
-    asyncio.create_task(asyncio.to_thread(engine_runner.start))
-
-    # 检查策略池中是否有 mode='paper' 的策略，有则启动纸面引擎子进程
-    async def _maybe_start_paper_engine():
-        # 等待实盘引擎基本就绪（给 3 秒缓冲）
-        await asyncio.sleep(3)
-        try:
-            paper_strategies = config_service.get_strategy_pool_by_mode("paper")
-            enabled_paper = {
-                n: c for n, c in paper_strategies.items()
-                if c.get("enabled", False)
-            }
-            if enabled_paper:
-                logger.info(
-                    "[PaperEngine] 检测到 %d 个纸面策略 %s，启动子进程...",
-                    len(enabled_paper), list(enabled_paper.keys()),
-                )
-                await asyncio.to_thread(paper_engine_manager.start)
-            else:
-                logger.info("[PaperEngine] 无已启用的纸面策略，跳过子进程启动")
-        except Exception as e:
-            logger.warning("[PaperEngine] 纸面引擎启动检查异常: %s", e)
-
-    asyncio.create_task(_maybe_start_paper_engine())
-
-    # 纸面引擎健康检查轮询（每 30 秒）
-    async def paper_engine_watchdog():
-        while PollerState.running:
-            try:
-                paper_engine_manager.ensure_running()
-            except Exception as e:
-                logger.warning("[PaperEngine] watchdog 异常: %s", e)
-            await asyncio.sleep(30)
-    # 后台延迟检查远程更新（默认 15s 后，避免启动同步 fetch 网络）
-    try:
-        from core.version import start_background_update_check
-        start_background_update_check()
-    except Exception:
-        pass
-
-    # 自动更新：冷启动检查 + 后台轮询
-    async def _auto_update_init():
-        try:
-            from dashboard.backend import auto_update
-            # 冷启动：如果有预下载的 pending，立即应用
-            result = auto_update.check_cold_update()
-            if result:
-                logger.warning(f"[AutoUpdate] 冷更新自动应用: {result.get('message','')}")
-            # 启动后 15s 执行首次预下载检查
-            await asyncio.sleep(15)
-            while PollerState.running:
-                try:
-                    cfg = auto_update.get_config()
-                    if cfg.get("auto_update_enabled"):
-                        state = auto_update.fetch_remote()
-                        if state.get("state") == "pending":
-                            logger.warning(f"[AutoUpdate] 新版本待应用: {state.get('message')}")
-                    interval_h = cfg.get("update_interval_hours", 1)
-                    await asyncio.sleep(interval_h * 3600)
-                except Exception as e:
-                    logger.warning(f"[AutoUpdate] 轮询异常: {e}")
-                    await asyncio.sleep(60)
-        except Exception as e:
-            logger.warning(f"[AutoUpdate] 初始化失败: {e}")
-
-    asyncio.create_task(_auto_update_init())
-
+    """启动/关闭事件 — 自动启动引擎线程"""
+    # 在后台线程启动引擎（不阻塞 asyncio 事件循环）
+    await asyncio.to_thread(engine_runner.start)
     PollerState.running = True
     tasks = [
         asyncio.create_task(broadcast_prices()),
@@ -333,62 +232,14 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(broadcast_engine_status()),
         asyncio.create_task(report_daily_loop()),
         asyncio.create_task(report_weekly_loop()),
-        asyncio.create_task(paper_engine_watchdog()),
+        asyncio.create_task(news_bias_loop()),
     ]
     yield
-    # === Shutdown: 完整释放资源 ===
-    logger.info("[Shutdown] 开始清理资源...")
     PollerState.running = False
-    # 1. 取消所有后台任务
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
-    logger.info("[Shutdown] 后台任务已取消")
-    # 1.5 关闭 MCP 运行时（stdio 子进程 / SSE 连接）
-    try:
-        from services.agent.mcp_runtime import get_mcp_runtime
-        await get_mcp_runtime().close_all()
-        logger.info("[Shutdown] MCP runtime closed")
-    except Exception as e:
-        logger.warning(f"[Shutdown] MCP runtime close failed: {e}")
-    # 1.6 停止纸面引擎子进程
-    try:
-        paper_engine_manager.stop()
-    except Exception as e:
-        logger.warning(f"[Shutdown] 纸面引擎停止异常: {e}")
-    # 2. 停止引擎（含策略线程、桥接心跳）
-    try:
-        engine_runner.stop()
-        logger.info("[Shutdown] 引擎已停止")
-    except Exception as e:
-        logger.warning(f"[Shutdown] 引擎停止异常: {e}")
-    # 3. 断开所有 WebSocket 连接
-    try:
-        await ws_manager.disconnect_all()
-        logger.info("[Shutdown] WebSocket 连接已断开")
-    except Exception:
-        pass
-    # 4. 关闭桥接连接
-    try:
-        if hasattr(engine_runner, '_engine') and engine_runner._engine:
-            bridge = getattr(engine_runner._engine, 'bridge', None)
-            if bridge and hasattr(bridge, 'disconnect'):
-                bridge.disconnect()
-                logger.info("[Shutdown] 桥接已断开")
-    except Exception:
-        pass
-    # 5. 关闭日志文件句柄
-    try:
-        for handler in logging.getLogger().handlers:
-            if hasattr(handler, 'close'):
-                handler.close()
-        logger.info("[Shutdown] 日志句柄已关闭")
-    except Exception:
-        pass
-    # 6. 强制 GC
-    import gc
-    gc.collect()
-    logger.info("[Shutdown] 资源清理完成")
+    engine_runner.stop()
 
 
 
@@ -420,15 +271,11 @@ app.include_router(route_trades.router)
 app.include_router(route_data.router)
 app.include_router(route_signals.router)
 app.include_router(route_reports.router)
+app.include_router(route_news_bias.router)
 app.include_router(route_version.router)
 app.include_router(route_strategies.router)
 app.include_router(route_supervisor.router)
 app.include_router(route_paper_trading.router)
-app.include_router(llm_provider_router)
-app.include_router(ai_router)
-app.include_router(mcp_router)
-app.include_router(skill_store_router)
-app.include_router(mcp_store_router)
 
 
 # === WebSocket 端点 ===
@@ -470,7 +317,6 @@ if os.path.isdir(FRONTEND_DIST):
 app.state.engine_runner = engine_runner
 app.state.ws_manager = ws_manager
 route_engine.engine_runner = engine_runner
-route_engine.paper_engine_manager = paper_engine_manager
 route_account.engine_runner = engine_runner
 route_positions.engine_runner = engine_runner
 route_config.config_service = config_service
@@ -479,6 +325,7 @@ route_logs.log_handler = log_handler
 route_trades.engine_runner = engine_runner
 route_data.engine_runner = engine_runner
 route_reports.engine_runner = engine_runner
+route_news_bias.engine_runner = engine_runner
 route_supervisor.engine_runner = engine_runner
 route_paper_trading.engine_runner = engine_runner
 # supervisor 路由需要引擎的监督者实例（延迟绑定，引擎启动后才有）

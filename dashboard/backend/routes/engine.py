@@ -4,7 +4,6 @@
 import logging
 import time
 from fastapi import APIRouter, HTTPException
-from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from config import settings
@@ -17,7 +16,6 @@ router = APIRouter(prefix="/api/engine", tags=["engine"])
 
 # 由 main.py 在启动时注入
 engine_runner = None
-paper_engine_manager = None
 # 由 main.py 注入 STRATEGY_MAP 的 name→label 信息
 available_strategies: dict = {}
 
@@ -34,16 +32,10 @@ class RemoveStrategyRequest(BaseModel):
 
 @router.get("/status")
 async def get_status():
-    """获取引擎运行状态（含纸面引擎子进程状态）"""
+    """获取引擎运行状态"""
     if not engine_runner:
         return {"status": "uninitialized", "uptime_seconds": 0}
-    result = engine_runner.get_status()
-    # 附加纸面引擎状态
-    if paper_engine_manager is not None:
-        result["paper_engine"] = paper_engine_manager.get_status()
-    else:
-        result["paper_engine"] = {"status": "not_configured"}
-    return result
+    return engine_runner.get_status()
 
 
 @router.post("/start")
@@ -68,28 +60,6 @@ async def stop_engine():
         raise HTTPException(409, "引擎未在运行")
     engine_runner.stop()
     return {"message": "引擎已停止"}
-
-
-@router.post("/restart")
-async def restart_engine():
-    """一键重启引擎（stop → start），用于纸面/实盘模式切换后重建桥接
-
-    前端契约：保存纸面配置收到 mode_switch=true 且用户确认后调用本接口。
-    边界处理：引擎未运行时跳过 stop 直接 start（等价于 /start 的效果），
-    start 失败返回 500；引擎未初始化返回 500。
-    """
-    if not engine_runner:
-        raise HTTPException(500, "引擎未初始化")
-    was_running = engine_runner.is_running
-    if was_running:
-        # stop() 内部 join(timeout=15) 同步阻塞，放线程池避免卡死事件循环 ~16s
-        await run_in_threadpool(engine_runner.stop)
-        if engine_runner.is_running:
-            raise HTTPException(503, "旧进程尚未退出，请稍候重试")
-    ok = await run_in_threadpool(engine_runner.start)
-    if not ok:
-        raise HTTPException(500, "引擎重启失败，请检查日志")
-    return {"status": "restarted" if was_running else "started"}
 
 
 @router.get("/strategies")
@@ -180,11 +150,7 @@ async def get_health():
 def _build_engine_block() -> dict:
     if not engine_runner:
         return {"status": "uninitialized", "uptime_seconds": 0}
-    block = engine_runner.get_status()
-    # 附加纸面引擎状态到 health 端点
-    if paper_engine_manager is not None:
-        block["paper_engine"] = paper_engine_manager.get_status()
-    return block
+    return engine_runner.get_status()
 
 
 def _build_datafactory_block() -> dict:

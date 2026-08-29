@@ -47,29 +47,48 @@ def check_rapid_exit(
     Returns:
         True 表示触发阻断
     """
-    # 清除窗口外的旧时间戳
+    cutoff = now - window_seconds
+    return sum(1 for t in state.exit_timestamps if t >= cutoff) >= max_exits
+
+
+def prune_exit_window(state: StrategyRiskState, window_seconds: int, now: float) -> None:
+    """维护操作：移除窗口外的时间戳，防止 exit_timestamps 无限增长。
+
+    由引擎在每个 tick 主动调用。单独拆出来，是为了让 :func:`check_rapid_exit`
+    成为纯查询（不偷偷改状态）。
+    """
     while state.exit_timestamps and state.exit_timestamps[0] < now - window_seconds:
         state.exit_timestamps.popleft()
 
-    return len(state.exit_timestamps) >= max_exits
 
+def register_trade_result(state: StrategyRiskState, pnl: float) -> None:
+    """根据单笔盈亏更新连续亏损计数（唯一允许修改 consecutive_losses 的地方）。
 
-def check_consecutive_loss(
-    state: StrategyRiskState,
-    pnl: float,
-    max_consecutive: int,
-) -> bool:
-    """检查连续亏损是否触发阻断
+    - pnl < 0：连续亏损 +1
+    - pnl > 0：连续亏损清零
+    - pnl == 0：不变（保本/未结算，不计入连亏也不清零）
 
-    Returns:
-        True 表示触发阻断（达到阈值）
+    注意：本函数只负责「改状态」，不下任何判断结论。是否触发阻断请用
+    :func:`check_consecutive_loss` 查询。把「改状态」与「查状态」拆开，
+    可以避免把 check 调用两次就重复计数的陷阱。
     """
     if pnl < 0:
         state.consecutive_losses += 1
-        return state.consecutive_losses >= max_consecutive
     elif pnl > 0:
         state.consecutive_losses = 0
-    return False
+
+
+def check_consecutive_loss(state: StrategyRiskState, max_consecutive: int) -> bool:
+    """纯查询：当前连续亏损次数是否已达阻断阈值（**不修改任何状态**）。
+
+    Args:
+        state: 策略风控状态
+        max_consecutive: 允许的最大连续亏损次数
+
+    Returns:
+        True 表示已达阈值、应触发阻断
+    """
+    return state.consecutive_losses >= max_consecutive
 
 
 def check_realized_loss_amount(
