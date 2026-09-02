@@ -85,12 +85,16 @@ class BaseStrategy(abc.ABC):
         raw = self.bridge.get_candles(self.symbol, self.timeframe, count)
         self.candles = list(reversed(raw)) if raw else []
         if self.candles:
-            try:
-                from services.data_factory import _ta_only_indicators
-                _ta = _ta_only_indicators(self.candles, self.timeframe)
-                self._cached_indicators = _ta.get(self.candles[-1].time, {}) if _ta else {}
-            except Exception:
-                self._cached_indicators = {}
+                try:
+                    from services.data_factory import _ta_only_indicators
+                    _ta = _ta_only_indicators(self.candles, self.timeframe)
+                    # 指标取自「已闭合」那根 (bar1, candles[-2])，禁止用正在形成的
+                    # forming bar (candles[-1]) 算指标——否则会引入重绘/未来函数。
+                    # 仅当蜡烛不足 2 根时才回退到末根，避免越界。
+                    idx = -2 if len(self.candles) >= 2 else -1
+                    self._cached_indicators = _ta.get(self.candles[idx].time, {}) if _ta else {}
+                except Exception:
+                    self._cached_indicators = {}
 
     def get_close_prices(self) -> list[float]:
         """get收盘价序列"""

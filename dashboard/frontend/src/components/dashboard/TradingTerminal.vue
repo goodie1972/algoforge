@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
 let autoScrollScheduled = false
 
@@ -383,6 +383,17 @@ onUnmounted(() => {
 
 // ---- 主题切换响应：销毁并重建所有图表实例 ----
 const appStore = useAppStore()
+
+// 副图指标标签样式（颜色随主题切换：暗色白字 / 亮色深字）
+const paneLabelStyle = computed(() => ({
+  position: 'absolute',
+  top: '2px',
+  left: '8px',
+  fontSize: '13px',
+  fontWeight: '700',
+  color: appStore.isDark ? '#ffffff' : '#333333',
+  zIndex: '2',
+}))
 watch(() => appStore.isDark, () => {
   // 1. 销毁所有图表
   chart?.remove()
@@ -1266,31 +1277,31 @@ function clearAllPanes() {
 
     <!-- 副图区域（按需渲染） -->
     <div v-if="showRSI" ref="rsiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">{{ $t('terminal.rsi_label', {period: rsiPeriod, ob: rsiOb, os: rsiOs}) }}</n-text>
+      <n-text depth="3" :style="paneLabelStyle">{{ $t('terminal.rsi_label', {period: rsiPeriod, ob: rsiOb, os: rsiOs}) }}</n-text>
     </div>
     <div v-if="showStoch" ref="stochRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">Stoch ({{ stochK }},{{ stochKSmooth }},{{ stochDSmooth }})</n-text>
+      <n-text depth="3" :style="paneLabelStyle">Stoch ({{ stochK }},{{ stochKSmooth }},{{ stochDSmooth }})</n-text>
     </div>
     <div v-if="showMACD" ref="macdRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">MACD ({{ macdFast }},{{ macdSlow }},{{ macdSignal }})</n-text>
+      <n-text depth="3" :style="paneLabelStyle">MACD ({{ macdFast }},{{ macdSlow }},{{ macdSignal }})</n-text>
     </div>
     <div v-if="showATR" ref="atrRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">ATR ({{ atrPeriod }})</n-text>
+      <n-text depth="3" :style="paneLabelStyle">ATR ({{ atrPeriod }})</n-text>
     </div>
     <div v-if="showVolume" ref="volRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">Volume</n-text>
+      <n-text depth="3" :style="paneLabelStyle">Volume</n-text>
     </div>
     <div v-if="showADX" ref="adxRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">ADX ({{ adxPeriod }})</n-text>
+      <n-text depth="3" :style="paneLabelStyle">ADX ({{ adxPeriod }})</n-text>
     </div>
     <div v-if="showDI" ref="diRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">DI ({{ diPeriod }})</n-text>
+      <n-text depth="3" :style="paneLabelStyle">DI ({{ diPeriod }})</n-text>
     </div>
     <div v-if="showMFI" ref="mfiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">MFI ({{ mfiPeriod }})</n-text>
+      <n-text depth="3" :style="paneLabelStyle">MFI ({{ mfiPeriod }})</n-text>
     </div>
     <div v-if="showBBI" ref="bbiRef" style="width: 100%; height: 110px; position: relative;">
-      <n-text depth="3" style="position: absolute; top: 2px; left: 8px; font-size: 13px; font-weight: 700; color: #ffffff; z-index: 2;">BBI</n-text>
+      <n-text depth="3" :style="paneLabelStyle">BBI</n-text>
     </div>
   </n-card>
 </template>

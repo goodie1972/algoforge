@@ -435,10 +435,13 @@ class DataFactory:
                 ta = _ta_only_indicators(merged, tf)
                 self._last_ta_calc_time[tf] = now
             else:
-                # 增量模式：只计算最新一根 K 线的指标
+                # 增量模式：只标记最新一根 K 线，不触发 talib 重算
                 latest_candle = merged[-1]
                 ta = {latest_candle.time: {}}
-            latest_ind = ta.get(merged[-1].time, {}) if merged else {}
+            # 策略基于已完成 K 线(bar1)做决策：取倒数第二根作为顶层缓存
+            # merged[-1]=bar0(未完成,tick级), merged[-2]=bar1(已完成,固定)
+            bar1_candle = merged[-2] if len(merged) >= 2 else merged[-1]
+            latest_ind = ta.get(bar1_candle.time, {}) if merged else {}
             # 缓存扁平：最新一根 TA-Lib 展开顶层，保留 _sync_indicators 已覆盖的 EA 字段
             with _CACHE_LOCK:
                 old_cache = _DATA_CACHE.get(tf, {})
@@ -576,7 +579,7 @@ class DataFactory:
                    "macd", "stoch_5_3_3", "volume_sma_20", "close")
         for tf in ["M15", "M30", "H1", "H4"]:
             try:
-                mt4_ind = bridge.get_indicators("XAUUSD", tf) if hasattr(bridge, "get_indicators") else {}
+                mt4_ind = bridge.get_indicators("XAUUSD", tf, shift=1) if hasattr(bridge, "get_indicators") else {}
             except Exception as _e:
                 logger.warning(f"[DataFactory] F043 tf={tf} exception: {_e}")
                 mt4_ind = {}

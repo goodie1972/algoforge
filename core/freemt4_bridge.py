@@ -223,10 +223,12 @@ class FreeMT4Bridge(MT4BridgeBase):
                 ))
         return candles
 
-    def get_indicators(self, symbol: str, timeframe: str) -> dict:
-        """从MT4直接获取指标值（F043命令），与图表完全一致"""
+    def get_indicators(self, symbol: str, timeframe: str, shift: int = 0) -> dict:
+        """从MT4直接获取指标值（F043命令），与图表完全一致
+        shift=0: 当前未完成K线(tick级), shift=1: 上一根已完成K线(固定值)
+        """
         tf = TF_MAP.get(timeframe, TF_MAP["H1"])
-        data = self._send_cmd(f"F043#3#{symbol}#{tf}#")
+        data = self._send_cmd(f"F043#4#{symbol}#{tf}#{shift}#")
         if not data:
             return {}
         # F043返回一整个字符串，用$分隔

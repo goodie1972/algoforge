@@ -230,63 +230,66 @@ void ProcessCommand(string cmd, int sock)
       SendResponse(resp, sock);
    }
    else if(fcode == "F043") {
-      // 获取最新K线 + MT4内置指标值（跟图表完全一致）
+      // 获取K线 + MT4内置指标值（跟图表完全一致）
+      // shift=0: 当前未完成K线(tick级), shift=1: 上一根已完成K线(固定值)
       if(n < 4) { SendResponse("F043#ERROR#bad params#", sock); return; }
       string sym = parts[2];
       int tf = (int)StringToInteger(parts[3]);
+      int shift = 0;
+      if(n >= 5) shift = (int)StringToInteger(parts[4]);
 
-      // 最新K线数据（shift=0）
+      // K线数据
       string resp = "F043#OK#";
       resp += StringFormat("%d$%.5f$%.5f$%.5f$%.5f$%d$",
-         (int)iTime(sym, tf, 0),
-         iOpen(sym, tf, 0),
-         iHigh(sym, tf, 0),
-         iLow(sym, tf, 0),
-         iClose(sym, tf, 0),
-         (int)iVolume(sym, tf, 0));
+         (int)iTime(sym, tf, shift),
+         iOpen(sym, tf, shift),
+         iHigh(sym, tf, shift),
+         iLow(sym, tf, shift),
+         iClose(sym, tf, shift),
+         (int)iVolume(sym, tf, shift));
 
       // RSI(14)
-      resp += StringFormat("%.2f$", iRSI(sym, tf, 14, PRICE_CLOSE, 0));
+      resp += StringFormat("%.2f$", iRSI(sym, tf, 14, PRICE_CLOSE, shift));
       // RSI(5)
-      resp += StringFormat("%.2f$", iRSI(sym, tf, 5, PRICE_CLOSE, 0));
+      resp += StringFormat("%.2f$", iRSI(sym, tf, 5, PRICE_CLOSE, shift));
       // RSI(10)
-      resp += StringFormat("%.2f$", iRSI(sym, tf, 10, PRICE_CLOSE, 0));
+      resp += StringFormat("%.2f$", iRSI(sym, tf, 10, PRICE_CLOSE, shift));
       // MFI(14)
-      resp += StringFormat("%.2f$", iMFI(sym, tf, 14, 0));
+      resp += StringFormat("%.2f$", iMFI(sym, tf, 14, shift));
       // BB upper/mid/lower (20,2)
       resp += StringFormat("%.5f$%.5f$%.5f$",
-         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_UPPER, 0),
-         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_MAIN, 0),
-         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_LOWER, 0));
+         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_UPPER, shift),
+         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_MAIN, shift),
+         iBands(sym, tf, 20, 2, 0, PRICE_CLOSE, MODE_LOWER, shift));
       // EMA9 / EMA21
       resp += StringFormat("%.5f$%.5f$",
-         iMA(sym, tf, 9, 0, MODE_EMA, PRICE_CLOSE, 0),
-         iMA(sym, tf, 21, 0, MODE_EMA, PRICE_CLOSE, 0));
+         iMA(sym, tf, 9, 0, MODE_EMA, PRICE_CLOSE, shift),
+         iMA(sym, tf, 21, 0, MODE_EMA, PRICE_CLOSE, shift));
       // SMA14 / SMA20 / SMA50
       resp += StringFormat("%.5f$%.5f$%.5f$",
-         iMA(sym, tf, 14, 0, MODE_SMA, PRICE_CLOSE, 0),
-         iMA(sym, tf, 20, 0, MODE_SMA, PRICE_CLOSE, 0),
-         iMA(sym, tf, 50, 0, MODE_SMA, PRICE_CLOSE, 0));
+         iMA(sym, tf, 14, 0, MODE_SMA, PRICE_CLOSE, shift),
+         iMA(sym, tf, 20, 0, MODE_SMA, PRICE_CLOSE, shift),
+         iMA(sym, tf, 50, 0, MODE_SMA, PRICE_CLOSE, shift));
       // ATR(14) / ATR(20)
       resp += StringFormat("%.5f$%.5f$",
-         iATR(sym, tf, 14, 0),
-         iATR(sym, tf, 20, 0));
+         iATR(sym, tf, 14, shift),
+         iATR(sym, tf, 20, shift));
       // ADX(14) / +DI / -DI
       resp += StringFormat("%.2f$%.2f$%.2f$",
-         iADX(sym, tf, 14, PRICE_CLOSE, MODE_MAIN, 0),
-         iADX(sym, tf, 14, PRICE_CLOSE, MODE_PLUSDI, 0),
-         iADX(sym, tf, 14, PRICE_CLOSE, MODE_MINUSDI, 0));
+         iADX(sym, tf, 14, PRICE_CLOSE, MODE_MAIN, shift),
+         iADX(sym, tf, 14, PRICE_CLOSE, MODE_PLUSDI, shift),
+         iADX(sym, tf, 14, PRICE_CLOSE, MODE_MINUSDI, shift));
       // MACD(12,26,9) main / signal
       resp += StringFormat("%.5f$%.5f$",
-         iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, 0),
-         iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_SIGNAL, 0));
+         iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, shift),
+         iMACD(sym, tf, 12, 26, 9, PRICE_CLOSE, MODE_SIGNAL, shift));
       // Stoch(5,3,3) K / D
       resp += StringFormat("%.2f$%.2f$",
-         iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_MAIN, 0),
-         iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_SIGNAL, 0));
+         iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_MAIN, shift),
+         iStochastic(sym, tf, 5, 3, 3, MODE_SMA, 0, MODE_SIGNAL, shift));
       // Volume SMA(20)
       double volSum = 0;
-      for(int vi = 0; vi < 20; vi++) volSum += iVolume(sym, tf, vi);
+      for(int vi = shift; vi < shift + 20; vi++) volSum += (double)iVolume(sym, tf, vi);
       resp += StringFormat("%.0f$", volSum / 20.0);
 
       resp += "#";

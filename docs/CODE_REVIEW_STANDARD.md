@@ -80,6 +80,15 @@ Fork/分支 → ① 作者本地自检 → ② 提 PR（带描述+资金路径�
 - [ ] **风控判定函数与"改状态"必须分离**
   - 证据：`engine_standalone/risk_mgr.py:57` `check_consecutive_loss` 在"判断"的同时 `state.consecutive_losses += 1`。同一函数被调用两次会重复计数；某处只"探测"不"提交"时极易出错。
   - **标准：纯查询函数（`is_*`）不改状态；需要累加的状态变更单独成函数（如 `register_loss`/`reset_loss`），调用点语义清晰。**
+- [ ] **确认性指标只能源自已闭合 K 线（bar1），禁止用正在形成的 forming bar（candles[-1]）做买卖判定**
+  - 证据：重绘/未来函数是本仓最大的隐性资金风险。`services/data_factory.py` 已把 `_sync_indicators` 切到 F043 `shift=1`、`latest_ind` 取 `merged[-2]`（已闭合 bar1），策略 `get_indicator()` 读顶层缓存即 bar1；运动员 `athlete._verify` 同样只读 `get_cache(tf)`（bar1），`_execute` 才用 `tick[ask/bid]` 当成交价。但 `strategies/base.py:91` 的兜底路径曾用 `self.candles[-1].time`（forming bar0）算指标——已修复为 `candles[-2]`。
+  - **标准：所有"买卖判定 / 风控指标（RSI/BB/MACD/ATR/ADX…）"只能取自上闭合 K 线——`get_indicator()` / `get_cache` 顶层 / `candles[-2]`。当前正在形成的 `candles[-1]` 仅可用于"价格/成交量是否触达某价位"的触发，绝不可在其上重算或读取指标做判定。策略 `_verify_entry` 同样只许读传入的 `latest` 字典，不得回读 `self.candles[-1]`。**
+  - **forming bar（`candles[-1]`）允许 / 禁止清单**（防止"价格触发"旗号下偷算指标）：
+    - ✅ **允许**：OHLCV 及其派生（振幅、实体大小、阴阳、上/下影线、量比、纯价格/量统计）。
+    - ❌ **禁止**：任何指标值（RSI/BB/MACD/ATR/ADX/Stoch/MFI/EMA/SMA…），以及基于 forming bar 自算的指标（`talib.` / `numpy` 手算）。
+- [ ] **禁止在策略内自算买卖指标（必须走 `get_indicator()`）**
+  - 证据：`strategy_manual.md:17` 明文——"DataFactory + TA-Lib 是唯一数据来源，所有策略指标通过 `get_indicator(key)` 读取，禁止自算 RSI/MFI/BB/EMA/ATR/ADX/Stoch/MACD 等指标"。但扫描发现多个策略直接 `import talib` / `import numpy` 在 `self.candles`（含 forming bar0）上重算：如 `20260630_M30_rsi_bb_v1.py:101` `talib.RSI(np.array(self.get_close_prices()), …)`，其 `rsi_arr[-1]` 即在 forming bar0 上算的 RSI；`20260801_m30_vol_return_v1.py:90` `talib.ATR` 基于 `self.candles`；`20260811_xaubot_backup_v1.py` 整段 `calculate_all` 用 talib 算全套指标；`20260630_gold_auto_research_v1.py:128`、`20260630_entry_score_pro_v1.py:146`、`20260630_momentum_pulse_pro_v1.py:79`、`20260821_m15/m30_followave_v1.py:158/160` 等。这既违反手册禁令，又因基于含 forming bar0 的序列引入了**重绘/未来函数**（与上方 bar1 项是同源隐患，只是发生在策略内部）。
+  - **标准：策略文件（除 `base.py` 框架 helper 外）一律不得 `import talib/numpy` 自算买卖指标；所有 RSI/ATR/BB/MACD/Stoch/ADX 等值必须来自 `get_indicator(key)`（DataFactory 已算好的 bar1 缓存）。确需自定义特征时，必须在 `services/data_factory.py` 的 `_ta_only_indicators` 中统一计算，再经 `get_indicator` 暴露，且使用已闭合序列（`candles[1:]`，剔除 forming bar0）。** 完整违规清单见 `docs/STRATEGY_SELF_COMPUTED_INDICATORS_AUDIT.md`。
 
 ### 🔴 B. 安全（Secrets / 注入 / 鉴权）
 
@@ -173,6 +182,8 @@ Fork/分支 → ① 作者本地自检 → ② 提 PR（带描述+资金路径�
 □ 批量写入无"悄悄吞异常"；迁移幂等可回滚
 □ 风控/新闻相关异常未被 except: pass 吞掉（fail-safe 而非 fail-open）
 □ 新增/修改的"算钱/算风控/报文解析"函数已加单测（含边界）
+□ 确认性指标取自已闭合 K 线（bar1 / F043 shift=1），forming bar 仅用于价格触发、未在其上做判定
+□ 无策略内自算买卖指标（未在 self.candles 上 import talib/numpy 重算 RSI/ATR/BB/MACD/Stoch/ADX 等，一律走 get_indicator）
 □ 已在纸面/模拟环境跑过一个完整 tick 周期验证
 ```
 
