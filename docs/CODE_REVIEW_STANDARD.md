@@ -96,6 +96,11 @@ Fork/分支 → ① 作者本地自检 → ② 提 PR（带描述+资金路径�
     - 维护约定：**新增/复制策略文件时，若又在文件头 `import talib/numpy`，本测试会直接拦合并**；若要引入自定义特征，必须先在 `data_factory._ta_only_indicators` 内基于 `candles[1:]` 计算后经 `get_indicator` 暴露，再删除文件头自算 import。
     - ⚠️ **运行范围说明**：本仓库 `.gitignore` 第 66 行 `tests/`（commit `43a65b6`「测试目录不上传主应用」）约定测试目录不入库，故该门禁测试**仅本地运行**（`pytest tests/unit/test_strategy_indicators_refactor.py`），不会随主程序推送、也不在共享 CI 自动跑。若要让它真正卡住共享 CI，二选一：① `git add -f tests/unit/test_strategy_indicators_refactor.py` 强制纳入；② 调整 `.gitignore` 放开该测试文件。在采用前，这条 🔴 仍主要靠「作者本地跑测试 + 评审人核查」兜底。
 
+- [ ] **策略每次改动必须 +1 版本号并补变更日志（禁止静默修改）**
+  - 证据：本次「去 talib 自算」重构初版推送时，8 个策略文件只复制了旧副本、未升 `STRATEGY_VERSION`、未补 `STRATEGY_CHANGELOG` 条目——评审与回滚时无法区分「哪版改了什么」；且 `20260630_M30_rsi_bb_v1.py` 原本就存在 `STRATEGY_VERSION="v13"` 与日志末条 `v14_optimized` 错位的隐患，说明版本纪律此前未被强制。
+  - **标准：任何对 `strategies/*.py` 的修改（含重构、参数调整、bug 修复），必须**：① 将文件顶部 `STRATEGY_VERSION` 由 `vN` 升到 `vN+1`（带小数位的如 `v1.2`→`v1.3`；若日志已存在更高版本号如 `v14_optimized`，新版本须跳过占用项，e.g. `v13`→`v15`）；② 在 `STRATEGY_CHANGELOG` 列表追加一条 `{"version": "v新", "magic": <同文件 STRATEGY_MAGIC>, "date": "<YYYY-MM-DD>", "desc": "<改了什么、为什么>"}`；③ 文件头 docstring 里的版本描述同步更新。无 `STRATEGY_CHANGELOG` 块的旧策略至少升 `STRATEGY_VERSION` 常量。
+  - **回滚/追责**：版本号 + 日志是策略「出了事能查到哪一版、能否秒级回滚」的唯一依据，缺一则按 🔴 处理、禁止合并。
+
 ### 🔴 B. 安全（Secrets / 注入 / 鉴权）
 
 - [ ] **密钥不落库、不进版本控制、不打印**
