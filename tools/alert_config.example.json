@@ -1,0 +1,12 @@
+{
+  "smtp": {
+    "host": "smtp.your-mail.com",
+    "port": 465,
+    "user": "alert@your-mail.com",
+    "pass": "YOUR_SMTP_PASSWORD",
+    "to": "you@your-mail.com,ops@your-mail.com"
+  },
+  "wecom": {
+    "webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_GROUP_ROBOT_KEY"
+  }
+}

@@ -65,7 +65,7 @@ def api_get(path: str):
 # Windows 通知
 # ============================================================
 def notify_critical(title: str, message: str):
-    """关键报警 — Windows 弹窗 + 日志"""
+    """关键报警 — Windows 弹窗 + 日志 + 邮件/企微推送"""
     logger.warning(f"=== 报警: {title} — {message} ===")
     try:
         subprocess.run(
@@ -77,6 +77,11 @@ def notify_critical(title: str, message: str):
             capture_output=True,
             timeout=10,
         )
+    except Exception:
+        pass
+    try:
+        from alert_sender import send_alert
+        send_alert(title, f"{title} — {message}")
     except Exception:
         pass
 

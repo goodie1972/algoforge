@@ -14,7 +14,7 @@ dist/
 runtime_config.json
 data/llm_providers.json
 
-# 涓存椂宸ュ叿/鎵�弿鑴氭湰
+# 涓存椂宸ュ叿/鎵?1?7弿鑴氭湰
 add_i18n_keys.py
 scan_i18n.py
 scan_signals.py
@@ -22,18 +22,18 @@ scan_signals.py
 *.db-shm
 *.db-wal
 
-# 鎴�浘
+# 鎴?1?7浘
 *.png
 *.jpg
 *.jpeg
 
-# 浣嗕繚鐣� docs/assets/ 涓嬬殑鎴�浘璧勬簮
+# 浣嗕繚鐣?1?7 docs/assets/ 涓嬬殑鎴?1?7浘璧勬簮
 !docs/assets/screenshot_*.png
 
-# 鍙�墽琛屾枃浠�
+# 鍙?1?7墽琛屾枃浠?1?7
 *.exe
 
-# 杩愯�鏃剁姸鎬�
+# 杩愯?1?7鏃剁姸鎬?1?7
 monitor/.patrol.*
 
 # 娴嬭瘯杈撳嚭
@@ -47,11 +47,11 @@ strategies/test_*.txt
 *.bak
 .backup/
 
-# 绛栫暐锛氫粎妗嗘灦淇濈暀鍦ㄤ富搴旂敤锛屽叿浣撶瓥鐣ュ疄鐜板湪鐙�珛 algoforge-strategies 浠撳簱
+# 绛栫暐锛氫粎妗嗘灦淇濈暀鍦ㄤ富搴旂敤锛屽叿浣撶瓥鐣ュ疄鐜板湪鐙?1?7珛 algoforge-strategies 浠撳簱
 strategies/__pycache__/
 strategies/backup/
 strategies/*.html
-# 绛栫暐瀹炵幇鏂囦欢锛堢敱 algoforge-strategies 浠撳簱缁存姢锛屼富搴旂敤涓嶅惈锛�
+# 绛栫暐瀹炵幇鏂囦欢锛堢敱 algoforge-strategies 浠撳簱缁存姢锛屼富搴旂敤涓嶅惈锛?1?7
 strategies/2026*.py
 
 # Playwright / UI 娴嬭瘯鑴氭湰涓庢埅鍥撅紙涓嶅叆搴擄級
@@ -70,3 +70,5 @@ data/agent_settings.json
 data/mcp_connectors.json
 data/skill_config.json
 data/persona/
+# 报警通道凭据（邮件/企微 webhook，仅本地，禁止入库）
+tools/alert_config.json

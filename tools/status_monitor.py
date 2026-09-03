@@ -30,6 +30,15 @@ def log_msg(msg):
         f.write(f"{datetime.now().strftime('%m-%d %H:%M')} {msg}\n")
     _sys.stderr.write(f"[监控] {msg}\n")
     _sys.stderr.flush()
+    # 报警转发：引擎异常/修复类日志同时推送邮件 + 企微（无配置时安全 no-op）
+    if "[警报]" in msg or "[修复]" in msg:
+        try:
+            from alert_sender import send_alert
+            title = msg.split("]", 1)[-1].strip()[:40]
+            send_alert(title, msg)
+        except Exception as e:
+            _sys.stderr.write(f"[监控] 报警转发失败(忽略): {e}\n")
+            _sys.stderr.flush()
 
 def restart_engine():
     """重启后端引擎"""
