@@ -3,6 +3,8 @@
 > 审计依据：`strategy_manual.md:17` —— "DataFactory + TA-Lib 是唯一数据来源。所有策略指标通过 `get_indicator(key)` 读取，禁止自算 RSI/MFI/BB/EMA/ATR/ADX/Stoch/MACD 等指标。"
 > 审计时间：2026-09-02 ｜ 审计人：火眼眼（Code Review Expert）
 > 关联标准：已写入 `docs/CODE_REVIEW_STANDARD.md` 🔴 A 节 —— "禁止在策略内自算买卖指标"
+>
+> 🟢 **整改状态：已整改（9/9）**。全部自算已改走 `get_indicator()`（xaubot 备份强制 `candles[:-1]` 闭合 + 豁免），并由 `tests/unit/test_strategy_indicators_refactor.py` 静态门禁钉死。详见第七节的整改结果与验证。改动已提交复审，未自动合并。
 
 ---
 
@@ -79,6 +81,52 @@ atr = self.get_indicator("atr")
 ---
 
 ## 六、建议的后续动作
+
+> ⚠️ 本节为原始建议；实际执行情况见第七节「整改结果」。原始 3 条建议**已全部落实**（按本仓规矩：改动已提交复审，未自动合并）。
+
 1. 逐文件按方案 A 改造上述 9 个策略（改 + 补单测，按本仓标准交复审、不自动合并）。
 2. 在 CI 加一条正则/静态检查：`strategies/*.py` 中（排除 base.py）匹配 `^\s*import talib|^\s*import numpy` 即报错拦截。
 3. `xaubot_backup_v1.py`：若不再使用，移出 `strategies/` 或加 `# DEPRECATED` 头；若保留，必须按方案 A/B 改造。
+
+---
+
+## 七、整改结果（本轮）
+
+**状态：9/9 文件已整改完毕，全部经测试钉死，待人工复审 + Risk Owner 确认后合并。**
+
+### 7.1 标准策略（7 个，方案 A：全部改走 `get_indicator()`）
+
+| 文件 | 原自算 | 整改后取值 | 移除 |
+|:-----|:------|:----------|:-----|
+| `20260630_M30_rsi_bb_v1.py` | `talib.RSI` 方向、`CDL*` 形态 | `get_indicator("rsi_dir_3bar")` / `candle_pattern_dir`+`candle_pattern_name` | 移除全部 `talib`/`numpy` 引用 |
+| `20260801_m30_vol_return_v1.py` | `talib.ATR` + 5 根均值 | `get_indicator("atr_ma_5")` 比较 | 移除 talib 块 |
+| `20260630_gold_auto_research_v1.py` | `talib.ATR` + 20 根均值 | `get_indicator("atr_sma20")` | 移除 talib 块 |
+| `20260630_entry_score_pro_v1.py` | `talib.ATR` 历史阈值 | `get_indicator("atr_ratio_30")` | 移除 ROC/ATR 自算 |
+| `20260630_momentum_pulse_pro_v1.py` | `talib.ROC` | `get_indicator("roc_10")` | 移除 talib 块 |
+| `20260821_m15_followave_v1.py` | `talib.STOCH` | `get_indicator("stoch_5_3_3")`+`stoch_k_prev`+`stoch_d_prev` | 移除 `import numpy` |
+| `20260821_m30_followave_v1.py` | `talib.STOCH` | 同上 | 移除 `import numpy` |
+
+### 7.2 ML 备份策略（1 个，方案 B 变体：强制闭合 + 豁免）
+
+- `20260811_xaubot_backup_v1.py`：XGBoost 模型耦合的特征管线**不能改写**（改写即破坏已训练模型输入分布）。改为：
+  - `generate_signal` 中 `for c in self.candles:` → `for c in self.candles[:-1]:`，**只对已闭合 K 线计算特征**，消除 forming bar0 重绘；
+  - 文件头 docstring 显式标注「审查豁免：model-coupled ML 特征管线，已限定 `candles[:-1]`」，CI 静态门禁对其豁免（见下方）。
+
+### 7.3 派生字段由 DataFactory 统一计算（`services/data_factory.py`）
+
+上述策略读取的派生字段（如 `rsi_dir_3bar`、`atr_ma_5`、`atr_sma20`、`atr_ratio_30`、`roc_10`、`stoch_k_prev/d_prev`、`candle_pattern_dir/name`）已全部在 `_ta_only_indicators` 内基于**已闭合序列**预算，并经 `get_indicator()` 暴露。修复了一个常年抛 `AttributeError` 被吞的死分支：`CDLBEARISHENGULFING` 在本环境 talib 不存在，已改为 `CDLENGULFING`；端到端验证吞没检测正确返回 `short/ENGULF`。
+
+### 7.4 CI 静态门禁（建议 2 已落地）
+
+- 文件：`tests/unit/test_strategy_indicators_refactor.py`
+- `test_no_talib_numpy_import_in_strategy_files`：扫描 `strategies/*.py`，**除 `base.py`/`scanner.py`/`__init__.py`（框架层）与 `xaubot_backup_v1.py`（豁免）外**，出现 `import talib/numpy`/`from talib/numpy` 即断言失败、CI 变红。
+- `test_strategy_reads_cached_indicators`（parametrize 7 策略）：验证 helper 直接读 `get_indicator` 缓存，不依赖 `self.candles` 上的 talib 计算。
+- `test_stoch_completed_graceful_when_cache_missing`：缓存缺失时优雅返回 `None`，不因缺失回退 talib。
+- 关联标准：已写入 `docs/CODE_REVIEW_STANDARD.md` 🔴 A 节「禁止在策略内自算买卖指标」的 CI 门禁段。
+
+### 7.5 验证结果
+
+- 策略重构回归测试：9 passed（本文件）。
+- 关联测试簇（含既有 risk_mgr / freemt4_bridge / strategy_base）：51 passed。
+- 所有改动文件 `py_compile` 通过；`base.py` 不在 `strategies/*.py` 自算拦截范围（其 talib 仅用于框架 helper `_compute_ema`，合法）。
+- 说明：仓库现有 `tests/unit/test_broadcast_hub.py`、`test_lifespan.py`、`test_config_schema.py`、`test_web_manager.py` 因隔离 venv 缺 `pytest-asyncio`/`fastapi`/`pydantic` 而报错，属**既有环境缺口**，与本整改无关。

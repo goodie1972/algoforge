@@ -228,12 +228,16 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     except Exception:
         pass
 
-    # Stoch(5,3,3)
+    # Stoch(5,3,3) —— 同时存前一根(prev)供策略穿越检测，避免策略内自算
     try:
         sk, sd = talib.STOCH(highs, lows, closes, fastk_period=5, slowk_period=3, slowd_period=3)
         for i, c in enumerate(candles):
             if sk[i] == sk[i]:
                 result[c.time]["stoch_5_3_3"] = {"k": float(sk[i]), "d": float(sd[i])}
+                if i >= 1:
+                    # prev = 前一根已闭合 K 线的 K/D（穿越检测用）
+                    result[c.time]["stoch_k_prev"] = float(sk[i-1])
+                    result[c.time]["stoch_d_prev"] = float(sd[i-1])
     except Exception:
         pass
 
@@ -284,6 +288,84 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
             hi20 = max(highs[max(0, i-19):i+1])
             lo20 = min(lows[max(0, i-19):i+1])
             result[c.time]["price_position"] = float((closes[i] - lo20) / (hi20 - lo20)) if hi20 > lo20 else 0.5
+
+    # ───────────────────────────────────────────────────────────────
+    # 派生字段：供策略经 get_indicator() 读取，统一在 DataFactory 计算。
+    # 不在 _EA_CACHE_KEYS 中，不会被 EA 值覆盖；_sync_tf 仅暴露 bar1(已闭合)。
+    # 目的：消除策略内 talib/numpy 自算（重绘 + 双份真相源），详见
+    # docs/CODE_REVIEW_STANDARD.md 🔴「禁止在策略内自算买卖指标」。
+    # ───────────────────────────────────────────────────────────────
+
+    # RSI(14) 连续 3 根方向（仅用已闭合 K 线）
+    try:
+        r = talib.RSI(closes, timeperiod=14)
+        for i in range(2, len(candles)):
+            if r[i] == r[i] and r[i-1] == r[i-1] and r[i-2] == r[i-2]:
+                if r[i-2] < r[i-1] < r[i]:
+                    result[candles[i].time]["rsi_dir_3bar"] = "up"
+                elif r[i-2] > r[i-1] > r[i]:
+                    result[candles[i].time]["rsi_dir_3bar"] = "down"
+                else:
+                    result[candles[i].time]["rsi_dir_3bar"] = "flat"
+    except Exception:
+        pass
+
+    # ATR(14) 派生：近 5 根均值 / SMA20 / 与 30 根前之比
+    try:
+        a14 = talib.ATR(highs, lows, closes, timeperiod=14)
+        for i in range(len(candles)):
+            if a14[i] != a14[i]:
+                continue
+            if i >= 4:
+                _w = [a14[j] for j in range(i-4, i+1) if a14[j] == a14[j]]
+                if len(_w) >= 5:
+                    result[candles[i].time]["atr_ma_5"] = float(sum(_w) / len(_w))
+            if i >= 19:
+                _w = [a14[j] for j in range(i-19, i+1) if a14[j] == a14[j]]
+                if len(_w) >= 20:
+                    result[candles[i].time]["atr_sma20"] = float(sum(_w) / len(_w))
+            if i >= 30 and a14[i-30] == a14[i-30] and a14[i-30] > 0:
+                result[candles[i].time]["atr_ratio_30"] = float(a14[i] / a14[i-30])
+    except Exception:
+        pass
+
+    # ROC(10)
+    try:
+        roc = talib.ROC(closes, timeperiod=10)
+        for i in range(10, len(candles)):
+            if roc[i] == roc[i]:
+                result[candles[i].time]["roc_10"] = float(roc[i])
+    except Exception:
+        pass
+
+    # K 线形态（仅基于已闭合 K 线，剔除 forming bar0；优先级同原策略）
+    try:
+        _o = np.array([c.open for c in candles], dtype=float)
+        _arrays = [
+            ("long", "MORNING", talib.CDLMORNINGSTAR(_o, highs, lows, closes, penetration=0.3)),
+            ("short", "EVENING", talib.CDLEVENINGSTAR(_o, highs, lows, closes, penetration=0.3)),
+            ("long", "HAMMER", talib.CDLHAMMER(_o, highs, lows, closes)),
+            ("long", "PIERCE", talib.CDLPIERCING(_o, highs, lows, closes)),
+            ("short", "SHOOT", talib.CDLSHOOTINGSTAR(_o, highs, lows, closes)),
+            ("short", "CLOUD", talib.CDLDARKCLOUDCOVER(_o, highs, lows, closes)),
+            ("short", "ENGULF", talib.CDLENGULFING(_o, highs, lows, closes)),
+            ("short", "HANG", talib.CDLHANGINGMAN(_o, highs, lows, closes)),
+        ]
+        for i in range(len(candles)):
+            _dir, _name = "none", None
+            for direction, name, arr in _arrays:
+                val = arr[i]
+                if direction == "long" and val > 0:
+                    _dir, _name = "long", name
+                    break
+                if direction == "short" and val < 0:
+                    _dir, _name = "short", name
+                    break
+            result[candles[i].time]["candle_pattern_dir"] = _dir
+            if _name:
+                result[candles[i].time]["candle_pattern_name"] = _name
+    except Exception:
+        pass
 
     return result
 

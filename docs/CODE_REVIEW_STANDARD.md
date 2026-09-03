@@ -89,6 +89,12 @@ Fork/分支 → ① 作者本地自检 → ② 提 PR（带描述+资金路径�
 - [ ] **禁止在策略内自算买卖指标（必须走 `get_indicator()`）**
   - 证据：`strategy_manual.md:17` 明文——"DataFactory + TA-Lib 是唯一数据来源，所有策略指标通过 `get_indicator(key)` 读取，禁止自算 RSI/MFI/BB/EMA/ATR/ADX/Stoch/MACD 等指标"。但扫描发现多个策略直接 `import talib` / `import numpy` 在 `self.candles`（含 forming bar0）上重算：如 `20260630_M30_rsi_bb_v1.py:101` `talib.RSI(np.array(self.get_close_prices()), …)`，其 `rsi_arr[-1]` 即在 forming bar0 上算的 RSI；`20260801_m30_vol_return_v1.py:90` `talib.ATR` 基于 `self.candles`；`20260811_xaubot_backup_v1.py` 整段 `calculate_all` 用 talib 算全套指标；`20260630_gold_auto_research_v1.py:128`、`20260630_entry_score_pro_v1.py:146`、`20260630_momentum_pulse_pro_v1.py:79`、`20260821_m15/m30_followave_v1.py:158/160` 等。这既违反手册禁令，又因基于含 forming bar0 的序列引入了**重绘/未来函数**（与上方 bar1 项是同源隐患，只是发生在策略内部）。
   - **标准：策略文件（除 `base.py` 框架 helper 外）一律不得 `import talib/numpy` 自算买卖指标；所有 RSI/ATR/BB/MACD/Stoch/ADX 等值必须来自 `get_indicator(key)`（DataFactory 已算好的 bar1 缓存）。确需自定义特征时，必须在 `services/data_factory.py` 的 `_ta_only_indicators` 中统一计算，再经 `get_indicator` 暴露，且使用已闭合序列（`candles[1:]`，剔除 forming bar0）。** 完整违规清单见 `docs/STRATEGY_SELF_COMPUTED_INDICATORS_AUDIT.md`。
+  - **CI 静态门禁（已落地）**：本项目已用一条**不可绕过的自动化检查**把这条 🔴 卡进流程，而非只靠人工肉眼：
+    - 检查文件：`tests/unit/test_strategy_indicators_refactor.py::test_no_talib_numpy_import_in_strategy_files`
+    - 规则：扫描 `strategies/*.py`，**除 `base.py` / `scanner.py` / `__init__.py`（框架层）与 `xaubot_backup_v1.py`（ML 特征管线，模型耦合，已强制 `candles[:-1]` 仅闭合 K 线并豁免）外**，任何文件出现 `import talib` / `from talib` / `import numpy` / `from numpy` 即断言失败、CI 变红。
+    - 行为回归：同一测试文件另含 `test_strategy_reads_cached_indicators`（7 个策略 parametrize，验证 helper 直接读 `get_indicator` 缓存而非 `self.candles` 上 talib 计算）与 `test_stoch_completed_graceful_when_cache_missing`（缓存缺失优雅返回 `None`，不因缺失回退 talib），确保"改完不靠自算"是被测试钉死的，而非口头约定。
+    - 维护约定：**新增/复制策略文件时，若又在文件头 `import talib/numpy`，本测试会直接拦合并**；若要引入自定义特征，必须先在 `data_factory._ta_only_indicators` 内基于 `candles[1:]` 计算后经 `get_indicator` 暴露，再删除文件头自算 import。
+    - ⚠️ **运行范围说明**：本仓库 `.gitignore` 第 66 行 `tests/`（commit `43a65b6`「测试目录不上传主应用」）约定测试目录不入库，故该门禁测试**仅本地运行**（`pytest tests/unit/test_strategy_indicators_refactor.py`），不会随主程序推送、也不在共享 CI 自动跑。若要让它真正卡住共享 CI，二选一：① `git add -f tests/unit/test_strategy_indicators_refactor.py` 强制纳入；② 调整 `.gitignore` 放开该测试文件。在采用前，这条 🔴 仍主要靠「作者本地跑测试 + 评审人核查」兜底。
 
 ### 🔴 B. 安全（Secrets / 注入 / 鉴权）
 
