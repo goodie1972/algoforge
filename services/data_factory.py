@@ -4,6 +4,24 @@
 - TA-Lib 预计算所有公共指标
 - 全局缓存供策略和 Athlete 读取
 """
+DATA_FACTORY_VERSION = "v1"
+
+# 变更日志：框架层版本纪律见 docs/CODE_REVIEW_STANDARD.md 🔴「策略/框架模块版本号」
+# 结构 {version, date, desc}（框架模块无 MT4 magic）
+DATA_FACTORY_CHANGELOG = [
+    {
+        "version": "v1",
+        "date": "2026-09-03",
+        "desc": (
+            "建立版本基线。记录最近一次实质性改动（commit 15f0c80 重构）："
+            "_ta_only_indicators 新增派生字段(rsi_dir_3bar/atr_ma_5/atr_sma20/"
+            "atr_ratio_30/roc_10/stoch_k_prev/d_prev/candle_pattern_dir/name)，"
+            "修复 CDLBEARISHENGULFING→CDLENGULFING 死分支；"
+            "供策略经 get_indicator() 读取已闭合 bar1 缓存，消除重绘/双份真相源。"
+        ),
+    },
+]
+
 import logging
 import threading
 import time
