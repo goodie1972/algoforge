@@ -4,7 +4,8 @@
 > 审计时间：2026-09-02 ｜ 审计人：火眼眼（Code Review Expert）
 > 关联标准：已写入 `docs/CODE_REVIEW_STANDARD.md` 🔴 A 节 —— "禁止在策略内自算买卖指标"
 >
-> 🟢 **整改状态：已整改（9/9）**。全部自算已改走 `get_indicator()`（xaubot 备份强制 `candles[:-1]` 闭合 + 豁免），并由 `tests/unit/test_strategy_indicators_refactor.py` 静态门禁钉死。详见第七节的整改结果与验证。改动已提交复审，未自动合并。
+> 🟢 **整改状态：已整改并推送（9/9）**。全部自算已改走 `get_indicator()`（xaubot 备份强制 `candles[:-1]` 闭合 + 豁免），并由 `tests/unit/test_strategy_indicators_refactor.py` 静态门禁钉死。详见第七节的整改结果与验证。
+> **已推送**：主程序 `algoforge` → `origin/main` @ `15f0c80`（策略按 `.gitignore` 约定不入库）；策略仓库 `algoforge-strategies` → `origin/main` @ `0c33f65`（8 文件以 xauusd 本地重构版覆盖同步，含 followave，按用户决策接受覆盖仓库既有版本）。静态门禁测试按仓库约定仅本地运行（`tests/` 不入库）。
 
 ---
 
