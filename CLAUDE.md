@@ -43,49 +43,27 @@ xauusd/                    # 系统代码（algoforge）
 
 ## 三轨架构
 
-- **轨1: DataFactory** — `services/data_factory.py` 独立线程，双桥接(exec+data)，增量拉取K线，TA-Lib统一计算指标
+- **轨1: DataFactory** — `services/data_factory.py` 独立线程，增量拉取K线；指标以 MT4 F043(EA) 直供为优先、TA-Lib 本地计算回退（v3 起 EA 掉线超 30s 自动回退）
 - **轨2: 策略员** — 主引擎循环，`get_indicator(key)` 读缓存指标，评分达标出门票（候选信号）
 - **轨3: 运动员** — `engine_standalone/athlete.py` tick验证层，调用 `_verify_entry` 实时重算入场条件，10秒过期作废
 
 ## 通用指标缓存 (DataFactory)
 
-> 详见 `docs/data_factory.md`
+> 完整 46 键权威来源表（EA 直供 / EA派生 / TA‑Lib 逐字段对照、勘误、F043 协议细节）见 `docs/data_factory.md`
 
-DataFactory 是**所有策略指标的唯一数据来源**。两层数据源：
-1. **F043 命令**：从 MT4 EA 直接获取指标值（优先，与 MT4 图表一致）
-2. **TA-Lib 本地计算**：`_talib_indicators()` 回退计算（首次加载 / F043 失败时）
+DataFactory 是**所有策略指标的唯一数据来源**。三层数据源（优先级从高到低）：
+1. **MT4 F043 命令**（EA 直供）— 与 MT4 图表完全一致，优先采用
+2. **TA‑Lib 本地计算**（`_ta_only_indicators()`）— 首次加载 / EA 掉线超 30s 时回退
+3. **SQLite 数据库** — 启动恢复 + 桥接数据不足时补充历史 K 线
 
-### 完整指标表（27 个）
+**v3 回退保护（关键）**：`_sync_tf` 仅当 EA 在 `_EA_PROVIDED_TTL`（30 秒）内确实提供过某键时才保护该 EA 值不被 TA‑Lib 覆盖。EA 正常在线受保护；EA 掉线 >30s 自动回退 TA‑Lib 实时值；缓存中尚无该键时直接取 TA‑Lib 值。
 
-| key | 类型 | 参数 | 说明 |
-|:----|:----|:----|:----|
-| `close` | float | — | 最新收盘价 |
-| `trend` | str | SMA14 | `"UP"` / `"DOWN"` |
-| `rsi` | float | 14 | RSI |
-| `rsi_5` | float | 5 | 快速 RSI |
-| `rsi_10` | float | 10 | 中速 RSI |
-| `mfi` | float | 14 | 资金流量指数 |
-| `mfi_direction` | str | — | `"up"` / `"down"` / `"flat"` |
-| `bb` | dict | 20,2,2 | `{"upper": f, "mid": f, "lower": f}` |
-| `bb_width` | float | — | BB 带宽 = upper − lower |
-| `bb_width_direction` | str | — | 带宽方向 |
-| `bb_width_ratio` | float | SMA3 | 当前带宽 / 近 3 根均值 |
-| `ema_9` | float | 9 | 指数移动平均 |
-| `ema_21` | float | 21 | 指数移动平均 |
-| `sma_14` | float | 14 | 简单移动平均 |
-| `sma_20` | float | 20 | 简单移动平均 |
-| `sma_50` | float | 50 | 简单移动平均 |
-| `atr` | float | 14 | 平均真实波幅 |
-| `atr_20` | float | 20 | 平均真实波幅 |
-| `atr_list` | list[float] | 14 | ATR 历史序列 |
-| `adx` | float | 14 | 趋势强度 |
-| `pdi` | float | 14 | +DI 多头方向 |
-| `ndi` | float | 14 | −DI 空头方向 |
-| `macd` | dict | 12,26,9 | `{"macd": f, "signal": f}` |
-| `stoch_5_3_3` | dict | 5,3,3 | `{"k": f, "d": f}` |
-| `stoch_14_3_3` | dict | 14,3,3 | `{"k": f, "d": f}` |
-| `volume_sma_20` | float | 20 | 成交量 SMA |
-| `price_position` | float | 20 周期 | 价格在 20 周期高低区间的位置 0~1 |
+**指标按来源分三类（共 46 键）：**
+- **EA 直供（24）**：`close`、`rsi`/`rsi_5`/`rsi_10`、`mfi`、`bb`、`ema_9`/`ema_21`/`ema_34`/`ema_50`/`ema_200`、`sma_14`/`sma_20`/`sma_50`、`atr`/`atr_20`、`adx`/`pdi`/`ndi`、`macd`、`stoch_5_3_3`、`linear_reg_slope`、`volume_sma_20`、`cci`
+- **EA 值本地派算（2）**：`bb_width`（由 `bb` 算）、`cci_direction`（当前 vs 前一根 CCI）
+- **仅 TA‑Lib 计算（20）**：`stoch_14_3_3`、`stoch_rsi`、`stoch_k_prev`/`stoch_d_prev`、`bbi`、`roc_10`、`trend`、`price_position`、`rsi_dir_3bar`、`mfi_direction`/`mfi_dir_50`、`bb_width_direction`/`bb_width_ratio`/`bb_mid_direction`、`atr_list_val`/`atr_ma_5`/`atr_sma20`/`atr_ratio_30`、`candle_pattern_dir`/`candle_pattern_name`
+
+> ⚠️ 蜡烛形态**没有** `cdl_*` 逐形态键，应读 `candle_pattern_dir` + `candle_pattern_name`；`stoch_rsi` 与蜡烛形态仅由 TA‑Lib 计算（MQL4 无内置）。
 
 ## 时区规则 (CRITICAL)
 

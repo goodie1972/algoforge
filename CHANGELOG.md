@@ -3,6 +3,17 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.5.3] - 2026-09-04 — 指标来源重构（F043 扩展 + DataFactory v3）
+
+### 变更
+- **F043 协议扩展（28 → 34 字段）**：新增 `ema_34`/`ema_50`/`ema_200`/`linear_reg_slope`（EA 直供）与 `cci`/`cci_prev`（CCI(14)，含方向用前一根值）；`stoch_rsi` 与蜡烛形态仍由 TA‑Lib 计算
+- **DataFactory v2**：删除 `_EA_CACHE_KEYS` 中 EA 从未发送的 5 个冻结键；`ema_34/50/200`、`linear_reg_slope` 改由 EA 真值；新增 `cci` 与 `cci_direction`
+- **DataFactory v3**：①修复增量轮次清空顶层缓存（指标被清零为 None）的严重缺陷；②保护逻辑改为"EA 本轮确实提供过该键才保护"（`_EA_PROVIDED_TTL`=30s），EA 掉线超 30s 自动回退 TA‑Lib 实时值
+- **文档同步**：`docs/data_factory.md`（46 键权威表）、`CLAUDE.md`、`AGENTS.md`、`docs/strategy_dev_guide.md`、`docs/mt4_guide.md`（F043 协议版本须知）、`INDICATOR_SOURCES.md`
+
+### 操作注意
+- EA 需重新编译 `FreeMT4Bridge.mq4` 并挂机到 XAUUSD 图表，否则旧 `.ex4`（28 字段）会被拒绝、EA 指标全部失效
+
 ## [3.5.2] - 2026-08-28 — FollowAve v1.2 出场逻辑重构
 
 ### 变更

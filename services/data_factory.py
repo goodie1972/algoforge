@@ -4,11 +4,37 @@
 - TA-Lib 预计算所有公共指标
 - 全局缓存供策略和 Athlete 读取
 """
-DATA_FACTORY_VERSION = "v1"
+DATA_FACTORY_VERSION = "v3"
 
 # 变更日志：框架层版本纪律见 docs/CODE_REVIEW_STANDARD.md 🔴「策略/框架模块版本号」
 # 结构 {version, date, desc}（框架模块无 MT4 magic）
 DATA_FACTORY_CHANGELOG = [
+    {
+        "version": "v3",
+        "date": "2026-09-04",
+        "desc": (
+            "两处缓存正确性修复：(1) 修复顶层缓存被清空——_sync_tf 增量模式(need_full_calc=False)"
+            "时 latest_ind 为空，new_cache 却只放 candles，导致全量计算得到的 45 个指标键在下一个"
+            "0.3s 增量轮次被整体清零（实测 rsi/TA-Lib 键均变 None，仅 EA 键能靠 _sync_indicators "
+            "补回）。改为先继承旧值再覆盖：bar1 在新 K 线出现前恒定，增量轮次保持原值语义正确。"
+            "(2) 保护条件改为“EA 本轮确实提供过该键才保护”——新增 _EA_PROVIDED_TS{key:ts} 与 "
+            "_EA_PROVIDED_TTL=30s，旧逻辑 `k in _EA_CACHE_KEYS and k in old_cache` 无条件保护，"
+            "EA 掉线时所有 EA 键永久冻结在最后有效值；现超 TTL 即自动回退 TA-Lib 实时值。"
+        ),
+    },
+    {
+        "version": "v2",
+        "date": "2026-09-04",
+        "desc": (
+            "修复 _EA_CACHE_KEYS 冻结 bug：原集合含 5 个 EA 从未发送的键(ema_34/ema_50/"
+            "ema_200/stoch_rsi/linear_reg_slope)，导致 _sync_tf 保护逻辑把它们冻结为启动期旧值。"
+            "现改为 ema_34/ema_50/ema_200/linear_reg_slope 改由 EA(F043) 真值提供"
+            "(协同 tools/FreeMT4Bridge.mq4 + core/freemt4_bridge.py F043 扩展 6 字段)，"
+            "stoch_rsi 与蜡烛图形态(candle_pattern_dir/name) 仍仅 TA-Lib 计算。"
+            "新增 cci(iCCI(14)) 与 cci_direction（EA 真值，方向由当前/前一根 CCI 比较），"
+            "_ta_only_indicators 保留 CCI 作为 EA 离线兜底。"
+        ),
+    },
     {
         "version": "v1",
         "date": "2026-09-03",
@@ -59,14 +85,24 @@ _HEALTH: dict = {
 _SYNC_ERRORS_MAX = 20
 
 # EA(F043) 可提供的指标字段：_sync_indicators 用 EA 值覆盖这些；_sync_tf 重建缓存时保留 EA 值不被 TA-Lib 覆盖
+# 注：stoch_rsi 与蜡烛图形态(candle_pattern_dir/name) 仅由 TA-Lib 计算，不在此集合——放入会被 _sync_tf 保护逻辑冻结为旧值。
 _EA_CACHE_KEYS = frozenset({
     "rsi", "rsi_5", "rsi_10", "mfi", "bb", "bb_width",
     "ema_9", "ema_21", "ema_34", "ema_50", "ema_200",
     "sma_14", "sma_20", "sma_50",
     "atr", "atr_20", "adx", "pdi", "ndi",
-    "macd", "stoch_5_3_3", "stoch_rsi", "linear_reg_slope",
-    "volume_sma_20", "close",
+    "macd", "stoch_5_3_3", "linear_reg_slope",
+    "volume_sma_20", "close", "cci", "cci_direction",
 })
+
+# EA 实际提供时间戳：{tf: {key: 最近一次 EA 提供该键的 time.time()}}。
+# 语义：只有 EA 在 _EA_PROVIDED_TTL 秒内确实提供过该键，_sync_tf 才保护其不被 TA-Lib 覆盖。
+# 否则（EA 掉线 / 该字段缺失 / 超时未刷新）视为"本轮未提供"，自动回退 TA-Lib 实时值，
+# 避免旧实现"无条件保护"导致的冻结（EA 掉线时所有 EA 键永久停在最后有效值）。
+# TTL 需 >> 正常一个 F043 轮询周期(约 1~3s，4 个周期各一次) 以避免 EA/TA 值来回跳变，
+# 又要足够短以便掉线后及时回退；30s 兼顾两者。
+_EA_PROVIDED_TS: dict = {}
+_EA_PROVIDED_TTL = 30.0
 
 def get_health() -> dict:
     """获取 DataFactory 健康状态快照（供外部监控/API 调用）"""
@@ -292,6 +328,18 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
         for i, c in enumerate(candles):
             if slope[i] == slope[i]:
                 result[c.time]["linear_reg_slope"] = float(slope[i])
+    except Exception:
+        pass
+
+    # CCI(14) + 方向（EA 离线兜底；EA 在线时由 _sync_indicators 用 EA 真值覆盖）
+    try:
+        cci = talib.CCI(highs, lows, closes, timeperiod=14)
+        for i in range(1, len(candles)):
+            if cci[i] == cci[i]:
+                result[candles[i].time]["cci"] = float(cci[i])
+                if cci[i-1] == cci[i-1]:
+                    _cur, _prv = float(cci[i]), float(cci[i-1])
+                    result[candles[i].time]["cci_direction"] = "up" if _cur > _prv else ("down" if _cur < _prv else "flat")
     except Exception:
         pass
 
@@ -543,11 +591,26 @@ class DataFactory:
             bar1_candle = merged[-2] if len(merged) >= 2 else merged[-1]
             latest_ind = ta.get(bar1_candle.time, {}) if merged else {}
             # 缓存扁平：最新一根 TA-Lib 展开顶层，保留 _sync_indicators 已覆盖的 EA 字段
+            #
+            # 两处关键修正（v3）：
+            # 1) 增量模式(need_full_calc=False)时 latest_ind 为空，若 new_cache 只放 candles
+            #    会把全部指标键清空 → 顶层缓存 45 键瞬间归零，策略读到 None。
+            #    先继承旧值：bar1 在新 K 线出现前本就固定不变，增量轮次保持原值语义正确。
+            # 2) 保护条件由"k in _EA_CACHE_KEYS and k in old_cache"改为
+            #    "EA 本轮确实提供过该键(时间戳在 TTL 内)"，EA 掉线超过 TTL 即回退 TA-Lib。
             with _CACHE_LOCK:
                 old_cache = _DATA_CACHE.get(tf, {})
+                prov = _EA_PROVIDED_TS.get(tf, {})
                 new_cache = {"candles": merged}
+                # (1) 继承：保留上一轮的指标值，避免增量轮次清空
+                for k, v in old_cache.items():
+                    if k != "candles":
+                        new_cache[k] = v
+                # (2) 覆盖：本轮 TA-Lib 值写入，但 EA 近期确实提供过的键保留 EA 值
                 for k, v in latest_ind.items():
-                    new_cache[k] = old_cache[k] if (k in _EA_CACHE_KEYS and k in old_cache) else v
+                    ea_provided = (k in _EA_CACHE_KEYS
+                                   and (now - prov.get(k, 0.0)) <= _EA_PROVIDED_TTL)
+                    new_cache[k] = old_cache[k] if (ea_provided and k in old_cache) else v
                 _DATA_CACHE[tf] = new_cache
             # DB 增量写：新 K 线 + 最新一根(未闭合更新)，历史已闭合跳过(1400->2根/轮)
             from data.database import upsert_indicators
@@ -674,9 +737,11 @@ class DataFactory:
         """
         from data.database import upsert_indicators
         ea_keys = ("rsi", "rsi_5", "rsi_10", "mfi", "bb",
-                   "ema_9", "ema_21", "sma_14", "sma_20", "sma_50",
+                   "ema_9", "ema_21", "ema_34", "ema_50", "ema_200",
+                   "sma_14", "sma_20", "sma_50",
                    "atr", "atr_20", "adx", "pdi", "ndi",
-                   "macd", "stoch_5_3_3", "volume_sma_20", "close")
+                   "macd", "stoch_5_3_3", "linear_reg_slope",
+                   "volume_sma_20", "close", "cci")
         for tf in ["M15", "M30", "H1", "H4"]:
             try:
                 mt4_ind = bridge.get_indicators("XAUUSD", tf, shift=1) if hasattr(bridge, "get_indicators") else {}
@@ -689,12 +754,25 @@ class DataFactory:
             ea_ts = mt4_ind.get("time")
             with _CACHE_LOCK:
                 cache = _DATA_CACHE.setdefault(tf, {"candles": []})
+                prov = _EA_PROVIDED_TS.setdefault(tf, {})
+                _now = time.time()
                 for k in ea_keys:
                     if k in mt4_ind and mt4_ind[k] is not None:
                         cache[k] = mt4_ind[k]
+                        prov[k] = _now  # 记录"EA 本轮确实提供了该键"
                 if mt4_ind.get("bb"):
                     bb = mt4_ind["bb"]
                     cache["bb_width"] = round(bb["upper"] - bb["lower"], 2)
+                    prov["bb_width"] = _now
+                # CCI 值与方向（方向由 EA 提供的当前/前一根 CCI 比较，保证图表一致真值）
+                if "cci" in mt4_ind and mt4_ind["cci"] is not None:
+                    cache["cci"] = mt4_ind["cci"]
+                    prov["cci"] = _now
+                    _cci_prev = mt4_ind.get("cci_prev")
+                    if _cci_prev is not None:
+                        _cur, _prv = float(mt4_ind["cci"]), float(_cci_prev)
+                        cache["cci_direction"] = "up" if _cur > _prv else ("down" if _cur < _prv else "flat")
+                        prov["cci_direction"] = _now
             # EA 值持久化到 DB：覆盖该 bar 的 TA-Lib 值，合并完整指标后写回（DB=EA 真理源）
             if ea_ts:
                 with _CACHE_LOCK:

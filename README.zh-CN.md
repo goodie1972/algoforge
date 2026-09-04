@@ -39,7 +39,7 @@
 - **GateManager**（时间/波动/趋势/亏损门）· **RiskManager**（单笔/敞口/持仓上限）· **TradeManager**（订单/滑点/Magic 隔离）三层管理体系
 
 ### 📊 数据驱动
-- DataFactory 统一计算 **26 个 TA-Lib 指标**，F043 MT4 值优先
+- DataFactory 提供 **46 个指标**（EA/F043 直供优先 + TA‑Lib 本地回退），详见 `docs/data_factory.md`
 - 指标在策略间**共享**，绝不重复计算
 - M5 / M15 / M30 / H1 / H4 多周期覆盖
 
@@ -127,7 +127,7 @@ http://localhost:1783
 
 | 轨道 | 组件 | 职责 |
 |:----|:----|:----|
-| **轨1** | DataFactory | 独立线程，增量拉取 K 线，TA-Lib 统一计算 26 个指标 |
+| **轨1** | DataFactory | 独立线程，增量拉取 K 线，EA(F043) 直供指标优先 + TA‑Lib 回退（共 46 个指标） |
 | **轨2** | 策略员 | 主循环，`get_indicator(key)` 读缓存，评分达标出门票 |
 | **轨3** | Athlete | tick 验证，`_verify_entry` 实时重算入场，10 秒过期 |
 
@@ -208,7 +208,7 @@ AlgoForge/
 | 文档 | 说明 |
 |:----|:----|
 | [strategy_dev_guide.md](docs/strategy_dev_guide.md) | 策略开发全流程 + BaseStrategy 参考 + MQL4 移植指南 |
-| [data_factory.md](docs/data_factory.md) | DataFactory 指标参考（26 个指标） |
+| [data_factory.md](docs/data_factory.md) | DataFactory 指标参考（46 个指标，EA/F043 直供 + TA‑Lib 回退） |
 | [product_manual.md](docs/product_manual.md) | 产品手册 |
 | [mt4_guide.md](docs/mt4_guide.md) | MT4 + EA 配置指南 |
 

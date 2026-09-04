@@ -76,7 +76,7 @@ MT4 通信抽象和系统级基础组件。
 
 | 文件 | 职责 |
 |:-----|:-----|
-| `data_factory.py` | DataFactory（轨1），独立线程增量拉取 K 线，TA-Lib 计算 26+ 指标，所有策略的唯一指标源 |
+| `data_factory.py` | DataFactory（轨1），独立线程增量拉取 K 线；指标以 MT4 F043(EA) 直供为优先、TA-Lib 本地计算回退（共 46 键），所有策略的唯一指标源 |
 | `news_filter.py` | 新闻过滤器，多源新闻聚合与方向判断 |
 | `huicong_news.py` | 汇通/金十中文新闻源适配器 |
 | `llm_provider.py` | LLM 提供商管理（多模型切换） |

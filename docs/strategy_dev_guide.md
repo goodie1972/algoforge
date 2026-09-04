@@ -63,9 +63,14 @@ stoch = self.get_indicator("stoch_5_3_3")# {"k", "d"}
 bbi = self.get_indicator("bbi")          # BBI (SMA3/6/12/24 均值)
 bb_mid_dir = self.get_indicator("bb_mid_direction")
 atr = self.get_indicator("atr")
+cci = self.get_indicator("cci")          # CCI(14) 商品通道指数（EA v2 起提供，典型价）
+cci_dir = self.get_indicator("cci_direction")  # "up" / "down" / "flat"
+# 蜡烛形态：没有 cdl_* 逐形态键，读方向与名称
+cdl_dir = self.get_indicator("candle_pattern_dir")    # "long" / "short" / "none"
+cdl_name = self.get_indicator("candle_pattern_name")  # "ENGULF" / "HAMMER" / ...
 ```
 
-完整 26 指标表见 `docs/data_factory.md`。
+完整 46 指标表（EA 直供 24 + EA 派生 2 + TA‑Lib 20）见 `docs/data_factory.md`。
 
 ## 命名与 Magic 规范
 

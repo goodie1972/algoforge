@@ -292,6 +292,31 @@ void ProcessCommand(string cmd, int sock)
       for(int vi = shift; vi < shift + 20; vi++) volSum += (double)iVolume(sym, tf, vi);
       resp += StringFormat("%.0f$", volSum / 20.0);
 
+      // ===== 扩展字段（务必与 Python 端 get_indicators 解析顺序严格一致）=====
+      // EMA34 / EMA50 / EMA200
+      resp += StringFormat("%.5f$%.5f$%.5f$",
+         iMA(sym, tf, 34, 0, MODE_EMA, PRICE_CLOSE, shift),
+         iMA(sym, tf, 50, 0, MODE_EMA, PRICE_CLOSE, shift),
+         iMA(sym, tf, 200, 0, MODE_EMA, PRICE_CLOSE, shift));
+      // LinearReg slope(20) — MQL4 无 iLR，手动计算回归斜率（窗口结束于 shift，与 TA-Lib LINEARREG_SLOPE 对齐）
+      {
+         int lr_n = 20;
+         double sx = 0, sy = 0, sxy = 0, sxx = 0;
+         for (int li = 0; li < lr_n; li++)
+         {
+            double y = iClose(sym, tf, shift - li);
+            double x = li;
+            sx += x; sy += y; sxy += x * y; sxx += x * x;
+         }
+         double denom = lr_n * sxx - sx * sx;
+         double lr_slope = (denom != 0) ? (lr_n * sxy - sx * sy) / denom : 0;
+         resp += StringFormat("%.5f$", lr_slope);
+      }
+      // CCI(14) 当前值 + 前一根值（供 Python 算方向，均来自 EA 保证图表一致）
+      resp += StringFormat("%.2f$%.2f$",
+         iCCI(sym, tf, 14, PRICE_TYPICAL, shift),
+         iCCI(sym, tf, 14, PRICE_TYPICAL, shift + 1));
+
       resp += "#";
       SendResponse(resp, sock);
    }

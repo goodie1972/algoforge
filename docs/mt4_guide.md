@@ -37,6 +37,14 @@ FreeMT4Bridge EA 是连接 Python 交易引擎与 MT4 终端的关键桥接组�
 - MT4 右下角应显示"自动交易"图标为绿色箭头
 - EA 图表左上角应显示 `FreeMT4Bridge: Connected`
 
+### 2.5 F043 指标协议版本（重要）
+
+DataFactory 通过 F043 命令向 EA 请求指标，Python 端对字段数与顺序有严格约定，EA 必须编译为匹配的版本：
+
+- **当前协议：34 字段**（原版 28 字段已扩展）。v2 起在 `volume_sma_20` 之后新增 `ema_34` / `ema_50` / `ema_200` / `linear_reg_slope` / `cci` / `cci_prev` 共 6 个字段。
+- **必须重新编译挂机**：使用旧版 `.ex4`（仅 28 字段）时，DataFactory 会判定字段数不足、拒绝整批指标（`get_indicators` 返回空），除 TA‑Lib 回退键外的 EA 指标全部失效。
+- 修改协议需四处同步：`tools/FreeMT4Bridge.mq4`（MQL4 响应端）、`core/freemt4_bridge.py`（Python 解析端）、`services/data_factory.py` 的 `ea_keys` 与 `_EA_CACHE_KEYS`，顺序与数量必须严格一致，否则会静默错位。
+
 ## 3. 启动交易系统
 
 ```bash

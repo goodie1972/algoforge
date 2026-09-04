@@ -18,6 +18,28 @@ from core.bridge import (
 
 logger = logging.getLogger(__name__)
 
+# 版本号纪律（框架模块，无 MT4 magic）：F043 协议字段扩展时 +1
+FREEMT4_BRIDGE_VERSION = "v2"
+
+FREEMT4_BRIDGE_CHANGELOG = [
+    {
+        "version": "v2",
+        "date": "2026-09-04",
+        "desc": (
+            "F043 协议扩展：在 volume_sma_20 之后追加 6 个字段——"
+            "ema_34/ema_50/ema_200(iMA EMA)、linear_reg_slope(iLR 差值)、"
+            "cci 与 cci_prev(iCCI(14))。Python 解析端同步到 idx+28..idx+33；"
+            "字段数下限由 20 提到 34，旧 EA 响应将被安全拒绝。与 services/data_factory.py "
+            "的 _EA_CACHE_KEYS/ea_keys 协同（见 DATA_FACTORY v2）。"
+        ),
+    },
+    {
+        "version": "v1",
+        "date": "2026-09-03",
+        "desc": "建立版本基线（F043 原 28 字段布局）。",
+    },
+]
+
 # MQL4 timeframe 值 (分钟数格式)
 TF_MAP = {
     "M1": 1, "M5": 5, "M15": 15, "M30": 30,
@@ -235,7 +257,7 @@ class FreeMT4Bridge(MT4BridgeBase):
         all_fields = "$".join(data).split("$")
         # 去掉空尾部
         all_fields = [f for f in all_fields if f != ""]
-        if len(all_fields) < 20:
+        if len(all_fields) < 34:  # F043 现固定 34 字段(idx 0-33)；旧 EA 字段不足将在此被拒
             return {}
         try:
             idx = 0
@@ -276,6 +298,13 @@ class FreeMT4Bridge(MT4BridgeBase):
                     "d": float(all_fields[idx+26]),
                 },
                 "volume_sma_20": float(all_fields[idx+27]),
+                # 扩展字段（顺序须与 tools/FreeMT4Bridge.mq4 的 F043 响应严格一致）
+                "ema_34": float(all_fields[idx+28]),
+                "ema_50": float(all_fields[idx+29]),
+                "ema_200": float(all_fields[idx+30]),
+                "linear_reg_slope": float(all_fields[idx+31]),
+                "cci": float(all_fields[idx+32]),
+                "cci_prev": float(all_fields[idx+33]),
             }
         except (ValueError, IndexError) as e:
             logger.warning(f"[FreeMT4] F043parse failed: {e}, fields={len(all_fields)}")
