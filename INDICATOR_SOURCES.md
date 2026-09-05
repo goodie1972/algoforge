@@ -152,3 +152,6 @@ new_cache[k] = old_cache[k] if (k in _EA_CACHE_KEYS and k in old_cache) else v
 *基于当前仓库 `services/data_factory.py`、`core/freemt4_bridge.py`、`tools/FreeMT4Bridge.mq4` 内容核对。*  
 *v2 变更：`ema_34/ema_50/ema_200/linear_reg_slope` 改由 EA(F043) 提供；新增 `cci` 与 `cci_direction`；`stoch_rsi` 与蜡烛形态保留 TA‑Lib；F043 由 28 字段扩至 34 字段。*  
 *v3 变更：修复增量模式清空顶层缓存（45 键→0）；保护逻辑改为"EA 本轮确实提供过该键才保护"（`_EA_PROVIDED_TS` + TTL 30s），EA 掉线超 30s 自动回退 TA‑Lib。*
+*v4 变更（2026-09-05 B）：新增 `data/cache/candles_cache.pkl` 持久化暖缓存，重启按时间差增量补齐（≤2000 根），冷启动不再无脑重拉 4×2000；缓存每 5 分钟落盘（详见 product_manual.md §19.2）。*
+*v5 变更（2026-09-05 D1）：`tick_data` 加 `idx_tick_data_ts` 索引；DataFactory 每 5 分钟调用 `prune_tick_data(max_rows=200000)`，避免无限增长（详见 product_manual.md §19.2）。*
+*对应回测工具：`tools/backfill_indicators.py` — 单连接 + executemany 批量 UPSERT，从 `ohlcv` 读 K 线重算全套 46 键；43K 行 23 秒完成（详见 product_manual.md §19.5）。*

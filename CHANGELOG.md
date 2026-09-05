@@ -73,6 +73,11 @@
 - `engine_standalone/core_loop.py` `CORE_LOOP_VERSION` 升 v2 并补 changelog
 - `docs/NEXT_IMPROVEMENTS.md` 新建：记录 F1 前端拆分 + F2 热重启覆盖 DataFactory 的下次改进计划
 
+### E1 + E3 真入口修正 (commit 944c6cd — Mixin 陷阱)
+- **陷阱**：原 E1 / E3 改动落在 `engine_standalone/core_loop.py`（Mixin），但 `engine_standalone/main.py::TradingEngine` 主类 **override 了所有 tick 相关方法**（`_run_strategy` / `_check_status_report` / `_status_report` / ...），Mixin 代码上线后被全部 bypass
+- **修复**：把 E1（ThreadPoolExecutor(max_workers=4)）和 E3（1s 超时回退缓存）真正移到 `main.py` 真入口，core_loop 的辅助方法通过继承访问
+- **验证**：单测 E1 25 任务 4 worker = 38ms（vs 串行 142ms，3.7x），E3 超时回退缓存生效
+
 ## [3.5.4] - 2026-09-05 — 启动加速 + Dashboard 假死修复
 
 ### 启动优化（B + C）
@@ -87,6 +92,12 @@
 ### 操作注意
 - 重启后首轮数据加载明显加快（暖缓存命中时近乎即时）；若缓存过旧（如隔周重启）会自动全量补齐，行为不变
 - 假死修复后，弱网/后台标签页不再拖垮整个面板
+
+### K 线拖拽后缓慢漂移修复 (commit 3f71af7)
+- **症状**：用户拖拽过 K 线后，图表会"缓慢漂移"自动回滚实时
+- **根因**：`TradingTerminal.vue::scheduleAutoScroll()` 在 `subscribeVisibleLogicalRangeChange` + `subscribeCrosshairMove` 两个订阅里被无条件调用，10s 后强制 `scrollAllToRealTime()`。`isViewingLatest()` 防护对"轻微拖动"场景无效（拖动后视窗右边缘仍落在最新 5 根内 → 防护绕过）
+- **修复**：彻底移除 scheduleAutoScroll 函数 + 4 处调用（onMounted / 主题切换 rebuild 各 2 处）+ 2 个 let 变量。dist 重新构建，已无残留
+- **行为变化**：拖拽后视图完全静止跟随意图；需主动滚到右边缘才吸附实时
 
 ## [3.5.3] - 2026-09-04 — 指标来源重构（F043 扩展 + DataFactory v3）
 

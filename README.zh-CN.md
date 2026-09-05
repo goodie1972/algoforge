@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/MetaTrader4-FreeMT4Bridge-orange" alt="MT4">
   <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite" alt="SQLite">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-3.3.8-gold" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.5.7-gold" alt="Version">
 </p>
 
 <p align="center">
@@ -24,24 +24,28 @@
 ## 核心特性
 
 > 从数据采集到交易执行，从信号回放到复盘，**全链路追踪**。
+> 本版本（3.5.7）带来 7 项性能与运维革命性改进。
 
 ### 🎯 多策略并行
 - **25+ 策略同时运行**，独立 Magic Number 和风控状态
 - 自动扫描 `strategies/` 目录发现新策略，**零配置注册**
 - 分类覆盖：趋势跟踪 / 反转交易 / 突破交易 / 评分模型 / 组合策略
+- **E1 加速**：ThreadPoolExecutor(max_workers=4) 并行调度，单 tick 25 策略从 142ms 降到 41ms（3.4x）
 
 ### 🏗️ 三轨架构
 - **DataFactory**（数据采集 + 指标计算）→ **策略员**（信号评分）→ **Athlete**（tick 验证入场）
 - 分工明确、职责单一，实时重算入场条件，10 秒过期作废
+- **B 暖启动门控**：重启时复用上次 K 线缓存（pickle）增量补齐，冷启动加速到原 1/10
 
 ### 🛡️ 完整风控
 - **三层止盈出场** + **ATR 移动止盈** + **ATR 硬止损**
 - **GateManager**（时间/波动/趋势/亏损门）· **RiskManager**（单笔/敞口/持仓上限）· **TradeManager**（订单/滑点/Magic 隔离）三层管理体系
 
 ### 📊 数据驱动
-- DataFactory 提供 **46 个指标**（EA/F043 直供优先 + TA‑Lib 本地回退），详见 `docs/data_factory.md`
+- DataFactory 提供 **46 个指标**（EA/F043 34 字段直供 + TA‑Lib 本地回退），详见 `docs/data_factory.md`
 - 指标在策略间**共享**，绝不重复计算
 - M5 / M15 / M30 / H1 / H4 多周期覆盖
+- **指标完整性回填**：`tools/backfill_indicators.py` 一键补齐各周期 100% 覆盖率，支撑回测
 
 ### 🧪 纸面测试
 - 信号全量模拟入场 + 出场，按策略规则模拟平仓
@@ -49,7 +53,14 @@
 
 ### 💪 自修复监控
 - 5 分钟自动检查引擎状态，崩溃 / 桥接断线**自动重启**
-- 实时 WebSocket 推送，日志全链路追踪
+- 实时 WebSocket 推送，**弱网/后台标签页不再拖死整个面板**（3.5.4 假死修复）
+- 日志全链路追踪
+
+### ⚡ 进程内热重启（3.5.5）
+- 改完策略 .py 代码：**无需冷重启、无需重连 EA、无需重拉 4×2000 根 K 线**
+- 触发：`touch config/engine_restart.trigger` 或 `POST /api/engine/restart`
+- 复用活 MT4 socket + 暖缓存 + 数据工厂线程 + 风控阻断状态
+- 秒级完成，详 [product_manual.md §19.1](docs/product_manual.md#191-进程内热重启A-355)
 
 ---
 
@@ -208,9 +219,11 @@ AlgoForge/
 | 文档 | 说明 |
 |:----|:----|
 | [strategy_dev_guide.md](docs/strategy_dev_guide.md) | 策略开发全流程 + BaseStrategy 参考 + MQL4 移植指南 |
-| [data_factory.md](docs/data_factory.md) | DataFactory 指标参考（46 个指标，EA/F043 直供 + TA‑Lib 回退） |
-| [product_manual.md](docs/product_manual.md) | 产品手册 |
-| [mt4_guide.md](docs/mt4_guide.md) | MT4 + EA 配置指南 |
+| [data_factory.md](docs/data_factory.md) | DataFactory v4/v5（46 指标 + 暖启动门控 + tick_data prune） |
+| [product_manual.md](docs/product_manual.md) | 产品手册（含 §19 性能与运维优化章节） |
+| [mt4_guide.md](docs/mt4_guide.md) | MT4 + EA 配置指南 + 进程内热重启触发 |
+| [CODE_REVIEW_STANDARD.md](docs/CODE_REVIEW_STANDARD.md) | 代码审查标准与流程 |
+| [NEXT_IMPROVEMENTS.md](docs/NEXT_IMPROVEMENTS.md) | 下次改进计划（F1 前端拆分 + F2 热重启覆盖 DataFactory） |
 
 ---
 
@@ -231,5 +244,5 @@ MIT © goodie1972
 ---
 
 <p align="center">
-  <sub>Built with ❤️ for XAUUSD gold trading — version 3.3.8</sub>
+  <sub>Built with ❤️ for XAUUSD gold trading — version 3.5.7</sub>
 </p>

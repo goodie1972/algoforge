@@ -20,6 +20,7 @@
 16. [回测系统](#16-回测系统)
 17. [纸面测试系统](#17-纸面测试系统)
 18. [故障排除](#18-故障排除)
+19. [性能与运维优化（v3.5.4-3.5.7）](#19-性能与运维优化v354-355)
 
 ---
 
@@ -29,8 +30,21 @@ XAUUSD 量化交易系统是一个专为黄金（XAUUSD）设计的自动化交�
 
 ### 核心特性
 
+**架构层**
 - **三轨架构** — DataFactory(独立线程拉K线，F043(EA)直供指标优先 + TA-Lib 本地回退) + 策略员(评分出门票) + Athlete(tick验证开仓)
-- **多策略并行** — 同时运行 7 个独立策略，各有独立 Magic Number 和风控状态
+- **多策略并行** — 同时运行 7-25+ 个独立策略，各有独立 Magic Number 和风控状态
+- **35 指标全字典** — EA 通过 F043 34 字段直供 26 个技术指标，剩 9 个 TA-Lib 计算/回退（详见 [data_factory.md](data_factory.md)）
+
+**性能与运维层（3.5.4-3.5.7）**
+- **进程内热重启** — `touch config/engine_restart.trigger` 或 `POST /api/engine/restart`，**秒级**重载策略代码并复用活 MT4 socket/暖缓存/数据工厂线程（无需重连 EA、无需重拉 K 线）
+- **DataFactory 暖启动门控** — 重启时优先复用上次 K 线缓存，按时间差增量补齐，冷启动加速到原 1/10
+- **策略并行调度** — `_tick` 用 `ThreadPoolExecutor(max_workers=4)` 并行执行策略，25 策略 × 5ms 从 142ms 降到 41ms（3.4x 加速）
+- **WebSocket 真·广播** — slow-client 1s 超时即断开，不再阻塞 asyncio 事件循环；Dashboard 切换导航/前端拖拽都即时响应
+- **价格推送去重** — `broadcast_prices` 仅在 bid/ask/spread 变化时才推，避免前端无意义 re-render
+- **数据库自维护** — tick_data 自动 prune 滚动窗口；SQLite cache_size 调到 64MB；synchronous=NORMAL
+- **指标完整性回填工具** — `tools/backfill_indicators.py` 单连接批量 UPSERT，42K 行 23 秒搞定，确保各周期 K 线 + 46 键指标同步覆盖，回测有底
+
+**业务层**
 - **纸面测试系统** — 全量信号模拟入场+出场，按策略规则自动平仓，统计收益
 - **状态监控+自修复** — 每5分钟检查引擎/桥接/数据工厂，崩溃自动重启
 - **策略池热同步** — 在 Dashboard 策略中心调整策略池后，引擎自动识别增删变更
@@ -925,3 +939,141 @@ GBK 终端下中文日志显示为乱码，通过 `/api/logs` API 读取正常�
 |------|------|------|
 | 版本更新按钮灰色 | 工作区有未提交修改 | 先提交或暂存代码 |
 | git pull 失败 | 远程有冲突 | 手动 `git pull` 解决冲突 |
+
+---
+
+## 19. 性能与运维优化（v3.5.4-3.5.7）
+
+> 本章汇总 3.5.4 → 3.5.7 四个版本的性能与运维改进。每项改进都满足 [CODE_REVIEW_STANDARD.md](CODE_REVIEW_STANDARD.md) 的"版本号 + changelog + 测试"铁律，可独立回滚。
+
+### 19.1 进程内热重启（A，3.5.5）
+
+**目标**：策略 .py 代码改了之后，无需冷重启进程（不会断开 MT4 socket、不会重新拉 4×2000 根 K 线），秒级完成"重载代码 + 重置运行态"。
+
+**两种触发方式**：
+
+| 方式 | 命令 | 适用场景 |
+|:---|:---|:---|
+| **触发文件** | `touch config/engine_restart.trigger` | SSH/定时任务/外部脚本触发 |
+| **Dashboard API** | `POST /api/engine/restart` | 人在仪表盘按按钮 |
+
+**复用清单（热重启全程保留）**：
+- 活 MT4 socket（`bridge._connected` 保持，仅做存活校验）
+- DataFactory 线程 + 暖启动缓存（pickle 落盘）
+- 价格轮询 / 偏置刷新线程（engine_runner 路径）
+- 风控阻断状态（DB 恢复）
+
+**关键坑（已修）**：`strategies/scanner.py::scan_strategies()` 有模块级 `_strategy_cache`，首次扫描后永远返回旧类。`importlib.reload` 单独不够——必须先 `clear_cache()` 再 `create_strategies()`，否则 `.py` 改动不生效。
+
+**不热重载边界**：策略 .py 代码、F043 字段集、桥接参数可热重载；涉及 `settings.py`/RuntimeConfig 中"不热重载"项仍需进程重启（边界与既有配置热重载一致）。
+
+### 19.2 DataFactory 暖启动门控（B，3.5.4）+ 数据库调优（D1+D3，3.5.6）
+
+**B 暖缓存**：新增 `data/cache/candles_cache.pkl`，重启时先加载上次 K 线缓存，按"当前时间 − 缓存末根时间"**增量补齐**（上限 2000 根）。冷启动从 36-60 秒（重拉 4×2000 根）降到秒级。
+
+**D1 tick_data 自动清理**：
+- 函数 `prune_tick_data(max_rows=200000)`，滚动 1-2 周全交易时段窗口
+- 加 `idx_tick_data_ts` 索引，prune 查询提速
+- DataFactory 每 5 分钟 `_validate_data()` 后调用
+
+**D3 SQLite cache_size 调优**：默认 2MB → 64MB（`PRAGMA cache_size=-64000`）。10w+ 行表的常见查询不再频繁淘汰页缓存。
+
+**D5 WebSocket 价格推送去重**：`broadcast_prices()` 0.3s 轮询但只在 bid/ask/spread 任意变化时才推。MT4 tick 1-3Hz，0.3s 轮询有大量重复，去重后前端避免无意义 re-render。
+
+### 19.3 策略并行 + get_positions 超时（E1+E3，3.5.7）
+
+**E1 策略并行**：`_tick()` 改用 `ThreadPoolExecutor(max_workers=4)` 并发 `_run_strategy`，每个任务 80ms deadline。实测：
+
+| 模式 | 25 策略 × 5ms | 余量 |
+|:---|---:|---:|
+| 串行（原） | 142ms | -42ms（**超 tick 预算**） |
+| 并行（现） | 41ms | +59ms |
+
+异常隔离 + 进程退出 `_shutdown_strategy_executor(wait=True)` 清理。
+
+**E3 get_positions 超时**：`bridge.get_positions()` 加 1 秒超时（`future.result(timeout)`），超时/异常回退 `_cached_positions` 缓存。MT4 卡顿时不再阻塞 tick 周期。
+
+> ⚠ **Mixin 陷阱（已修）**：E1+E3 原写在 `engine_standalone/core_loop.py`（Mixin）被主类 `main.py` 整体 bypass。已迁移到 main.py 真入口，详见 CHANGELOG 3.5.7 末尾。
+
+### 19.4 Dashboard 假死修复（3.5.4）+ K 线拖拽漂移修复（3.5.7）
+
+**Dashboard 假死**：
+- **根因**：`web_manager.broadcast()` 持锁 `await ws.send_text()` 无超时 → 任何被浏览器节流/弱网的 WS 客户端拖垮整个 asyncio 事件循环 → 切导航卡顿 + K线冻结 + 客户端恢复后积压消息一次性涌入（"漂移/跳动"）
+- **修复**：快照连接列表后释放全局锁，按连接并发发送，单客户端 1s 超时即放弃断开。原设计的 `broadcast_hub` 背压机制保留备用
+
+**K 线拖拽后缓慢漂移**：详见 [CHANGELOG §3.5.4 / 3.5.7]。`scheduleAutoScroll()` 的 10s 强制回滚已被移除——拖拽后视图完全静止跟随意图，需主动滚到右边缘才吸附实时。
+
+### 19.5 指标完整性回填工具（3.5.6）
+
+> MT4 历史保留期短，自存是回测的硬需求。
+
+**问题**：调研发现 `indicator_snapshots` 表历史覆盖率仅 30%，多数行只有 2-35 键（不完整）。新写入已正常（45-46 键），但 K 线历史无对应指标，导致回测时大量键缺失。
+
+**工具**：`tools/backfill_indicators.py` 单连接批量回填：
+
+```bash
+# 仅回填 < 40 键的行（保留完整行不动）
+python tools/backfill_indicators.py --only-incomplete
+
+# 清掉历史黄金合约残留 GC_*
+python tools/backfill_indicators.py --clean-gc-only
+
+# 完整重算（耗时长）
+python tools/backfill_indicators.py --force-recompute
+```
+
+- 单连接 + `executemany` 批量写入（每 1000 行 commit），实测 42K 行仅 23 秒
+- 关键学习：**批量 DB 操作永远不要每行新建连接**——之前实现一连接一行 = 5 rows/sec，改成 executemany 后 = 2000+ rows/sec
+
+**回填结果**：5,643 → 48,569 行（97% 完整 45+ 键），各周期 100% 覆盖。同时清理 17,085 个 `GC_*` 历史残留。
+
+### 19.6 运维检查清单（推荐运行后核实）
+
+```bash
+# 1. 触发热重启是否生效？
+touch config/engine_restart.trigger
+sleep 6
+# 应该看到日志: [HotRestart] trigger file detected → reboot complete
+
+# 2. 暖缓存是否生成？
+ls -la data/cache/candles_cache.pkl
+
+# 3. 指标覆盖率是否全？
+python -c "
+import sqlite3; c = sqlite3.connect('data/market_data.db')
+for tf in ['M5','M15','M30','H1','H4','D1','W1']:
+    o = c.execute('SELECT COUNT(*) FROM ohlcv WHERE timeframe=?', (tf,)).fetchone()[0]
+    i = c.execute('SELECT COUNT(*) FROM indicator_snapshots WHERE timeframe=?', (tf,)).fetchone()[0]
+    print(f'{tf}: ohlcv={o} indicators={i} ({100*i/o:.0f}%)')
+"
+
+# 4. tick_data 行数（应在 200K 以下）？
+python -c "
+import sqlite3; print('tick_data:', sqlite3.connect('data/market_data.db').execute('SELECT COUNT(*) FROM tick_data').fetchone()[0])
+"
+
+# 5. WebSocket 是否健壮？（应 1s 内连接，无明显卡顿）
+python -c "
+import websockets, asyncio, time
+async def t():
+    t0=time.time()
+    async with websockets.connect('ws://127.0.0.1:1783/ws'): pass
+    print(f'connect: {(time.time()-t0)*1000:.0f}ms')
+asyncio.run(t())
+"
+```
+
+### 19.7 重启须知（什么时候必须冷重启）
+
+| 改动范围 | 是否要冷重启 |
+|:---|:---:|
+| 策略 `.py` 代码（base + strategies） | ❌ 用热重启 |
+| 配置（settings.yaml） | ❌ 配置热重载已支持 |
+| `services/data_factory.py` | ✅ **必须冷重启**（热重启保留旧实例） |
+| `data/database.py` | ✅ **必须冷重启**（连接池在模块顶层） |
+| `engine_standalone/main.py` / `core_loop.py` | ✅ **必须冷重启** |
+| `dashboard/backend/*` | ✅ **必须冷重启** |
+| `dashboard/frontend/dist/*` | ❌ 刷新浏览器即可（StaticFiles mount 自动读最新） |
+| F043 字段集 | ✅ 重启 EA + Python 引擎 |
+
+下次改进计划见 [NEXT_IMPROVEMENTS.md](NEXT_IMPROVEMENTS.md)（F1 前端拆分 + F2 热重启覆盖 DataFactory）。

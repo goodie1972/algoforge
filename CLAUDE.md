@@ -1,4 +1,4 @@
-# XAUUSD 量化交易系统 v2.8.0 — CLAUDE.md
+# XAUUSD 量化交易系统 v3.5.7 — CLAUDE.md
 
 ## 项目
 
@@ -7,9 +7,24 @@ XAUUSD 黄金自动化交易系统，基于 Python + MetaTrader 4。
 - **入口:** `start.py`（一键启动）或 `dashboard/backend/main.py`（仅后端）
 - **技术栈:** Python 3.10+ / FastAPI / Vue 3 + TypeScript + Vite + Naive UI / SQLite / lightweight-charts
 - **桥接:** FreeMT4Bridge EA (MQL4, TCP Socket :23232) 或 MetaApi 云端
-- **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals 表)
-- **版本:** 3.4.0 (VERSION)
+- **数据库:** `data/market_data.db` (SQLite, 含 ohlcv / trades / signals / indicator_snapshots / tick_data / logs 表)
+- **暖缓存:** `data/cache/candles_cache.pkl`（DataFactory v4 持久化的 K 线，进程内热重启复用）
+- **版本:** 3.5.7 (VERSION)
 - **策略仓库:** [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies.git)
+
+## 项目当前里程碑（3.5.4 - 3.5.7，2026-09-05）
+
+本版本（v3.5.7）已完成**性能与运维优化波次**，共 7 个改进：
+
+| 标识 | 标题 | 章节 |
+|:---|:---|:---|
+| A | 进程内引擎热重启 | [product_manual.md §19.1](docs/product_manual.md#191-进程内热重启a-355) |
+| B | DataFactory 暖启动门控 | [product_manual.md §19.2](docs/product_manual.md#192-datafactory-暖启动门控b-354-数据库调优d1d3-356) |
+| C | 启动加速（砍 sleep/收缩重连） | [product_manual.md §19.2](docs/product_manual.md#192-datafactory-暖启动门控b-354-数据库调优d1d3-356) |
+| D1+D3+D5 | tick_data prune + SQLite cache + WS 去重 | [product_manual.md §19.2](docs/product_manual.md#192-datafactory-暖启动门控b-354-数据库调优d1d3-356) |
+| E1+E3 | 策略并行 + get_positions 超时 | [product_manual.md §19.3](docs/product_manual.md#193-策略并行--get_positions-超时e1e3-357) |
+| F | Dashboard 假死修复 + K 线拖拽漂移修复 | [product_manual.md §19.4](docs/product_manual.md#194-dashboard-假死修复354--k-线拖拽漂移修复357) |
+| D回填 | 指标完整性回填工具 | [product_manual.md §19.5](docs/product_manual.md#195-指标完整性回填工具-356) |
 
 ## 仓库结构
 

@@ -1,6 +1,8 @@
 # 策略开发指南
 
 > 主应用内置策略**快照**（clone 后开箱即用）。策略的**日常开发 / 版本管理 / 推送**在独立仓库 [algoforge-strategies](https://github.com/goodie1972/algoforge-strategies) 进行。
+>
+> **当前应用版本 v3.5.7**。策略代码改动后无需冷重启，详见 [product_manual.md §19.1 进程内热重启](product_manual.md#191-进程内热重启a-355)：改完 .py 后 `touch config/engine_restart.trigger` 即可生效。
 
 ## 策略存放位置
 

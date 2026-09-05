@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/MetaTrader4-FreeMT4Bridge-orange" alt="MT4">
   <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite" alt="SQLite">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-3.4.0-gold" alt="Version">
+  <img src="https://img.shields.io/badge/version-3.5.7-gold" alt="Version">
 </p>
 
 <p align="center">
@@ -242,5 +242,5 @@ MIT © goodie1972
 ---
 
 <p align="center">
-  <sub>Built with ❤️ for XAUUSD gold trading — version 3.3.8</sub>
+  <sub>Built with ❤️ for XAUUSD gold trading — version 3.5.7</sub>
 </p>

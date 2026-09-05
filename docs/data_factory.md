@@ -18,9 +18,10 @@ MT4 终端 ←→ FreeMT4 桥接(F043) ←→ DataFactory（独立线程） ←�
 
 1. `DataFactory.connect()` → 连接桥接
 2. `DataFactory.start()` → 启动独立线程 `data-factory`
-3. `_init_indicators_from_db()` → 从 SQLite 恢复最近指标（保证 EA 未连上时策略即可运行）
-4. 首次全量加载（最多重试 10 次）
-5. 进入增量循环（每 0.3 秒一轮）
+3. **加载暖缓存**（v4）→ 从 `data/cache/candles_cache.pkl` 恢复上次 K 线（如可用，避免冷启动重拉 4×2000 根）
+4. `_init_indicators_from_db()` → 从 SQLite 恢复最近指标（保证 EA 未连上时策略即可运行）
+5. 首次加载按"上次末根 − 当前时间"测算缺口，增量补齐（上限 2000 根）；如无暖缓存/缓存过旧则全量加载
+6. 进入增量循环（每 0.3 秒一轮）
 
 ### 增量循环
 
@@ -29,9 +30,10 @@ MT4 终端 ←→ FreeMT4 桥接(F043) ←→ DataFactory（独立线程） ←�
 | 步骤 | 方法 | 说明 |
 |:----|:----|:----|
 | ① K 线同步 | `_sync_tf("M15"/"M30"/"H1"/"H4")` | 增量拉取 2 根，合并去重；必要时 TA‑Lib 重算 |
-| ② Tick 同步 | `_sync_tick()` | bid/ask 报价 |
+| ② Tick 同步 | `_sync_tick()` | bid/ask 报价，**自动 prune tick_data ≤ 200K 行**（v5 起） |
 | ③ 指标覆盖 | `_sync_indicators()` | F043 从 MT4 EA 取指标，覆盖 TA‑Lib 值 |
 | ④ 数据校验 | `_validate_data()` | 每 5 分钟一次，对比数据库 |
+| ⑤ 暖缓存落盘 | `_save_candle_cache()` | 每 5 分钟一次（v4 起，重启可复用） |
 
 ### 全量计算 vs 增量更新
 
@@ -228,11 +230,23 @@ F043 取不到指标时（EA 未挂 / 协议不匹配）会在日志输出
 
 | 版本 | 日期 | 要点 |
 |:----|:----|:----|
+| v5 | 2026-09-05 | (3.5.6 D1) **`tick_data` 自动清理**：每 5 分钟 prune 调用，max_rows=200000；新增 `idx_tick_data_ts` 索引。修复合法化维护：永久删除与数据库连接池错误等不再阻塞 tick 同步 |
+| v4 | 2026-09-05 | (3.5.4 B) **暖启动门控**：新增 `data/cache/candles_cache.pkl` 本地 K 线缓存，重启按时间差增量补齐（≤2000 根），冷启动加速；缓存每 5 分钟及首轮成功后落盘 |
 | v3 | 2026-09-04 | ①修复增量轮次清空顶层缓存（指标被清零）；②保护逻辑改为"EA 本轮确实提供过该键才保护"（`_EA_PROVIDED_TS` + TTL 30s），EA 掉线超 30s 自动回退 TA‑Lib |
 | v2 | 2026-09-04 | F043 由 28 字段扩至 34 字段：`ema_34/ema_50/ema_200/linear_reg_slope` 改由 EA 提供；新增 `cci` 与 `cci_direction`；修复 `_EA_CACHE_KEYS` 含 EA 未发送键导致 5 个键被冻结 |
 | v1 | 2026-09-03 | 建立版本基线；新增派生字段（`rsi_dir_3bar`/`atr_ma_5`/`atr_sma20`/`atr_ratio_30`/`roc_10`/`stoch_k_prev`/`stoch_d_prev`/`candle_pattern_dir`/`candle_pattern_name` 等） |
 
 版本号常量：`DATA_FACTORY_VERSION` / `DATA_FACTORY_CHANGELOG`（见文件头）。
+
+### 指标完整性回填（回测前推荐执行）
+
+MT4 历史保留期短，自存是回测的硬需求。运行：
+
+```bash
+python tools/backfill_indicators.py --only-incomplete
+```
+
+从 `ohlcv` 表读取全部 K 线，对覆盖率不足的行用 TA-Lib 重新计算全套 46 键并 UPSERT 到 `indicator_snapshots`。详见 [product_manual.md §19.5](product_manual.md#195-指标完整性回填工具-356)。
 
 ## 注意事项
 
@@ -241,3 +255,4 @@ F043 取不到指标时（EA 未挂 / 协议不匹配）会在日志输出
 - **确认性指标只能源自 bar1**：`get_indicator()` / `get_cache()` / `candles[-2]`；`candles[-1]`（未闭合 bar0）仅可价格/量触发，禁止在其上算指标做判定
 - **指标可能为 None**：启动初期或数据不足时仍可能缺值，策略请保留空值检查
 - **改 F043 协议需四处同步**：MQL4 响应端（`tools/FreeMT4Bridge.mq4`）、Python 解析端（`core/freemt4_bridge.py`）、`_sync_indicators.ea_keys`、`_EA_CACHE_KEYS`，字段顺序与数量必须严格一致，否则会静默错位
+- **改 DataFactory 代码要冷重启**：进程内热重启（A 改进）**不重载 `services/data_factory.py`**——DataFactory 实例被保留。如改 DataFactory 需冷重启，下次改进计划 F2 计划让其覆盖热重启

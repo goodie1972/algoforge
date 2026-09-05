@@ -159,12 +159,30 @@ cd dashboard/frontend && npm run build
 |:-----|:-----|
 | `config/` | 系统配置（`settings.py` 全局常量、`runtime_config.py` 热配置、`config_schema.py` 配置校验） |
 | `strategies/` | 策略框架（`base.py` 基类、`scanner.py` 自动扫描），策略源码在外部仓库 |
-| `data/` | 数据库层（`database.py` ORM、`market_data.db` SQLite） |
+| `data/` | 数据库层（`database.py` ORM v2、`market_data.db` SQLite） |
+| `data/cache/` | DataFactory v4 暖缓存（`candles_cache.pkl`，可被 gitignore） |
 | `indicators/` | 自定义指标计算辅助模块 |
 | `backtest/` | 回测脚本与结果存储 |
-| `tools/` | 独立工具（状态监控、纸面交易、信号分析、环境检查） |
+| `tools/` | 独立工具（`backfill_indicators.py` 指标回填等） |
 | `models/` | 数据模型定义 |
 | `monitor/` | 外部监控脚本 |
 | `scripts/` | 运维脚本 |
 | `tests/` | 测试套件 |
-| `docs/` | 项目文档（产品手册、策略开发指南、DataFactory 参考） |
+| `docs/` | 项目文档（产品手册含 §19 性能与运维优化章节、策略开发指南、DataFactory v4/v5 参考） |
+
+---
+
+## 当前版本关键能力（3.5.7）
+
+实现以下性能/运维能力后请参考对应文档：
+
+| 能力 | 用法 | 文档 |
+|:---|:---|:---|
+| 进程内热重启策略代码 | `touch config/engine_restart.trigger` 或 `POST /api/engine/restart` | [mt4_guide.md §2.6](docs/mt4_guide.md#26-引擎生命周期管理355) |
+| DataFactory 暖缓存 | 自动，重启瞬间恢复 4×2000 根 K 线 | [data_factory.md v4](docs/data_factory.md) |
+| tick_data 自动清理 | 自动，每 5 分钟 prune 至 ≤200K 行 | [data_factory.md v5](docs/data_factory.md) |
+| 策略并行调度（ThreadPoolExecutor 4 worker） | 自动 | [product_manual.md §19.3](docs/product_manual.md#193-策略并行--get_positions-超时e1e3-357) |
+| WebSocket 慢客户端超时 | 自动 | [product_manual.md §19.4](docs/product_manual.md#194-dashboard-假死修复354--k-线拖拽漂移修复357) |
+| 指标完整性回填 | `python tools/backfill_indicators.py --only-incomplete` | [product_manual.md §19.5](docs/product_manual.md#195-指标完整性回填工具-356) |
+
+下次改进计划见 [NEXT_IMPROVEMENTS.md](docs/NEXT_IMPROVEMENTS.md)。
