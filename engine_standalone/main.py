@@ -1203,6 +1203,11 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                 self._data_factory.stop()
             except Exception:
                 pass
+        # E1：清理策略并行执行器
+        try:
+            self._shutdown_strategy_executor()
+        except Exception:
+            pass
         try:
             self.bridge.disconnect()
         except Exception:

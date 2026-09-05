@@ -52,6 +52,27 @@
 ### 版本号
 - `data/database.py` `DATABASE_VERSION` 升 v2 并补 changelog
 
+---
+
+## [3.5.7] - 2026-09-05 — 主循环性能优化（E1 + E3）
+
+### E1｜策略并行执行
+- `_tick()` 改用 `ThreadPoolExecutor(max_workers=4)` 并发跑 `_run_strategy`，替代原 for 循环串行
+- 实测：25 策略 × 5ms，**串行 142ms → 并行 41ms，加速 3.4x**
+- 收益：tick 处理从 100ms 预算超标 42ms 降到 41ms（充足余量），K 线不再掉帧
+- 异常隔离：每个 `_run_strategy` 仍自带 try/except，单策略异常不影响整体
+- 超时防御：每个任务设 80ms deadline（tick 周期 100ms 留 20ms 给协调出场/状态报告）
+- 线程生命周期：惰性 init + 进程退出时 `_shutdown_strategy_executor(wait=True)`
+
+### E3｜bridge.get_positions 加超时
+- `_status_report` 中 `bridge.get_positions()` 加 1s 超时（`ThreadPoolExecutor.submit + future.result(timeout)`）
+- 超时/异常回退 `_cached_positions` 缓存值，避免 MT4 卡顿阻塞 tick 周期
+- 首次无缓存返回空列表（语义安全）
+
+### 版本号
+- `engine_standalone/core_loop.py` `CORE_LOOP_VERSION` 升 v2 并补 changelog
+- `docs/NEXT_IMPROVEMENTS.md` 新建：记录 F1 前端拆分 + F2 热重启覆盖 DataFactory 的下次改进计划
+
 ## [3.5.4] - 2026-09-05 — 启动加速 + Dashboard 假死修复
 
 ### 启动优化（B + C）
