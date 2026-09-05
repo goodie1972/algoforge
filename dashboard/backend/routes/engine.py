@@ -62,6 +62,18 @@ async def stop_engine():
     return {"message": "引擎已停止"}
 
 
+@router.post("/restart")
+async def restart_engine():
+    """进程内热重启引擎：复用活 MT4 socket + 暖缓存，重载策略代码，不退出进程/不重连。"""
+    if not engine_runner:
+        raise HTTPException(500, "引擎未初始化")
+    engine = getattr(engine_runner, "_engine", None)
+    if engine is None:
+        raise HTTPException(409, "引擎未在运行")
+    engine.request_restart()
+    return {"message": "已请求进程内热重启（复用 MT4 socket + 暖缓存，重载策略代码）"}
+
+
 @router.get("/strategies")
 async def list_strategies():
     """列出当前引擎中运行的策略"""

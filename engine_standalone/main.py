@@ -162,6 +162,14 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         self._last_recover_time = 0.0   # 上次成交恢复时间
         self._last_config_check = 0.0   # 配置文件热重载检查时间守卫
         self._config_check_interval = 5.0  # 配置文件检查间隔（秒）
+
+        # 进程内热重启（A）：复用活 MT4 socket + 暖缓存，不退出进程、不重连
+        self._keep_process_alive = True   # 外层循环：被真正 stop 时置 False
+        self._restart_requested = False   # 请求进程内热重启
+        self._hot_restart_last_check = 0.0
+        self._engine_restart_trigger = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "config", "engine_restart.trigger")
         self._mt4_offset: float = 0.0                    # MT4 服务器 vs 本机 UTC 的偏移秒数
         self._last_reverse_tp_bar: dict[int, dict[str, int]] = {}  # magic → timeframe → 已止盈的 bar 起始时间
         self._entry_times: dict[int | str, float] = {}     # ticket → 开仓时间戳
@@ -958,26 +966,76 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
             self._mtf_coordinator = MTFResonanceCoordinator(self.bridge)
         return self._mtf_coordinator.get_allowed_direction()
 
-    def start(self):
-        logger.info("=" * 60)
-        logger.info("XAUUSD Multi-Strategy Trading Engine Starting")
-        logger.info(f"Symbol: {settings.SYMBOL} | Lot: {self._rt('lot_size')}")
-        for s in self.strategies:
-            logger.info(f"  Strategy: {s.name} | Magic={s.magic} | TF={s.timeframe} | "
-                        f"双倍首 orders={s.double_first} | 最大仓位={s.max_positions}")
-        logger.info("=" * 60)
+    # ======================== 进程内热重启（A） ========================
+    # 复用活 MT4 socket + 暖缓存：不退出进程、不重连、不重拉 K 线，
+    # 仅重新加载策略代码并重置运行态，秒级完成。
 
-        if not self.bridge.connect():
-            logger.warning(f"Failed to connect to MT4, retrying every {BRIDGE_CONNECT_INTERVAL}s...")
-            for attempt in range(BRIDGE_CONNECT_RETRIES):
-                time.sleep(BRIDGE_CONNECT_INTERVAL)
-                if self.bridge.connect():
-                    logger.info(f"Connected after {attempt+1} retries")
-                    break
-            else:
-                logger.error(f"Failed to connect after {BRIDGE_CONNECT_RETRIES} retries, exiting")
-                return
+    def _is_bridge_connected(self) -> bool:
+        """桥接是否已连接（兼容无 is_connected 方法的桥接实现）"""
+        return bool(getattr(self.bridge, "_connected", False))
 
+    def request_restart(self):
+        """请求进程内热重启：复用活 MT4 socket + 暖缓存，不退出进程。
+        由 trigger 文件或 Dashboard API 调用；下一轮内层循环结束后生效。"""
+        logger.info("[HotRestart] restart requested (in-process; MT4 socket preserved)")
+        self._restart_requested = True
+        self.running = False
+
+    def _check_restart_trigger(self):
+        """检查进程内热重启触发文件（与配置热重载一致的 watch 模式）。"""
+        now = time.time()
+        if now - self._hot_restart_last_check < 2.0:
+            return
+        self._hot_restart_last_check = now
+        try:
+            if os.path.exists(self._engine_restart_trigger):
+                try:
+                    with open(self._engine_restart_trigger, "r", encoding="utf-8") as f:
+                        payload = f.read().strip()
+                except Exception:
+                    payload = ""
+                try:
+                    os.remove(self._engine_restart_trigger)
+                except OSError:
+                    pass
+                logger.info(f"[HotRestart] trigger file detected"
+                            f"{' (' + payload + ')' if payload else ''}; requesting in-process restart")
+                self.request_restart()
+        except Exception:
+            pass
+
+    def _boot_connect(self, connect: bool = True) -> bool:
+        """建立或复用 MT4 连接。
+        connect=True（首启）：主动 connect，失败按 BRIDGE_CONNECT_RETRIES 退避；
+        connect=False（热重启）：假定活 socket 仍在，若意外断开则尝试一次恢复，
+        但不强制退出进程（交给 _tick 心跳重连持续兜底）。
+        """
+        if connect:
+            if not self.bridge.connect():
+                logger.warning(f"Failed to connect to MT4, retrying every {BRIDGE_CONNECT_INTERVAL}s...")
+                for attempt in range(BRIDGE_CONNECT_RETRIES):
+                    time.sleep(BRIDGE_CONNECT_INTERVAL)
+                    if self.bridge.connect():
+                        logger.info(f"Connected after {attempt + 1} retries")
+                        break
+                else:
+                    logger.error(f"Failed to connect after {BRIDGE_CONNECT_RETRIES} retries, exiting")
+                    self.running = False
+                    return False
+            return True
+        # 热重启：校验 socket 存活
+        if not self._is_bridge_connected():
+            logger.warning("[HotRestart] MT4 socket dropped unexpectedly, attempting reconnect "
+                          "(no process exit)")
+            try:
+                self.bridge.connect()
+            except Exception as e:
+                logger.error(f"[HotRestart] reconnect attempt error: {e}")
+        return True
+
+    def _boot_strategies(self):
+        """初始化策略风控状态 + 接管持仓 + 校准 + 恢复（幂等，首启与热重启共用）。
+        不触碰 MT4 socket 与 DataFactory 线程生命周期。"""
         # 初始化策略风控状态
         for s in self.strategies:
             self._init_risk_state(s.name, s.magic)
@@ -991,13 +1049,11 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                     rs = self._risk_states[magic]
                     rs.realized_pnl = saved.get("realized_pnl", 0)
                     rs.consecutive_losses = saved.get("consecutive_losses", 0)
-                    # 恢复快速出场计数器（重启不丢）
                     et_raw = saved.get("exit_timestamps", "[]")
                     try:
                         et_list = json.loads(et_raw) if isinstance(et_raw, str) else et_raw
                         now = time.time()
                         window = self._rt('rapid_exit_window_seconds')
-                        # 只恢复窗口内的有效时间戳
                         valid = [t for t in et_list if now - t < window]
                         rs.exit_timestamps = deque(valid)
                     except (json.JSONDecodeError, TypeError):
@@ -1025,7 +1081,6 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
                 logger.info(f"[Takeover] {s.name} Ticket={pos.ticket}(Magic={pos.magic}) entry time recorded ts={_open_ts}")
 
         # 纸面模式兜底：takeover_existing_positions 返回空，但 PaperBridge 已从 CSV 恢复持仓
-        # → 直接遍历 get_positions 填充 _entry_times，避免 hold_sec=0 触发"可疑秒平"误报
         try:
             _all_pos = self.bridge.get_positions(settings.SYMBOL)
             for pos in _all_pos:
@@ -1037,7 +1092,6 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
             logger.warning(f"[EntryTimeFallback] failed: {e}")
 
         self._daily_start_balance = self._get_balance()
-        self.running = True
 
         # 校准 MT4 服务器时间 vs 本机 UTC
         self._calibrate_mt4_time()
@@ -1045,35 +1099,114 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         # 自动补充遗漏历史成交
         self._recover_missing_trades()
 
-        # 启动数据工厂独立线程（使用专用数据桥接）
-        if self._data_factory:
-            self._data_factory.start()
-            # 暖启动门控：等待首轮拉取完成（暖启动下极快），最多 5s 即继续，
-            # 不在开盘前死等（原 time.sleep(5) 无脑阻塞引擎线程）
-            self._wait_data_factory_ready(timeout=5.0)
-
         # 新闻过滤初始化加载
-        windows = self.news_filter.get_blackout_windows()
-        if windows:
-            logger.info(f"[NewsFilter] loaded {len(windows)} blackout windows:")
-            for s, e, t in windows[:5]:
-                logger.info(f"  {s.strftime('%m-%d %H:%M')} ~ {e.strftime('%H:%M')} | {t}")
+        try:
+            windows = self.news_filter.get_blackout_windows()
+            if windows:
+                logger.info(f"[NewsFilter] loaded {len(windows)} blackout windows:")
+                for s, e, t in windows[:5]:
+                    logger.info(f"  {s.strftime('%m-%d %H:%M')} ~ {e.strftime('%H:%M')} | {t}")
+        except Exception as e:
+            logger.warning(f"[NewsFilter] load failed: {e}")
 
-        logger.info("Entering main loop...")
-
-        while self.running:
+    def _reboot_engine(self):
+        """进程内热重启：复用活 MT4 socket + 暖缓存，重新加载策略代码并重置运行态。
+        不调用 bridge.disconnect() / data_factory.stop()（socket 与缓存全部保留）。"""
+        logger.info("[HotRestart] ===== in-process reboot: reusing live MT4 socket + warm cache =====")
+        with self._strategies_lock:
+            # 1) 重新加载策略模块代码（使 .py 改动生效）
+            #    关键：scan_strategies() 有模块级 _strategy_cache，首次扫描后永远返回旧类，
+            #    必须 clear_cache() 让其重新 import+reload 各策略模块；同时 reload 基类
             try:
-                self._tick()
-            except KeyboardInterrupt:
-                logger.info("Interrupt received, stopping")
-                self.running = False
+                from strategies.scanner import clear_cache
+                clear_cache()
+                if "strategies.base" in sys.modules:
+                    importlib.reload(sys.modules["strategies.base"])
+                logger.info("[HotRestart] strategy scanner cache cleared + base reloaded")
             except Exception as e:
-                logger.exception(f"Main loop exception: {e}")
-                time.sleep(60)
-            # 主循环休眠 100ms，避免 CPU 满载（tick 频率约 1-10Hz，100ms 足够了）
-            time.sleep(0.1)
+                logger.warning(f"[HotRestart] cache clear failed: {e}")
+            # 2) 基于最新 settings / runtime_config 池重建策略实例
+            #    create_strategies -> scan_strategies 会重新 import+reload 各策略模块
+            try:
+                self.strategies = create_strategies(
+                    self.bridge, self._get_strategy_pool(), engine_mode=self._engine_mode)
+                logger.info(f"[HotRestart] strategies rebuilt: {[s.name for s in self.strategies]}")
+            except Exception as e:
+                logger.error(f"[HotRestart] rebuild strategies failed: {e}")
+        # 3) 重置瞬态运行态 + 重新初始化（复用 _boot_strategies，不碰 socket/缓存）
+        self._entry_times.clear()
+        self._last_config_check = 0.0
+        self._config_mtime = 0.0
+        self._rtconfig_mtime = 0.0
+        self._boot_strategies()
+        self.running = True
+        logger.info("[HotRestart] ===== reboot complete (socket + warm cache preserved) =====")
 
-        self.bridge.disconnect()
+    def start(self):
+        logger.info("=" * 60)
+        logger.info("XAUUSD Multi-Strategy Trading Engine Starting")
+        logger.info(f"Symbol: {settings.SYMBOL} | Lot: {self._rt('lot_size')}")
+        for s in self.strategies:
+            logger.info(f"  Strategy: {s.name} | Magic={s.magic} | TF={s.timeframe} | "
+                        f"双倍首 orders={s.double_first} | 最大仓位={s.max_positions}")
+        logger.info("=" * 60)
+
+        self._keep_process_alive = True
+        _first_boot = True
+        while self._keep_process_alive:
+            # ---- 连接：首启主动连；热重启复用活 socket ----
+            if not self._boot_connect(connect=_first_boot):
+                logger.error("Bridge connection failed after retries; process exit")
+                break
+
+            if _first_boot:
+                # 首启：策略/风控/持仓/校准/恢复初始化（幂等）
+                self._boot_strategies()
+                # 首启专属：启动数据工厂线程（暖缓存已落盘，极快）
+                if self._data_factory:
+                    self._data_factory.start()
+                    self._wait_data_factory_ready(timeout=5.0)
+                _first_boot = False
+            else:
+                # ★ 进程内热重启：复用活 MT4 socket + 暖缓存，
+                #   重载策略代码 + 重置运行态（不重连、不重拉 K 线）
+                self._reboot_engine()
+
+            self.running = True
+            logger.info("Entering main loop...")
+
+            while self.running:
+                try:
+                    self._tick()
+                except KeyboardInterrupt:
+                    logger.info("Interrupt received, stopping")
+                    self.running = False
+                except Exception as e:
+                    logger.exception(f"Main loop exception: {e}")
+                    time.sleep(60)
+                # 主循环休眠 100ms，避免 CPU 满载（tick 频率约 1-10Hz，100ms 足够了）
+                time.sleep(0.1)
+
+            # 内层循环退出：判断是否热重启
+            if self._restart_requested:
+                self._restart_requested = False
+                logger.info("[HotRestart] socket + warm cache preserved, rebooting in-process "
+                            "(no MT4 socket teardown, no data re-pull)")
+                # 注意：不调用 bridge.disconnect() / data_factory.stop()
+                continue
+            else:
+                break
+
+        # 进程退出清理（仅真正退出进程时执行）
+        if self._data_factory:
+            try:
+                self._data_factory.stop()
+            except Exception:
+                pass
+        try:
+            self.bridge.disconnect()
+        except Exception:
+            pass
         logger.info("Trading engine stopped")
 
     def _wait_data_factory_ready(self, timeout: float = 5.0):
@@ -1103,6 +1236,9 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         logger.info("[DataFactory] wait timeout, proceeding (strategies self-warm from DB cache)")
 
     def _tick(self):
+        # 进程内热重启触发检查（节流 2s，避免高频文件 I/O）
+        self._check_restart_trigger()
+
         # 取策略快照（线程安全，允许运行中加减策略）
         with self._strategies_lock:
             snapshot = list(self.strategies)

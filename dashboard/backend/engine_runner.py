@@ -557,7 +557,7 @@ class EngineRunner:
         # 将各策略 STRATEGY_CHANGELOG 写入数据库 strategy_versions 表
         self._sync_strategy_versions()
 
-        # 主循环 — 与 TradingEngine.start() 逻辑一致，但支持外部 stop 信号
+        # 主循环 — 支持外部 stop 信号；并复用 TradingEngine 的进程内热重启（A）
         # 价格/持仓/账户采样由独立线程 _price_poller 负责（1s 间隔）
         while engine.running and not self._stop_requested:
             try:
@@ -574,6 +574,18 @@ class EngineRunner:
 
             # DataFactory 健康检查（每 60 秒一次）
             self._check_data_factory_health(engine)
+
+            # 进程内热重启（A）：复用活 MT4 socket + 暖缓存 + 数据工厂线程，
+            # 重载策略代码并重置运行态；不重连、不重拉 K 线、不退出进程
+            if getattr(engine, "_restart_requested", False):
+                engine._restart_requested = False
+                self.logger.info("[HotRestart] in-process reboot triggered (Dashboard path)")
+                try:
+                    engine._reboot_engine()
+                    self._sync_strategy_versions()  # 重载后刷新 DB 版本表
+                except Exception as e:
+                    self.logger.exception(f"[HotRestart] reboot failed: {e}")
+                engine.running = True
 
         # 清理
         if engine.bridge:

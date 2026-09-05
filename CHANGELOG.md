@@ -3,6 +3,21 @@
 > 此文件为**人工整理的里程碑日志**，Dashboard 顶部的版本徽章会自动从 `git log` 拉取最新 commit。
 > 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [3.5.5] - 2026-09-05 — 进程内热重启（A）
+
+### 进程内引擎热重启（A）
+- **目标**：不退出进程、不拆除 MT4 桥接 socket、不重拉 K 线，秒级完成"重新加载策略代码 + 重置运行态"，彻底消除冷重启的 36s 重连 + 4×2000 根重拉开销
+- **触发方式（两种）**：
+  1. 触发文件：`touch config/engine_restart.trigger`，引擎在 `_tick` 中节流 2s 检测后自动热重启（与配置热重载一致的 watch 模式）
+  2. Dashboard API：`POST /api/engine/restart`，由 `engine_runner` 转调 `engine.request_restart()`
+- **关键修复**：`strategies.scanner.scan_strategies()` 有模块级 `_strategy_cache`，首次扫描后永远返回旧类；热重启必须先 `clear_cache()` 再 `create_strategies`（其内部会重新 `import_module`+`reload` 各策略模块），同时 reload `strategies.base`，否则 .py 改动不生效
+- **复用清单**：活 MT4 socket（`bridge._connected` 保持，仅做存活校验）、DataFactory 线程与暖缓存、价格轮询/偏置刷新线程（engine_runner 路径）、风控阻断状态（DB 恢复）
+- **不热重载边界**：策略 `.py` 代码、F043 字段集、桥接参数可热重载；若改动涉及 `settings.py`/RuntimeConfig 中"不热重载"项仍需进程重启（与既有配置热重载边界一致）
+
+### 操作注意
+- 热重启后日志会出现 `[HotRestart] ===== in-process reboot ... =====` 与 `strategies rebuilt: [...]`；socket 不断、K线不闪
+- 触发文件为一次性消费（检测即删除），误触不会重复重启
+
 ## [3.5.4] - 2026-09-05 — 启动加速 + Dashboard 假死修复
 
 ### 启动优化（B + C）
