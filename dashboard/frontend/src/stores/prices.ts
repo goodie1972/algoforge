@@ -80,8 +80,8 @@ export const usePriceStore = defineStore('prices', () => {
         const existTimes = new Set(candles.value.map(c => c.time))
         const newCandles = data.filter(c => !existTimes.has(c.time))
         candles.value = [...newCandles, ...candles.value]
-        // 不设上限：保留全部已加载历史，滚动回看不用重新加载。
-        // 当前单周期最多几万根（M5 约1.6万），内存完全可承受
+        // 软上限：防止历史滚动加载无限增长，导致每 2s 的 setData / 指标重算卡顿
+        if (candles.value.length > 8000) candles.value = candles.value.slice(-8000)
       }
       return data
     } catch { return [] }

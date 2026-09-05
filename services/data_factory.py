@@ -4,11 +4,23 @@
 - TA-Lib 预计算所有公共指标
 - 全局缓存供策略和 Athlete 读取
 """
-DATA_FACTORY_VERSION = "v3"
+DATA_FACTORY_VERSION = "v4"
 
 # 变更日志：框架层版本纪律见 docs/CODE_REVIEW_STANDARD.md 🔴「策略/框架模块版本号」
 # 结构 {version, date, desc}（框架模块无 MT4 magic）
 DATA_FACTORY_CHANGELOG = [
+    {
+        "version": "v4",
+        "date": "2026-09-05",
+        "desc": (
+            "暖启动门控（B 优化，加速重启）：新增本地 K 线缓存持久化 "
+            "(data/cache/candles_cache.pkl)。启动时先加载上次缓存作为暖缓存，"
+            "首轮 _initial_load 按「当前时间 − 缓存最后一根时间」估算缺口根数增量补齐"
+            "(上限 2000)，不再无脑重拉 4×2000 根。桥接就绪时首轮拉取从 ~秒级降至毫秒级，"
+            "引擎 start() 的 time.sleep 死等同时改为 _wait_data_factory_ready 有界等待(≤5s)。"
+            "缓存每 5 分钟及首轮成功后落盘，异常自动回退全量拉取。"
+        ),
+    },
     {
         "version": "v3",
         "date": "2026-09-04",
@@ -49,9 +61,11 @@ DATA_FACTORY_CHANGELOG = [
 ]
 
 import logging
+import os
 import threading
 import time
 import numpy as np
+import pickle
 
 from core.bridge import Candle
 
@@ -436,6 +450,69 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     return result
 
 
+# ---- 暖启动 K 线缓存（B 优化）----
+# 持久化上次的 K 线缓存，重启时按「当前时间 − 缓存最后一根时间」增量补齐，
+# 避免无脑重拉 4×2000 根，引擎重启首轮拉取从秒级降至毫秒级。
+_TF_SECONDS = {
+    "M1": 60, "M5": 300, "M15": 900, "M30": 1800,
+    "H1": 3600, "H4": 14400, "D1": 86400, "W1": 604800,
+}
+
+_CANDLE_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "cache", "candles_cache.pkl",
+)
+
+
+def _save_candle_cache() -> None:
+    """将各周期 candles 落盘（pickle），供下次重启暖启动。"""
+    try:
+        os.makedirs(os.path.dirname(_CANDLE_CACHE_PATH), exist_ok=True)
+        snapshot = {}
+        with _CACHE_LOCK:
+            for tf in ("M15", "M30", "H1", "H4"):
+                candles = _DATA_CACHE.get(tf, {}).get("candles", [])
+                if candles:
+                    snapshot[tf] = [
+                        {"time": c.time, "open": c.open, "high": c.high,
+                         "low": c.low, "close": c.close, "volume": c.volume}
+                        for c in candles
+                    ]
+        if not snapshot:
+            return
+        with open(_CANDLE_CACHE_PATH, "wb") as f:
+            pickle.dump(snapshot, f)
+    except Exception as e:
+        logger.warning(f"[DataFactory] save candle cache failed: {e}")
+
+
+def _load_candle_cache() -> None:
+    """加载上次落盘的 K 线缓存到内存（暖缓存）；失败或无文件则忽略。"""
+    try:
+        if not os.path.exists(_CANDLE_CACHE_PATH):
+            return
+        with open(_CANDLE_CACHE_PATH, "rb") as f:
+            snapshot = pickle.load(f)
+        if not isinstance(snapshot, dict):
+            return
+        loaded = {}
+        with _CACHE_LOCK:
+            for tf, rows in snapshot.items():
+                if tf not in ("M15", "M30", "H1", "H4"):
+                    continue
+                if not rows:
+                    continue
+                _DATA_CACHE.setdefault(tf, {"candles": []})["candles"] = [
+                    Candle(r["time"], r["open"], r["high"], r["low"], r["close"], r["volume"])
+                    for r in rows
+                ]
+                loaded[tf] = len(rows)
+        if loaded:
+            logger.info(f"[DataFactory] candle cache loaded (warm-start): {loaded}")
+    except Exception as e:
+        logger.warning(f"[DataFactory] load candle cache failed: {e}")
+
+
 class DataFactory:
     """数据工厂 — 独立线程维护所有周期缓存"""
 
@@ -470,6 +547,8 @@ class DataFactory:
             _HEALTH["started_at"] = time.time()
         # 启动时从 DB 恢复指标（保证 EA 死 / 重启时数据不丢）
         self._init_indicators_from_db()
+        # 暖启动：加载上次落盘的 K 线缓存，使首轮只需增量补齐
+        self._load_candle_cache()
         self._thread = threading.Thread(target=self._run, daemon=True, name="data-factory")
         self._thread.start()
         logger.info("[DataFactory] started")
@@ -505,8 +584,11 @@ class DataFactory:
         else:
             logger.warning("[DataFactory] After 10 retries still missing, resuming incremental loop")
         logger.info("[DataFactory] First load done, entering incremental loop")
+        # 落盘暖启动缓存（供下次重启增量补齐）
+        self._save_candle_cache()
         _last_validation = 0
         _last_tick_persist = 0.0
+        _last_cache_persist = time.time()
         while self._running:
             for tf in ["M15", "M30", "H1", "H4"]:
                 self._sync_tf(tf, self._bridge)
@@ -520,24 +602,42 @@ class DataFactory:
             if time.time() - _last_validation > 300:
                 _last_validation = time.time()
                 self._validate_data()
+            # 每 5 分钟落盘一次暖启动缓存
+            if time.time() - _last_cache_persist > 300:
+                _last_cache_persist = time.time()
+                self._save_candle_cache()
             time.sleep(0.3)
 
     def _initial_load(self) -> bool:
-        """初始全量加载，返回是否所有周期加载成功"""
+        """初始加载：有暖缓存则按时间差增量补齐（极快），否则全量 2000 根。"""
         all_ok = True
         for tf in ["M15", "M30", "H1", "H4"]:
-            ok = self._sync_tf(tf, self._bridge, full=True)
+            with _CACHE_LOCK:
+                candles = _DATA_CACHE.get(tf, {}).get("candles", [])
+                last_t = candles[-1].time if candles else 0
+            if last_t:
+                # 按时间差估算需补齐的 K 线根数（含 10 根余量），上限 2000
+                gap = int((time.time() - last_t) / _TF_SECONDS[tf]) + 10
+                cnt = min(2000, max(2, gap))
+                ok = self._sync_tf(tf, self._bridge, full=False, count=cnt)
+            else:
+                ok = self._sync_tf(tf, self._bridge, full=True)
             if not ok:
                 all_ok = False
         return all_ok
 
-    def _sync_tf(self, tf: str, bridge, full: bool = False) -> bool:
-        """同步一个周期，返回是否成功获取数据"""
+    def _sync_tf(self, tf: str, bridge, full: bool = False, count: int = None) -> bool:
+        """同步一个周期，返回是否成功获取数据。
+
+        count 可显式指定拉取根数（暖启动按时间差计算缺口）；为 None 时
+        全量用 2000、增量用 2。
+        """
         try:
             with _CACHE_LOCK:
                 has_data = tf in _DATA_CACHE and _DATA_CACHE[tf].get("candles") and "rsi" in _DATA_CACHE[tf]
             needs_full = full or not has_data
-            count = 2000 if needs_full else 2
+            if count is None:
+                count = 2000 if needs_full else 2
             raw = bridge.get_candles("XAUUSD", tf, count)
             new_candles = list(reversed(raw)) if raw else []
 

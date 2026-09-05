@@ -76,6 +76,10 @@ logger = logging.getLogger(__name__)
 SAFETY_LOCK_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "safety_lock.txt")
 MIN_HOLD_SECONDS = 30  # 持仓小于此时间被平仓视为可疑
 
+# 桥接启动重连策略（C 优化：收缩原 30×10s=300s → 12×3s，最大 ~36s）
+BRIDGE_CONNECT_RETRIES = 12
+BRIDGE_CONNECT_INTERVAL = 3.0
+
 
 @dataclass
 class StrategyRiskState(_StrategyRiskStateBase):
@@ -240,7 +244,7 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
             pass
         return {
             "enabled": getattr(settings, "PAPER_TRADING_ENABLED", False),
-            "max_positions": PAPER_DEFAULT_MAX_POSITIONS,
+            "max_positions": None,
             "ignore_gates": True,
         }
 
@@ -964,14 +968,14 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         logger.info("=" * 60)
 
         if not self.bridge.connect():
-            logger.warning("Failed to connect to MT4, retrying every 10s...")
-            for attempt in range(30):  # 最多重试 5 分钟
-                time.sleep(10)
+            logger.warning(f"Failed to connect to MT4, retrying every {BRIDGE_CONNECT_INTERVAL}s...")
+            for attempt in range(BRIDGE_CONNECT_RETRIES):
+                time.sleep(BRIDGE_CONNECT_INTERVAL)
                 if self.bridge.connect():
                     logger.info(f"Connected after {attempt+1} retries")
                     break
             else:
-                logger.error("Failed to connect after 30 retries, exiting")
+                logger.error(f"Failed to connect after {BRIDGE_CONNECT_RETRIES} retries, exiting")
                 return
 
         # 初始化策略风控状态
@@ -1044,7 +1048,9 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         # 启动数据工厂独立线程（使用专用数据桥接）
         if self._data_factory:
             self._data_factory.start()
-            time.sleep(5)
+            # 暖启动门控：等待首轮拉取完成（暖启动下极快），最多 5s 即继续，
+            # 不在开盘前死等（原 time.sleep(5) 无脑阻塞引擎线程）
+            self._wait_data_factory_ready(timeout=5.0)
 
         # 新闻过滤初始化加载
         windows = self.news_filter.get_blackout_windows()
@@ -1069,6 +1075,32 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
 
         self.bridge.disconnect()
         logger.info("Trading engine stopped")
+
+    def _wait_data_factory_ready(self, timeout: float = 5.0):
+        """等待 DataFactory 完成首轮数据加载（暖启动下极快），超时即继续。
+
+        冷启动时若 MT4 尚未就绪，_sync_tf 会失败、tfs 不置 ok，
+        等待超时后正常继续——策略可先用 DB 缓存（_init_indicators_from_db）运行。
+        """
+        if not self._data_factory:
+            return
+        try:
+            from services.data_factory import get_health
+        except Exception:
+            return
+        deadline = time.time() + timeout
+        tfs = ("M15", "M30", "H1", "H4")
+        while time.time() < deadline:
+            try:
+                health = get_health()
+                _tfs = health.get("tfs", {})
+                if _tfs and all(_tfs.get(tf, {}).get("ok") for tf in tfs):
+                    logger.info("[DataFactory] first load ready (warm-start)")
+                    return
+            except Exception:
+                pass
+            time.sleep(0.5)
+        logger.info("[DataFactory] wait timeout, proceeding (strategies self-warm from DB cache)")
 
     def _tick(self):
         # 取策略快照（线程安全，允许运行中加减策略）
@@ -1718,9 +1750,9 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         _pc = self._get_paper_config()
         _paper_enabled = _pc.get("enabled", False)
         _paper_ignore = _pc.get("ignore_gates", False)
-        _paper_max = _pc.get("max_positions", PAPER_DEFAULT_MAX_POSITIONS)
+        _paper_max = _pc.get("max_positions")
 
-        if _paper_enabled and not _paper_ignore and _paper_max > 0:
+        if _paper_enabled and not _paper_ignore and _paper_max is not None and _paper_max > 0:
             _my_positions = [p for p in self.bridge.get_positions(settings.SYMBOL)
                              if p.magic in self._strategy_magics(strategy)]
             if len(_my_positions) >= _paper_max:
@@ -1729,7 +1761,7 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
         # ── 真实模式全局总持仓上限检查 ──
         if not _paper_enabled:
             _global_max = self._rt('max_positions')
-            if _global_max and _global_max > 0:
+            if _global_max is not None and _global_max > 0:
                 _all_positions = self.bridge.get_positions(settings.SYMBOL)
                 if len(_all_positions) >= _global_max:
                     logger.debug(f"[{strategy.name}] total positions {len(_all_positions)} ≥ {_global_max}, skipopen")
@@ -1737,8 +1769,8 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
 
         # ── 纸面模式全局总持仓上限检查（与真实模式对称） ──
         if _paper_enabled:
-            _paper_total_max = _pc.get("total_max_positions", 0)
-            if _paper_total_max and _paper_total_max > 0:
+            _paper_total_max = _pc.get("total_max_positions")
+            if _paper_total_max is not None and _paper_total_max > 0:
                 _all_positions = self.bridge.get_positions(settings.SYMBOL)
                 if len(_all_positions) >= _paper_total_max:
                     logger.debug(f"[{strategy.name}] paper total positions {len(_all_positions)} ≥ {_paper_total_max}, skip open")
@@ -1778,18 +1810,18 @@ class TradingEngine(PositionMgrMixin, CoreLoopMixin):
 
         # 持仓上限单一来源：模式设置（纸面=纸面设置，实盘=风控参数），不再与策略池 strategy.max_positions 取小。
         # 策略池的 max_positions 仅保留禁用语义（0=禁用，加载/同步时跳过），不参与持仓限制。
-        if _paper_enabled and _paper_max > 0:
+        if _paper_enabled and _paper_max is not None and _paper_max > 0:
             # 纸面模式：单策略上限 = 纸面设置 paper_trading.max_positions（唯一来源）
             _limit = _paper_max
             if n_total >= _limit:
                 return  # 达到单策略持仓上限（纸面）
-        else:
-            # 实盘模式：单策略上限 = 风控参数 per_strategy_max_positions（唯一来源），保留 None 防御兜底为策略池值
+        elif not _paper_enabled:
+            # 实盘模式：单策略上限 = 风控参数 per_strategy_max_positions（唯一来源）
+            # 未设置（None）= 无限制
             _rt_per_strategy_limit = self._rt('per_strategy_max_positions')
-            _live_per_strategy_limit = _rt_per_strategy_limit \
-                if _rt_per_strategy_limit else strategy.max_positions
-            if n_total >= _live_per_strategy_limit:
-                return  # 达到单策略持仓上限（实盘）
+            if _rt_per_strategy_limit is not None:
+                if n_total >= _rt_per_strategy_limit:
+                    return  # 达到单策略持仓上限（实盘）
 
         # 生成信号
         signal = strategy.on_tick()

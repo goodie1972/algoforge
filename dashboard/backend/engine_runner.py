@@ -72,6 +72,7 @@ class EngineRunner:
         self._stop_requested = False
         self.engine_thread = threading.Thread(target=self._run, daemon=False)
         self.engine_thread.start()
+        self._running = True
         time.sleep(3)  # 等待引擎初始化
         return True
 
@@ -82,6 +83,7 @@ class EngineRunner:
             self._engine.running = False
         if self.engine_thread and self.engine_thread.is_alive():
             self.engine_thread.join(timeout=15)
+        self._running = False
 
     def get_status(self) -> dict:
         """获取引擎状态"""
@@ -493,16 +495,16 @@ class EngineRunner:
         engine = TradingEngine(config_service=self.config_service)
         self._engine = engine
 
-        # 连接 MT4（带重试）
+        # 连接 MT4（带重试）：收缩为 12 次 × 3s（原 30×10s=300s → 最大 ~36s）
         if not engine.bridge.connect():
-            self.logger.warning("无法连接 MT4，每 10 秒重试...")
-            for attempt in range(30):
-                time.sleep(10)
+            self.logger.warning("无法连接 MT4，每 3 秒重试...")
+            for attempt in range(12):
+                time.sleep(3.0)
                 if engine.bridge.connect():
                     self.logger.info(f"第 {attempt+1} 次重试后连接成功")
                     break
             else:
-                self.logger.error("重试 30 次仍无法连接 MT4")
+                self.logger.error("重试 12 次仍无法连接 MT4")
                 self._running = False
                 return
 

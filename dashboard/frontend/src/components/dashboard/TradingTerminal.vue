@@ -192,11 +192,20 @@ function startAutoRefresh() {
   refreshTimer = setInterval(async () => {
     if (!candleSeries) return
     // 只拉最新 3 根增量更新，不触发 loading 转圈
+    const beforeT = store.candles.length ? store.candles[store.candles.length - 1].time : 0
     await store.fetchLatestCandles(activeTf.value, 3)
     if (store.candles.length === 0) return
+    const afterT = store.candles[store.candles.length - 1].time
+    const newBar = afterT !== beforeT
     try { candleSeries.setData(sanitizeCandleData(store.candles)) }
     catch (e) { console.warn('[K线] auto-refresh setData失败', e) }
-    afterDataLoad()
+    // 仅当新 K 线出现时才全量重算所有指标（RSI/Stoch/MACD/...），
+    // 否则只刷新主图叠加（EMA/BB），避免每 2s 全量重算拖垮主线程导致界面卡顿
+    if (newBar) {
+      afterDataLoad()
+    } else {
+      applyOverlay()
+    }
     nextTick(() => {
       if (isViewingLatest()) scrollAllToRealTime()
       requestAnimationFrame(() => syncAllPriceScaleWidths())
