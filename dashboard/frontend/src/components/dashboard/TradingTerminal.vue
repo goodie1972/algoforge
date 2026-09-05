@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-let autoScrollTimer: ReturnType<typeof setTimeout> | null = null
-let autoScrollScheduled = false
 
 /** 检查用户是否在查看最新数据（近5根K线内） */
 function isViewingLatest() {
@@ -14,16 +12,6 @@ function isViewingLatest() {
   } catch { return true }
 }
 
-function scheduleAutoScroll() {
-  if (autoScrollScheduled) return  // 防止 scrollAllToRealTime 触发的事件循环
-  if (autoScrollTimer) clearTimeout(autoScrollTimer)
-  if (!isViewingLatest()) return  // 查看历史数据时不自动回滚
-  autoScrollTimer = setTimeout(() => {
-    autoScrollScheduled = true
-    scrollAllToRealTime()
-    setTimeout(() => { autoScrollScheduled = false }, 500)
-  }, 10000)
-}
 import { usePriceStore } from '@/stores/prices'
 import { useAppStore } from '@/stores/app'
 import { useFlashOnChange } from '@/composables/useFlashOnChange'
@@ -363,8 +351,7 @@ onMounted(() => {
   // 双向时间轴同步：主图缩放 → 所有副图
   chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
     syncAllChartsFrom(chart!, _chartRef())
-    scheduleAutoScroll()
-    // 检测用户滚动到左边缘时加载更多历史数据
+        // 检测用户滚动到左边缘时加载更多历史数据
     try {
       const range = chart!.timeScale().getVisibleLogicalRange()
       if (range && range.from <= 3 && store.candles.length > 0) {
@@ -378,8 +365,7 @@ onMounted(() => {
   chart.subscribeCrosshairMove((param: any) => {
     syncAllChartsFrom(chart!, _chartRef())
     onCrosshairMove(chart!, param, _chartRef())
-    scheduleAutoScroll()
-  })
+      })
 
   startAutoRefresh()
 })
@@ -428,8 +414,7 @@ watch(() => appStore.isDark, () => {
     // 3. 重新订阅主图事件
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
       syncAllChartsFrom(chart!, _chartRef())
-      scheduleAutoScroll()
-      try {
+            try {
         const range = chart!.timeScale().getVisibleLogicalRange()
         if (range && range.from <= 3 && store.candles.length > 0) {
           const firstCandle = store.candles[0]
@@ -442,8 +427,7 @@ watch(() => appStore.isDark, () => {
     chart.subscribeCrosshairMove((param: any) => {
       syncAllChartsFrom(chart!, _chartRef())
       onCrosshairMove(chart!, param, _chartRef())
-      scheduleAutoScroll()
-    })
+          })
 
     // 4. 刷新 K 线数据 + 叠加指标
     if (store.candles.length > 0) {
