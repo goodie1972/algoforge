@@ -1,5 +1,15 @@
 """
 SQLite 数据库 — 存储 K线、交易、信号、账户快照、风控状态、系统日志
+
+DATABASE_VERSION = "v2"
+DATABASE_CHANGELOG = [
+    {"version": "v2", "date": "2026-09-05", "changes": [
+        "PRAGMA cache_size=-64000 (默认 2MB → 64MB，减少 10w+ 行表查询页淘汰)",
+        "tick_data 加 idx_tick_data_ts 索引（按时间戳查询/清理路径全覆盖）",
+        "新增 prune_tick_data(max_rows=200000)，DataFactory 每 5 分钟调用（tick 表滚动窗口）",
+    ]},
+    {"version": "v1", "date": "2024-xx-xx", "changes": ["initial"]},
+]
 """
 import json
 import logging
@@ -14,6 +24,20 @@ logger = logging.getLogger(__name__)
 
 DB_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(DB_DIR, "market_data.db")
+
+DATABASE_VERSION = "v2"
+DATABASE_CHANGELOG = [
+    {
+        "version": "v2",
+        "date": "2026-09-05",
+        "changes": [
+            "PRAGMA cache_size=-64000 (默认 2MB → 64MB，减少 10w+ 行表查询页淘汰)",
+            "tick_data 加 idx_tick_data_ts 索引（按时间戳查询/清理路径全覆盖）",
+            "新增 prune_tick_data(max_rows=200000)，DataFactory 每 5 分钟调用（tick 表滚动窗口）",
+        ],
+    },
+    {"version": "v1", "date": "2024-xx-xx", "changes": ["initial"]},
+]
 
 TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
 
@@ -265,6 +289,7 @@ CREATE TABLE IF NOT EXISTS tick_data (
     ask REAL,
     spread REAL
 );
+CREATE INDEX IF NOT EXISTS idx_tick_data_ts ON tick_data(timestamp);
 
 CREATE TABLE IF NOT EXISTS indicator_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -309,6 +334,7 @@ def get_conn() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=-64000")  # 64 MB（默认 2MB 太小，10w 行 logs+65k ohlcv 会频繁淘汰）
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
@@ -592,6 +618,28 @@ def upsert_tick(timestamp: int, bid: float, ask: float) -> bool:
     except Exception as e:
         logger.warning(f"[DB] Write tick failed ts={timestamp}: {e}")
         return False
+    finally:
+        conn.close()
+
+
+def prune_tick_data(max_rows: int = 200000) -> int:
+    """tick_data 表按行数清理（tick 频率高，会无限增长）。
+
+    返回删除条数；max_rows 默认 200K ≈ 1-2 周全交易时段 tick 量。
+    """
+    conn = get_conn()
+    try:
+        total = conn.execute("SELECT COUNT(*) AS cnt FROM tick_data").fetchone()["cnt"]
+        if total <= max_rows:
+            return 0
+        excess = total - max_rows
+        conn.execute(
+            "DELETE FROM tick_data WHERE timestamp IN "
+            "(SELECT timestamp FROM tick_data ORDER BY timestamp ASC LIMIT ?)",
+            (excess,),
+        )
+        conn.commit()
+        return conn.total_changes
     finally:
         conn.close()
 

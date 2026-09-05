@@ -4,11 +4,20 @@
 - TA-Lib 预计算所有公共指标
 - 全局缓存供策略和 Athlete 读取
 """
-DATA_FACTORY_VERSION = "v4"
+DATA_FACTORY_VERSION = "v5"
 
 # 变更日志：框架层版本纪律见 docs/CODE_REVIEW_STANDARD.md 🔴「策略/框架模块版本号」
 # 结构 {version, date, desc}（框架模块无 MT4 magic）
 DATA_FACTORY_CHANGELOG = [
+    {
+        "version": "v5",
+        "date": "2026-09-05",
+        "desc": (
+            "tick_data 表持久化清理（D1 优化）：DataFactory 在每 5 分钟 _validate_data() "
+            "之后调用 prune_tick_data(max_rows=200000)，tick 表滚动窗口避免无限增长。"
+            "（database.py 同步加了 idx_tick_data_ts 索引与 prune_tick_data 函数。）"
+        ),
+    },
     {
         "version": "v4",
         "date": "2026-09-05",
@@ -602,6 +611,14 @@ class DataFactory:
             if time.time() - _last_validation > 300:
                 _last_validation = time.time()
                 self._validate_data()
+                # 同时清理 tick_data 表（避免无限增长，1-2 周滚动）
+                try:
+                    from data.database import prune_tick_data
+                    deleted = prune_tick_data()
+                    if deleted:
+                        logger.info(f"[DataFactory] tick_data pruned {deleted} rows")
+                except Exception as e:
+                    logger.warning(f"[DataFactory] prune_tick_data failed: {e}")
             # 每 5 分钟落盘一次暖启动缓存
             if time.time() - _last_cache_persist > 300:
                 _last_cache_persist = time.time()

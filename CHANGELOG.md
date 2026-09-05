@@ -18,6 +18,40 @@
 - 热重启后日志会出现 `[HotRestart] ===== in-process reboot ... =====` 与 `strategies rebuilt: [...]`；socket 不断、K线不闪
 - 触发文件为一次性消费（检测即删除），误触不会重复重启
 
+---
+
+## [3.5.6] - 2026-09-05 — 数据库/日志/WS 三层性能优化 + 指标全量回填
+
+### 数据完整性修复（核心，关系回测）
+调研发现 `indicator_snapshots` 表历史残缺：覆盖率仅 30%，且键数多数残缺（2-35 键不等），**新写入已正常（全 45-46 键），但历史 K 线无对应指标**。MT4 历史保留期短，自存是回测硬需求。
+
+提供 **`tools/backfill_indicators.py`** 一次性回填工具：
+- 从 `ohlcv` 读全部 K 线 → 调用 `_ta_only_indicators` 计算全套 46 键 → UPSERT 到 `indicator_snapshots`
+- 支持 `--only-incomplete`（仅回填 < 40 键的行）、`--keep-gc`（保留 GC_* 残留）、`--clean-gc-only`（仅清理）
+- 使用单连接 + `executemany` 批量写入（每 1000 行 commit），实测 42K 行仅需 23 秒
+- **回填结果**：5,643 → 48,569 行（**97% 完整 45+ 键**），各周期 100% 覆盖 M5/M15/M30/H1/H4/D1/W1
+- 同时清理 17,085 个 GC_*（历史黄金合约）残留
+
+### D1 tick_data 表持久化清理
+- `data/database.py` 加 `prune_tick_data(max_rows=200000)`（默认 1-2 周全交易时段 tick 量）
+- `tick_data` 加 `idx_tick_data_ts` 索引（清理路径查询提速）
+- DataFactory 在每 5 分钟 `_validate_data()` 之后调用 prune，避免无限增长
+
+### D3 SQLite cache_size 调优
+- `PRAGMA cache_size=-64000`（默认 2MB → 64MB）
+- 表行数上 10 万后旧值频繁淘汰，每次查询重新读页；64MB 让热表常驻缓存
+
+### D5 价格 WS 推送去重
+- `broadcast_prices()` 0.3s 轮询，但仅在 bid/ask/spread 任一变化时才推
+- MT4 tick 频率 1-3Hz，0.3s 轮询大量重复；去重后前端不会收到无变化 JSON 触发无效 re-render
+
+### 已有未改动（D2/D4 经核实已就位）
+- **D2 trading.log 轮转**：10MB × 7 备份（`engine_standalone/main.py:55`，无需改）
+- **D4 synchronous=NORMAL**：已是 WAL 模式默认（`data/database.py:311`，无需改）
+
+### 版本号
+- `data/database.py` `DATABASE_VERSION` 升 v2 并补 changelog
+
 ## [3.5.4] - 2026-09-05 — 启动加速 + Dashboard 假死修复
 
 ### 启动优化（B + C）

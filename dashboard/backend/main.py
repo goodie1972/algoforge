@@ -85,17 +85,28 @@ class PollerState:
     running: bool = True
 
 
+# D5：缓存上次推过的价格指纹，仅在变化时推送（MT4 tick 1-3Hz，0.3s 轮询大量重复）
+_last_price_sig: tuple = (None, None, None)
+
+
 async def broadcast_prices():
-    """每 0.3 秒推送一次价格（引擎高速采样缓存，使前端 K 线实时跳动）"""
+    """每 0.3 秒轮询，但仅在 bid/ask/spread 变化时才广播（前端避免无意义 re-render）"""
+    global _last_price_sig
     while PollerState.running:
         try:
             cached = engine_runner._cached_price
             if cached:
-                await ws_manager.broadcast("prices", {
-                    "bid": cached["bid"],
-                    "ask": cached["ask"],
-                    "spread": round(cached["ask"] - cached["bid"], 2),
-                })
+                bid = cached["bid"]
+                ask = cached["ask"]
+                spread = round(ask - bid, 2)
+                sig = (bid, ask, spread)
+                if sig != _last_price_sig:
+                    _last_price_sig = sig
+                    await ws_manager.broadcast("prices", {
+                        "bid": bid,
+                        "ask": ask,
+                        "spread": spread,
+                    })
         except Exception:
             pass
         await asyncio.sleep(0.3)
