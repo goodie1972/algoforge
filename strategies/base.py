@@ -13,6 +13,17 @@ from core.runtime_config import RuntimeConfig as _RuntimeConfig
 
 logger = logging.getLogger(__name__)
 
+# ── 版本纪律：修改本文件必须 +1 并补 STRATEGY_BASE_CHANGELOG ──
+STRATEGY_BASE_VERSION = "v2"
+STRATEGY_BASE_CHANGELOG = [
+    {"version": "v1", "date": "2026-09-06",
+     "desc": "建立基线：refresh_data/get_indicator 仅暴露 bar1(已闭合K线)单值，无历史序列"},
+    {"version": "v2", "date": "2026-09-06",
+     "desc": "新增 get_indicator_series(name, n)：从 SQLite indicator_snapshots 按 K 线时间对齐读取"
+             "指标历史序列(旧→新，末项=当前 bar1)，每根新 K 线仅回查一次 DB；"
+             "解决策略无法做背离/持续性/方向转折判定的问题（实盘与回测共用同一套打分）"},
+]
+
 
 class BaseStrategy(abc.ABC):
     """strategy基类"""
@@ -39,6 +50,10 @@ class BaseStrategy(abc.ABC):
         self._m30_candles: list[Candle] = []
         self._h1_candles: list[Candle] = []
         self._h4_candles: list[Candle] = []
+
+        # 指标历史序列缓存（v2 新增，供 get_indicator_series 使用）
+        self._series_hist: dict = {}     # {candle_time(int): {指标键值}}
+        self._series_bar_time = None     # 上次刷新 DB 时对应的 bar1 time
 
         # K-line filter parameters (from RuntimeConfig → runtime_config.json, hot-reloadable)
         _coord = _RuntimeConfig().get_coordinator_config()
@@ -105,6 +120,94 @@ class BaseStrategy(abc.ABC):
         if hasattr(self, '_cached_indicators') and self._cached_indicators:
             return self._cached_indicators.get(name)
         return None
+
+    # ─────────── 指标历史序列（v2 新增）───────────
+    # DataFactory 内存缓存只暴露 bar1 单值，无法做背离 / 持续性 / 方向转折判定。
+    # 这里从 SQLite indicator_snapshots 按 K 线时间对齐回读历史，供策略做衰竭打分。
+
+    SERIES_DB_LOOKBACK = 120   # 每次回查 DB 读取的最近根数
+
+    @staticmethod
+    def _series_ts(t) -> Optional[int]:
+        try:
+            return int(t)
+        except (ValueError, TypeError):
+            return None
+
+    def _series_refresh(self) -> None:
+        """bar1 换根时回查一次 DB（不是每 tick 都查）"""
+        if len(self.candles) < 2:
+            return
+        bar_time = self.candles[-2].time
+        if bar_time is not None and self._series_bar_time == bar_time and self._series_hist:
+            return
+        self._series_bar_time = bar_time
+        try:
+            from data.database import get_recent_indicators
+            rows = get_recent_indicators(self.timeframe, self.SERIES_DB_LOOKBACK)
+        except Exception as e:
+            logger.debug(f"[Series] {self.name} {self.timeframe} DB 回读失败: {e}")
+            return
+        hist: dict = {}
+        for r in rows or []:
+            ts = self._series_ts(r.get("timestamp"))
+            if ts is not None:
+                hist[ts] = r.get("indicators") or {}
+        self._series_hist = hist
+
+    def get_indicator_series(self, name: str, n: int = 10) -> list:
+        """读取指标历史序列，旧 → 新，末项 = 当前 bar1 值（与 get_indicator 同源）。
+
+        与 get_indicator 的差别：get_indicator 只有"当前已闭合K线"一个数，
+        本接口返回最近 n 根已闭合 K 线的同名指标，可用来做：
+          - 方向转折（adx[i] < adx[i-1] 表示趋势动能衰减）
+          - 持续性 / 钝化（连续 N 根超卖）
+          - 背离（价格新低而 RSI 不新低）
+
+        注意：
+          - 只用已闭合 K 线（从 candles[-2] 往回取），绝不触碰 forming bar0，无未来函数。
+          - 末项强制用内存实时值覆盖，抵消 DB 写入滞后一根的偏差。
+          - 序列按「有值的 K 线」紧凑拼接，DB 缺根的会被跳过（当前覆盖率 100%，可忽略）。
+          - 返回长度可能 < n（启动初期或 DB 不可用时），调用方必须判长度。
+        """
+        n = max(1, int(n))
+        self._series_refresh()
+        vals: list = []
+        hist = self._series_hist
+        if hist:
+            for i in range(len(self.candles) - 2, -1, -1):
+                if len(vals) >= n:
+                    break
+                ts = self._series_ts(self.candles[i].time)
+                if ts is None:
+                    continue
+                ind = hist.get(ts)
+                if not ind:
+                    continue
+                v = ind.get(name)
+                if v is not None:
+                    vals.append(v)
+        vals.reverse()
+        cur = self.get_indicator(name)
+        if cur is not None:
+            if vals:
+                vals[-1] = cur
+            else:
+                vals.append(cur)
+        return vals
+
+    def get_bar1_series(self, field: str, n: int = 10) -> list:
+        """读取已闭合 K 线的 OHLC 序列（旧 → 新，末项 = bar1）。field: open/high/low/close"""
+        n = max(1, int(n))
+        out: list = []
+        for i in range(len(self.candles) - 2, -1, -1):
+            if len(out) >= n:
+                break
+            v = getattr(self.candles[i], field, None)
+            if v is not None:
+                out.append(v)
+        out.reverse()
+        return out
 
     def _apply_kline_filters(self, result: tuple):
         """统一 K 线filter器（保留供外部调用，engine层使用 calc_gate_state）"""

@@ -167,8 +167,15 @@ STRATEGY_POOL = {
         "max_positions": 1,
         "mode": "live",
     },
-    "fish_eaten": {
+    "fish_eaten_v2": {
         "magic": 661302,
+        "timeframe": "M30",
+        "double_first": False,
+        "max_positions": 1,
+        "mode": "live",
+    },
+    "fish_eaten_v3": {
+        "magic": 661303,
         "timeframe": "M30",
         "double_first": False,
         "max_positions": 1,
