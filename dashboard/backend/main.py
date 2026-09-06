@@ -215,6 +215,11 @@ async def lifespan(app: FastAPI):
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     engine_runner.stop()
+    # 优雅关闭：断开所有 WebSocket 客户端连接（释放资源 + 让前端感知断线）
+    try:
+        await ws_manager.disconnect_all()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[lifespan] disconnect_all 异常: {e}")
 
 
 
