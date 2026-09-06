@@ -50,8 +50,9 @@
 | `bb_width` | 布林带宽度 = upper − lower （由 `bb` 计算） | 虽然依赖 EA 的 `bb`，但宽度本身在本地计算 |
 | `bb_width_direction` | 布林带宽度方向（up/down/flat） | 本地根据前值比较得出 |
 | `bb_width_ratio` | 当前宽度 / 近 3 均值 | 本地计算 |
-| `bb_mid_direction` | 布林带中轨方向（up/down/flat） | 本地根据前值比较得出 |
+| `bb_mid_direction` | 布林带中轨方向（up/down/flat）＝ **SMA20 斜率** | 本地根据前值比较得出。⚠️ **不是 BBI 方向**：与 `bbi_direction` 不一致率约 25%，不可互相替代（v6 起在代码注释中明确警示） |
 | `bbi` | BBI = (SMA3+SMA6+SMA12+SMA24)/4 | 本地计算 |
+| `bbi_direction` | **BBI 方向（up/down/flat）**（v6 新增） | 本地计算，与 `bbi` 同批产出。含 SMA3 分量，**反应比 `bb_mid_direction` 更快** |
 | `mfi_direction` | MFI 方向（up/down/flat） | 本地根据前值比较得出 |
 | `mfi_dir_50` | MFI 相对于 50 的方向（1/‑1） | 本地计算 |
 | `rsi_dir_3bar` | RSI 连续 3 根方向（up/down/flat） | 本地根据已闭合 K 线计算 |
@@ -154,4 +155,4 @@ new_cache[k] = old_cache[k] if (k in _EA_CACHE_KEYS and k in old_cache) else v
 *v3 变更：修复增量模式清空顶层缓存（45 键→0）；保护逻辑改为"EA 本轮确实提供过该键才保护"（`_EA_PROVIDED_TS` + TTL 30s），EA 掉线超 30s 自动回退 TA‑Lib。*
 *v4 变更（2026-09-05 B）：新增 `data/cache/candles_cache.pkl` 持久化暖缓存，重启按时间差增量补齐（≤2000 根），冷启动不再无脑重拉 4×2000；缓存每 5 分钟落盘（详见 product_manual.md §19.2）。*
 *v5 变更（2026-09-05 D1）：`tick_data` 加 `idx_tick_data_ts` 索引；DataFactory 每 5 分钟调用 `prune_tick_data(max_rows=200000)`，避免无限增长（详见 product_manual.md §19.2）。*
-*对应回测工具：`tools/backfill_indicators.py` — 单连接 + executemany 批量 UPSERT，从 `ohlcv` 读 K 线重算全套 46 键；43K 行 23 秒完成（详见 product_manual.md §19.5）。*
+*对应回测工具：`tools/backfill_indicators.py` — 单连接 + executemany 批量 UPSERT，从 `ohlcv` 读 K 线重算全套 47 键；43K 行 23 秒完成（详见 product_manual.md §19.5）。*

@@ -1,13 +1,18 @@
 """
-FollowAve v1.2 参数对比测试
-测试 EXIT_CONFIRM_BARS (2,3) x TRAIL_ATR (2,3,4)
+FollowAve v1.2 参数对比测试（历史脚本，已废弃）
+================================================
+⚠️ 本脚本仅保留 ECB×TRAIL 网格的探索性结果，且默认区间已改为库内全量。
+   其 run_v12 硬编码 70/30 + TRAIL 2.0，且 bbi_dir 按 BBI 斜率算——与线上 v1.2
+   （proxy bb_mid_direction/SMA20）语义并不一致，数字仅供历史参考，不可直接用于
+   "改进是否生效"的判定。
+📌 权威回测引擎与 v1.2↔v1.3 对比见 followave_exit_value.py / followave_v1_compare.py。
 """
 import sys, sqlite3, numpy as np, datetime as dt
 sys.stdout.reconfigure(encoding='utf-8')
 
 DB_PATH = 'D:/backup/BaoBao/PythonProgram/xauusd/data/market_data.db'
 
-def load_candles(tf, start='2026-07-01', end='2026-08-27'):
+def load_candles(tf, start='2026-01-01', end='2026-09-30'):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     ts_start = int(dt.datetime.strptime(start, '%Y-%m-%d').replace(
@@ -156,23 +161,24 @@ def summarize(trades):
         reasons[r]['p'] += t['pnl']
     return total, wr, pnl, reasons, avg, mxw, mxl
 
-for tf in ['M15', 'M30']:
-    print(f'\n{"="*60}')
-    print(f'{tf}')
-    print('='*60)
-    candles = load_candles(tf)
-    candles = calc_indicators(candles)
-    print(f'数据: {len(candles)} 根 K 线')
-    print(f'\n{"Param":<22} {"Trades":>6} {"WR%":>6} {"PnL":>9} {"Avg":>6} {"Reasons"}')
-    print('-'*100)
-    results = []
-    for ecb in [2, 3]:
-        for trail in [2.0, 3.0, 4.0]:
-            trades = run_v12(candles, EXIT_CONFIRM_BARS=ecb, TRAIL_ATR=trail)
-            total, wr, pnl, reasons, avg, mxw, mxl = summarize(trades)
-            results.append((ecb, trail, total, wr, pnl, avg, reasons))
-            r_str = ' '.join(f'{k}:{v["c"]}({v["p"]:+.0f})' for k, v in sorted(reasons.items(), key=lambda x: -x[1]['c']))
-            print(f'ECB={ecb} Trail={trail:<4.1f} {total:>6} {wr:>5.1f} {pnl:>+9.1f} {avg:>+5.1f}  {r_str}')
-    # best
-    best = max(results, key=lambda x: x[4])
-    print(f'\n[BEST] ECB={best[0]} Trail={best[1]} PnL={best[4]:+.2f} WR={best[3]:.1f}% Trades={best[2]}')
+if __name__ == '__main__':
+    for tf in ['M15', 'M30']:
+        print(f'\n{"="*60}')
+        print(f'{tf}')
+        print('='*60)
+        candles = load_candles(tf)
+        candles = calc_indicators(candles)
+        print(f'数据: {len(candles)} 根 K 线')
+        print(f'\n{"Param":<22} {"Trades":>6} {"WR%":>6} {"PnL":>9} {"Avg":>6} {"Reasons"}')
+        print('-'*100)
+        results = []
+        for ecb in [2, 3]:
+            for trail in [2.0, 3.0, 4.0]:
+                trades = run_v12(candles, EXIT_CONFIRM_BARS=ecb, TRAIL_ATR=trail)
+                total, wr, pnl, reasons, avg, mxw, mxl = summarize(trades)
+                results.append((ecb, trail, total, wr, pnl, avg, reasons))
+                r_str = ' '.join(f'{k}:{v["c"]}({v["p"]:+.0f})' for k, v in sorted(reasons.items(), key=lambda x: -x[1]['c']))
+                print(f'ECB={ecb} Trail={trail:<4.1f} {total:>6} {wr:>5.1f} {pnl:>+9.1f} {avg:>+5.1f}  {r_str}')
+        # best
+        best = max(results, key=lambda x: x[4])
+        print(f'\n[BEST] ECB={best[0]} Trail={best[1]} PnL={best[4]:+.2f} WR={best[3]:.1f}% Trades={best[2]}')

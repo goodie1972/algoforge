@@ -64,7 +64,7 @@ TTL 取 30s 是刻意的：远大于正常 F043 轮询周期（约 1–3 秒）�
 
 ## 指标表（46 个键）
 
-顶层缓存共 **46 个指标键**；其中 `candle_pattern_name` 仅在识别到形态时出现，常态可见 **45 个**。
+顶层缓存共 **47 个指标键**（v6 新增 `bbi_direction`）；其中 `candle_pattern_name` 仅在识别到形态时出现，常态可见 **46 个**。
 
 图例：**EA** = MT4 F043 直供 · **EA派生** = 由 EA 值在 Python 侧派算 · **TA** = 仅 TA‑Lib 计算
 
@@ -143,7 +143,8 @@ h4_candles = h4.get("candles", [])  # → [Candle, ...]
 | `mfi_dir_50` | int | — | MFI 相对 50：`1` / `-1` |
 | `bb_width_direction` | str | — | 带宽方向 |
 | `bb_width_ratio` | float | SMA3 | 当前带宽 / 近 3 根均值 |
-| `bb_mid_direction` | str | — | BB 中轨方向 |
+| `bb_mid_direction` | str | — | BB 中轨方向（= SMA20 斜率）。⚠️ **不是** BBI 方向，两者不一致率约 25%，需要 BBI 方向请用 `bbi_direction` |
+| `bbi_direction` | str | — | **BBI 方向**（v6 新增）。BBI=(SMA3+SMA6+SMA12+SMA24)/4 的当前根 vs 前一根 |
 | `atr_list_val` | float | 14 | ATR(14) 单值（DB 存单值用） |
 | `atr_ma_5` | float | 5 | ATR 近 5 根均值 |
 | `atr_sma20` | float | 20 | ATR 的 SMA(20) |
@@ -246,7 +247,7 @@ MT4 历史保留期短，自存是回测的硬需求。运行：
 python tools/backfill_indicators.py --only-incomplete
 ```
 
-从 `ohlcv` 表读取全部 K 线，对覆盖率不足的行用 TA-Lib 重新计算全套 46 键并 UPSERT 到 `indicator_snapshots`。详见 [product_manual.md §19.5](product_manual.md#195-指标完整性回填工具-356)。
+从 `ohlcv` 表读取全部 K 线，对覆盖率不足的行用 TA-Lib 重新计算全套 47 键并 UPSERT 到 `indicator_snapshots`。详见 [product_manual.md §19.5](product_manual.md#195-指标完整性回填工具-356)。
 
 ## 注意事项
 

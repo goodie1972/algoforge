@@ -4,11 +4,26 @@
 - TA-Lib 预计算所有公共指标
 - 全局缓存供策略和 Athlete 读取
 """
-DATA_FACTORY_VERSION = "v5"
+DATA_FACTORY_VERSION = "v6"
 
 # 变更日志：框架层版本纪律见 docs/CODE_REVIEW_STANDARD.md 🔴「策略/框架模块版本号」
 # 结构 {version, date, desc}（框架模块无 MT4 magic）
 DATA_FACTORY_CHANGELOG = [
+    {
+        "version": "v6",
+        "date": "2026-09-06",
+        "desc": (
+            "新增 bbi_direction（BBI 真实方向，up/down/flat），在 _ta_only_indicators 内与 bbi 同批计算"
+            "（BBI=(SMA3+SMA6+SMA12+SMA24)/4 的当前根 vs 前一根），作为 bb_mid_direction（BB中轨=SMA20斜率）"
+            "的对照字段。"
+            "背景：框架原只提供 bb_mid_direction，两条序列实测不一致率 25.7%(M15)/26.1%(M30)；"
+            "我们曾误以为 followave 应改读真实 bbi_direction，但全样本 A/B 表明：同 80/20 阈值下，"
+            "真实 BBI 方向在 M15 反亏 +462.8（proxy+80/20 +684.7 → real+80/20 +221.9）、仅 M30 多 +54.6，"
+            "综合净亏，故 followave v1.3 维持 bb_mid_direction（详见策略变更日志）。bbi_direction 仍作为"
+            "通用指标保留供其他策略按需取用。同时更正 bb_mid_direction 上方注释：原写「比 bbi_direction "
+            "反应早」为事实错误（BBI 含 SMA3，反应更快），已改为明确警示两者不可互相替代。"
+        ),
+    },
     {
         "version": "v5",
         "date": "2026-09-05",
@@ -227,7 +242,10 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
             if i > 0 and widths[i-1] == widths[i-1]:
                 cur, prv = widths[i], widths[i-1]
                 result[c.time]["bb_width_direction"] = "up" if cur > prv else ("down" if cur < prv else "flat")
-            # BB 中轨方向（更快、比 bbi_direction 反应早）
+            # BB 中轨方向（= SMA20 斜率）。
+            # ⚠️ 这不是 BBI 方向：BBI=(SMA3+SMA6+SMA12+SMA24)/4 含 SMA3 分量，反应比中轨更快，
+            # 两者方向实测不一致率约 26%。需要「BBI 方向」请用 bbi_direction，
+            # 不要用本字段代替（曾发生策略拿本字段当 bbi_dir 用，导致回测与实盘口径分裂）。
             if i > 0 and mid[i] == mid[i] and mid[i-1] == mid[i-1]:
                 cur_m, prv_m = float(mid[i]), float(mid[i-1])
                 result[c.time]["bb_mid_direction"] = "up" if cur_m > prv_m else ("down" if cur_m < prv_m else "flat")
@@ -237,13 +255,21 @@ def _ta_only_indicators(candles: list, tf: str) -> dict:
     except Exception:
         pass
 
-    # BBI = (SMA3 + SMA6 + SMA12 + SMA24) / 4
+    # BBI = (SMA3 + SMA6 + SMA12 + SMA24) / 4，并给出其方向 bbi_direction
     try:
         bbi_periods = [3, 6, 12, 24]
         _bbi_smas = {p: talib.SMA(closes, timeperiod=p) for p in bbi_periods}
-        for i, c in enumerate(candles):
+        _bbi = np.full(len(candles), np.nan, dtype=float)
+        for i in range(len(candles)):
             if i >= bbi_periods[-1] - 1 and all(_bbi_smas[p][i] == _bbi_smas[p][i] for p in bbi_periods):
-                result[c.time]["bbi"] = float(sum(_bbi_smas[p][i] for p in bbi_periods) / len(bbi_periods))
+                _bbi[i] = sum(_bbi_smas[p][i] for p in bbi_periods) / len(bbi_periods)
+        for i, c in enumerate(candles):
+            if _bbi[i] == _bbi[i]:
+                result[c.time]["bbi"] = float(_bbi[i])
+                if i > 0 and _bbi[i-1] == _bbi[i-1]:
+                    cur_b, prv_b = float(_bbi[i]), float(_bbi[i-1])
+                    result[c.time]["bbi_direction"] = (
+                        "up" if cur_b > prv_b else ("down" if cur_b < prv_b else "flat"))
     except Exception:
         pass
 
@@ -850,7 +876,8 @@ class DataFactory:
         原则：EA 提供的字段用 EA 值（与图表完全一致），覆盖内存缓存顶层 + 持久化到 DB。
         兜底：EA 拿不到（None 或空 dict），字段由 _ta_only_indicators（_sync_tf 调）算。
         EA 没提供的字段（bb_width_direction / bb_width_ratio / bb_mid_direction /
-        bbi / mfi_direction / mfi_dir_50 / trend / price_position）一律由 _ta_only_indicators 算。
+        bbi / bbi_direction / mfi_direction / mfi_dir_50 / trend / price_position）
+        一律由 _ta_only_indicators 算。
         """
         from data.database import upsert_indicators
         ea_keys = ("rsi", "rsi_5", "rsi_10", "mfi", "bb",
